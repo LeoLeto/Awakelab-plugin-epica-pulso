@@ -591,9 +591,9 @@ try {
         'timestamp' => date('Y-m-d H:i:s')
     ];
     
-} catch (Exception $e) {
+} catch (\Throwable $e) {
     // Manejo de errores
-    http_response_code(400);
+    http_response_code(500);
     $response = [
         'success' => false,
         'message' => 'Error: ' . $e->getMessage(),

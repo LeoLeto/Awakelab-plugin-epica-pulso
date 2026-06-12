@@ -29,6 +29,7 @@ $string['chat_loading'] = 'Loading...';
 $string['chat_thinking'] = 'Thinking...';
 
 // === ERRORS ===
+$string['error_no_apikey'] = 'OpenAI API key is not configured. Please set it in Site Administration → Plugins → Blocks → Pulso AI.';
 $string['error_no_response'] = 'No response received from the AI service.';
 $string['error_api_error'] = 'API Error: {$a}';
 $string['error_invalid_course'] = 'Invalid course ID.';

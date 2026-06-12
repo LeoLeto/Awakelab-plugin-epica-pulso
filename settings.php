@@ -14,6 +14,49 @@ if ($ADMIN->fulltree) {
         ''                                            // Valor por defecto (vacío)
     ));
 
+    // "Check key" button rendered below the API key field.
+    $settings->add(new admin_setting_description(
+        'block_pulso/test_key_button',
+        '',
+        '<button type="button" id="pulso-test-key-btn" class="btn btn-secondary btn-sm">
+            Check API key
+        </button>
+        <span id="pulso-test-key-result" style="margin-left:10px;font-weight:bold"></span>
+        <script>
+        (function() {
+            function init() {
+                var btn = document.getElementById("pulso-test-key-btn");
+                if (!btn) { return; }
+                btn.addEventListener("click", function() {
+                    var result = document.getElementById("pulso-test-key-result");
+                    btn.disabled = true;
+                    btn.textContent = "Checking…";
+                    result.textContent = "";
+                    fetch(M.cfg.wwwroot + "/blocks/pulso/check_api_key.php", {credentials: "same-origin"})
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            result.style.color = d.success ? "green" : "red";
+                            result.textContent  = (d.success ? "✓ " : "✗ ") + d.message;
+                        })
+                        .catch(function(e) {
+                            result.style.color = "red";
+                            result.textContent  = "✗ " + e.message;
+                        })
+                        .finally(function() {
+                            btn.disabled = false;
+                            btn.textContent = "Check API key";
+                        });
+                });
+            }
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
+            } else {
+                init();
+            }
+        })();
+        </script>'
+    ));
+
     // Requisito T2.1.4.2: Selector de Modelo de IA.
     $options = [
         'gpt-4o' => 'GPT-4o (Recomendado)',

@@ -1,0 +1,49 @@
+<?php
+/**
+ * AJAX endpoint: validate the configured OpenAI API key.
+ * Calls GET /v1/models — uses no tokens, just verifies auth.
+ */
+
+define('AJAX_SCRIPT', true);
+require_once(__DIR__ . '/../../../config.php');
+
+require_login();
+require_capability('moodle/site:config', context_system::instance());
+
+header('Content-Type: application/json; charset=utf-8');
+
+try {
+    $apikey = get_config('block_pulso', 'openai_key');
+
+    if (empty($apikey)) {
+        echo json_encode(['success' => false, 'message' => 'No API key configured.']);
+        exit;
+    }
+
+    $ch = curl_init('https://api.openai.com/v1/models');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $apikey],
+        CURLOPT_TIMEOUT        => 10,
+    ]);
+    $body     = curl_exec($ch);
+    $httpcode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlerr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlerr) {
+        echo json_encode(['success' => false, 'message' => 'Connection error: ' . $curlerr]);
+        exit;
+    }
+
+    if ($httpcode === 200) {
+        echo json_encode(['success' => true, 'message' => 'API key is valid.']);
+    } else {
+        $data    = json_decode($body, true);
+        $message = $data['error']['message'] ?? 'HTTP ' . $httpcode;
+        echo json_encode(['success' => false, 'message' => $message]);
+    }
+} catch (\Throwable $e) {
+    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+}
+exit;

@@ -147,7 +147,8 @@ class openai_connector {
         // 5. Hacer la solicitud a OpenAI
         require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
-        
+        $curl->setopt(['CURLOPT_TIMEOUT' => 55]);
+
         $curl->setHeader([
             'Content-Type: application/json',
             'Authorization: Bearer ' . $this->apikey

@@ -18,19 +18,20 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_description(
         'block_pulso/test_key_button',
         '',
-        '<style>
-            /* Prevent the masked API key dots from overflowing the form column */
-            #admin-openai_key .form-inline { flex-wrap: nowrap; overflow: hidden; }
-            #admin-openai_key .form-control { min-width: 0; flex: 1 1 auto; max-width: 100%; }
-            /* Space between the button row and the next setting */
-            #admin-test_key_button { margin-bottom: 1.5rem; }
-        </style>
-        <button type="button" id="pulso-test-key-btn" class="btn btn-secondary btn-sm">
+        '<button type="button" id="pulso-test-key-btn" class="btn btn-secondary btn-sm">
             Check API key
         </button>
         <span id="pulso-test-key-result" style="margin-left:10px;font-weight:bold"></span>
         <script>
         (function() {
+            // Inject layout fixes via JS so Moodle\'s HTML purifier cannot strip them.
+            var s = document.createElement("style");
+            s.textContent =
+                "#admin-openai_key .form-inline{overflow:hidden}" +
+                "#admin-openai_key .form-control{min-width:0;flex:1 1 auto;max-width:100%}" +
+                "#admin-test_key_button{margin-bottom:1.5rem}";
+            document.head.appendChild(s);
+
             function init() {
                 var btn = document.getElementById("pulso-test-key-btn");
                 if (!btn) { return; }

@@ -1,0 +1,15 @@
+# Moodle zip-packaging folder (must be named "pulso" for Moodle to accept it)
+pulso/
+PulsoAwakeIA/
+
+# Built zip archives
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.sublime-workspace

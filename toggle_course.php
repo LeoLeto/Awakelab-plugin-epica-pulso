@@ -9,7 +9,7 @@
 
 define('AJAX_SCRIPT', true);
 
-require_once(__DIR__ . '/../../../config.php');
+require_once(__DIR__ . '/../../config.php');
 
 $courseid = required_param('courseid', PARAM_INT);
 $enabled = required_param('enabled', PARAM_INT);

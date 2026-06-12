@@ -14,7 +14,7 @@
 define('AJAX_SCRIPT', true);
 
 // Incluir Moodle config
-require_once(__DIR__ . '/../../../config.php');
+require_once(__DIR__ . '/../../config.php');
 
 // Incluir clases necesarias
 require_once(__DIR__ . '/classes/data_retriever.php');

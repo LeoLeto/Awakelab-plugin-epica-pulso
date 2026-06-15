@@ -662,9 +662,11 @@ function render_chat_simple($courseid, $context) {
         }
         
         .pulso-examples {
-        padding: 12px 10px;
-        gap: 6px;
-    }
+            display: flex;
+            flex-wrap: wrap;
+            padding: 12px 10px;
+            gap: 8px;
+        }
         
         .pulso-chip {
             padding: 8px 14px;

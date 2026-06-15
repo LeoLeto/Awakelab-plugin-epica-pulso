@@ -90,14 +90,12 @@ function render_chat_simple($courseid, $context) {
         .pulso-chat-container {
             display: none;
             position: fixed;
+            top: 12px;
             bottom: 100px;
             right: 32px;
             width: min(460px, calc(100vw - 48px));
-            height: min(680px, calc(100vh - 130px));
             min-width: 300px;
-            min-height: 300px;
             max-width: calc(100vw - 48px);
-            max-height: calc(100vh - 130px);
             z-index: 9999;
             background: #f8f9fa;
             border-radius: 12px;
@@ -106,7 +104,6 @@ function render_chat_simple($courseid, $context) {
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             box-sizing: border-box;
-            resize: both;
             animation: pulso-slideUp 0.3s ease-out;
         }
 

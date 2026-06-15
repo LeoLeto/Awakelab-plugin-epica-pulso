@@ -92,8 +92,8 @@ function render_chat_simple($courseid, $context) {
             position: fixed;
             bottom: 100px;
             right: 32px;
-            width: 380px;
-            height: 600px;
+            width: 460px;
+            height: 680px;
             min-width: 320px;
             min-height: 300px;
             max-width: 900px;
@@ -710,8 +710,7 @@ function render_chat_simple($courseid, $context) {
         <div class="pulso-chat-messages" id="pulso-messages">
             <div class="pulso-message ai">
                 <div class="pulso-message-content">
-                    ¡Hola! 👋 Soy tu asistente de analítica. Pregúntame sobre notas, completitud o estudiantes en riesgo.<br><br>
-                    <em>Hi! I'm your analytics assistant. Ask me about grades, completion rates, or at-risk students.</em>
+                    ¡Hola! 👋 Soy tu asistente de analítica. Pregúntame sobre notas, completitud o estudiantes en riesgo.
                 </div>
             </div>
         </div>

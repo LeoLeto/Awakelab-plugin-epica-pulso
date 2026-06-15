@@ -92,12 +92,12 @@ function render_chat_simple($courseid, $context) {
             position: fixed;
             bottom: 100px;
             right: 32px;
-            width: 460px;
-            height: 680px;
-            min-width: 320px;
+            width: min(460px, calc(100vw - 48px));
+            height: min(680px, calc(100vh - 130px));
+            min-width: 300px;
             min-height: 300px;
-            max-width: 900px;
-            max-height: 85vh;
+            max-width: calc(100vw - 48px);
+            max-height: calc(100vh - 130px);
             z-index: 9999;
             background: #f8f9fa;
             border-radius: 12px;

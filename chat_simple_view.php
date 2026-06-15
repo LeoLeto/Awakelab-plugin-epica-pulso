@@ -95,7 +95,9 @@ function render_chat_simple($courseid, $context) {
             right: 32px;
             width: min(460px, calc(100vw - 48px));
             min-width: 300px;
+            min-height: 300px;
             max-width: calc(100vw - 48px);
+            max-height: calc(100vh - 112px);
             z-index: 9999;
             background: #f8f9fa;
             border-radius: 12px;
@@ -104,6 +106,7 @@ function render_chat_simple($courseid, $context) {
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             box-sizing: border-box;
+            resize: both;
             animation: pulso-slideUp 0.3s ease-out;
         }
 
@@ -2132,7 +2135,22 @@ function render_chat_simple($courseid, $context) {
                 floatingState.isOpen = true;
                 container.classList.add('is-open');
                 bubble.style.display = 'none';
-                
+
+                // Convert auto height (from top+bottom pins) to explicit px so CSS resize works.
+                container.style.height = container.offsetHeight + 'px';
+                container.style.width  = container.offsetWidth  + 'px';
+
+                // Clamp size to viewport whenever the user drags the resize handle.
+                if (!container._resizeObserver && window.ResizeObserver) {
+                    container._resizeObserver = new ResizeObserver(function() {
+                        var maxH = window.innerHeight - 112;
+                        var maxW = window.innerWidth  - 48;
+                        if (container.offsetHeight > maxH) container.style.height = maxH + 'px';
+                        if (container.offsetWidth  > maxW) container.style.width  = maxW + 'px';
+                    });
+                    container._resizeObserver.observe(container);
+                }
+
                 // Hacer draggable
                 header.addEventListener('mousedown', startDrag);
                 

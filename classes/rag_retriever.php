@@ -1553,7 +1553,25 @@ class rag_retriever {
      * Detecta si el usuario pregunta por el contenido general del curso.
      */
     private static function is_course_content_query(string $query): bool {
-        return (bool)preg_match('/qu[eé]\s+(contenidos?|actividades|materiales?)\s+(hay|tiene|tiene|existen?|incluye|tiene\s+este|hay\s+en)\b|contenidos?\s+(del|de\s+este|de\s+el)\s+curso|actividades\s+(del|de\s+este)\s+curso|qu[eé]\s+hay\s+en\s+(este|el)\s+curso|todo\s+(el\s+)?contenido\s+del|estructura\s+(del|de\s+este)\s+curso|mu[eé]strame\s+(el|todo|los?)\s+(contenido|curso)/u', $query);
+        return (bool)preg_match(
+            '/qu[eé]\s+(contenidos?|actividades|materiales?)\s+(hay|tiene|existen?|incluye|hay\s+en)\b' .
+            '|contenidos?\s+(del|de\s+este|de\s+el)\s+curso' .
+            '|actividades\s+(del|de\s+este)\s+curso' .
+            '|qu[eé]\s+hay\s+en\s+(este|el)\s+curso' .
+            '|todo\s+(el\s+)?contenido\s+del' .
+            '|estructura\s+(del|de\s+este)\s+curso' .
+            '|mu[eé]strame\s+(el|todo|los?)\s+(contenido|curso)' .
+            // General "what is this course about" questions that should go to OpenAI.
+            '|de\s+qu[eé]\s+(se\s+)?trata\s+(este\s+|el\s+)?curso' .
+            '|de\s+qu[eé]\s+va\s+(este\s+|el\s+)?curso' .
+            '|sobre\s+qu[eé]\s+(trata|va|es)\s+(este\s+|el\s+)?curso' .
+            '|qu[eé]\s+es\s+(este|el)\s+curso' .
+            '|cu[eé]ntame\s+(algo\s+)?(sobre\s+)?(este\s+|el\s+)?curso' .
+            '|resumen\s+(del\s+|de\s+este\s+)curso' .
+            '|dame\s+un\s+resumen\s+del\s+curso' .
+            '|describe\s+(este\s+|el\s+)?curso/u',
+            $query
+        );
     }
 
     /**
@@ -1777,6 +1795,8 @@ class rag_retriever {
      * @return array ['context' => string, 'diagnostics' => array]
      */
     public static function get_context_and_diagnostics_for_query(int $courseid, string $query): array {
+        global $DB;
+
         $diagnostics = [
             'rag_enabled' => (bool)get_config('block_pulso', 'rag_enabled'),
             'rag_table_exists' => false,

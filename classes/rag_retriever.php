@@ -519,6 +519,9 @@ class rag_retriever {
         }
 
         // Fuzzy: score all records by token hits and return the best match.
+        // Words that appear in virtually every Moodle activity name or teacher query
+        // are useless as discriminators and must not contribute to the score.
+        $stopwords = ['curso', 'foro', 'tarea', 'tema', 'quiz', 'link', 'book', 'page'];
         $bestRecord = null;
         $bestScore = 0;
         foreach ($records as $record) {
@@ -531,6 +534,9 @@ class rag_retriever {
             $hits = 0;
             foreach ($tokens as $token) {
                 if (mb_strlen($token, 'UTF-8') < 4) {
+                    continue;
+                }
+                if (in_array($token, $stopwords, true)) {
                     continue;
                 }
                 $significantTokens++;

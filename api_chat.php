@@ -217,8 +217,12 @@ try {
     // Preguntas sobre una actividad sin especificar nombre: "cuántas preguntas tiene", "cuántos intentos", "cuántos alumnos lo han completado"
     $asksAboutActivity = (bool)preg_match('/\bcu[aá]ntas?\s+(preguntas?|intentos|alumnos|estudiantes)|qui[eé]n(es)?\s+(ha|han)\s+(completado|hecho|realizado|entregado)|nota\s+media|calificaci[oó]n\s+media|tiene\s+este|tiene\s+esta|tiempo\s+l[ií]mite/u', $qnorm);
     // "hazme un resumen" / "haz un resumen" / "resúmelo" sin especificar qué → buscar en historial.
-    $bareSummaryRequest = (bool)preg_match('/\b(hazme|haz|dame|quiero)\s+(un\s+)?resum/u', $qnorm)
-        || (preg_match('/\bresum/u', $qnorm) && !preg_match('/\b(secci[oó]n|seccion|curso)\b/u', $qnorm));
+    // Only when the query does NOT already refer to the course explicitly.
+    $refersToCourse = (bool)preg_match('/\b(secci[oó]n|seccion|curso)\b/u', $qnorm);
+    $bareSummaryRequest = !$refersToCourse && (
+        (bool)preg_match('/\b(hazme|haz|dame|quiero)\s+(un\s+)?resum/u', $qnorm)
+        || (bool)preg_match('/\bresum/u', $qnorm)
+    );
     // No usar history hint cuando el usuario ya especifica una sección concreta.
     $mentionsSection = (bool)preg_match('/\bsecci[oó]n\s+\d+|\bseccion\s+\d+|\ben\s+la\s+secci[oó]n|\ben\s+la\s+seccion/u', $qnorm);
     // No usar history hint cuando el usuario ya nombra un recurso concreto: "archivo spark", "pdf tema2", "resource spark", etc.

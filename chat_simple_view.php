@@ -576,17 +576,17 @@ function render_chat_simple($courseid, $context) {
         .pulso-followup-chip {
             background: linear-gradient(135deg, #e7f3ff 0%, #f0f8ff 100%);
             border: 1px solid #b3d9ff;
-            border-radius: 20px;
+            border-radius: 16px;
             padding: 8px 14px;
             font-size: 0.9rem;
             cursor: pointer;
             transition: all 0.2s ease;
             color: #0056b3;
             font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 300px;
+            white-space: normal;
+            text-align: left;
+            line-height: 1.4;
+            max-width: 100%;
         }
         
         .pulso-followup-chip:hover {
@@ -844,15 +844,35 @@ function render_chat_simple($courseid, $context) {
                 }
                 
                 let html = '<div class="pulso-rich-answer">';
-                
-                // Título
-                if (data.title) {
+
+                // Simplificación: cuando la respuesta tiene cuerpo real
+                // (content/data), el título y los resúmenes boilerplate solo
+                // duplican información antes de la respuesta — no renderizarlos.
+                const hasBody = (function() {
+                    if (Array.isArray(data.data) && data.data.length > 0) return true;
+                    if (data.content) {
+                        if (Array.isArray(data.content)) return data.content.length > 0;
+                        if (typeof data.content === 'object') return Object.keys(data.content).length > 0;
+                        return String(data.content).trim() !== '';
+                    }
+                    return false;
+                })();
+                const boilerplateSummaryRe = /^(he\s+(localizado|encontrado|recuperado|obtenido|listado)\b|contenido de la etiqueta\b|resumen del (curso|recurso|pdf|archivo)\b)/i;
+
+                // Título: solo cuando no hay cuerpo (es lo único que hay que mostrar).
+                if (data.title && !hasBody) {
                     html += `<div class="pulso-rich-title">${escapeHtml(String(data.title))}</div>`;
                 }
-                
-                // Resumen
-                if (data.summary) {
-                    html += `<div class="pulso-rich-summary">${formatRichTextResponse(String(data.summary), true)}</div>`;
+
+                // Resumen: mantenerlo como dato clave en tablas/listas (salvo
+                // boilerplate); en respuestas narrativas el contenido ya lo repite.
+                const summaryText = data.summary ? String(data.summary).trim() : '';
+                const showSummary = summaryText !== '' && (
+                    !hasBody
+                    || ((data.type === 'table' || data.type === 'list') && !boilerplateSummaryRe.test(summaryText))
+                );
+                if (showSummary) {
+                    html += `<div class="pulso-rich-summary">${formatRichTextResponse(summaryText, true)}</div>`;
                 }
                 
                 // Datos según tipo
@@ -2102,7 +2122,9 @@ function render_chat_simple($courseid, $context) {
             if (!/^\s*[\[{]/.test(s)) {
                 return s; // texto plano (respuestas de documento) → mostrar tal cual
             }
-            const keys = ['title', 'summary', 'paragraph', 'párrafo', 'parrafo', 'text', 'texto', 'content', 'contenido', 'description', 'descripción', 'descripcion'];
+            // Sin 'title': el render final ya no muestra títulos cuando hay
+            // cuerpo, así evitamos previsualizar texto que luego desaparece.
+            const keys = ['summary', 'paragraph', 'párrafo', 'parrafo', 'text', 'texto', 'content', 'contenido', 'description', 'descripción', 'descripcion'];
             const re = new RegExp('"(' + keys.join('|') + ')"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)', 'g');
             const parts = [];
             let m;

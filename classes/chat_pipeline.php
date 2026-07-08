@@ -268,17 +268,20 @@ class chat_pipeline {
         $qnorm = mb_strtolower(trim($user_query), 'UTF-8');
         // Detectar si el usuario pregunta por contenido específico de un documento (enunciado, problema, ejercicio...).
         $isContentSpecificQuery = (bool)preg_match('/enunciado|primer\s+problem[ao]|\bproblema\s+\d+|primer\s+ejercicio|ejercicio\s*\d+|mu[eé]strame\s+(el|la|los|las|un)\b|soluci[oó]n\s+del\b|dame\s+(un|el|la|los)\s+\w+|qu[eé]\s+preguntas?|pregunta\s+\d+/u', $qnorm);
+        // Referencias explícitas al curso o a una sección: en esos casos la
+        // pregunta NO es sobre un recurso previo del historial.
+        $refersToCourse = (bool)preg_match('/\b(secci[oó]n|seccion|curso)\b/u', $qnorm);
         // Detectar una referencia implícita a un recurso/pdf discutido previamente.
         $isSummaryOfPrevious = (bool)preg_match('/resumen\s+(del|de\s+ese|de\s+este|de\s+el)\s+(pdf|recurso|archivo|documento)/u', $qnorm);
         $refersToKnownResource = (bool)preg_match('/\b(ese|este|el|del|de\s+ese|de\s+este)\s+(pdf|recurso|archivo)\b/u', $qnorm);
-        $asksAboutPrevious = (bool)preg_match('/\b(en\s+qu[eé]\s+consiste|de\s+qu[eé]\s+(va|trata)|qu[eé]\s+(dice|contiene))\b/u', $qnorm);
+        $asksAboutPrevious = !$refersToCourse
+            && (bool)preg_match('/\b(en\s+qu[eé]\s+consiste|de\s+qu[eé]\s+(va|trata)|qu[eé]\s+(dice|contiene))\b/u', $qnorm);
         // Detectar referencia a una actividad discutida previamente: "este cuestionario", "ese quiz", "esta tarea", "este foro", etc.
         $refersToActivity = (bool)preg_match('/\b(este|ese|esta|esa|el|la|del|de\s+este|de\s+esta|de\s+ese|de\s+esa)\s+(cuestionario|quiz|examen|tarea|assignment|foro|forum|p[aá]gina|page|etiqueta|label|libro|book|url|enlace|actividad)\b/u', $qnorm);
         // Preguntas sobre una actividad sin especificar nombre: "cuántas preguntas tiene", "cuántos intentos", "cuántos alumnos lo han completado"
         $asksAboutActivity = (bool)preg_match('/\bcu[aá]ntas?\s+(preguntas?|intentos|alumnos|estudiantes)|qui[eé]n(es)?\s+(ha|han)\s+(completado|hecho|realizado|entregado)|nota\s+media|calificaci[oó]n\s+media|tiene\s+este|tiene\s+esta|tiempo\s+l[ií]mite/u', $qnorm);
         // "hazme un resumen" / "haz un resumen" / "resúmelo" sin especificar qué → buscar en historial.
         // Only when the query does NOT already refer to the course explicitly.
-        $refersToCourse = (bool)preg_match('/\b(secci[oó]n|seccion|curso)\b/u', $qnorm);
         $bareSummaryRequest = !$refersToCourse && (
             (bool)preg_match('/\b(hazme|haz|dame|quiero)\s+(un\s+)?resum/u', $qnorm)
             || (bool)preg_match('/\bresum/u', $qnorm)

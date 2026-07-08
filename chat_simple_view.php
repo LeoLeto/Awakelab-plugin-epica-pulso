@@ -24,6 +24,13 @@ function render_chat_simple($courseid, $context) {
     $api_url = $CFG->wwwroot . '/blocks/pulso/api_chat.php';
     $stream_url = $CFG->wwwroot . '/blocks/pulso/api_chat_stream.php';
 
+    // Leer la versión directamente de version.php (no de la BD) para que el
+    // badge del header refleje siempre el código desplegado, incluso antes
+    // de ejecutar la actualización de Moodle.
+    $plugin = new stdClass();
+    include(__DIR__ . '/version.php');
+    $pulso_release = 'v' . ($plugin->release ?? $plugin->version ?? '?');
+
     // Inyectar variables globales JavaScript
     $js_init = <<<JSINIT
     <script>
@@ -149,6 +156,18 @@ function render_chat_simple($courseid, $context) {
             margin: 0;
             font-size: 1rem;
             flex: 1;
+        }
+
+        .pulso-version-badge {
+            display: inline-block;
+            font-size: 0.68rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.22);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
+            vertical-align: middle;
+            letter-spacing: 0.3px;
         }
         
         .header-controls {
@@ -725,7 +744,7 @@ function render_chat_simple($courseid, $context) {
 
     <div class="pulso-chat-container" id="pulso-chat-container">
         <div class="pulso-chat-header" id="pulso-chat-header">
-            <h4>🤖 Pulso Analytics</h4>
+            <h4>🤖 Pulso Analytics <span class="pulso-version-badge">%%PULSO_VERSION%%</span></h4>
             <div class="header-controls">
                 <button class="header-btn" id="pulso-minimize-btn" title="Minimizar" onclick="toggleChat()">&#x2212;</button>
             </div>
@@ -2554,6 +2573,9 @@ function render_chat_simple($courseid, $context) {
     </script>
     HTML;
     
+    // Inyectar versión en el header (el bloque HTML es un nowdoc sin interpolación).
+    $html = str_replace('%%PULSO_VERSION%%', s($pulso_release), $html);
+
     // Retornar con variables inicializadas
     return $js_init . $html;
 }

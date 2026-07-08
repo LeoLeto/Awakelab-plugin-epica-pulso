@@ -68,6 +68,15 @@ class rag_retriever {
         global $DB;
 
         $q = mb_strtolower(trim($query), 'UTF-8');
+
+        // Preguntas semánticas de nivel de curso ("¿de qué trata el curso?",
+        // "describe el curso") NO se resuelven con datos estructurales: deben
+        // ir a la IA con contexto RAG + resumen del curso para dar una
+        // respuesta real sobre la temática.
+        if (self::is_course_about_query($q)) {
+            return null;
+        }
+
         $isSectionQuery = self::is_explicit_section_query($q);
         $isResourceIntent = self::is_resource_query($q);
         $isCourseNameQuery = (bool)preg_match('/c[oó]mo\s+se\s+llama\s+este\s+curso|nombre\s+del\s+curso|nombre\s+de\s+este\s+curso/u', $q);
@@ -1556,6 +1565,29 @@ class rag_retriever {
     }
 
     /**
+     * Detecta preguntas semánticas sobre la temática del curso ("¿de qué trata
+     * el curso?", "describe este curso"). Estas consultas deben responderse
+     * con la IA (RAG + resumen del curso), nunca con la ruta directa.
+     *
+     * @param string $query Lowercased query
+     * @return bool
+     */
+    private static function is_course_about_query(string $query): bool {
+        return (bool)preg_match(
+            '/de\s+qu[eé]\s+(se\s+)?(trata|va)\s+(este\s+|el\s+)?curso' .
+            '|sobre\s+qu[eé]\s+(trata|va|es)\s+(este\s+|el\s+)?curso' .
+            '|qu[eé]\s+es\s+(este|el)\s+curso' .
+            '|cu[eé]ntame\s+(algo\s+)?(sobre\s+|de\s+)?(este\s+|el\s+)?curso' .
+            '|descr[ií]be(me)?\s+(este\s+|el\s+)?curso' .
+            '|tem[aá]tica\s+(del|de\s+este)\s+curso' .
+            '|objetivos?\s+(del|de\s+este)\s+curso' .
+            '|resumen\s+(del|de\s+este)\s+curso' .
+            '|res[uú]me(me)?\s+(este\s+|el\s+)?curso/u',
+            $query
+        );
+    }
+
+    /**
      * Detecta si el usuario pregunta por el contenido general del curso.
      */
     private static function is_course_content_query(string $query): bool {
@@ -1969,6 +2001,10 @@ class rag_retriever {
         $lines[] = '## ESTRUCTURA DIRECTA DEL CURSO';
         $lines[] = 'Curso: ' . trim((string)$course->fullname);
         $lines[] = 'Nombre corto: ' . trim((string)$course->shortname);
+        $coursesummary = trim(strip_tags((string)$course->summary));
+        if ($coursesummary !== '') {
+            $lines[] = 'Resumen del curso: ' . preg_replace('/\s+/u', ' ', $coursesummary);
+        }
 
         $realSections = [];
         foreach ($sections as $section) {
@@ -2032,6 +2068,12 @@ class rag_retriever {
      * @return object|null
      */
     private static function find_matching_section_for_query(array $sections, string $query) {
+        // Ignorar referencias genéricas al curso ("este curso", "del curso",
+        // "the course") al comparar nombres: una sección llamada "Curso" no
+        // debe capturar preguntas de nivel de curso.
+        $query = preg_replace('/\b(este|ese|el|del|al|de\s+este|de\s+ese|un)\s+curso\b/u', ' ', $query);
+        $query = preg_replace('/\b(this|the)\s+course\b/u', ' ', $query);
+
         if (preg_match('/secci[oó]n\s+(\d{1,2})/u', $query, $m)) {
             $target = (int)$m[1];
             foreach ($sections as $section) {

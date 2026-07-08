@@ -1,0 +1,54 @@
+# block_pulso — Moodle AI analytics chat (Pulso AI)
+
+## Versioning rule (MANDATORY — apply on EVERY change)
+
+Every code change, however small, must bump BOTH values in `version.php`:
+
+- `$plugin->version` — Moodle build number, format `YYYYMMDDXX` (increment `XX` for
+  same-day changes).
+- `$plugin->release` — semver string (`1.1.1` → `1.1.2`). Patch for fixes/tweaks,
+  minor for new features.
+
+The release is shown as a badge next to the chat title so the user can verify which
+build is running. `chat_simple_view.php` reads `version.php` directly from disk
+(placeholder `%%PULSO_VERSION%%`), so the badge updates on deploy without running
+the Moodle upgrade. A DB upgrade (Site Administration → Notifications) is only
+needed when `db/` files change (install.xml, upgrade.php, caches.php, tasks.php…),
+but the `$plugin->version` bump is still mandatory every time.
+
+## Architecture (chat request path)
+
+- `chat_simple_view.php` — floating chat UI (inline HTML/CSS/JS, rendered by
+  `block_pulso.php`). Sends messages to `api_chat_stream.php` via fetch + SSE
+  (ChatGPT-style token streaming, progressive preview of partial JSON) and falls
+  back automatically to `api_chat.php` (XHR/JSON) if streaming is unavailable.
+- `api_chat_stream.php` — SSE endpoint. Events: `status`, `delta`, `final`
+  (same JSON shape as api_chat.php), `followups` (deferred, off the critical
+  path), `error`.
+- `api_chat.php` — classic JSON endpoint (fallback). Same behavior, follow-ups
+  generated synchronously.
+- `classes/chat_pipeline.php` — shared logic for both endpoints: enablement
+  check, analytics context (2-min MUC cache + 250-row caps), RAG retrieval,
+  history hygiene, history-hint ("ese pdf"), direct Moodle-backed answer routing.
+- `classes/rag_retriever.php` — direct structural answers (sections, resources,
+  quizzes…) + RAG chunk retrieval. Semantic course-level questions
+  ("¿de qué trata el curso?") must return `null` from the direct path so the
+  LLM answers with RAG context (`is_course_about_query()`).
+- `classes/openai_connector.php` — OpenAI calls: gpt-4o (configurable) for main
+  answers, `FAST_MODEL` (gpt-4o-mini) for follow-up questions,
+  `stream_query_with_context()` for SSE streaming.
+- Both endpoints call `\core\session\manager::write_close()` before OpenAI so
+  the Moodle session lock doesn't freeze the user's other tabs. Server-side
+  `$SESSION` history writes after that point don't persist — the client's
+  sessionStorage copy is the source of truth.
+
+## Dev notes
+
+- No PHP installed locally: lint with the portable PHP in the session scratchpad
+  (download `php-8.3-nts` zip from windows.php.net) or Docker (`php:8.2-cli`)
+  if the daemon is running.
+- The big JS blob lives inside a nowdoc heredoc in `chat_simple_view.php` —
+  `${...}` template literals are safe there; the small `JSINIT` heredoc DOES
+  interpolate PHP variables.
+- Language: UI and answers are Spanish-first; keep new user-facing strings in
+  Spanish and add lang strings to `lang/en/block_pulso.php`.

@@ -514,9 +514,11 @@ PROMPT;
         }
 
         // Append analytics JSON context.
+        // JSON compacto (sin PRETTY_PRINT): la indentación solo añade tokens
+        // de whitespace al prompt — más lento y más caro sin aportar nada.
         $context_section  = "\n\n## CONTEXTO DE ANALÍTICA DEL CURSO (JSON)\n\n";
         $context_section .= "```json\n";
-        $context_section .= json_encode($course_context, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $context_section .= json_encode($course_context, JSON_UNESCAPED_UNICODE);
         $context_section .= "\n```\n";
         $context_section .= "\nUsando los datos anteriores, responde las preguntas del usuario con cifras reales.\n";
 
@@ -544,7 +546,7 @@ PROMPT;
             }
 
             return $json;
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }

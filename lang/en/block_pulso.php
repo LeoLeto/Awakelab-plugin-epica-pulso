@@ -64,3 +64,6 @@ $string['rag_heading_desc'] = 'Retrieval-Augmented Generation lets the AI read a
 $string['rag_enabled'] = 'Enable RAG content indexing';
 $string['rag_enabled_desc'] = 'When enabled, Pulso will embed course content and inject relevant fragments into each query so the AI can answer questions about course material (e.g. explain an exercise, solve a problem from the course).';
 $string['task_index_course_content'] = 'Index course content for RAG (Pulso AI)';
+
+// === CACHES ===
+$string['cachedef_coursecontext'] = 'Unified course analytics context used by the Pulso chat';

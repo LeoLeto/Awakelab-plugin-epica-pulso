@@ -9,6 +9,12 @@ defined('MOODLE_INTERNAL') || die();
  */
 class openai_connector {
 
+    /**
+     * Modelo rápido/barato para tareas auxiliares (preguntas de seguimiento).
+     * No se usa para la respuesta principal.
+     */
+    const FAST_MODEL = 'gpt-4o-mini';
+
     private $apikey;
     private $model;
     private $apiurl = 'https://api.openai.com/v1/chat/completions';
@@ -201,6 +207,140 @@ class openai_connector {
     }
 
     /**
+     * Igual que send_query_with_context() pero en modo STREAMING (SSE).
+     *
+     * Abre la petición a OpenAI con stream=true y va invocando $ondelta con
+     * cada fragmento de texto a medida que llega, para que el endpoint pueda
+     * reenviarlo al navegador sin esperar la respuesta completa.
+     *
+     * @param string $user_message
+     * @param string $system_prompt
+     * @param array $conversation_history
+     * @param int $max_tokens
+     * @param callable $ondelta fn(string $textdelta): void
+     * @return array ['answer', 'tokens_used', 'model', 'finish_reason']
+     * @throws \moodle_exception
+     */
+    public function stream_query_with_context(
+        string $user_message,
+        string $system_prompt,
+        array $conversation_history,
+        int $max_tokens,
+        callable $ondelta
+    ): array {
+        $messages = [['role' => 'system', 'content' => $system_prompt]];
+        foreach ($conversation_history as $msg) {
+            if (isset($msg['role']) && isset($msg['content'])) {
+                $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
+            }
+        }
+        $messages[] = ['role' => 'user', 'content' => $user_message];
+
+        $payload = [
+            'model' => $this->model,
+            'messages' => $messages,
+            'temperature' => 0.5,
+            'max_tokens' => $max_tokens,
+            'top_p' => 0.9,
+            'presence_penalty' => 0.1,
+            'stream' => true,
+            'stream_options' => ['include_usage' => true]
+        ];
+
+        $answer = '';
+        $tokens_used = 0;
+        $finish_reason = 'unknown';
+        $sse_buffer = '';
+        $error_body = '';
+
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $this->apiurl,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $this->apikey,
+                'Accept: text/event-stream'
+            ],
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (
+                &$sse_buffer, &$answer, &$tokens_used, &$finish_reason, &$error_body, $ondelta
+            ) {
+                // Con error HTTP, OpenAI devuelve un body JSON normal: acumularlo.
+                $httpcode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+                if ($httpcode >= 400) {
+                    $error_body .= $data;
+                    return strlen($data);
+                }
+
+                $sse_buffer .= $data;
+                while (($pos = strpos($sse_buffer, "\n")) !== false) {
+                    $line = trim(substr($sse_buffer, 0, $pos));
+                    $sse_buffer = substr($sse_buffer, $pos + 1);
+                    if ($line === '' || strpos($line, 'data:') !== 0) {
+                        continue;
+                    }
+                    $json = trim(substr($line, 5));
+                    if ($json === '[DONE]') {
+                        continue;
+                    }
+                    $event = json_decode($json, true);
+                    if (!is_array($event)) {
+                        continue;
+                    }
+                    if (isset($event['usage']['total_tokens'])) {
+                        $tokens_used = (int)$event['usage']['total_tokens'];
+                    }
+                    if (!empty($event['choices'][0]['finish_reason'])) {
+                        $finish_reason = (string)$event['choices'][0]['finish_reason'];
+                    }
+                    $delta = $event['choices'][0]['delta']['content'] ?? '';
+                    if ($delta !== '') {
+                        $answer .= $delta;
+                        $ondelta($delta);
+                    }
+                }
+                return strlen($data);
+            }
+        ]);
+
+        curl_exec($curl);
+        $curl_errno = curl_errno($curl);
+        $curl_error = curl_error($curl);
+        curl_close($curl);
+
+        if ($curl_errno) {
+            // Si ya llegó parte de la respuesta, devolver lo acumulado en vez de fallar.
+            if ($answer === '') {
+                throw new \moodle_exception('error_api_connection', 'block_pulso', '', 'cURL error: ' . $curl_error);
+            }
+        }
+
+        if ($error_body !== '') {
+            $err = json_decode($error_body, true);
+            throw new \moodle_exception(
+                'error_api_response',
+                'block_pulso',
+                '',
+                $err['error']['message'] ?? 'Unknown API error'
+            );
+        }
+
+        if ($answer === '') {
+            throw new \moodle_exception('error_empty_response', 'block_pulso', '', 'No content in OpenAI stream');
+        }
+
+        return [
+            'answer' => trim($answer),
+            'tokens_used' => $tokens_used,
+            'model' => $this->model,
+            'finish_reason' => $finish_reason
+        ];
+    }
+
+    /**
      * Enviar query analítica con system prompt completo y schema JSON
      * Task T2.3.3: Design system prompt with schema and examples
      *
@@ -257,7 +397,8 @@ class openai_connector {
     public function summarize_document_text(
         string $document_text,
         string $user_query = '',
-        int $max_tokens = 220
+        int $max_tokens = 220,
+        ?callable $ondelta = null
     ): string {
         $document_text = trim($document_text);
         if ($document_text === '') {
@@ -275,7 +416,9 @@ class openai_connector {
             . "Texto extraído del documento:\n"
             . mb_substr($document_text, 0, 7000);
 
-        $response = $this->send_query_with_context($user_prompt, $system_prompt, [], $max_tokens);
+        $response = $ondelta !== null
+            ? $this->stream_query_with_context($user_prompt, $system_prompt, [], $max_tokens, $ondelta)
+            : $this->send_query_with_context($user_prompt, $system_prompt, [], $max_tokens);
         return trim((string)($response['answer'] ?? ''));
     }
 
@@ -290,7 +433,8 @@ class openai_connector {
     public function answer_document_question(
         string $document_text,
         string $question,
-        int $max_tokens = 500
+        int $max_tokens = 500,
+        ?callable $ondelta = null
     ): string {
         $document_text = trim($document_text);
         if ($document_text === '') {
@@ -309,7 +453,9 @@ class openai_connector {
             . "Contenido del documento:\n"
             . mb_substr($document_text, 0, 7000);
 
-        $response = $this->send_query_with_context($user_prompt, $system_prompt, [], $max_tokens);
+        $response = $ondelta !== null
+            ? $this->stream_query_with_context($user_prompt, $system_prompt, [], $max_tokens, $ondelta)
+            : $this->send_query_with_context($user_prompt, $system_prompt, [], $max_tokens);
         return trim((string)($response['answer'] ?? ''));
     }
 
@@ -355,9 +501,11 @@ PROMPT;
             $truncated_response = substr($ai_response, 0, 500);
             $followup_prompt = "Pregunta original: \"$user_query\"\n\nRespuesta anterior: \"$truncated_response\"\n\nGenera 2-3 preguntas de seguimiento relevantes.";
 
-            // Llamar a OpenAI para generar las preguntas
+            // Llamar a OpenAI para generar las preguntas.
+            // Tarea auxiliar y corta → modelo rápido y menos tokens: reduce
+            // varios segundos de latencia frente a usar el modelo principal.
             $payload = [
-                'model' => $this->model,
+                'model' => self::FAST_MODEL,
                 'messages' => [
                     [
                         'role' => 'system',
@@ -369,7 +517,7 @@ PROMPT;
                     ]
                 ],
                 'temperature' => 0.7,
-                'max_tokens' => 300
+                'max_tokens' => 150
             ];
 
             $curl = curl_init();
@@ -378,7 +526,7 @@ PROMPT;
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_ENCODING => '',
                 CURLOPT_MAXREDIRS => 10,
-                CURLOPT_TIMEOUT => 30,
+                CURLOPT_TIMEOUT => 15,
                 CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
                 CURLOPT_CUSTOMREQUEST => 'POST',
                 CURLOPT_POSTFIELDS => json_encode($payload),
@@ -435,7 +583,7 @@ PROMPT;
 
             error_log('Follow-up questions: No followup_questions field in JSON');
             return $this->fallback_followup_questions($user_query);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             error_log('Follow-up questions exception: ' . $e->getMessage());
             return $this->fallback_followup_questions($user_query);
         }

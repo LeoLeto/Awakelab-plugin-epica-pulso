@@ -22,13 +22,15 @@ function render_chat_simple($courseid, $context) {
     
     // Construir URL base correcta para AJAX
     $api_url = $CFG->wwwroot . '/blocks/pulso/api_chat.php';
-    
+    $stream_url = $CFG->wwwroot . '/blocks/pulso/api_chat_stream.php';
+
     // Inyectar variables globales JavaScript
     $js_init = <<<JSINIT
     <script>
         // Variables globales para AJAX
         window.courseid = {$courseid};
         window.apiUrl = '{$api_url}';
+        window.streamApiUrl = '{$stream_url}';
         
         // T2.5.3: Recuperar historial de sessionStorage (persiste entre recargas)
         try {
@@ -586,6 +588,26 @@ function render_chat_simple($courseid, $context) {
             padding: 15px;
             color: #6c757d;
         }
+
+        /* ========== STREAMING (respuesta en vivo, estilo ChatGPT) ========== */
+        .pulso-stream-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .pulso-stream-cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1em;
+            margin-left: 2px;
+            background: #007bff;
+            vertical-align: text-bottom;
+            animation: pulso-blink 1s steps(2, start) infinite;
+        }
+
+        @keyframes pulso-blink {
+            to { visibility: hidden; }
+        }
         
         .pulso-loading.show {
             display: block;
@@ -718,7 +740,7 @@ function render_chat_simple($courseid, $context) {
         </div>
         
         <div class="pulso-loading" id="pulso-loading">
-            <span class="pulso-spinner"></span>Procesando...
+            <span class="pulso-spinner"></span><span id="pulso-loading-text">Procesando...</span>
         </div>
         
         <div class="pulso-examples">
@@ -1937,93 +1959,265 @@ function render_chat_simple($courseid, $context) {
             return analyticsKeywords.some(k => q.includes(k));
         }
         
+        // ========== ENVÍO DE MENSAJES (streaming SSE + fallback XHR) ==========
+
+        let pulsoSending = false;
+        let streamBubble = null;
+
         function sendMessage(e) {
             e.preventDefault();
+            if (pulsoSending) return;
             const input = document.getElementById('pulso-input');
             const message = input.value.trim();
-            
+
             if (!message) {
                 const lang = navigator.language.startsWith('en') ? 'en' : 'es';
                 const alertMsg = lang === 'en' ? 'Please enter a message' : 'Por favor escribe un mensaje';
                 alert(alertMsg);
                 return;
             }
-            
+
             // Agregar mensaje del usuario
             addMessage(message, 'user');
             input.value = '';
             updateCharCount();
-            
+
             // Mostrar loading
             showLoading(true);
-            
-            // AJAX call a api_chat.php (Task T2.3.4)
-            // Obtener contexto del curso + inyectar en prompt + llamar OpenAI
-            const xhr = new XMLHttpRequest();
-            const apiUrl = window.apiUrl;  // URL construida por PHP
-            
-            // Preparar datos para enviar
+
+            // Streaming (estilo ChatGPT) cuando el navegador lo soporta;
+            // si no, o si el endpoint de streaming falla, XHR clásico.
+            if (window.fetch && window.ReadableStream && window.TextDecoder) {
+                sendMessageStream(message);
+            } else {
+                sendMessageXHR(message);
+            }
+        }
+
+        function buildChatFormData(message) {
             const formData = new FormData();
-            formData.append('courseid', window.courseid || 2);  // courseid por defecto
+            formData.append('courseid', window.courseid || 2);
             formData.append('user_query', message);
             formData.append('conversation_history', JSON.stringify(window.conversationHistory || []));
-            
+            return formData;
+        }
+
+        // Procesamiento compartido de la respuesta completa (stream final / XHR).
+        function handleChatResponse(message, response) {
+            if (response.success && response.answer) {
+                const showAnalysisSections = isAnalyticsQuestion(message);
+                const formattedAnswer = formatAIResponse(response.answer, showAnalysisSections);
+                addMessage(formattedAnswer, 'ai', true);
+
+                // Mostrar preguntas sugeridas (T2.4.12) — en streaming pueden
+                // llegar después como evento 'followups'.
+                if (response.followup_questions && response.followup_questions.length > 0) {
+                    showFollowupQuestions(response.followup_questions);
+                }
+
+                // T2.5.3: Guardar en historial para conversación futura
+                if (!window.conversationHistory) {
+                    window.conversationHistory = [];
+                }
+                window.conversationHistory.push({role: 'user', content: message});
+                window.conversationHistory.push({role: 'assistant', content: response.answer});
+                if (window.conversationHistory.length > 20) {
+                    window.conversationHistory = window.conversationHistory.slice(-20);
+                }
+                try {
+                    sessionStorage.setItem('pulso_history_' + window.courseid, JSON.stringify(window.conversationHistory));
+                } catch(e) {
+                    console.warn('⚠️ No se pudo guardar historial en sessionStorage');
+                }
+            } else {
+                const errorMsg = response.message || 'No success flag';
+                console.error('❌ Response not successful:', response);
+                addMessage('⚠️ Error: ' + errorMsg, 'ai');
+            }
+        }
+
+        // ---------- Burbuja de respuesta en vivo ----------
+
+        function ensureStreamBubble() {
+            if (streamBubble && streamBubble.isConnected) {
+                return streamBubble;
+            }
+            const messagesDiv = document.getElementById('pulso-messages');
+            const messageEl = document.createElement('div');
+            messageEl.className = 'pulso-message ai';
+            const contentEl = document.createElement('div');
+            contentEl.className = 'pulso-message-content';
+            const textEl = document.createElement('span');
+            textEl.className = 'pulso-stream-text';
+            const cursorEl = document.createElement('span');
+            cursorEl.className = 'pulso-stream-cursor';
+            contentEl.appendChild(textEl);
+            contentEl.appendChild(cursorEl);
+            messageEl.appendChild(contentEl);
+            messagesDiv.appendChild(messageEl);
+            streamBubble = messageEl;
+            return messageEl;
+        }
+
+        function updateStreamBubble(text) {
+            if (!text) return;
+            const bubble = ensureStreamBubble();
+            const textEl = bubble.querySelector('.pulso-stream-text');
+            if (textEl) textEl.textContent = text;
+            const messagesDiv = document.getElementById('pulso-messages');
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function removeStreamBubble() {
+            if (streamBubble && streamBubble.parentNode) {
+                streamBubble.parentNode.removeChild(streamBubble);
+            }
+            streamBubble = null;
+        }
+
+        // Extraer texto legible de una respuesta parcial. Las respuestas del
+        // modelo son JSON: mientras llegan tokens vamos mostrando los valores
+        // de texto (title, summary, párrafos...) en vez del JSON crudo.
+        function extractStreamPreview(accum) {
+            let s = String(accum || '').replace(/^\s*```[a-z]*\s*/i, '').replace(/\s*```\s*$/, '');
+            if (!/^\s*[\[{]/.test(s)) {
+                return s; // texto plano (respuestas de documento) → mostrar tal cual
+            }
+            const keys = ['title', 'summary', 'paragraph', 'párrafo', 'parrafo', 'text', 'texto', 'content', 'contenido', 'description', 'descripción', 'descripcion'];
+            const re = new RegExp('"(' + keys.join('|') + ')"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)', 'g');
+            const parts = [];
+            let m;
+            while ((m = re.exec(s)) !== null) {
+                const v = m[2]
+                    .replace(/\\n/g, '\n')
+                    .replace(/\\"/g, '"')
+                    .replace(/\\\\/g, '\\');
+                if (v.trim()) parts.push(v.trim());
+            }
+            return parts.join('\n\n');
+        }
+
+        // ---------- Streaming SSE ----------
+
+        function sendMessageStream(message) {
+            pulsoSending = true;
+            let accum = '';
+            let gotFinal = false;
+            let receivedAny = false;
+
+            function handleSseEvent(raw) {
+                let eventName = 'message';
+                const dataLines = [];
+                raw.split('\n').forEach(function(line) {
+                    if (line.indexOf('event:') === 0) {
+                        eventName = line.slice(6).trim();
+                    } else if (line.indexOf('data:') === 0) {
+                        dataLines.push(line.slice(5).trim());
+                    }
+                });
+                if (!dataLines.length) return;
+                let data;
+                try {
+                    data = JSON.parse(dataLines.join('\n'));
+                } catch (err) {
+                    return;
+                }
+                receivedAny = true;
+
+                if (eventName === 'status') {
+                    showLoading(true, data.stage === 'generating' ? 'Generando respuesta...' : 'Analizando datos del curso...');
+                } else if (eventName === 'delta') {
+                    accum += (data.text || '');
+                    const preview = extractStreamPreview(accum);
+                    if (preview) {
+                        showLoading(false);
+                        updateStreamBubble(preview);
+                    }
+                } else if (eventName === 'final') {
+                    gotFinal = true;
+                    showLoading(false);
+                    removeStreamBubble();
+                    handleChatResponse(message, data);
+                } else if (eventName === 'followups') {
+                    if (data.questions && data.questions.length > 0) {
+                        showFollowupQuestions(data.questions);
+                    }
+                } else if (eventName === 'error') {
+                    gotFinal = true;
+                    showLoading(false);
+                    removeStreamBubble();
+                    addMessage('⚠️ Error: ' + (data.message || 'desconocido'), 'ai');
+                }
+            }
+
+            fetch(window.streamApiUrl, {
+                method: 'POST',
+                body: buildChatFormData(message),
+                credentials: 'same-origin'
+            })
+            .then(function(res) {
+                const ct = res.headers.get('content-type') || '';
+                if (!res.ok || !res.body || ct.indexOf('text/event-stream') === -1) {
+                    throw new Error('stream-unavailable');
+                }
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buf = '';
+                function pump() {
+                    return reader.read().then(function(r) {
+                        if (r.done) return;
+                        buf += decoder.decode(r.value, {stream: true});
+                        let idx;
+                        while ((idx = buf.indexOf('\n\n')) !== -1) {
+                            handleSseEvent(buf.slice(0, idx));
+                            buf = buf.slice(idx + 2);
+                        }
+                        return pump();
+                    });
+                }
+                return pump();
+            })
+            .then(function() {
+                pulsoSending = false;
+                if (!gotFinal) {
+                    removeStreamBubble();
+                    if (!receivedAny) {
+                        // El servidor no habló SSE → endpoint clásico.
+                        sendMessageXHR(message);
+                    } else {
+                        showLoading(false);
+                        addMessage('⚠️ La respuesta se interrumpió. Inténtalo de nuevo.', 'ai');
+                    }
+                }
+            })
+            .catch(function(err) {
+                pulsoSending = false;
+                removeStreamBubble();
+                if (!gotFinal && !receivedAny) {
+                    console.warn('⚠️ Streaming no disponible, usando endpoint clásico:', err.message);
+                    sendMessageXHR(message);
+                } else if (!gotFinal) {
+                    showLoading(false);
+                    addMessage('⚠️ Error de conexión durante el streaming', 'ai');
+                }
+            });
+        }
+
+        // ---------- Fallback XHR clásico (api_chat.php) ----------
+
+        function sendMessageXHR(message) {
+            showLoading(true);
+            const xhr = new XMLHttpRequest();
+
             xhr.onreadystatechange = function() {
                 if (xhr.readyState === 4) {
                     showLoading(false);
-                    
-                    // DEBUG: Loguear respuesta completa
                     console.log('📡 AJAX Status:', xhr.status);
-                    console.log('📡 AJAX Response:', xhr.responseText);
-                    
+
                     if (xhr.status === 200) {
                         try {
                             const response = JSON.parse(xhr.responseText);
-                            console.log('✅ Response parsed:', response);
-                            
-                            if (response.success && response.answer) {
-                                // Formatear la respuesta (tabla, lista, etc)
-                                const showAnalysisSections = isAnalyticsQuestion(message);
-                                const formattedAnswer = formatAIResponse(response.answer, showAnalysisSections);
-                                
-                                // Agregar respuesta de IA
-                                addMessage(formattedAnswer, 'ai', true);
-                                
-                                // Mostrar preguntas sugeridas (T2.4.12)
-                                console.log('Follow-up questions:', response.followup_questions);
-                                if (response.followup_questions && response.followup_questions.length > 0) {
-                                    console.log('✅ Mostrando ' + response.followup_questions.length + ' preguntas de seguimiento');
-                                    showFollowupQuestions(response.followup_questions);
-                                } else {
-                                    console.log('⚠️ No hay preguntas de seguimiento disponibles');
-                                }
-                                
-                                // T2.5.3: Guardar en historial para conversación futura
-                                if (!window.conversationHistory) {
-                                    window.conversationHistory = [];
-                                }
-                                window.conversationHistory.push({role: 'user', content: message});
-                                window.conversationHistory.push({role: 'assistant', content: response.answer});
-                                
-                                // Limitar historial en cliente (últimos 20 mensajes)
-                                if (window.conversationHistory.length > 20) {
-                                    window.conversationHistory = window.conversationHistory.slice(-20);
-                                }
-                                
-                                // Persistir en sessionStorage
-                                try {
-                                    sessionStorage.setItem('pulso_history_' + window.courseid, JSON.stringify(window.conversationHistory));
-                                } catch(e) {
-                                    console.warn('⚠️ No se pudo guardar historial en sessionStorage');
-                                }
-                                
-                                // Log de debug
-                                console.log('✓ OpenAI Response:', response);
-                            } else {
-                                const errorMsg = response.message || 'No success flag';
-                                console.error('❌ Response not successful:', response);
-                                addMessage('⚠️ Error: ' + errorMsg, 'ai');
-                            }
+                            handleChatResponse(message, response);
                         } catch (e) {
                             console.error('❌ JSON Parse Error:', e.message);
                             console.error('❌ Raw response was:', xhr.responseText);
@@ -2035,9 +2229,9 @@ function render_chat_simple($courseid, $context) {
                     }
                 }
             };
-            
-            xhr.open('POST', apiUrl, true);
-            xhr.send(formData);
+
+            xhr.open('POST', window.apiUrl, true);
+            xhr.send(buildChatFormData(message));
         }
         
         function addMessage(text, sender, isHtml = false) {
@@ -2061,8 +2255,12 @@ function render_chat_simple($courseid, $context) {
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
         
-        function showLoading(show) {
+        function showLoading(show, label) {
             const loading = document.getElementById('pulso-loading');
+            const labelEl = document.getElementById('pulso-loading-text');
+            if (labelEl) {
+                labelEl.textContent = label || 'Procesando...';
+            }
             if (show) {
                 loading.classList.add('show');
             } else {

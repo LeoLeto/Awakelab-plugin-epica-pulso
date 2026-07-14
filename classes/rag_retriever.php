@@ -1619,7 +1619,7 @@ class rag_retriever {
      * @return bool
      */
     private static function is_pdf_content_query(string $query): bool {
-        return (bool)preg_match('/enunciado|primer\s+problem[ao]|\bproblema\s+\d+|primer\s+ejercicio|ejercicio\s*\d+|mu[eé]strame\s+(el|la|los|las|un)\b|soluci[oó]n\s+del\b|dame\s+(un|el|la|los)\s+\w+|qu[eé]\s+preguntas?|cu[aá]ntas?\s+preguntas?|pregunta\s+\d+|\bpregunta\s+del|cu[aá]ntos?\s+(alumnos|estudiantes)|qui[eé]n(es)?\s+(ha|han)\s+(completado|hecho|realizado)|nota\s+media|calificaci[oó]n\s+(media|promedio)|cu[aá]ntos?\s+intentos/u', $query);
+        return (bool)preg_match('/enunciado|primer\s+problem[ao]|\bproblema\s+\d+|primer\s+ejercicio|ejercicio\s*\d+|mu[eé]strame\s+(el|la|los|las|un)\b|soluci[oó]n\s+del\b|dame\s+(un|el|la|los)\s+\w+|qu[eé]\s+preguntas?|cu[aá]ntas?\s+preguntas?|pregunta\s+\d+|\bpregunta\s+del/u', $query);
     }
 
     /**

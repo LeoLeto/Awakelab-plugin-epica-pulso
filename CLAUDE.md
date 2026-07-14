@@ -42,6 +42,66 @@ but the `$plugin->version` bump is still mandatory every time.
   `$SESSION` history writes after that point don't persist — the client's
   sessionStorage copy is the source of truth.
 
+## Bug backlog — evaluación jul-2026 (arreglar en este orden)
+
+Evaluación de 56 preguntas reales (resultados y prompts de arreglo detallados en
+`Pulso_AI_matriz_evaluacion.xlsx`, pestaña "Preguntas"). Los fallos se agrupan en
+6 bugs raíz. Recuerda la Versioning rule (bump `version.php`) en CADA arreglo, y
+mantén los strings de usuario en español (+ `lang/en/block_pulso.php`).
+
+**#1 (crítico, empezar por aquí). Keywords analíticas en `is_pdf_content_query`.**
+`classes/rag_retriever.php`, función `is_pdf_content_query()` (~línea 1622). La
+regex incluye keywords ANALÍTICAS (`nota media`, `calificación media|promedio`,
+`cuántos alumnos|estudiantes`, `quién ha completado`, `cuántos intentos`). Eso hace
+que preguntas de analítica se clasifiquen como "contenido de documento"
+(`isContentIntent=true`) y se respondan sobre un PDF → "el documento no proporciona
+información sobre la nota media", incluso en cursos CON notas. Comprobado: `%
+aprobados` (sin esas keywords) sí funciona por analítica. Fix: quitar esas keywords
+de la regex. No romper: la nota media de UN quiz/tarea concretos debe seguir yendo
+por la rama `$asksGradeData` de `build_quiz_answer()`/`build_assign_answer()`; el
+contenido real de un PDF ("dame el enunciado del problema 1") debe seguir en
+content_mode. Afecta: P12, P15, P16, P25, P28, P29, P45, P52.
+
+**#2 (alta). El matcher engancha por palabra genérica.**
+`classes/rag_retriever.php`, `match_activity_by_name()`. Empareja un recurso/actividad
+cuando comparte UNA sola palabra genérica con la pregunta ("alumno", "nota", "resumen",
+"estudiante", "investigación"…) y devuelve ese PDF al azar. Rompe preguntas sueltas,
+los seguimientos conversacionales y hasta los botones (En riesgo/Notas), porque los
+botones inyectan una pregunta en lenguaje natural que pasa por el mismo pipeline. Fix:
+subir el umbral (puntuar el nombre completo, usar números/ordinales como discriminador,
+ampliar stopwords, priorizar la sección mencionada); si no hay match claro NO devolver
+recurso; dar prioridad a las intenciones analíticas sobre el match de actividad. Afecta:
+P4, P6, P30, P31, P32, P33, P34, P39, P53, P54.
+
+**#3 (media). Contaminación de contexto / history-hint.**
+`classes/chat_pipeline.php`, `build_direct_query()` / `find_resource_in_history()`. El
+history-hint arrastra el último recurso visto aunque la nueva pregunta nombre otra cosa
+(reproducido: con chat sucio devuelve recursos viejos; Ctrl+F5 lo arregla). Fix: si el
+mensaje nombra explícitamente una actividad/recurso, prioridad al nombre y no aplicar el
+hint; limitar el hint a continuaciones claras ("ese", "este", "el anterior"); ampliar
+`$alreadyNamesResource` para nombres de tarea. Afecta: P14, P37, P38, P50, P51.
+
+**#4 (media, config de servidor). Extracción de PDF rota.**
+`classes/content_extractor.php`, `extract_pdf_text()`. El parser naïve no lee PDFs con
+fuentes CID TrueType / Identity-H (confirmado en sandbox: `pdftotext`/poppler SÍ extrae
+el texto, `pypdf` y el parser del plugin no; NO hace falta OCR). Fix: instalar
+`poppler-utils` (pdftotext) o `smalot/pdfparser` en el servidor y asegurar que esa
+estrategia se usa; revisar el orden de estrategias (el parser naïve puede colar basura
+>20 chars antes de llegar a pdftotext). Para PDFs realmente escaneados, mensaje claro.
+Afecta: P22, P23, P24.
+
+**#5 (baja). Referencias por posición ("el primero/segundo") no se resuelven.**
+`classes/chat_pipeline.php`. "dame el enunciado del primero" se interpreta por keyword y
+engancha una actividad llamada "Resumen"/etc. Fix: resolver ordinales al N-ésimo recurso
+del historial reciente. Afecta: P51.
+
+**#6 (mejoras de funcionalidad).** Extracción de contenido Office `.docx`/`.pptx` en
+`content_extractor.php` (P39); ranking de alumnos por nota respetando privacidad (P34);
+e **indexación del contenido de los SCORM** (`extract_module()` no soporta `scorm`, por
+eso no puede resumir ni explicar el material de un SCORM; es la principal ventaja del
+plugin Phia) + modo "resumen/explicación de unidad" orientado al alumno acotado al SCORM
+actual (P55, P56).
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

@@ -404,6 +404,10 @@ class content_extractor {
                     if (!empty($pdftext)) {
                         $parts[] = 'Contenido PDF extraido:';
                         $parts[] = $pdftext;
+                    } else {
+                        // Ninguna estrategia de extraccion dio texto legible — mensaje
+                        // claro en vez de dejar el recurso vacio o basura sin avisar.
+                        $parts[] = 'No se pudo leer el texto de este PDF; puede estar escaneado o protegido.';
                     }
                 }
             }
@@ -524,9 +528,14 @@ class content_extractor {
     /**
      * Best-effort PDF text extraction.
      *
-     * Strategy:
-     *  1) Try a pure PHP parser library (smalot/pdfparser) if installed.
-     *  2) Fallback to local pdftotext binary if available.
+     * Strategy (cada resultado se valida con is_pdf_text_useful() antes de
+     * aceptarse; si no es texto legible, se prueba la siguiente):
+     *  (a) Libreria PHP pura smalot/pdfparser, vendorizada con el plugin
+     *      (lib/pdfparser/) — unica que decodifica fuentes CID/Identity-H
+     *      con tabla ToUnicode.
+     *  (b) Binario pdftotext via shell_exec, solo si el servidor lo tuviera
+     *      instalado (fallback inofensivo, no es un requisito).
+     *  (c) Parser naive de streams PDF (ultimo recurso).
      *
      * @param \stored_file $file
      * @return string
@@ -544,19 +553,13 @@ class content_extractor {
         try {
             $file->copy_content_to($tmpin);
 
-            // Option A: PHP library parser (no shell dependency).
+            // (a) Libreria PHP pura (sin dependencia de shell).
             $librarytext = $this->try_parse_pdf_with_php_library($tmpin);
-            if (!empty($librarytext)) {
-                return $librarytext;
+            if ($this->is_pdf_text_useful($librarytext)) {
+                return trim($librarytext);
             }
 
-            // Option B: pure-PHP naive extraction from PDF streams (best effort).
-            $naivetext = $this->try_parse_pdf_naive($tmpin);
-            if (!empty($naivetext)) {
-                return $naivetext;
-            }
-
-            // Option C: fallback to pdftotext command.
+            // (b) Fallback a pdftotext si el servidor lo tiene instalado.
             if (function_exists('shell_exec')) {
                 $commands = [
                     'pdftotext -layout ' . escapeshellarg($tmpin) . ' ' . escapeshellarg($txtout),
@@ -566,10 +569,18 @@ class content_extractor {
                 foreach ($commands as $cmd) {
                     @shell_exec($cmd . ' 2>&1');
                     if (is_file($txtout) && filesize($txtout) > 0) {
-                        $content = file_get_contents($txtout);
-                        return trim((string)$content);
+                        $content = trim((string)file_get_contents($txtout));
+                        if ($this->is_pdf_text_useful($content)) {
+                            return $content;
+                        }
                     }
                 }
+            }
+
+            // (c) Parser naive de streams PDF, ultimo recurso.
+            $naivetext = $this->try_parse_pdf_naive($tmpin);
+            if ($this->is_pdf_text_useful($naivetext)) {
+                return $naivetext;
             }
         } catch (\Throwable $e) {
             return '';
@@ -580,6 +591,37 @@ class content_extractor {
         }
 
         return '';
+    }
+
+    /**
+     * Heuristica de "texto legible": descarta basura/bytes mal decodificados
+     * que pasarian un simple chequeo de longitud (p. ej. fuentes CID leidas
+     * con el encoding equivocado) pero no son texto real.
+     *
+     * @param string $text
+     * @return bool
+     */
+    private function is_pdf_text_useful(string $text): bool {
+        $trimmed = trim($text);
+        $totalLen = mb_strlen($trimmed, 'UTF-8');
+        if ($totalLen < 20) {
+            return false;
+        }
+
+        $letters = preg_match_all('/\p{L}/u', $trimmed);
+        if ($letters === false || ($letters / $totalLen) < 0.4) {
+            return false;
+        }
+
+        $words = preg_split('/\s+/u', $trimmed, -1, PREG_SPLIT_NO_EMPTY);
+        $realWords = 0;
+        foreach ($words as $word) {
+            if (mb_strlen($word, 'UTF-8') >= 3 && preg_match('/\p{L}/u', $word)) {
+                $realWords++;
+            }
+        }
+
+        return $realWords >= 3;
     }
 
     /**
@@ -622,6 +664,7 @@ class content_extractor {
         }
 
         $autoloaders = [
+            __DIR__ . '/../lib/pdfparser/autoload.php',      // vendorizado con el plugin (sin Composer)
             __DIR__ . '/../vendor/autoload.php',            // plugin-local vendor
             __DIR__ . '/../../vendor/autoload.php',          // blocks/pulso/vendor
             $CFG->dirroot . '/vendor/autoload.php',          // moodle root vendor

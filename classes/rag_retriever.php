@@ -1701,7 +1701,7 @@ class rag_retriever {
      * @param string $query
      * @return bool
      */
-    private static function is_course_analytics_query(string $query): bool {
+    public static function is_course_analytics_query(string $query): bool {
         return (bool)preg_match(
             '/nota\s+media|calificaci[oó]n\s+(media|promedio)|media\s+de\s+(nota|calificaci)' .
             '|matricul|en\s+riesgo|ranking|mejor(es)?\s+nota|peor(es)?\s+nota' .

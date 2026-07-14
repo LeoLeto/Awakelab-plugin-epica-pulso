@@ -300,7 +300,31 @@ class chat_pipeline {
                 $qnorm
             );
         }
-        $needsHistoryHint = !$mentionsSection && !$alreadyNamesResource && ($isContentSpecificQuery || $isSummaryOfPrevious || $refersToKnownResource || $asksAboutPrevious || $bareSummaryRequest || $refersToActivity || $asksAboutActivity);
+        // También detectar cuando el usuario nombra otra ACTIVIDAD concreta (no solo recurso):
+        // "cuestionario tipo test", "tarea de matemáticas", "foro de dudas"... — prioridad al
+        // nombre citado en el propio mensaje, no arrastrar el recurso del historial.
+        if (!$alreadyNamesResource) {
+            $alreadyNamesResource = (bool)preg_match(
+                '/\b(cuestionario|quiz|examen|tarea|assignment|foro|forum)\s+(?!que\b|este\b|ese\b|esta\b|esa\b|del\b|de\b|la\b|el\b|las\b|los\b|un\b|una\b|anterior\b|previo\b|pasado\b|mismo\b)\S+/u',
+                $qnorm
+            );
+        }
+        // Pregunta de analitica de CURSO (nota media, matriculados, en riesgo, ranking...):
+        // nunca debe arrastrar un recurso visto en un turno anterior.
+        $isAnalyticsQuery = rag_retriever::is_course_analytics_query($qnorm);
+        // Limitar el hint a continuaciones CLARAS: referencia anaforica explicita
+        // ("ese", "este", "el anterior", "de ese"...) — si no hay, no se infiere continuidad.
+        $hasAnaphoricReference = (bool)preg_match(
+            '/\b(ese|esa|eso|este|esta|esto|el\s+mismo|la\s+misma|el\s+anterior|la\s+anterior' .
+            '|lo\s+anterior|anteriormente\s+mencionad\w*|de\s+ese|de\s+esta|de\s+este|de\s+esa' .
+            '|del\s+anterior|de\s+la\s+anterior)\b/u',
+            $qnorm
+        );
+        $needsHistoryHint = !$isAnalyticsQuery
+            && !$mentionsSection
+            && !$alreadyNamesResource
+            && ($hasAnaphoricReference || $asksAboutPrevious)
+            && ($isContentSpecificQuery || $isSummaryOfPrevious || $refersToKnownResource || $asksAboutPrevious || $bareSummaryRequest || $refersToActivity || $asksAboutActivity);
 
         if ($needsHistoryHint) {
             $foundResource = self::find_resource_in_history($history, $qnorm);

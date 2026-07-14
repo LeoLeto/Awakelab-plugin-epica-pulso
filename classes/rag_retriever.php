@@ -311,6 +311,7 @@ class rag_retriever {
 
         $isSummaryIntent = (bool)preg_match('/resumen|resumir|s[ií]ntesis|sintesis|resum[eé]n|de\s+qu[eé]\s+va|de\s+qu[eé]\s+trata/u', $query);
         $isContentIntent = !$isSummaryIntent && self::is_pdf_content_query($query);
+        $isAnalyticsIntent = self::is_course_analytics_query($query);
 
         $resources = $DB->get_records('resource', ['course' => $courseid], 'name ASC', 'id, name, intro');
 
@@ -339,30 +340,7 @@ class rag_retriever {
         try { $feedbacks = $DB->get_records('feedback', ['course' => $courseid], 'name ASC', 'id, name, intro'); } catch (\Throwable $e) {}
         try { $lessons = $DB->get_records('lesson', ['course' => $courseid], 'name ASC', 'id, name, intro'); } catch (\Throwable $e) {}
 
-        // Primero intentar emparejar un recurso (PDF/archivo).
-        $matched = null;
-        $matchedType = 'resource'; // resource | quiz | assign | forum | page | url | book | folder | ...
-        if (!empty($resources)) {
-            $matched = self::match_activity_by_name($resources, $query);
-        }
-
-        // Si no se encontró recurso, intentar quiz.
-        if ($matched === null && !empty($quizzes)) {
-            $matched = self::match_activity_by_name($quizzes, $query);
-            if ($matched !== null) {
-                $matchedType = 'quiz';
-            }
-        }
-
-        // Si no se encontró quiz, intentar assign.
-        if ($matched === null && !empty($assigns)) {
-            $matched = self::match_activity_by_name($assigns, $query);
-            if ($matched !== null) {
-                $matchedType = 'assign';
-            }
-        }
-
-        // Buscar en otros tipos de actividad.
+        // Otros tipos de actividad comunes.
         $otherTypes = [
             'forum' => $forums,
             'page' => $pages,
@@ -375,11 +353,40 @@ class rag_retriever {
             'feedback' => $feedbacks,
             'lesson' => $lessons,
         ];
+
+        // Orden de matching: actividades "accionables" (quiz/assign/otras) ANTES
+        // que los recursos, para que un PDF con una palabra generica en el nombre
+        // no eclipse al quiz/tarea/foro real (bug: "nota media" -> "NOTA INFORMATIVA").
+        $collections = ['quiz' => $quizzes, 'assign' => $assigns] + $otherTypes + ['resource' => $resources];
+
+        // Fase 1: match EXACTO (nombre completo e inequivoco) en todos los tipos.
+        $matched = null;
+        $matchedType = null;
+        foreach ($collections as $typeName => $records) {
+            if (!empty($records)) {
+                $exact = self::match_activity_by_name_exact($records, $query);
+                if ($exact !== null) {
+                    $matched = $exact;
+                    $matchedType = $typeName;
+                    break;
+                }
+            }
+        }
+
+        // Sin nombre de actividad inequivoco: si es una pregunta de analitica de
+        // curso (nota media, matriculados, en riesgo, ranking...), no forzar un
+        // match difuso sobre un recurso — que la responda la ruta de analitica/LLM.
+        if ($matched === null && $isAnalyticsIntent) {
+            return null;
+        }
+
+        // Fase 2: sin match exacto, probar difuso (umbral alto), mismo orden.
         if ($matched === null) {
-            foreach ($otherTypes as $typeName => $records) {
+            foreach ($collections as $typeName => $records) {
                 if (!empty($records)) {
-                    $matched = self::match_activity_by_name($records, $query);
-                    if ($matched !== null) {
+                    $fuzzy = self::match_activity_by_name_fuzzy($records, $query);
+                    if ($fuzzy !== null) {
+                        $matched = $fuzzy;
                         $matchedType = $typeName;
                         break;
                     }
@@ -519,18 +526,58 @@ class rag_retriever {
      * @return object|null
      */
     private static function match_activity_by_name(array $records, string $query) {
-        // Exact whole-word match first.
+        $exact = self::match_activity_by_name_exact($records, $query);
+        if ($exact !== null) {
+            return $exact;
+        }
+        return self::match_activity_by_name_fuzzy($records, $query);
+    }
+
+    /**
+     * Exact whole-word match: the record's full name appears verbatim in the query.
+     *
+     * @param array $records
+     * @param string $query
+     * @return object|null
+     */
+    private static function match_activity_by_name_exact(array $records, string $query) {
         foreach ($records as $record) {
             $name = mb_strtolower(trim((string)$record->name), 'UTF-8');
             if ($name !== '' && preg_match('/(?<![\pL\pN])' . preg_quote($name, '/') . '(?![\pL\pN])/ui', $query)) {
                 return $record;
             }
         }
+        return null;
+    }
 
-        // Fuzzy: score all records by token hits and return the best match.
+    /**
+     * Fuzzy match: scores records by how much of their significant name tokens are
+     * covered by the query. A single generic word is not enough on its own — either
+     * the name is fully covered, or at least 2 independent significant words hit.
+     * A number in the name ("Tema 3", "Problema 2") acts as a hard discriminator.
+     *
+     * @param array $records
+     * @param string $query
+     * @return object|null
+     */
+    private static function match_activity_by_name_fuzzy(array $records, string $query) {
         // Words that appear in virtually every Moodle activity name or teacher query
         // are useless as discriminators and must not contribute to the score.
-        $stopwords = ['curso', 'foro', 'tarea', 'tema', 'quiz', 'link', 'book', 'page'];
+        $stopwords = [
+            'curso', 'foro', 'tarea', 'tema', 'quiz', 'link', 'book', 'page',
+            'tipo', 'test', 'nota', 'notas', 'alumno', 'alumnos', 'estudiante', 'estudiantes',
+            'resumen', 'participante', 'participantes', 'guia', 'manual', 'cuestionario',
+            'actividad', 'pregunta', 'preguntas',
+        ];
+        $ordinalMap = [
+            'primer' => '1', 'primero' => '1', 'primera' => '1',
+            'segundo' => '2', 'segunda' => '2', 'tercer' => '3', 'tercero' => '3',
+            'tercera' => '3', 'cuarto' => '4', 'cuarta' => '4', 'quinto' => '5', 'quinta' => '5',
+        ];
+        $queryNorm = strtr($query, $ordinalMap);
+        preg_match_all('/\d+/u', $queryNorm, $qm);
+        $queryNumbers = $qm[0];
+
         $bestRecord = null;
         $bestScore = 0;
         foreach ($records as $record) {
@@ -541,7 +588,12 @@ class rag_retriever {
             $tokens = preg_split('/\s+/u', $name);
             $significantTokens = 0;
             $hits = 0;
+            $nameNumbers = [];
             foreach ($tokens as $token) {
+                if (preg_match('/^\d+$/u', $token)) {
+                    $nameNumbers[] = $token;
+                    continue;
+                }
                 if (mb_strlen($token, 'UTF-8') < 4) {
                     continue;
                 }
@@ -553,8 +605,27 @@ class rag_retriever {
                     $hits++;
                 }
             }
-            if ($hits > 0 && $hits > $bestScore) {
-                $bestScore = $hits;
+
+            // Un numero en el nombre es un discriminador fuerte: si la pregunta
+            // cita otro numero distinto, este candidato queda descartado.
+            if (!empty($nameNumbers) && !empty($queryNumbers) && !array_intersect($nameNumbers, $queryNumbers)) {
+                continue;
+            }
+
+            if ($significantTokens === 0 || $hits === 0) {
+                continue;
+            }
+
+            // Ya no basta una palabra generica suelta: o cubre el nombre entero,
+            // o hay al menos 2 palabras significativas independientes.
+            $covers = $hits >= $significantTokens;
+            if (!$covers && $hits < 2) {
+                continue;
+            }
+
+            $score = $hits + ($covers ? 1 : 0);
+            if ($score > $bestScore) {
+                $bestScore = $score;
                 $bestRecord = $record;
             }
         }
@@ -1620,6 +1691,25 @@ class rag_retriever {
      */
     private static function is_pdf_content_query(string $query): bool {
         return (bool)preg_match('/enunciado|primer\s+problem[ao]|\bproblema\s+\d+|primer\s+ejercicio|ejercicio\s*\d+|mu[eé]strame\s+(el|la|los|las|un)\b|soluci[oó]n\s+del\b|dame\s+(un|el|la|los)\s+\w+|qu[eé]\s+preguntas?|cu[aá]ntas?\s+preguntas?|pregunta\s+\d+|\bpregunta\s+del/u', $query);
+    }
+
+    /**
+     * Detecta preguntas de analitica de CURSO (nota media, matriculados, en riesgo,
+     * ranking, completitud...) que deben resolverse via analitica/LLM y no deben
+     * dejar que un match difuso de recurso/PDF las secuestre.
+     *
+     * @param string $query
+     * @return bool
+     */
+    private static function is_course_analytics_query(string $query): bool {
+        return (bool)preg_match(
+            '/nota\s+media|calificaci[oó]n\s+(media|promedio)|media\s+de\s+(nota|calificaci)' .
+            '|matricul|en\s+riesgo|ranking|mejor(es)?\s+nota|peor(es)?\s+nota' .
+            '|porcentaje\s+de\s+aprobad' .
+            '|cu[aá]ntos?\s+(alumnos|estudiantes)\b(?!.*\b(pdf|documento|archivo)\b)' .
+            '|qui[eé]n(es)?\s+(es|tiene|ha|han)\s+.*(nota|complet|aprobad|suspend)/u',
+            $query
+        );
     }
 
     /**

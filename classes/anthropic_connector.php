@@ -1,93 +1,121 @@
 <?php
-// T2.3.1: Setup OpenAI PHP client.
+// Cliente de la API de Anthropic (Claude) para las respuestas de chat.
+// Los embeddings del RAG siguen usando OpenAI (ver classes/embedding_manager.php).
 namespace block_pulso;
 
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Clase encargada de la comunicación con la API de OpenAI.
+ * Clase encargada de la comunicación con la API de Anthropic (Claude).
  */
-class openai_connector {
+class anthropic_connector {
 
     /**
      * Modelo rápido/barato para tareas auxiliares (preguntas de seguimiento).
      * No se usa para la respuesta principal.
      */
-    const FAST_MODEL = 'gpt-4o-mini';
+    const FAST_MODEL = 'claude-haiku-4-5';
+
+    /** Versión de la API de Anthropic requerida por cabecera. */
+    const API_VERSION = '2023-06-01';
 
     private $apikey;
     private $model;
-    private $apiurl = 'https://api.openai.com/v1/chat/completions';
+    private $apiurl = 'https://api.anthropic.com/v1/messages';
 
     /**
      * Constructor: Inicializa el cliente usando la API Key de los ajustes.
-     * Criterio de Aceptación: "Initialize OpenAI client using API key from settings"
      */
     public function __construct() {
-        // Recuperamos la configuración que guardamos en la administración (T2.1.4)
         $config = get_config('block_pulso');
-        
-        // Verificamos que exista la clave
-        if (empty($config->openai_key)) {
-            // Lanzamos una excepción de Moodle si no hay clave configurada
-            throw new \moodle_exception('error_no_apikey', 'block_pulso');
+
+        if (empty($config->anthropic_key)) {
+            throw new \moodle_exception('error_no_apikey_anthropic', 'block_pulso');
         }
 
-        $this->apikey = $config->openai_key;
-        // Si no se configuró modelo, usamos gpt-4o por defecto
-        $this->model = $config->model ?: 'gpt-4o'; 
+        $this->apikey = $config->anthropic_key;
+        // Si no se configuró modelo, usamos claude-sonnet-5 por defecto.
+        $this->model = $config->model ?: 'claude-sonnet-5';
+    }
+
+    /**
+     * Cabeceras HTTP comunes para cualquier llamada a la API de Anthropic.
+     *
+     * @return string[]
+     */
+    private function headers(): array {
+        return [
+            'Content-Type: application/json',
+            'x-api-key: ' . $this->apikey,
+            'anthropic-version: ' . self::API_VERSION,
+        ];
+    }
+
+    /**
+     * Filtra el historial de conversación a solo mensajes user/assistant,
+     * tal y como exige la Messages API (el system prompt va aparte).
+     *
+     * @param array $conversation_history
+     * @return array
+     */
+    private function build_messages(array $conversation_history, string $user_message): array {
+        $messages = [];
+        foreach ($conversation_history as $msg) {
+            if (isset($msg['role'], $msg['content']) && in_array($msg['role'], ['user', 'assistant'], true)) {
+                $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
+            }
+        }
+        $messages[] = ['role' => 'user', 'content' => $user_message];
+        return $messages;
+    }
+
+    /**
+     * Extrae el primer bloque de texto de la respuesta de Anthropic.
+     *
+     * @param array $content Array "content" de la respuesta.
+     * @return string
+     */
+    private function extract_text(array $content): string {
+        foreach ($content as $block) {
+            if (($block['type'] ?? '') === 'text') {
+                return (string)($block['text'] ?? '');
+            }
+        }
+        return '';
     }
 
     /**
      * Envía una consulta básica a la IA para verificar la conexión.
-     * Criterio de Aceptación: "Prepare basic chat completion request payload"
      *
      * @param string $user_prompt El texto que escribe el usuario.
-     * @return stdClass La respuesta cruda de OpenAI desglosada.
+     * @return stdClass La respuesta cruda de Anthropic desglosada.
      */
     public function send_basic_test_query(string $user_prompt) {
         global $CFG;
 
-        // 1. Preparar el PAYLOAD básico según documentación de OpenAI
         $payload = [
             'model' => $this->model,
+            'system' => 'Eres Pulso AI, un asistente de analítica para Moodle. Responde de forma concisa y educada.',
             'messages' => [
-                [
-                    'role' => 'system', 
-                    'content' => 'Eres Pulso AI, un asistente de analítica para Moodle. Responde de forma concisa y educada.'
-                ],
-                [
-                    'role' => 'user', 
-                    'content' => $user_prompt
-                ]
+                ['role' => 'user', 'content' => $user_prompt],
             ],
-            'temperature' => 0.7, // Controla la "creatividad" de la respuesta
-            'max_tokens' => 150   // Limitamos para pruebas
+            'max_tokens' => 150, // Anthropic exige max_tokens en cada petición.
         ];
 
-        // 2. Usar el cliente nativo cURL de Moodle para hacer la petición POST
         require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
-        
-        // Configuramos las cabeceras HTTP necesarias (Authorization)
-        $curl->setHeader([
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $this->apikey
-        ]);
 
-        // Convertimos el payload a JSON y hacemos el envío
+        $curl->setHeader($this->headers());
+
         $json_payload = json_encode($payload);
         $response_raw = $curl->post($this->apiurl, $json_payload);
 
-        // 3. Procesar la respuesta
         if ($curl->errno) {
-            // Manejo básico de errores de red/conexión
             throw new \moodle_exception('error_api_connection', 'block_pulso', '', $curl->error);
         }
 
         $response = json_decode($response_raw);
 
-        // Verificamos si OpenAI devolvió un error (ej: clave inválida)
         if (isset($response->error)) {
             throw new \moodle_exception('error_api_response', 'block_pulso', '', $response->error->message);
         }
@@ -97,7 +125,6 @@ class openai_connector {
 
     /**
      * Envía una consulta con contexto del curso para análisis inteligente.
-     * Este método es usado por el chat UI (T2.3.2) para procesar queries de usuarios.
      *
      * @param string $user_message El mensaje del usuario con contexto del curso
      * @param string $system_prompt El prompt del sistema que define el rol de la IA
@@ -114,56 +141,25 @@ class openai_connector {
     ): array {
         global $CFG;
 
-        // 1. Construir el arreglo de mensajes
-        $messages = [
-            [
-                'role' => 'system',
-                'content' => $system_prompt
-            ]
-        ];
-
-        // 2. Agregar el historial de conversación si existe
-        if (!empty($conversation_history)) {
-            foreach ($conversation_history as $msg) {
-                if (isset($msg['role']) && isset($msg['content'])) {
-                    $messages[] = [
-                        'role' => $msg['role'],
-                        'content' => $msg['content']
-                    ];
-                }
-            }
-        }
-
-        // 3. Agregar el mensaje actual del usuario
-        $messages[] = [
-            'role' => 'user',
-            'content' => $user_message
-        ];
-
-        // 4. Preparar el payload para OpenAI
         $payload = [
             'model' => $this->model,
-            'messages' => $messages,
-            'temperature' => 0.5,      // Más preciso que creativo
+            'system' => $system_prompt,
+            'messages' => $this->build_messages($conversation_history, $user_message),
             'max_tokens' => $max_tokens,
-            'top_p' => 0.9,            // Nucleus sampling
-            'presence_penalty' => 0.1   // Reducir repeticiones
+            // Sin temperature/top_p: Claude Sonnet 5 / Opus 4.8 rechazan (400) valores
+            // no-default de estos parámetros; se omiten para funcionar con cualquier
+            // modelo del selector.
         ];
 
-        // 5. Hacer la solicitud a OpenAI
         require_once($CFG->libdir . '/filelib.php');
         $curl = new \curl();
         $curl->setopt(['CURLOPT_TIMEOUT' => 55]);
 
-        $curl->setHeader([
-            'Content-Type: application/json',
-            'Authorization: Bearer ' . $this->apikey
-        ]);
+        $curl->setHeader($this->headers());
 
         $json_payload = json_encode($payload);
         $response_raw = $curl->post($this->apiurl, $json_payload);
 
-        // 6. Validar respuesta
         if ($curl->errno) {
             throw new \moodle_exception(
                 'error_api_connection',
@@ -175,7 +171,6 @@ class openai_connector {
 
         $response = json_decode($response_raw, true);
 
-        // Verificar si hay error en la respuesta de OpenAI
         if (isset($response['error'])) {
             throw new \moodle_exception(
                 'error_api_response',
@@ -185,31 +180,35 @@ class openai_connector {
             );
         }
 
-        // 7. Extraer la respuesta y contar tokens
-        if (empty($response['choices'][0]['message']['content'])) {
+        $stop_reason = $response['stop_reason'] ?? 'unknown';
+        $answer = trim($this->extract_text($response['content'] ?? []));
+
+        if ($answer === '') {
+            if ($stop_reason === 'refusal') {
+                throw new \moodle_exception('error_refusal', 'block_pulso');
+            }
             throw new \moodle_exception(
                 'error_empty_response',
                 'block_pulso',
                 '',
-                'No content in OpenAI response'
+                'No content in Anthropic response'
             );
         }
 
-        $answer = trim($response['choices'][0]['message']['content']);
-        $tokens_used = $response['usage']['total_tokens'] ?? 0;
+        $tokens_used = ($response['usage']['input_tokens'] ?? 0) + ($response['usage']['output_tokens'] ?? 0);
 
         return [
             'answer' => $answer,
             'tokens_used' => (int)$tokens_used,
             'model' => $this->model,
-            'finish_reason' => $response['choices'][0]['finish_reason'] ?? 'unknown'
+            'finish_reason' => $stop_reason,
         ];
     }
 
     /**
      * Igual que send_query_with_context() pero en modo STREAMING (SSE).
      *
-     * Abre la petición a OpenAI con stream=true y va invocando $ondelta con
+     * Abre la petición a Anthropic con stream=true y va invocando $ondelta con
      * cada fragmento de texto a medida que llega, para que el endpoint pueda
      * reenviarlo al navegador sin esperar la respuesta completa.
      *
@@ -228,27 +227,17 @@ class openai_connector {
         int $max_tokens,
         callable $ondelta
     ): array {
-        $messages = [['role' => 'system', 'content' => $system_prompt]];
-        foreach ($conversation_history as $msg) {
-            if (isset($msg['role']) && isset($msg['content'])) {
-                $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
-            }
-        }
-        $messages[] = ['role' => 'user', 'content' => $user_message];
-
         $payload = [
             'model' => $this->model,
-            'messages' => $messages,
-            'temperature' => 0.5,
+            'system' => $system_prompt,
+            'messages' => $this->build_messages($conversation_history, $user_message),
             'max_tokens' => $max_tokens,
-            'top_p' => 0.9,
-            'presence_penalty' => 0.1,
             'stream' => true,
-            'stream_options' => ['include_usage' => true]
         ];
 
         $answer = '';
-        $tokens_used = 0;
+        $tokens_in = 0;
+        $tokens_out = 0;
         $finish_reason = 'unknown';
         $sse_buffer = '';
         $error_body = '';
@@ -258,17 +247,13 @@ class openai_connector {
             CURLOPT_URL => $this->apiurl,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $this->apikey,
-                'Accept: text/event-stream'
-            ],
+            CURLOPT_HTTPHEADER => array_merge($this->headers(), ['Accept: text/event-stream']),
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (
-                &$sse_buffer, &$answer, &$tokens_used, &$finish_reason, &$error_body, $ondelta
+                &$sse_buffer, &$answer, &$tokens_in, &$tokens_out, &$finish_reason, &$error_body, $ondelta
             ) {
-                // Con error HTTP, OpenAI devuelve un body JSON normal: acumularlo.
+                // Con error HTTP, Anthropic devuelve un body JSON normal: acumularlo.
                 $httpcode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
                 if ($httpcode >= 400) {
                     $error_body .= $data;
@@ -283,23 +268,32 @@ class openai_connector {
                         continue;
                     }
                     $json = trim(substr($line, 5));
-                    if ($json === '[DONE]') {
-                        continue;
-                    }
                     $event = json_decode($json, true);
-                    if (!is_array($event)) {
+                    if (!is_array($event) || !isset($event['type'])) {
                         continue;
                     }
-                    if (isset($event['usage']['total_tokens'])) {
-                        $tokens_used = (int)$event['usage']['total_tokens'];
-                    }
-                    if (!empty($event['choices'][0]['finish_reason'])) {
-                        $finish_reason = (string)$event['choices'][0]['finish_reason'];
-                    }
-                    $delta = $event['choices'][0]['delta']['content'] ?? '';
-                    if ($delta !== '') {
-                        $answer .= $delta;
-                        $ondelta($delta);
+
+                    switch ($event['type']) {
+                        case 'message_start':
+                            $tokens_in = (int)($event['message']['usage']['input_tokens'] ?? 0);
+                            break;
+                        case 'content_block_delta':
+                            if (($event['delta']['type'] ?? '') === 'text_delta') {
+                                $delta = (string)($event['delta']['text'] ?? '');
+                                if ($delta !== '') {
+                                    $answer .= $delta;
+                                    $ondelta($delta);
+                                }
+                            }
+                            break;
+                        case 'message_delta':
+                            if (isset($event['usage']['output_tokens'])) {
+                                $tokens_out = (int)$event['usage']['output_tokens'];
+                            }
+                            if (!empty($event['delta']['stop_reason'])) {
+                                $finish_reason = (string)$event['delta']['stop_reason'];
+                            }
+                            break;
                     }
                 }
                 return strlen($data);
@@ -329,20 +323,22 @@ class openai_connector {
         }
 
         if ($answer === '') {
-            throw new \moodle_exception('error_empty_response', 'block_pulso', '', 'No content in OpenAI stream');
+            if ($finish_reason === 'refusal') {
+                throw new \moodle_exception('error_refusal', 'block_pulso');
+            }
+            throw new \moodle_exception('error_empty_response', 'block_pulso', '', 'No content in Anthropic stream');
         }
 
         return [
             'answer' => trim($answer),
-            'tokens_used' => $tokens_used,
+            'tokens_used' => $tokens_in + $tokens_out,
             'model' => $this->model,
-            'finish_reason' => $finish_reason
+            'finish_reason' => $finish_reason,
         ];
     }
 
     /**
      * Enviar query analítica con system prompt completo y schema JSON
-     * Task T2.3.3: Design system prompt with schema and examples
      *
      * @param string $user_query Pregunta del usuario
      * @param array $course_context Contexto del curso desde data_retriever
@@ -358,13 +354,10 @@ class openai_connector {
         int $max_tokens = 800,
         ?string $custom_system_prompt = null
     ): array {
-        // Cargar system_prompt_designer
         require_once(__DIR__ . '/system_prompt_designer.php');
 
-        // Generar system prompt enriquecido con contexto del curso
         $system_prompt = $custom_system_prompt ?: system_prompt_designer::generate_prompt_with_context($course_context);
 
-        // Enviar query a OpenAI
         $response = $this->send_query_with_context(
             $user_query,
             $system_prompt,
@@ -372,7 +365,6 @@ class openai_connector {
             $max_tokens
         );
 
-        // Validar que la respuesta sigue el schema JSON
         $is_valid = system_prompt_designer::validate_response($response['answer']);
 
         return [
@@ -461,7 +453,6 @@ class openai_connector {
 
     /**
      * Generar preguntas de seguimiento basadas en contexto y respuesta anterior
-     * Task T2.4.12: Generate follow-up questions
      *
      * @param string $user_query Pregunta original del usuario
      * @param string $ai_response Respuesta anterior de la IA
@@ -473,12 +464,10 @@ class openai_connector {
         string $ai_response,
         array $course_context = []
     ): array {
-        global $CFG;
-
         try {
             // System prompt para generar preguntas de seguimiento
             $system_prompt = <<<'PROMPT'
-Eres un asistente educativo inteligente. Basándote en la pregunta del usuario y la respuesta anterior, 
+Eres un asistente educativo inteligente. Basándote en la pregunta del usuario y la respuesta anterior,
 genera exactamente 2-3 preguntas de seguimiento naturales y relevantes que el profesor podría hacer a continuación.
 
 Las preguntas deben:
@@ -501,23 +490,17 @@ PROMPT;
             $truncated_response = substr($ai_response, 0, 500);
             $followup_prompt = "Pregunta original: \"$user_query\"\n\nRespuesta anterior: \"$truncated_response\"\n\nGenera 2-3 preguntas de seguimiento relevantes.";
 
-            // Llamar a OpenAI para generar las preguntas.
+            // Llamar a Claude para generar las preguntas.
             // Tarea auxiliar y corta → modelo rápido y menos tokens: reduce
             // varios segundos de latencia frente a usar el modelo principal.
             $payload = [
                 'model' => self::FAST_MODEL,
+                'system' => $system_prompt,
                 'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => $system_prompt
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => $followup_prompt
-                    ]
+                    ['role' => 'user', 'content' => $followup_prompt],
                 ],
                 'temperature' => 0.7,
-                'max_tokens' => 150
+                'max_tokens' => 150,
             ];
 
             $curl = curl_init();
@@ -530,10 +513,7 @@ PROMPT;
                 CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
                 CURLOPT_CUSTOMREQUEST => 'POST',
                 CURLOPT_POSTFIELDS => json_encode($payload),
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $this->apikey
-                ],
+                CURLOPT_HTTPHEADER => $this->headers(),
             ]);
 
             $response = curl_exec($curl);
@@ -548,17 +528,15 @@ PROMPT;
             }
 
             $response_data = json_decode($response, true);
-            if (!isset($response_data['choices'][0]['message']['content'])) {
+            $content = $this->extract_text($response_data['content'] ?? []);
+            if ($content === '') {
                 error_log('Follow-up questions: Missing content in response');
                 return [];
             }
 
-            // Parsear respuesta
-            $content = $response_data['choices'][0]['message']['content'];
-            
             // Intenta parsear como JSON
             $questions_json = json_decode($content, true);
-            
+
             // Si falla el JSON, intentar extraer las preguntas manualmente
             if (!$questions_json) {
                 error_log('Follow-up questions: Invalid JSON - ' . substr($content, 0, 200));

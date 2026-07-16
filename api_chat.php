@@ -1,9 +1,8 @@
 <?php
 /**
  * API Endpoint: Chat Query Processing
- * Task T2.3.4: Implement OpenAI call with dynamic data injection
  *
- * Recibe query del usuario y retorna respuesta de OpenAI
+ * Recibe query del usuario y retorna respuesta de Claude (Anthropic)
  * con contexto del curso inyectado dinámicamente.
  *
  * Endpoint clásico (no streaming). El cliente usa api_chat_stream.php por
@@ -22,13 +21,13 @@ require_once(__DIR__ . '/../../config.php');
 
 // Incluir clases necesarias
 require_once(__DIR__ . '/classes/data_retriever.php');
-require_once(__DIR__ . '/classes/openai_connector.php');
+require_once(__DIR__ . '/classes/anthropic_connector.php');
 require_once(__DIR__ . '/classes/system_prompt_designer.php');
 require_once(__DIR__ . '/classes/rag_retriever.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
 
 use block_pulso\chat_pipeline;
-use block_pulso\openai_connector;
+use block_pulso\anthropic_connector;
 use block_pulso\system_prompt_designer;
 
 $courseid = optional_param('courseid', 0, PARAM_INT);
@@ -129,7 +128,7 @@ try {
         $rag_context
     );
 
-    $connector = new openai_connector();
+    $connector = new anthropic_connector();
     $ai_response = $connector->send_analytics_query_with_schema(
         $user_query,
         $course_context,
@@ -176,7 +175,7 @@ try {
         'message' => 'Query procesado exitosamente',
         'answer' => $answer,
         'tokens_used' => $ai_response['tokens_used'] ?? 0,
-        'model' => $ai_response['model'] ?? 'gpt-4o',
+        'model' => $ai_response['model'] ?? 'claude-sonnet-5',
         'schema_valid' => $schema_data ? true : false,
         'schema_data' => $schema_data,
         'rag_diagnostics' => $rag_diagnostics,

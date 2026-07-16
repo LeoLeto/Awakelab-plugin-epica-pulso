@@ -828,7 +828,7 @@ function render_chat_simple($courseid, $context) {
                 
                 // ========== MANEJO DE ERRORES ==========
                 if (data.status === 'insufficient_data' || data.status === 'error') {
-                    console.warn('⚠️ OpenAI retornó status:', data.status);
+                    console.warn('⚠️ La IA retornó status:', data.status);
                     // Intentar mostrar mensaje útil en vez de solo error
                     if (data.message) {
                         return `<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; color: #1565c0;">ℹ️ ${escapeHtml(data.message)}</div>`;

@@ -34,13 +34,20 @@ but the `$plugin->version` bump is still mandatory every time.
   quizzes…) + RAG chunk retrieval. Semantic course-level questions
   ("¿de qué trata el curso?") must return `null` from the direct path so the
   LLM answers with RAG context (`is_course_about_query()`).
-- `classes/openai_connector.php` — OpenAI calls: gpt-4o (configurable) for main
-  answers, `FAST_MODEL` (gpt-4o-mini) for follow-up questions,
-  `stream_query_with_context()` for SSE streaming.
-- Both endpoints call `\core\session\manager::write_close()` before OpenAI so
-  the Moodle session lock doesn't freeze the user's other tabs. Server-side
-  `$SESSION` history writes after that point don't persist — the client's
-  sessionStorage copy is the source of truth.
+- `classes/anthropic_connector.php` — Anthropic (Claude) calls for ALL chat
+  answers: `claude-sonnet-5` (configurable via `block_pulso/model`, options
+  also include `claude-opus-4-8` and `claude-haiku-4-5`) for main answers,
+  `FAST_MODEL` (`claude-haiku-4-5`) for follow-up questions,
+  `stream_query_with_context()` for SSE streaming (parses Anthropic's own SSE
+  event types: `message_start`, `content_block_delta`, `message_delta`,
+  `message_stop`). Uses `block_pulso/anthropic_key`, NOT `openai_key`.
+- `classes/embedding_manager.php` — still uses OpenAI (`block_pulso/openai_key`,
+  `text-embedding-3-small`) exclusively for RAG embeddings. This is the ONLY
+  remaining use of the OpenAI key in the plugin — do not repurpose it for chat.
+- Both endpoints call `\core\session\manager::write_close()` before calling the
+  AI so the Moodle session lock doesn't freeze the user's other tabs.
+  Server-side `$SESSION` history writes after that point don't persist — the
+  client's sessionStorage copy is the source of truth.
 
 ## Bug backlog — evaluación jul-2026 (arreglar en este orden)
 

@@ -3,10 +3,12 @@ $string['pluginname'] = 'Pulso AI';
 $string['pulso:addinstance'] = 'Add a new Pulso block';
 $string['pulso:myaddinstance'] = 'Add a new Pulso block to the My Moodle page';
 // Settings strings for T2.1.4
-$string['setapikey'] = 'OpenAI API Key';
-$string['setapikey_desc'] = 'Enter your secret API key from OpenAI. This will be stored securely and used to process analytics queries.';
-$string['setmodel'] = 'AI Model';
-$string['setmodel_desc'] = 'Choose the OpenAI model to use for analyzing course data.';
+$string['setanthropickey'] = 'Anthropic API Key (chat)';
+$string['setanthropickey_desc'] = 'Enter your secret API key from Anthropic (Claude). Used exclusively to generate the chat answers (analytics and content Q&A).';
+$string['setapikey'] = 'OpenAI API Key (RAG embeddings only)';
+$string['setapikey_desc'] = 'Enter your secret API key from OpenAI. Used exclusively to generate embeddings for the RAG content index — it is no longer used for chat answers.';
+$string['setmodel'] = 'AI Model (chat)';
+$string['setmodel_desc'] = 'Choose the Claude model to use for analyzing course data and answering questions.';
 
 // === CHAT QUERY UI STRINGS (T2.3.2) ===
 $string['chat_title'] = 'Pulso Analytics AI';
@@ -30,11 +32,13 @@ $string['chat_thinking'] = 'Thinking...';
 
 // === ERRORS ===
 $string['error_no_apikey'] = 'OpenAI API key is not configured. Please set it in Site Administration → Plugins → Blocks → Pulso AI.';
+$string['error_no_apikey_anthropic'] = 'Anthropic API key is not configured. Please set it in Site Administration → Plugins → Blocks → Pulso AI.';
 $string['error_no_response'] = 'No response received from the AI service.';
 $string['error_api_error'] = 'API Error: {$a}';
 $string['error_invalid_course'] = 'Invalid course ID.';
 $string['error_no_permission'] = 'You do not have permission to use this feature.';
 $string['error_timeout'] = 'Request timed out. Please try again.';
+$string['error_refusal'] = 'The AI declined to answer this request for policy reasons. Try rephrasing your question.';
 
 // === ACCESSIBILITY ===
 $string['send_message'] = 'Send message';
@@ -50,7 +54,7 @@ $string['plugin_disabled_course'] = 'Pulso AI is not enabled for this course.';
 // === T2.6.2: Data access permission controls ===
 $string['pulso:viewanalytics'] = 'View Pulso analytics data';
 $string['dataaccess_heading'] = 'Data Access Controls';
-$string['dataaccess_heading_desc'] = 'Choose which data categories are available for AI analysis. Disabling a category will prevent it from being sent to OpenAI.';
+$string['dataaccess_heading_desc'] = 'Choose which data categories are available for AI analysis. Disabling a category will prevent it from being sent to the AI (Anthropic).';
 $string['data_completion'] = 'Completion data';
 $string['data_completion_desc'] = 'Allow access to course and activity completion data.';
 $string['data_grades'] = 'Grades data';

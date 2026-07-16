@@ -4,17 +4,90 @@ defined('MOODLE_INTERNAL') || die();
 // Solo los usuarios con permisos de administración total del sitio pueden ver esto.
 if ($ADMIN->fulltree) {
 
-    // Requisito T2.1.4.1: Campo para la OpenAI API Key.
-    // Usamos admin_setting_configpasswordunmask para que la clave esté oculta (con puntos) 
+    // Anthropic API Key: se usa EXCLUSIVAMENTE para las respuestas de chat (Claude).
+    // Usamos admin_setting_configpasswordunmask para que la clave esté oculta (con puntos)
     // pero el administrador pueda desenmascararla para verificarla. Es más seguro.
     $settings->add(new admin_setting_configpasswordunmask(
-        'block_pulso/openai_key',                     // Variable de configuración: componente/nombre
-        get_string('setapikey', 'block_pulso'),       // Título (desde archivo de idioma)
-        get_string('setapikey_desc', 'block_pulso'),  // Descripción
-        ''                                            // Valor por defecto (vacío)
+        'block_pulso/anthropic_key',
+        get_string('setanthropickey', 'block_pulso'),
+        get_string('setanthropickey_desc', 'block_pulso'),
+        ''
     ));
 
-    // "Check key" button rendered below the API key field.
+    // "Check key" button para la clave de Anthropic.
+    $settings->add(new admin_setting_description(
+        'block_pulso/test_anthropic_key_button',
+        '',
+        '<button type="button" id="pulso-test-anthropic-key-btn" class="btn btn-secondary btn-sm">
+            Check API key
+        </button>
+        <span id="pulso-test-anthropic-key-result" style="margin-left:10px;font-weight:bold"></span>
+        <script>
+        (function() {
+            var s = document.createElement("style");
+            s.textContent =
+                "#admin-anthropic_key .form-inline{overflow:hidden}" +
+                "#admin-anthropic_key .form-control{min-width:0;flex:1 1 auto;max-width:100%}" +
+                "#admin-test_anthropic_key_button{margin-bottom:1.5rem}";
+            document.head.appendChild(s);
+
+            function init() {
+                var btn = document.getElementById("pulso-test-anthropic-key-btn");
+                if (!btn) { return; }
+                btn.addEventListener("click", function() {
+                    var result = document.getElementById("pulso-test-anthropic-key-result");
+                    btn.disabled = true;
+                    btn.textContent = "Checking…";
+                    result.textContent = "";
+                    fetch(M.cfg.wwwroot + "/blocks/pulso/check_anthropic_key.php", {credentials: "same-origin"})
+                        .then(function(r) { return r.json(); })
+                        .then(function(d) {
+                            result.style.color = d.success ? "green" : "red";
+                            result.textContent  = (d.success ? "✓ " : "✗ ") + d.message;
+                        })
+                        .catch(function(e) {
+                            result.style.color = "red";
+                            result.textContent  = "✗ " + e.message;
+                        })
+                        .finally(function() {
+                            btn.disabled = false;
+                            btn.textContent = "Check API key";
+                        });
+                });
+            }
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", init);
+            } else {
+                init();
+            }
+        })();
+        </script>'
+    ));
+
+    // Selector de modelo Claude para las respuestas de chat.
+    $options = [
+        'claude-sonnet-5' => 'Claude Sonnet 5 (Recomendado)',
+        'claude-opus-4-8' => 'Claude Opus 4.8 (Máxima calidad)',
+        'claude-haiku-4-5' => 'Claude Haiku 4.5 (Económico)',
+    ];
+    $settings->add(new admin_setting_configselect(
+        'block_pulso/model',                          // Variable de configuración
+        get_string('setmodel', 'block_pulso'),        // Título
+        get_string('setmodel_desc', 'block_pulso'),   // Descripción
+        'claude-sonnet-5',                            // Valor por defecto
+        $options                                      // Opciones del selector
+    ));
+
+    // OpenAI API Key: se usa EXCLUSIVAMENTE para generar los embeddings del RAG
+    // (classes/embedding_manager.php). Ya NO se usa para el chat.
+    $settings->add(new admin_setting_configpasswordunmask(
+        'block_pulso/openai_key',
+        get_string('setapikey', 'block_pulso'),
+        get_string('setapikey_desc', 'block_pulso'),
+        ''
+    ));
+
+    // "Check key" button para la clave de OpenAI (embeddings).
     $settings->add(new admin_setting_description(
         'block_pulso/test_key_button',
         '',
@@ -63,19 +136,6 @@ if ($ADMIN->fulltree) {
             }
         })();
         </script>'
-    ));
-
-    // Requisito T2.1.4.2: Selector de Modelo de IA.
-    $options = [
-        'gpt-4o' => 'GPT-4o (Recomendado)',
-        'gpt-4'  => 'GPT-4'
-    ];
-    $settings->add(new admin_setting_configselect(
-        'block_pulso/model',                          // Variable de configuración
-        get_string('setmodel', 'block_pulso'),        // Título
-        get_string('setmodel_desc', 'block_pulso'),   // Descripción
-        'gpt-4o',                                     // Valor por defecto
-        $options                                      // Opciones del selector
     ));
 
     // ============================================================

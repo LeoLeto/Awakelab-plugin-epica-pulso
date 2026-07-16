@@ -19,7 +19,7 @@ namespace block_pulso;
 defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/data_retriever.php');
-require_once(__DIR__ . '/openai_connector.php');
+require_once(__DIR__ . '/anthropic_connector.php');
 require_once(__DIR__ . '/system_prompt_designer.php');
 require_once(__DIR__ . '/rag_retriever.php');
 
@@ -761,7 +761,7 @@ class chat_pipeline {
         // Modo contenido: responder pregunta concreta sobre el texto de un PDF.
         if (!empty($direct_course_answer['content_mode']) && !empty($direct_course_answer['raw_content_source'])) {
             try {
-                $contentConnector = new openai_connector();
+                $contentConnector = new anthropic_connector();
                 $aiAnswer = $contentConnector->answer_document_question(
                     (string)$direct_course_answer['raw_content_source'],
                     $user_query,
@@ -779,7 +779,7 @@ class chat_pipeline {
 
         if (!empty($direct_course_answer['summary_mode']) && !empty($direct_course_answer['raw_summary_source'])) {
             try {
-                $summaryConnector = new openai_connector();
+                $summaryConnector = new anthropic_connector();
                 $aiSummary = $summaryConnector->summarize_document_text(
                     (string)$direct_course_answer['raw_summary_source'],
                     $user_query,

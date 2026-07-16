@@ -2,8 +2,8 @@
 /**
  * API Endpoint: Chat Query Processing — STREAMING (Server-Sent Events)
  *
- * Igual que api_chat.php pero transmite la respuesta de OpenAI token a token,
- * al estilo ChatGPT, para que el usuario vea la respuesta mientras se genera.
+ * Igual que api_chat.php pero transmite la respuesta de Claude (Anthropic)
+ * token a token, para que el usuario vea la respuesta mientras se genera.
  *
  * Protocolo (eventos SSE):
  *   status    → {stage: 'retrieving'|'generating'}   progreso previo a la IA
@@ -21,13 +21,13 @@ define('NO_OUTPUT_BUFFERING', true);
 
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/classes/data_retriever.php');
-require_once(__DIR__ . '/classes/openai_connector.php');
+require_once(__DIR__ . '/classes/anthropic_connector.php');
 require_once(__DIR__ . '/classes/system_prompt_designer.php');
 require_once(__DIR__ . '/classes/rag_retriever.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
 
 use block_pulso\chat_pipeline;
-use block_pulso\openai_connector;
+use block_pulso\anthropic_connector;
 use block_pulso\system_prompt_designer;
 
 $courseid = optional_param('courseid', 0, PARAM_INT);
@@ -161,7 +161,7 @@ try {
         $rag_context
     );
 
-    $connector = new openai_connector();
+    $connector = new anthropic_connector();
     $ai_response = $connector->stream_query_with_context(
         $user_query,
         $system_prompt,
@@ -180,7 +180,7 @@ try {
         'message' => 'Query procesado exitosamente',
         'answer' => $answer,
         'tokens_used' => $ai_response['tokens_used'] ?? 0,
-        'model' => $ai_response['model'] ?? 'gpt-4o',
+        'model' => $ai_response['model'] ?? 'claude-sonnet-5',
         'schema_valid' => $schema_data ? true : false,
         'schema_data' => $schema_data,
         'rag_diagnostics' => $rag_diagnostics,

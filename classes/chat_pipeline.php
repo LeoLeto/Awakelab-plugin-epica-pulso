@@ -320,11 +320,14 @@ class chat_pipeline {
             '|del\s+anterior|de\s+la\s+anterior)\b/u',
             $qnorm
         );
+        // Referencia ORDINAL a la posicion de un recurso ya visto ("el primero",
+        // "el segundo", "el ultimo"...) — cuenta tambien como continuacion clara.
+        $hasOrdinalReference = self::detect_ordinal_reference($qnorm) !== null;
         $needsHistoryHint = !$isAnalyticsQuery
             && !$mentionsSection
             && !$alreadyNamesResource
-            && ($hasAnaphoricReference || $asksAboutPrevious)
-            && ($isContentSpecificQuery || $isSummaryOfPrevious || $refersToKnownResource || $asksAboutPrevious || $bareSummaryRequest || $refersToActivity || $asksAboutActivity);
+            && ($hasAnaphoricReference || $asksAboutPrevious || $hasOrdinalReference)
+            && ($isContentSpecificQuery || $isSummaryOfPrevious || $refersToKnownResource || $asksAboutPrevious || $bareSummaryRequest || $refersToActivity || $asksAboutActivity || $hasOrdinalReference);
 
         if ($needsHistoryHint) {
             $foundResource = self::find_resource_in_history($history, $qnorm);
@@ -368,6 +371,18 @@ class chat_pipeline {
         $wantsAssign = (bool)preg_match('/\b(tarea|assignment)\b/u', $qnorm);
         $wantsSpecificType = $wantsPdf || $wantsQuiz || $wantsAssign;
 
+        // Referencia por POSICION ("el primero", "el segundo", "el ultimo"...):
+        // resolver sobre la lista ordenada de recursos distintos, no por "mas reciente".
+        $ordinal = self::detect_ordinal_reference($qnorm);
+        if ($ordinal !== null) {
+            $ordered = self::list_distinct_resources_in_history($history, $wantsPdf, $wantsQuiz, $wantsAssign);
+            if (empty($ordered)) {
+                return null;
+            }
+            $idx = $ordinal['fromEnd'] ? (count($ordered) - $ordinal['n']) : ($ordinal['n'] - 1);
+            return $ordered[$idx] ?? null;
+        }
+
         $foundResource = null;
         $fallbackResource = null;
 
@@ -408,6 +423,86 @@ class chat_pipeline {
         }
 
         return $foundResource;
+    }
+
+    /**
+     * Detecta una referencia ORDINAL a la posicion de un recurso en el historial
+     * ("el primero", "el segundo", "el ultimo", "el penultimo"...). Excluye los
+     * ordinales que se refieren a contenido DENTRO de un documento ya resuelto
+     * ("el primer problema", "el segundo ejercicio", "la primera pregunta") — esos
+     * no son recursos distintos, son posiciones dentro del recurso ya identificado.
+     *
+     * @param string $qnorm
+     * @return array|null ['fromEnd' => bool, 'n' => int] posicion 1-based
+     */
+    private static function detect_ordinal_reference(string $qnorm): ?array {
+        if (!preg_match(
+            '/\b(primer[oa]?|segund[oa]|tercer[oa]?|cuart[oa]|quint[oa]|[uú]ltim[oa]|pen[uú]ltim[oa])\b(?!\s*(problema|ejercicio|pregunta))/u',
+            $qnorm,
+            $m
+        )) {
+            return null;
+        }
+
+        $word = $m[1];
+        $ordinalMap = [
+            'primer' => 1, 'primero' => 1, 'primera' => 1,
+            'segundo' => 2, 'segunda' => 2,
+            'tercer' => 3, 'tercero' => 3, 'tercera' => 3,
+            'cuarto' => 4, 'cuarta' => 4,
+            'quinto' => 5, 'quinta' => 5,
+        ];
+        if (isset($ordinalMap[$word])) {
+            return ['fromEnd' => false, 'n' => $ordinalMap[$word]];
+        }
+        if (in_array($word, ['ultimo', 'último', 'ultima', 'última'], true)) {
+            return ['fromEnd' => true, 'n' => 1];
+        }
+        if (in_array($word, ['penultimo', 'penúltimo', 'penultima', 'penúltima'], true)) {
+            return ['fromEnd' => true, 'n' => 2];
+        }
+        return null;
+    }
+
+    /**
+     * Lista, en orden cronologico y sin duplicados, los recursos/actividades
+     * mencionados en el historial — usada para resolver referencias ordinales
+     * ("el primero", "el segundo", "el ultimo").
+     *
+     * @param array $history
+     * @param bool $wantsPdf
+     * @param bool $wantsQuiz
+     * @param bool $wantsAssign
+     * @return array lista de ['name' =>, 'section' =>, 'type' =>]
+     */
+    private static function list_distinct_resources_in_history(array $history, bool $wantsPdf, bool $wantsQuiz, bool $wantsAssign): array {
+        $wantsSpecificType = $wantsPdf || $wantsQuiz || $wantsAssign;
+        $seen = [];
+        $ordered = [];
+        foreach ($history as $msg) {
+            $info = self::extract_resource_from_message($msg);
+            if ($info === null) {
+                continue;
+            }
+            if ($wantsSpecificType) {
+                if ($wantsPdf && $info['type'] !== 'resource') {
+                    continue;
+                }
+                if ($wantsQuiz && $info['type'] !== 'quiz') {
+                    continue;
+                }
+                if ($wantsAssign && $info['type'] !== 'assign') {
+                    continue;
+                }
+            }
+            $key = $info['type'] . '|' . mb_strtolower($info['name'], 'UTF-8');
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $ordered[] = $info;
+        }
+        return $ordered;
     }
 
     /**

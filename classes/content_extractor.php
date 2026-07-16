@@ -24,6 +24,12 @@ class content_extractor {
     /** Overlap between consecutive chunks in characters. */
     const CHUNK_OVERLAP = 200;
 
+    /** Max SCORM package files processed (rendimiento en paquetes muy grandes). */
+    const SCORM_MAX_FILES = 60;
+
+    /** Max characters extraidos de un SCORM antes de parar. */
+    const SCORM_MAX_CHARS = 80000;
+
     /**
      * Extract all content from a course and return as an array of chunks.
      *
@@ -226,6 +232,8 @@ class content_extractor {
                 return $this->extract_wiki($cmid, $instance);
             case 'resource':
                 return $this->extract_resource($cmid, $instance);
+            case 'scorm':
+                return $this->extract_scorm($cmid, $instance);
             default:
                 return [];
         }
@@ -438,6 +446,181 @@ class content_extractor {
         }
 
         return $this->chunk_text($full, $cmid, 'resource', $resource->name);
+    }
+
+    private function extract_scorm(int $cmid, int $instance): array {
+        global $DB;
+
+        $scorm = $DB->get_record('scorm', ['id' => $instance], 'name');
+        if (!$scorm) {
+            return [];
+        }
+
+        $parts = [$scorm->name];
+
+        try {
+            $context = \context_module::instance($cmid);
+            $scormtext = $this->extract_scorm_content_text($context);
+            if ($scormtext !== '') {
+                $parts[] = $scormtext;
+            } else {
+                $parts[] = 'No se pudo extraer el contenido de texto de este SCORM (puede usar un ' .
+                    'formato interactivo, p. ej. Articulate/Storyline, que no expone texto en el HTML, ' .
+                    'o estar alojado externamente).';
+            }
+        } catch (\Throwable $e) {
+            $parts[] = 'Nota: no se pudo procesar el paquete SCORM (' . $e->getMessage() . ').';
+        }
+
+        $full = trim(implode("\n\n", array_filter($parts)));
+        if (strlen($full) < 20) {
+            return [];
+        }
+
+        return $this->chunk_text($full, $cmid, 'scorm', $scorm->name);
+    }
+
+    /**
+     * Moodle descomprime el paquete SCORM al subirlo, en component 'mod_scorm',
+     * filearea 'content', itemid 0 (incluido el imsmanifest.xml) — no hace falta
+     * ZipArchive, los ficheros ya estan accesibles individualmente via file API.
+     *
+     * @param \context $context
+     * @return string
+     */
+    private function extract_scorm_content_text(\context $context): string {
+        $fs = get_file_storage();
+        $files = $fs->get_area_files($context->id, 'mod_scorm', 'content', 0, 'sortorder, filepath, filename', false);
+        if (empty($files)) {
+            return '';
+        }
+
+        // Mapa "ruta relativa" -> stored_file, para resolver los href del manifest.
+        $byPath = [];
+        $manifestFile = null;
+        foreach ($files as $file) {
+            $relpath = ltrim($file->get_filepath(), '/') . $file->get_filename();
+            $byPath[$relpath] = $file;
+            if (mb_strtolower($file->get_filename()) === 'imsmanifest.xml') {
+                $manifestFile = $file;
+            }
+        }
+
+        $orderedPaths = [];
+        if ($manifestFile !== null) {
+            $orderedPaths = $this->scorm_resolve_launch_order((string)$manifestFile->get_content(), $byPath);
+        }
+        if (empty($orderedPaths)) {
+            // Fallback: todos los HTML del paquete, en orden alfabetico de ruta.
+            foreach ($byPath as $relpath => $file) {
+                if (preg_match('/\.(html?|xhtml)$/i', $relpath)) {
+                    $orderedPaths[] = $relpath;
+                }
+            }
+            sort($orderedPaths, SORT_STRING);
+        }
+
+        $orderedPaths = array_slice($orderedPaths, 0, self::SCORM_MAX_FILES);
+
+        $pageTexts = [];
+        $totalChars = 0;
+        foreach ($orderedPaths as $relpath) {
+            if ($totalChars >= self::SCORM_MAX_CHARS) {
+                break;
+            }
+            if (!isset($byPath[$relpath])) {
+                continue;
+            }
+            $html = (string)$byPath[$relpath]->get_content();
+            $clean = $this->strip_script_and_style($html);
+            $text = $this->html_to_text($clean);
+            if (!$this->is_extracted_text_useful($text)) {
+                continue;
+            }
+            $pageTexts[] = $text;
+            $totalChars += strlen($text);
+        }
+
+        return trim(implode("\n\n", $pageTexts));
+    }
+
+    /**
+     * Resolver el orden de lanzamiento a partir de <organizations><item identifierref="...">
+     * y su correspondiente <resources><resource identifier="..." href="...">.
+     *
+     * @param string $manifestXml
+     * @param array  $byPath ruta relativa -> stored_file, para validar que el href existe en el paquete
+     * @return array lista de rutas relativas, en orden de lanzamiento
+     */
+    private function scorm_resolve_launch_order(string $manifestXml, array $byPath): array {
+        if (trim($manifestXml) === '') {
+            return [];
+        }
+
+        $manifest = @simplexml_load_string($manifestXml);
+        if ($manifest === false) {
+            return [];
+        }
+
+        $resourceHrefs = [];
+        foreach ($manifest->resources->resource ?? [] as $resource) {
+            $attrs = $resource->attributes();
+            $identifier = (string)($attrs['identifier'] ?? '');
+            $href = (string)($attrs['href'] ?? '');
+            if ($identifier === '' || $href === '') {
+                continue;
+            }
+            $normalized = ltrim(str_replace('\\', '/', $href), './');
+            if (isset($byPath[$normalized])) {
+                $resourceHrefs[$identifier] = $normalized;
+            }
+        }
+
+        if (empty($resourceHrefs)) {
+            return [];
+        }
+
+        $ordered = [];
+        $seen = [];
+        foreach ($manifest->organizations->organization ?? [] as $organization) {
+            $this->scorm_collect_item_order($organization, $resourceHrefs, $ordered, $seen);
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * Recorre recursivamente <item> (pueden anidarse) en orden de documento,
+     * acumulando las rutas de recurso referenciadas por identifierref.
+     *
+     * @param \SimpleXMLElement $node
+     * @param array $resourceHrefs
+     * @param array $ordered
+     * @param array $seen
+     */
+    private function scorm_collect_item_order(\SimpleXMLElement $node, array $resourceHrefs, array &$ordered, array &$seen): void {
+        foreach ($node->item ?? [] as $item) {
+            $attrs = $item->attributes();
+            $ref = (string)($attrs['identifierref'] ?? '');
+            if ($ref !== '' && isset($resourceHrefs[$ref]) && !isset($seen[$ref])) {
+                $seen[$ref] = true;
+                $ordered[] = $resourceHrefs[$ref];
+            }
+            $this->scorm_collect_item_order($item, $resourceHrefs, $ordered, $seen);
+        }
+    }
+
+    /**
+     * Quita bloques <script> y <style> COMPLETOS (etiqueta + contenido) antes
+     * de pasar por html_to_text(), para no colar JS/CSS como si fuera texto.
+     *
+     * @param string $html
+     * @return string
+     */
+    private function strip_script_and_style(string $html): string {
+        $html = preg_replace('/<script\b[^>]*>.*?<\/script>/is', ' ', $html);
+        $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', ' ', $html);
+        return (string)$html;
     }
 
     // ----------------------------------------------------------------

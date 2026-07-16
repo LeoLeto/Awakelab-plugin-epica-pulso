@@ -398,6 +398,22 @@ class content_extractor {
                     continue;
                 }
 
+                // Documentos Office (Word/PowerPoint) — ZIP con XML dentro.
+                $isDocx = $mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                    || preg_match('/\.docx$/i', $filename);
+                $isPptx = $mimetype === 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+                    || preg_match('/\.pptx$/i', $filename);
+                if ($isDocx || $isPptx) {
+                    $officetext = $isDocx ? $this->extract_docx_text($file) : $this->extract_pptx_text($file);
+                    if ($this->is_extracted_text_useful($officetext)) {
+                        $parts[] = 'Contenido del documento extraido:';
+                        $parts[] = $officetext;
+                    } else {
+                        $parts[] = 'No se pudo leer el contenido de este documento.';
+                    }
+                    continue;
+                }
+
                 // PDFs require extraction step.
                 if ($mimetype === 'application/pdf' || preg_match('/\.pdf$/i', $filename)) {
                     $pdftext = $this->extract_pdf_text($file);
@@ -528,7 +544,7 @@ class content_extractor {
     /**
      * Best-effort PDF text extraction.
      *
-     * Strategy (cada resultado se valida con is_pdf_text_useful() antes de
+     * Strategy (cada resultado se valida con is_extracted_text_useful() antes de
      * aceptarse; si no es texto legible, se prueba la siguiente):
      *  (a) Libreria PHP pura smalot/pdfparser, vendorizada con el plugin
      *      (lib/pdfparser/) — unica que decodifica fuentes CID/Identity-H
@@ -555,7 +571,7 @@ class content_extractor {
 
             // (a) Libreria PHP pura (sin dependencia de shell).
             $librarytext = $this->try_parse_pdf_with_php_library($tmpin);
-            if ($this->is_pdf_text_useful($librarytext)) {
+            if ($this->is_extracted_text_useful($librarytext)) {
                 return trim($librarytext);
             }
 
@@ -570,7 +586,7 @@ class content_extractor {
                     @shell_exec($cmd . ' 2>&1');
                     if (is_file($txtout) && filesize($txtout) > 0) {
                         $content = trim((string)file_get_contents($txtout));
-                        if ($this->is_pdf_text_useful($content)) {
+                        if ($this->is_extracted_text_useful($content)) {
                             return $content;
                         }
                     }
@@ -579,7 +595,7 @@ class content_extractor {
 
             // (c) Parser naive de streams PDF, ultimo recurso.
             $naivetext = $this->try_parse_pdf_naive($tmpin);
-            if ($this->is_pdf_text_useful($naivetext)) {
+            if ($this->is_extracted_text_useful($naivetext)) {
                 return $naivetext;
             }
         } catch (\Throwable $e) {
@@ -601,7 +617,7 @@ class content_extractor {
      * @param string $text
      * @return bool
      */
-    private function is_pdf_text_useful(string $text): bool {
+    private function is_extracted_text_useful(string $text): bool {
         $trimmed = trim($text);
         $totalLen = mb_strlen($trimmed, 'UTF-8');
         if ($totalLen < 20) {
@@ -622,6 +638,140 @@ class content_extractor {
         }
 
         return $realWords >= 3;
+    }
+
+    /**
+     * Extraer texto de un .docx (Word) — es un ZIP con XML dentro.
+     * Usa ZipArchive (extension nativa de PHP), sin librerias externas.
+     *
+     * @param \stored_file $file
+     * @return string
+     */
+    private function extract_docx_text(\stored_file $file): string {
+        if (!class_exists('ZipArchive')) {
+            return '';
+        }
+
+        $tmpin = tempnam(sys_get_temp_dir(), 'pulso_docx_');
+        if (!$tmpin) {
+            return '';
+        }
+
+        try {
+            $file->copy_content_to($tmpin);
+
+            $zip = new \ZipArchive();
+            if ($zip->open($tmpin) !== true) {
+                return '';
+            }
+            $xml = $zip->getFromName('word/document.xml');
+            $zip->close();
+
+            if ($xml === false || $xml === '') {
+                return '';
+            }
+
+            return $this->docx_xml_to_text($xml);
+        } catch (\Throwable $e) {
+            return '';
+        } finally {
+            @unlink($tmpin);
+        }
+    }
+
+    /**
+     * Convertir el XML de word/document.xml a texto plano.
+     *
+     * @param string $xml
+     * @return string
+     */
+    private function docx_xml_to_text(string $xml): string {
+        // Saltos de parrafo y de linea explicitos ANTES de quitar etiquetas.
+        $xml = str_replace('</w:p>', "</w:p>\n", $xml);
+        $xml = preg_replace('/<w:tab\s*\/>/', "\t", $xml);
+        $xml = preg_replace('/<w:br\s*\/>/', "\n", $xml);
+
+        $text = strip_tags($xml);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+        $text = preg_replace('/[ \t]+/', ' ', $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+
+        return trim((string)$text);
+    }
+
+    /**
+     * Extraer texto de un .pptx (PowerPoint) — lee las diapositivas EN ORDEN
+     * y concatena el texto de los nodos <a:t> de cada una.
+     *
+     * @param \stored_file $file
+     * @return string
+     */
+    private function extract_pptx_text(\stored_file $file): string {
+        if (!class_exists('ZipArchive')) {
+            return '';
+        }
+
+        $tmpin = tempnam(sys_get_temp_dir(), 'pulso_pptx_');
+        if (!$tmpin) {
+            return '';
+        }
+
+        try {
+            $file->copy_content_to($tmpin);
+
+            $zip = new \ZipArchive();
+            if ($zip->open($tmpin) !== true) {
+                return '';
+            }
+
+            // Localizar diapositivas y ordenarlas numericamente (slide2 antes que slide10).
+            $slideNumbers = [];
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $name = $zip->getNameIndex($i);
+                if ($name !== false && preg_match('#^ppt/slides/slide(\d+)\.xml$#', $name, $m)) {
+                    $slideNumbers[(int)$m[1]] = $name;
+                }
+            }
+            ksort($slideNumbers, SORT_NUMERIC);
+
+            $slideTexts = [];
+            foreach ($slideNumbers as $num => $entryName) {
+                $xml = $zip->getFromName($entryName);
+                if ($xml === false || $xml === '') {
+                    continue;
+                }
+                $text = $this->pptx_slide_xml_to_text($xml);
+                if ($text !== '') {
+                    $slideTexts[] = 'Diapositiva ' . $num . ":\n" . $text;
+                }
+            }
+            $zip->close();
+
+            return trim(implode("\n\n", $slideTexts));
+        } catch (\Throwable $e) {
+            return '';
+        } finally {
+            @unlink($tmpin);
+        }
+    }
+
+    /**
+     * Extraer el texto (nodos <a:t>) de una diapositiva pptx.
+     *
+     * @param string $xml
+     * @return string
+     */
+    private function pptx_slide_xml_to_text(string $xml): string {
+        $texts = [];
+        if (preg_match_all('/<a:t>(.*?)<\/a:t>/s', $xml, $matches)) {
+            foreach ($matches[1] as $chunk) {
+                $decoded = trim(html_entity_decode($chunk, ENT_QUOTES | ENT_XML1, 'UTF-8'));
+                if ($decoded !== '') {
+                    $texts[] = $decoded;
+                }
+            }
+        }
+        return implode("\n", $texts);
     }
 
     /**

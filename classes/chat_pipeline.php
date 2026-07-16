@@ -135,7 +135,175 @@ class chat_pipeline {
             }
         }
 
+        // Privacidad (RGPD/LOPD): solo quien puede calificar el curso ve datos
+        // identificables por alumno. Se comprueba SIEMPRE aqui (nunca en la cache
+        // compartida por curso) porque depende del usuario de la peticion actual.
+        $permctx = \context_course::instance($courseid);
+        $canseegrades = has_capability('moodle/grade:viewall', $permctx);
+        $course_context = self::apply_privacy_redaction($course_context, $canseegrades);
+
         return $course_context;
+    }
+
+    /**
+     * Sustituye los datos identificables por alumno por agregados cuando el
+     * usuario actual no tiene permiso para ver notas individuales
+     * (moodle/grade:viewall). Con permiso, se deja el detalle por alumno y se
+     * añade un ranking pre-calculado y ordenado.
+     *
+     * @param array $course_context
+     * @param bool  $canseegrades
+     * @return array
+     */
+    private static function apply_privacy_redaction(array $course_context, bool $canseegrades): array {
+        if (!isset($course_context['analytics'])) {
+            return $course_context;
+        }
+
+        $course_context['analytics']['individual_data_visible'] = $canseegrades;
+
+        if ($canseegrades) {
+            $course_context['analytics']['student_ranking_by_average_grade'] =
+                self::build_student_ranking($course_context['analytics']['grades_and_quizzes'] ?? []);
+            return $course_context;
+        }
+
+        $course_context['analytics']['course_completions'] =
+            self::aggregate_completions($course_context['analytics']['course_completions'] ?? []);
+        $course_context['analytics']['grades_and_quizzes'] =
+            self::aggregate_grades($course_context['analytics']['grades_and_quizzes'] ?? []);
+        $course_context['analytics']['module_completions'] =
+            self::aggregate_module_completions($course_context['analytics']['module_completions'] ?? []);
+        if (isset($course_context['access_logs']) && is_array($course_context['access_logs'])) {
+            $course_context['access_logs'] = self::aggregate_access_logs($course_context['access_logs']);
+        }
+
+        return $course_context;
+    }
+
+    /**
+     * Ranking de alumnos por nota media (agregada entre todos sus items
+     * calificados), ordenado de mayor a menor. Solo se usa cuando el usuario
+     * tiene permiso para ver notas individuales.
+     *
+     * @param array $gradeRows
+     * @return array
+     */
+    private static function build_student_ranking(array $gradeRows): array {
+        $byStudent = [];
+        foreach ($gradeRows as $row) {
+            $uid = $row['userid'] ?? null;
+            $pct = $row['percentage'] ?? null;
+            if ($uid === null || $pct === null) {
+                continue;
+            }
+            if (!isset($byStudent[$uid])) {
+                $byStudent[$uid] = [
+                    'name' => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')),
+                    'sum' => 0.0,
+                    'count' => 0,
+                ];
+            }
+            $byStudent[$uid]['sum'] += (float)$pct;
+            $byStudent[$uid]['count']++;
+        }
+
+        $ranking = [];
+        foreach ($byStudent as $s) {
+            $ranking[] = [
+                'name' => $s['name'],
+                'average_percentage' => round($s['sum'] / $s['count'], 2),
+            ];
+        }
+        usort($ranking, function ($a, $b) {
+            return $b['average_percentage'] <=> $a['average_percentage'];
+        });
+
+        return $ranking;
+    }
+
+    /**
+     * @param array $rows
+     * @return array
+     */
+    private static function aggregate_completions(array $rows): array {
+        $total = count($rows);
+        $completed = 0;
+        foreach ($rows as $row) {
+            if (!empty($row['is_completed'])) {
+                $completed++;
+            }
+        }
+        return [
+            'aggregate_only' => true,
+            'total_students' => $total,
+            'completed_count' => $completed,
+            'completed_percentage' => $total > 0 ? round(($completed / $total) * 100, 2) : null,
+        ];
+    }
+
+    /**
+     * @param array $rows
+     * @return array
+     */
+    private static function aggregate_grades(array $rows): array {
+        $total = count($rows);
+        $passed = 0;
+        $withGrade = 0;
+        $sumPercentage = 0.0;
+        foreach ($rows as $row) {
+            $pct = $row['percentage'] ?? null;
+            if ($pct !== null) {
+                $sumPercentage += (float)$pct;
+                $withGrade++;
+            }
+            if (!empty($row['is_passed'])) {
+                $passed++;
+            }
+        }
+        return [
+            'aggregate_only' => true,
+            'total_grade_records' => $total,
+            'average_percentage' => $withGrade > 0 ? round($sumPercentage / $withGrade, 2) : null,
+            'passed_count' => $passed,
+            'passed_percentage' => $total > 0 ? round(($passed / $total) * 100, 2) : null,
+        ];
+    }
+
+    /**
+     * @param array $rows
+     * @return array
+     */
+    private static function aggregate_module_completions(array $rows): array {
+        $total = count($rows);
+        $byStatus = [];
+        foreach ($rows as $row) {
+            $status = $row['completion_status'] ?? 'unknown';
+            $byStatus[$status] = ($byStatus[$status] ?? 0) + 1;
+        }
+        return [
+            'aggregate_only' => true,
+            'total_records' => $total,
+            'by_status' => $byStatus,
+        ];
+    }
+
+    /**
+     * @param array $logs
+     * @return array
+     */
+    private static function aggregate_access_logs(array $logs): array {
+        $distinctUsers = [];
+        foreach ($logs as $log) {
+            if (isset($log['user_id'])) {
+                $distinctUsers[$log['user_id']] = true;
+            }
+        }
+        return [
+            'aggregate_only' => true,
+            'total_entries' => count($logs),
+            'distinct_active_students' => count($distinctUsers),
+        ];
     }
 
     /**

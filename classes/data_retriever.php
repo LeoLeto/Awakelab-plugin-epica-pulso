@@ -38,12 +38,11 @@ class data_retriever {
         // SQL: Obtener completions del curso
         // Joinea {course_completions} con {user} para obtener nombres
         // y con {course_modules} para información de módulos
-        $sql = "SELECT 
+        $sql = "SELECT
                     cc.id,
                     u.id AS userid,
                     u.firstname,
                     u.lastname,
-                    u.email,
                     cc.timecompleted,
                     cc.timeenrolled,
                     CASE WHEN cc.timecompleted > 0 THEN 1 ELSE 0 END AS is_completed
@@ -64,7 +63,6 @@ class data_retriever {
                     'userid' => (int)$record->userid,
                     'firstname' => $record->firstname,
                     'lastname' => $record->lastname,
-                    'email' => $record->email,
                     'is_completed' => (int)$record->is_completed,
                     'time_completed' => $record->timecompleted ? userdate($record->timecompleted, '%Y-%m-%d %H:%M:%S') : null,
                     'time_enrolled' => $record->timeenrolled ? userdate($record->timeenrolled, '%Y-%m-%d %H:%M:%S') : null,
@@ -109,12 +107,11 @@ class data_retriever {
         // {grade_items} → información del ítem (nombre, tipo)
         // {user} → información del usuario
         // {course_modules} → información de módulos
-        $sql = "SELECT 
+        $sql = "SELECT
                     gg.id,
                     u.id AS userid,
                     u.firstname,
                     u.lastname,
-                    u.email,
                     gi.itemname,
                     gi.itemtype,
                     gi.grademax,
@@ -153,7 +150,6 @@ class data_retriever {
                     'userid' => (int)$record->userid,
                     'firstname' => $record->firstname,
                     'lastname' => $record->lastname,
-                    'email' => $record->email,
                     'item_name' => $record->itemname,
                     'item_type' => $record->itemtype,
                     'grade_obtained' => $finalgrade,
@@ -202,12 +198,11 @@ class data_retriever {
         // {course_modules} → información del módulo
         // {modules} → tipo de módulo
         // {user} → información del usuario
-        $sql = "SELECT 
+        $sql = "SELECT
                     cmc.id,
                     u.id AS userid,
                     u.firstname,
                     u.lastname,
-                    u.email,
                     cm.id AS moduleid,
                     cm.module,
                     m.name AS moduletype,
@@ -239,7 +234,6 @@ class data_retriever {
                     'userid' => (int)$record->userid,
                     'firstname' => $record->firstname,
                     'lastname' => $record->lastname,
-                    'email' => $record->email,
                     'module_id' => (int)$record->moduleid,
                     'module_type' => $record->moduletype,
                     'module_instance' => (int)$record->instance,

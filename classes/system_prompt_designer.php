@@ -42,7 +42,6 @@ Tienes acceso a los siguientes campos de datos del curso:
 - userid: ID único del usuario
 - firstname: Nombre del estudiante
 - lastname: Apellido del estudiante
-- email: Email del estudiante
 - is_completed: 1=completado, 0=no completado
 - time_completed: Timestamp de completitud
 - time_enrolled: Timestamp de inscripción
@@ -521,6 +520,13 @@ PROMPT;
         $context_section .= json_encode($course_context, JSON_UNESCAPED_UNICODE);
         $context_section .= "\n```\n";
         $context_section .= "\nUsando los datos anteriores, responde las preguntas del usuario con cifras reales.\n";
+
+        $individual_data_visible = $course_context['analytics']['individual_data_visible'] ?? true;
+        if ($individual_data_visible) {
+            $context_section .= "\nEste usuario SÍ tiene permiso para ver notas y datos individuales de alumnos: puedes nombrar estudiantes concretos y dar rankings usando 'student_ranking_by_average_grade'.\n";
+        } else {
+            $context_section .= "\nEste usuario NO tiene permiso para ver datos individuales de alumnos. Los datos de 'course_completions', 'grades_and_quizzes', 'module_completions' y 'access_logs' son SOLO AGREGADOS (sin nombres, marcados con 'aggregate_only'). Si pregunta por un ranking, la nota de un alumno concreto o cualquier otro dato identificable, respóndele con amabilidad que no tiene permisos para ver datos individuales y ofrécele los agregados disponibles en su lugar. NUNCA inventes nombres ni notas de alumnos.\n";
+        }
 
         return $base_prompt . $context_section;
     }

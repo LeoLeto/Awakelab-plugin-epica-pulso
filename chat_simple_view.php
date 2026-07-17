@@ -2019,8 +2019,9 @@ function render_chat_simple($courseid, $context) {
 
             html += '<thead><tr>';
             Object.keys(firstRow).forEach((key, idx) => {
-                html += '<th onclick="sortTable(\'' + tableId + '\', ' + idx + ')" title="Ordenar por ' + escapeHtml(key) + '">';
-                html += escapeHtml(key) + '<span class="pulso-sort-mark" aria-hidden="true">⇅</span></th>';
+                const label = pulsoFieldLabel(key);
+                html += '<th onclick="sortTable(\'' + tableId + '\', ' + idx + ')" title="Ordenar por ' + escapeHtml(label) + '">';
+                html += escapeHtml(label) + '<span class="pulso-sort-mark" aria-hidden="true">⇅</span></th>';
             });
             html += '</tr></thead>';
 
@@ -2352,46 +2353,71 @@ function render_chat_simple($courseid, $context) {
         }
         
         
+        // Mapeo de claves técnicas del modelo → etiquetas amigables en español.
+        // Compartido por las tablas (encabezados) y las tarjetas (clave: valor).
+        const PULSO_FIELD_LABELS = {
+            'active_users': 'Usuarios activos',
+            'status': 'Estado',
+            'grade': 'Calificación',
+            'grade_10': 'Nota sobre 10',
+            'completion': 'Completitud',
+            'completado': 'Completado',
+            'score': 'Puntuación',
+            'pass_rate': 'Tasa de aprobación',
+            'percentage': 'Porcentaje',
+            'value': 'Valor',
+            'count': 'Cantidad',
+            'trend': 'Tendencia',
+            'rank': 'Puesto',
+            'reason': 'Motivo',
+            'action': 'Acción recomendada',
+            'risk': 'Riesgo',
+            'engagement': 'Participación',
+            'progress': 'Progreso',
+            'avg_grade': 'Nota media',
+            'color': 'Estado',
+            'duration': 'Duración',
+            'drop_rate': 'Tasa de abandono',
+            'started': 'Iniciado',
+            'completed': 'Completado',
+            'period': 'Período',
+            'metric': 'Métrica',
+            'item': 'Elemento',
+            'time': 'Hora',
+            'actions': 'Acciones',
+            'name': 'Nombre',
+            'title': 'Título',
+            'label': 'Etiqueta',
+            'firstname': 'Nombre',
+            'lastname': 'Apellidos',
+            'student': 'Estudiante',
+            'module': 'Módulo',
+            'activity': 'Actividad',
+            'last_access': 'Último acceso',
+            'enrolled': 'Inscripción',
+            'fecha_inscripcion': 'Fecha de inscripción',
+            'nota_promedio': 'Nota media',
+            'attempts': 'Intentos',
+            'email': 'Correo'
+        };
+
+        // Etiqueta amigable para una clave: usa el mapa y, si no está, la
+        // embellece (guiones bajos → espacios, primera letra en mayúscula).
+        function pulsoFieldLabel(key) {
+            const k = String(key || '').trim();
+            const mapped = PULSO_FIELD_LABELS[k.toLowerCase()];
+            if (mapped) {
+                return mapped;
+            }
+            const pretty = k.replace(/_/g, ' ').trim();
+            return pretty.charAt(0).toUpperCase() + pretty.slice(1);
+        }
+
         function formatAsList(data) {
             if (!data || data.length === 0) {
                 return '<p class="pulso-empty">No hay datos disponibles para mostrar.</p>';
             }
-            
-            // Mapeo de etiquetas amigables en español
-            const labelMap = {
-                'active_users': 'usuarios activos',
-                'status': 'estado',
-                'grade': 'calificación',
-                'completion': 'completitud',
-                'score': 'puntuación',
-                'pass_rate': 'tasa de aprobación',
-                'percentage': 'porcentaje',
-                'value': 'valor',
-                'count': 'cantidad',
-                'trend': 'tendencia',
-                'rank': 'rango',
-                'reason': 'razón',
-                'action': 'acción',
-                'risk': 'riesgo',
-                'engagement': 'compromiso',
-                'progress': 'progreso',
-                'avg_grade': 'calificación promedio',
-                'color': 'color',
-                'duration': 'duración',
-                'drop_rate': 'tasa de abandono',
-                'started': 'iniciado',
-                'completed': 'completado',
-                'period': 'período',
-                'metric': 'métrica',
-                'item': 'elemento',
-                'time': 'hora',
-                'actions': 'acciones',
-                'name': 'nombre',
-                'title': 'título',
-                'label': 'etiqueta',
-                'firstname': 'nombre'
-            };
-            
+
             let html = '<div class="pulso-list-stack">';
             
             data.forEach((item, idx) => {
@@ -2459,7 +2485,7 @@ function render_chat_simple($courseid, $context) {
                     // Propiedades en dos columnas
                     html += '<div class="pulso-kv-grid">';
                     for (const [key, value] of Object.entries(keyProps)) {
-                        const friendlyLabel = labelMap[key] || key;
+                        const friendlyLabel = pulsoFieldLabel(key);
                         html += '<div><span class="pulso-kv-key">' + escapeHtml(friendlyLabel) + ':</span> <span class="pulso-kv-val">' + escapeHtml(String(value)) + '</span></div>';
                     }
                     html += '</div>';
@@ -2478,7 +2504,7 @@ function render_chat_simple($courseid, $context) {
                         if (shortProps.length > 0) {
                             html += '<div class="pulso-kv-grid secondary">';
                             for (const [key, value] of shortProps) {
-                                const friendlyLabel = labelMap[key] || key;
+                                const friendlyLabel = pulsoFieldLabel(key);
                                 html += '<div><span class="pulso-kv-key">' + escapeHtml(friendlyLabel) + ':</span> <span class="pulso-kv-val">' + escapeHtml(String(value)) + '</span></div>';
                             }
                             html += '</div>';

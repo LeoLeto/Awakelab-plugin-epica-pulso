@@ -1286,19 +1286,21 @@ function render_chat_simple($courseid, $context) {
                 return '';
             }
 
+            // OJO: stepText llega ya escapado (viene de formatRichTextResponse);
+            // no volver a aplicar escapeHtml o se pintan '&quot;' literales.
             if (/^(respuesta final|resultado final|en resumen|conclusi[oó]n)/i.test(raw)) {
-                return '<div class="pulso-result-box">' + highlightResultPhrases(escapeHtml(raw)) + '</div>';
+                return '<div class="pulso-result-box">' + highlightResultPhrases(raw) + '</div>';
             }
 
             const finalCue = /(por lo tanto|en conclusi[oó]n|la respuesta final es|el resultado final es|la respuesta es|el resultado es)[:\s]+(.+)/i.exec(raw);
             if (finalCue && finalCue[2]) {
-                return '<div class="pulso-result-box"><strong>Respuesta final:</strong> ' + highlightResultPhrases(escapeHtml(finalCue[2].trim())) + '</div>';
+                return '<div class="pulso-result-box"><strong>Respuesta final:</strong> ' + highlightResultPhrases(finalCue[2].trim()) + '</div>';
             }
 
             const likelyFinal = /(?:\b(?:es|son)\b\s*)(\d+(?:[.,]\d+)?)\s*(metros|metro|m|kil[oó]metros|km|hect[oó]metros|hm|cent[ií]metros|cm|euros|€|%|grados)?\b/i.exec(raw);
             const isLastStep = totalSteps >= 2 && stepNumber === totalSteps;
             if (isLastStep && likelyFinal) {
-                return '<div class="pulso-result-box"><strong>Respuesta final:</strong> ' + highlightResultPhrases(escapeHtml(raw)) + '</div>';
+                return '<div class="pulso-result-box"><strong>Respuesta final:</strong> ' + highlightResultPhrases(raw) + '</div>';
             }
 
             return '';
@@ -1338,12 +1340,15 @@ function render_chat_simple($courseid, $context) {
             const isTitleKey = titleKeys.includes(keyLower);
             const isBodyKey = bodyKeys.includes(keyLower);
 
+            // OJO: el texto llega ya escapado (formatRichTextResponse hace
+            // escapeHtml sobre todo el bloque antes de trocearlo en líneas);
+            // volver a escapar aquí pintaba '&quot;' literales en pantalla.
             if (isTitleKey) {
-                return '<div class="pulso-card-item"><div class="pulso-card-item-title"><span>🎯</span> ' + escapeHtml(value) + '</div></div>';
+                return '<div class="pulso-card-item"><div class="pulso-card-item-title"><span>🎯</span> ' + value + '</div></div>';
             }
 
             if (isBodyKey) {
-                return '<div class="pulso-card-item-body">' + highlightResultPhrases(escapeHtml(value)) + '</div>';
+                return '<div class="pulso-card-item-body">' + highlightResultPhrases(value) + '</div>';
             }
 
             const translations = {
@@ -1371,7 +1376,7 @@ function render_chat_simple($courseid, $context) {
 
             const info = translations[key] || { label: key, icon: 'ℹ️' };
 
-            return '<div class="pulso-meta-row"><div class="pulso-meta-key"><span>' + info.icon + '</span> ' + escapeHtml(info.label) + '</div><div class="pulso-meta-value">' + highlightResultPhrases(escapeHtml(value)) + '</div></div>';
+            return '<div class="pulso-meta-row"><div class="pulso-meta-key"><span>' + info.icon + '</span> ' + info.label + '</div><div class="pulso-meta-value">' + highlightResultPhrases(value) + '</div></div>';
         }
 
         function renderActivityItem(line) {

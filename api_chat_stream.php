@@ -166,7 +166,7 @@ try {
         $user_query,
         $system_prompt,
         $history,
-        800,
+        2000, // Con 800, rankings/listas largas en JSON se truncaban a mitad → JSON inválido.
         $ondelta
     );
 

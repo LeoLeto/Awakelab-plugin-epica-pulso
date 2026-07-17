@@ -518,6 +518,8 @@ PROMPT;
         $format_reinforcement .= "- NO escribas ningún texto antes del JSON (nada de \"Aquí tienes\", \"Claro,\", saludos, explicaciones).\n";
         $format_reinforcement .= "- NO escribas ningún texto después del JSON.\n";
         $format_reinforcement .= "- NO envuelvas el JSON en bloques de código markdown (nada de ```json ni ```).\n";
+        $format_reinforcement .= "- Escribe el JSON COMPACTO, en una sola línea: sin indentación ni saltos de línea entre claves. La indentación solo desperdicia tokens y puede truncar la respuesta.\n";
+        $format_reinforcement .= "- Si la lista de resultados es muy larga, limita 'data' a los 10 elementos más relevantes e indícalo en 'summary', antes que arriesgarte a dejar el JSON sin cerrar.\n";
 
         if (empty($course_context)) {
             return $base_prompt . $format_reinforcement;

@@ -49,6 +49,28 @@ but the `$plugin->version` bump is still mandatory every time.
   Server-side `$SESSION` history writes after that point don't persist — the
   client's sessionStorage copy is the source of truth.
 
+### Anthropic API constraints (learned the hard way — do NOT regress)
+
+- `claude-sonnet-5` (and other Claude 4.x/5 models) REJECTS assistant message
+  prefill with 400 invalid_request_error ("The conversation must end with a
+  user message"). Never append a `role: assistant` message to force JSON output
+  — JSON purity is enforced via the "FORMATO DE SALIDA" system-prompt rule in
+  `system_prompt_designer.php` plus the balanced-brace extraction in
+  `chat_pipeline::clean_answer()`.
+- `claude-sonnet-5` / `claude-opus-4-8` reject non-default `temperature` /
+  `top_p` / `top_k` with 400. Omit them in main-answer payloads.
+  `claude-haiku-4-5` (follow-ups) does accept `temperature`.
+- Claude pretty-prints JSON by default (unlike gpt-4o) — much longer output.
+  Main answers use `max_tokens` 2000 (800 truncated long rankings mid-array →
+  invalid JSON → raw-text fallback in the UI) and the system prompt demands
+  compact single-line JSON, capping `data` at ~10 items.
+- `moodle_exception` signature: 4th arg is `$a` (lang-string interpolation),
+  5th is `$debuginfo`. API error details must go in the 5th.
+- Frontend note: `formatRichTextResponse()` in `chat_simple_view.php` escapes
+  HTML ONCE for the whole block; helpers it calls (`renderMetaRow`,
+  `extractFinalAnswerBlock`) receive already-escaped text — re-escaping there
+  renders literal `&quot;`.
+
 ## Bug backlog — evaluación jul-2026 (arreglar en este orden)
 
 Evaluación de 56 preguntas reales (resultados y prompts de arreglo detallados en

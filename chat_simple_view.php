@@ -52,30 +52,59 @@ function render_chat_simple($courseid, $context) {
     // HTML y CSS combinados
     $html = <<<'HTML'
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+
+        /* ==================================================================
+           PULSO AI — Identidad Awakelab 2026
+           Azules profundos para jerarquía y fondos; cian vivo como acento
+           SOLO sobre fondos oscuros; superficies claras suaves. Poppins.
+           ================================================================== */
+        .pulso-chat-bubble,
+        .pulso-chat-container {
+            --pulso-ink: #011932;        /* texto principal sobre claro */
+            --pulso-deep: #012142;       /* superficie oscura principal */
+            --pulso-navy: #003670;       /* azul profundo secundario */
+            --pulso-slate: #34547A;      /* texto secundario sobre claro */
+            --pulso-muted: #4E7EA5;      /* texto terciario / hints */
+            --pulso-cyan: #11EAEA;       /* acento vivo (solo sobre oscuro) */
+            --pulso-cyan-soft: #D9FBFF;  /* cian pálido (texto sobre oscuro) */
+            --pulso-teal: #0ABCC9;       /* acento funcional (bordes, focus) */
+            --pulso-teal-ink: #0B93AA;   /* cian oscuro utilitario */
+            --pulso-surface: #F0F3FC;    /* fondo claro suave */
+            --pulso-line: #E2E6F2;       /* bordes y divisores */
+            --pulso-font: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
         /* ========== BOTÓN CIRCULAR INICIAL ========== */
         .pulso-chat-bubble {
             position: fixed;
             bottom: 28px;
             right: 32px;
-            width: 62px;
-            height: 62px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-            color: white;
-            border: none;
+            background: linear-gradient(160deg, #003670 0%, #012142 62%);
+            color: #D9FBFF;
+            border: 1px solid rgba(17, 234, 234, 0.35);
             cursor: pointer;
             z-index: 9999;
-            box-shadow: 0 4px 16px rgba(0, 123, 255, 0.4);
+            box-shadow: 0 8px 24px rgba(1, 25, 50, 0.35);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.7rem;
-            transition: all 0.3s ease;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .pulso-chat-bubble img {
+            width: 30px;
+            height: 30px;
+            display: block;
+            pointer-events: none;
         }
 
         .pulso-chat-bubble:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 24px rgba(0, 123, 255, 0.5);
+            transform: scale(1.08);
+            box-shadow: 0 10px 28px rgba(1, 25, 50, 0.4), 0 0 0 4px rgba(17, 234, 234, 0.18);
         }
 
         .pulso-chat-bubble:active {
@@ -83,12 +112,12 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-chat-bubble.has-chat {
-            animation: pulso-pulse 2s infinite;
+            animation: pulso-pulse 2.4s ease-in-out infinite;
         }
 
         @keyframes pulso-pulse {
-            0%, 100% { box-shadow: 0 4px 16px rgba(0, 123, 255, 0.4); }
-            50% { box-shadow: 0 4px 24px rgba(0, 123, 255, 0.6); }
+            0%, 100% { box-shadow: 0 8px 24px rgba(1, 25, 50, 0.35), 0 0 0 0 rgba(17, 234, 234, 0.35); }
+            50% { box-shadow: 0 8px 24px rgba(1, 25, 50, 0.35), 0 0 0 7px rgba(17, 234, 234, 0); }
         }
 
         .pulso-chat-bubble.drawer-collapsed {
@@ -108,15 +137,24 @@ function render_chat_simple($courseid, $context) {
             max-width: calc(100vw - 48px);
             max-height: calc(100vh - 112px);
             z-index: 9999;
-            background: #f8f9fa;
-            border-radius: 12px;
+            background: var(--pulso-surface);
+            border: 1px solid var(--pulso-line);
+            border-radius: 16px;
             overflow: hidden;
             flex-direction: column;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            box-shadow: 0 24px 64px rgba(1, 25, 50, 0.28);
+            font-family: var(--pulso-font);
+            font-size: 0.92rem;
+            color: var(--pulso-ink);
             box-sizing: border-box;
             resize: both;
             animation: pulso-slideUp 0.3s ease-out;
+        }
+
+        .pulso-chat-container :focus-visible,
+        .pulso-chat-bubble:focus-visible {
+            outline: 2px solid var(--pulso-teal);
+            outline-offset: 2px;
         }
 
         .pulso-chat-container.is-open {
@@ -139,11 +177,10 @@ function render_chat_simple($courseid, $context) {
         }
         
         .pulso-chat-header {
-            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-            color: white;
-            padding: 12px 18px;
-            font-weight: 600;
-            border-bottom: 1px solid #dee2e6;
+            background: linear-gradient(150deg, #003670 0%, #012142 70%);
+            color: #ffffff;
+            padding: 12px 16px;
+            border-bottom: 2px solid rgba(17, 234, 234, 0.45);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -151,70 +188,130 @@ function render_chat_simple($courseid, $context) {
             cursor: move;
             flex-shrink: 0;
         }
-        
+
+        .pulso-header-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .pulso-header-logo {
+            width: 28px;
+            height: 28px;
+            flex-shrink: 0;
+        }
+
         .pulso-chat-header h4 {
             margin: 0;
-            font-size: 1rem;
-            flex: 1;
+            font-size: 0.98rem;
+            font-weight: 600;
+            font-family: var(--pulso-font);
+            letter-spacing: 0.01em;
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .pulso-header-sub {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #D9FBFF;
+            opacity: 0.85;
+            margin-top: 1px;
+        }
+
+        .pulso-status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--pulso-cyan);
+            box-shadow: 0 0 6px rgba(17, 234, 234, 0.9);
+            flex-shrink: 0;
         }
 
         .pulso-version-badge {
             display: inline-block;
-            font-size: 0.68rem;
+            font-size: 0.64rem;
             font-weight: 600;
-            background: rgba(255, 255, 255, 0.22);
-            padding: 2px 8px;
-            border-radius: 10px;
+            color: var(--pulso-cyan-soft);
+            background: rgba(17, 234, 234, 0.14);
+            border: 1px solid rgba(17, 234, 234, 0.3);
+            padding: 1px 8px;
+            border-radius: 999px;
             margin-left: 8px;
             vertical-align: middle;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.04em;
         }
-        
+
         .header-controls {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             margin-left: 12px;
         }
-        
+
         .header-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            color: #ffffff;
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
+            transition: background 0.2s, border-color 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
         }
-        
-        .header-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+        .header-btn svg {
+            width: 15px;
+            height: 15px;
+            display: block;
         }
-        
+
+        .header-btn:hover {
+            background: rgba(17, 234, 234, 0.18);
+            border-color: rgba(17, 234, 234, 0.5);
+        }
+
         .header-btn:active {
             transform: scale(0.95);
         }
-        
+
         .pulso-chat-messages {
             flex: 1 1 auto;
             overflow-y: auto;
             overflow-x: auto;
-            padding: 15px 10px;
-            background: white;
+            padding: 16px 14px;
+            background: var(--pulso-surface);
             min-height: 120px;
             width: 100%;
         }
-        
+
+        .pulso-chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .pulso-chat-messages::-webkit-scrollbar-thumb {
+            background: #c3cde4;
+            border-radius: 8px;
+        }
+
+        .pulso-chat-messages::-webkit-scrollbar-thumb:hover {
+            background: var(--pulso-muted);
+        }
+
         .pulso-message {
-            margin-bottom: 16px;
+            margin-bottom: 14px;
             display: flex;
             animation: slideIn 0.3s ease-out;
         }
-        
+
         @keyframes slideIn {
             from {
                 opacity: 0;
@@ -225,33 +322,72 @@ function render_chat_simple($courseid, $context) {
                 transform: translateY(0);
             }
         }
-        
+
         .pulso-message.user {
             justify-content: flex-end;
         }
-        
+
         .pulso-message.ai {
             justify-content: flex-start;
         }
-        
-        .pulso-message-content {
-        max-width: 98%; 
-        padding: 10px 14px;
-        border-radius: 12px;
-        word-wrap: break-word;
-        overflow-x: auto;
-        font-size: 0.95rem;
-        line-height: 1.4;
-    }
-        
-        .pulso-message.user .pulso-message-content {
-            background: #007bff;
-            color: white;
+
+        /* Avatar del asistente: isotipo sobre disco azul profundo. */
+        .pulso-message.ai::before {
+            content: '';
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            margin-right: 8px;
+            border-radius: 50%;
+            background: var(--pulso-deep) url('https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png') center / 16px 16px no-repeat;
+            border: 1px solid rgba(17, 234, 234, 0.35);
+            align-self: flex-start;
         }
-        
+
+        .pulso-message-content {
+            max-width: calc(98% - 36px);
+            padding: 11px 14px;
+            border-radius: 14px;
+            word-wrap: break-word;
+            overflow-x: auto;
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+
+        .pulso-message.user .pulso-message-content {
+            background: var(--pulso-navy);
+            color: #ffffff;
+            border-bottom-right-radius: 4px;
+            max-width: 85%;
+            box-shadow: 0 2px 8px rgba(1, 25, 50, 0.18);
+        }
+
         .pulso-message.ai .pulso-message-content {
-            background: #e9ecef;
-            color: #212529;
+            background: #ffffff;
+            color: var(--pulso-ink);
+            border: 1px solid var(--pulso-line);
+            border-top-left-radius: 4px;
+            box-shadow: 0 2px 10px rgba(1, 25, 50, 0.06);
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        /* Revelado escalonado del contenido de la respuesta. */
+        .pulso-message.ai .pulso-rich-answer > * {
+            opacity: 0;
+            animation: pulsoFadeUp 0.4s ease forwards;
+        }
+
+        .pulso-message.ai .pulso-rich-answer > *:nth-child(1) { animation-delay: 0.03s; }
+        .pulso-message.ai .pulso-rich-answer > *:nth-child(2) { animation-delay: 0.12s; }
+        .pulso-message.ai .pulso-rich-answer > *:nth-child(3) { animation-delay: 0.21s; }
+        .pulso-message.ai .pulso-rich-answer > *:nth-child(4) { animation-delay: 0.3s; }
+        .pulso-message.ai .pulso-rich-answer > *:nth-child(5) { animation-delay: 0.39s; }
+        .pulso-message.ai .pulso-rich-answer > *:nth-child(n+6) { animation-delay: 0.48s; }
+
+        @keyframes pulsoFadeUp {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .pulso-rich-answer {
@@ -261,27 +397,27 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-rich-title {
-            font-size: 1.03rem;
-            font-weight: 700;
-            color: #0f3b62;
-            margin-bottom: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--pulso-navy);
+            margin-bottom: 2px;
             line-height: 1.35;
         }
 
         .pulso-rich-summary {
-            background: #f4f9ff;
-            border: 1px solid #d9eafe;
-            border-left: 4px solid #2f80ed;
+            background: var(--pulso-surface);
+            border: 1px solid var(--pulso-line);
+            border-left: 3px solid var(--pulso-teal);
             padding: 10px 12px;
-            border-radius: 8px;
-            color: #223548;
+            border-radius: 10px;
+            color: var(--pulso-ink);
             line-height: 1.6;
         }
 
         .pulso-rich-paragraph {
             margin: 2px 0;
             line-height: 1.65;
-            color: #1f2933;
+            color: var(--pulso-ink);
         }
 
         .pulso-rich-steps {
@@ -298,8 +434,8 @@ function render_chat_simple($courseid, $context) {
             margin: 0;
             padding: 10px 12px;
             border-radius: 10px;
-            border: 1px solid #d9e3ef;
-            background: #f7fbff;
+            border: 1px solid var(--pulso-line);
+            background: var(--pulso-surface);
             display: flex;
             flex-direction: column;
             gap: 7px;
@@ -308,17 +444,17 @@ function render_chat_simple($courseid, $context) {
         .pulso-step-badge {
             display: inline-block;
             align-self: flex-start;
-            padding: 3px 9px;
+            padding: 2px 10px;
             border-radius: 999px;
-            background: #1363c6;
-            color: #fff;
-            font-size: 0.78rem;
-            font-weight: 700;
-            letter-spacing: 0.2px;
+            background: var(--pulso-deep);
+            color: var(--pulso-cyan-soft);
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
         }
 
         .pulso-step-body {
-            color: #1f2933;
+            color: var(--pulso-ink);
             line-height: 1.62;
         }
 
@@ -332,12 +468,16 @@ function render_chat_simple($courseid, $context) {
             margin: 6px 0;
         }
 
+        .pulso-rich-bullets li::marker {
+            color: var(--pulso-teal-ink);
+        }
+
         .pulso-meta-card {
-            background: #f8fbff;
-            border: 1px solid #dfeaf7;
-            border-radius: 10px;
+            background: #ffffff;
+            border: 1px solid var(--pulso-line);
+            border-radius: 12px;
             overflow: hidden;
-            margin: 6px 0;
+            margin: 4px 0;
         }
 
         .pulso-meta-row {
@@ -346,7 +486,7 @@ function render_chat_simple($courseid, $context) {
             gap: 4px 12px;
             align-items: baseline;
             padding: 10px 14px;
-            border-bottom: 1px solid #edf2f8;
+            border-bottom: 1px solid var(--pulso-surface);
         }
 
         .pulso-meta-card .pulso-meta-row:last-child {
@@ -355,8 +495,8 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-meta-key {
             font-weight: 600;
-            color: #1e4f7a;
-            font-size: 0.88em;
+            color: var(--pulso-navy);
+            font-size: 0.85em;
             white-space: nowrap;
             display: flex;
             align-items: center;
@@ -364,13 +504,13 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-meta-value {
-            color: #243b53;
+            color: var(--pulso-ink);
             line-height: 1.55;
         }
 
         .pulso-card-item {
             padding: 10px 12px;
-            border-bottom: 1px solid #edf2f8;
+            border-bottom: 1px solid var(--pulso-surface);
             width: 100%;
             box-sizing: border-box;
         }
@@ -380,9 +520,9 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-card-item-title {
-            font-weight: 700;
-            color: #1363c6;
-            font-size: 1rem;
+            font-weight: 600;
+            color: var(--pulso-navy);
+            font-size: 0.95rem;
             margin-bottom: 4px;
             display: flex;
             align-items: center;
@@ -390,8 +530,8 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-card-item-body {
-            color: #3e4c59;
-            font-size: 0.95rem;
+            color: var(--pulso-slate);
+            font-size: 0.9rem;
             line-height: 1.5;
             word-break: break-word;
         }
@@ -410,8 +550,8 @@ function render_chat_simple($courseid, $context) {
             padding: 10px 12px;
             border-radius: 10px;
             background: #ffffff;
-            border: 1px solid #d9e6f2;
-            box-shadow: 0 1px 2px rgba(15, 59, 98, 0.06);
+            border: 1px solid var(--pulso-line);
+            box-shadow: 0 1px 3px rgba(1, 25, 50, 0.05);
         }
 
         .pulso-activity-badge {
@@ -419,48 +559,52 @@ function render_chat_simple($courseid, $context) {
             align-items: center;
             justify-content: center;
             min-width: 74px;
-            padding: 4px 10px;
+            padding: 3px 10px;
             border-radius: 999px;
-            font-size: 0.76rem;
-            font-weight: 700;
+            font-size: 0.7rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.35px;
-            background: #dbeafe;
-            color: #0b4f99;
+            letter-spacing: 0.05em;
+            background: var(--pulso-surface);
+            color: var(--pulso-navy);
+            border: 1px solid var(--pulso-line);
         }
 
         .pulso-activity-badge.resource {
-            background: #e8f7eb;
-            color: #196b34;
+            background: #E7F7EF;
+            color: #0F7B4D;
+            border-color: #cdeedd;
         }
 
         .pulso-activity-badge.label {
-            background: #fff4db;
-            color: #8a5a00;
+            background: #FFF4DB;
+            color: #8A5A00;
+            border-color: #f3e3b8;
         }
 
         .pulso-activity-badge.page,
         .pulso-activity-badge.book,
         .pulso-activity-badge.wiki {
-            background: #efe8ff;
-            color: #5a32a3;
+            background: #EFE8FF;
+            color: #5A32A3;
+            border-color: #ded0f5;
         }
 
         .pulso-activity-name {
-            color: #1f2933;
-            font-weight: 600;
+            color: var(--pulso-ink);
+            font-weight: 500;
             line-height: 1.45;
         }
 
         .pulso-formula {
-            background: #f8fafc;
-            border: 1px solid #e3e8ef;
-            border-left: 4px solid #6c8fb3;
+            background: var(--pulso-deep);
+            border: none;
+            border-left: 3px solid var(--pulso-cyan);
             border-radius: 8px;
-            padding: 9px 11px;
-            color: #102a43;
+            padding: 10px 12px;
+            color: var(--pulso-cyan-soft);
             font-family: Consolas, Monaco, "Courier New", monospace;
-            font-size: 0.9em;
+            font-size: 0.88em;
             line-height: 1.45;
             overflow-x: auto;
             white-space: nowrap;
@@ -468,147 +612,400 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-result-box {
-            background: linear-gradient(135deg, #ecfdf3 0%, #f7fff9 100%);
-            border: 1px solid #b7e4c7;
-            border-left: 4px solid #2d9d6a;
-            color: #1f5136;
-            border-radius: 8px;
+            background: #E7F7EF;
+            border: 1px solid #cdeedd;
+            border-left: 3px solid #0F7B4D;
+            color: #124F35;
+            border-radius: 10px;
             padding: 10px 12px;
-            font-weight: 600;
+            font-weight: 500;
             line-height: 1.55;
         }
+
+        /* ===== Secciones de análisis (Insights / Recomendaciones) ===== */
+        .pulso-section-label {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--pulso-slate);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .pulso-section-label::before {
+            content: '';
+            width: 14px;
+            height: 2px;
+            border-radius: 2px;
+            background: var(--pulso-teal);
+        }
+
+        .pulso-insights,
+        .pulso-recos {
+            background: #ffffff;
+            border: 1px solid var(--pulso-line);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-top: 4px;
+        }
+
+        .pulso-insights ul,
+        .pulso-recos ul {
+            margin: 0;
+            padding-left: 18px;
+        }
+
+        .pulso-insights li,
+        .pulso-recos li {
+            margin: 5px 0;
+            line-height: 1.55;
+            color: var(--pulso-ink);
+        }
+
+        .pulso-insights li::marker {
+            color: var(--pulso-teal-ink);
+        }
+
+        .pulso-recos li::marker {
+            color: var(--pulso-navy);
+        }
+
+        /* ===== Tarjetas de lista (resultados por alumno/actividad) ===== */
+        .pulso-list-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin: 4px 0;
+        }
+
+        .pulso-list-card {
+            padding: 11px 14px;
+            background: #ffffff;
+            border: 1px solid var(--pulso-line);
+            border-left: 3px solid var(--pulso-muted);
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(1, 25, 50, 0.05);
+        }
+
+        .pulso-list-card.success { border-left-color: #0F7B4D; }
+        .pulso-list-card.info    { border-left-color: var(--pulso-teal); }
+        .pulso-list-card.warn    { border-left-color: #C98A00; }
+        .pulso-list-card.danger  { border-left-color: #B3261E; }
+
+        .pulso-list-card-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--pulso-ink);
+        }
+
+        .pulso-kv-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .pulso-kv-grid.secondary {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--pulso-surface);
+            font-size: 0.82em;
+        }
+
+        .pulso-kv-key {
+            color: var(--pulso-slate);
+            font-weight: 500;
+        }
+
+        .pulso-kv-val {
+            color: var(--pulso-ink);
+        }
+
+        .pulso-list-card-desc {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--pulso-surface);
+            font-size: 0.88em;
+            color: var(--pulso-slate);
+            line-height: 1.5;
+        }
+
+        .pulso-list-item-simple {
+            padding: 10px 12px;
+            border-left: 3px solid var(--pulso-teal);
+            background: #ffffff;
+            border-top: 1px solid var(--pulso-line);
+            border-right: 1px solid var(--pulso-line);
+            border-bottom: 1px solid var(--pulso-line);
+            border-radius: 10px;
+            color: var(--pulso-ink);
+        }
+
+        .pulso-empty {
+            color: var(--pulso-slate);
+            font-size: 0.9em;
+            padding: 12px 14px;
+            background: var(--pulso-surface);
+            border-radius: 10px;
+            border: 1px dashed var(--pulso-line);
+            margin: 4px 0;
+        }
         
-        .pulso-message-content table {
-            width: 100% !important;
-            margin: 12px 0 !important;
+        /* ========== TABLA DE DATOS ========== */
+        .pulso-table-card {
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--pulso-line);
+            box-shadow: 0 1px 4px rgba(1, 25, 50, 0.06);
+            margin: 4px 0;
+        }
+
+        .pulso-table-toolbar {
+            padding: 10px 12px;
+            background: var(--pulso-surface);
+            border-bottom: 1px solid var(--pulso-line);
+        }
+
+        .pulso-table-search {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px 12px;
+            border: 1px solid var(--pulso-line);
+            border-radius: 8px;
+            font-size: 0.85em;
+            font-family: var(--pulso-font);
+            color: var(--pulso-ink);
+            background: #ffffff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .pulso-table-search:focus {
+            outline: none;
+            border-color: var(--pulso-teal);
+            box-shadow: 0 0 0 3px rgba(10, 188, 201, 0.15);
+        }
+
+        .pulso-table-search::placeholder {
+            color: var(--pulso-muted);
+        }
+
+        .pulso-table-scroll {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .pulso-table {
+            width: 100%;
             border-collapse: collapse;
+            font-size: 0.88em;
+            min-width: 480px;
         }
-        
-        .pulso-message-content table th,
-        .pulso-message-content table td {
-            padding: 10px !important;
-            border: 1px solid #dee2e6 !important;
+
+        .pulso-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
-        
-        .pulso-message-content table th {
-            background: #007bff !important;
-            color: white !important;
-            font-weight: 600 !important;
-            cursor: pointer !important;
-            user-select: none !important;
-            transition: background 0.2s !important;
-        }
-        
-        .pulso-message-content table th:hover {
-            background: #0056b3 !important;
-        }
-        
-        .pulso-message-content table tbody tr {
-            transition: background 0.2s;
-        }
-        
-        .pulso-message-content table tbody tr:hover {
-            background: #e7f3ff !important;
-        }
-        
-        .pulso-message-content input[type="text"] {
-            padding: 8px 12px;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            font-size: 0.85em;
-        }
-        
-        .pulso-message-content button {
-            padding: 8px 12px;
-            background: #f0f0f0;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
+
+        .pulso-table th {
+            background: var(--pulso-deep);
+            padding: 11px 14px;
+            text-align: left;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.82em;
+            letter-spacing: 0.02em;
             cursor: pointer;
-            font-size: 0.85em;
+            user-select: none;
+            white-space: nowrap;
+            border-bottom: 2px solid transparent;
             transition: background 0.2s;
         }
-        
-        .pulso-message-content button:hover {
-            background: #e0e0e0;
+
+        .pulso-table th:hover {
+            background: var(--pulso-navy);
         }
-        
-        .pulso-message-content ul, 
+
+        .pulso-table th.is-sorted {
+            background: var(--pulso-navy);
+            border-bottom-color: var(--pulso-cyan);
+        }
+
+        .pulso-table th .pulso-sort-mark {
+            font-size: 0.75em;
+            margin-left: 4px;
+            opacity: 0.6;
+        }
+
+        .pulso-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--pulso-surface);
+            color: var(--pulso-ink);
+        }
+
+        .pulso-table tbody tr:nth-child(even) {
+            background: #F7F9FE;
+        }
+
+        .pulso-table tbody tr {
+            transition: background 0.15s;
+        }
+
+        .pulso-table tbody tr:hover {
+            background: #E9FBFC;
+        }
+
+        .pulso-no-results td {
+            padding: 20px;
+            text-align: center;
+            color: var(--pulso-muted);
+        }
+
+        .pulso-table-footer {
+            padding: 10px 12px;
+            background: var(--pulso-surface);
+            border-top: 1px solid var(--pulso-line);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pulso-table-count {
+            color: var(--pulso-slate);
+            font-size: 0.82em;
+            font-weight: 500;
+        }
+
+        .pulso-table-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .pulso-export-btn {
+            padding: 6px 14px;
+            background: #ffffff;
+            color: var(--pulso-navy);
+            border: 1px solid var(--pulso-line);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8em;
+            font-weight: 500;
+            font-family: var(--pulso-font);
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .pulso-export-btn:hover {
+            border-color: var(--pulso-teal);
+            background: #F2FDFE;
+        }
+
+        /* Píldoras de estado en celdas */
+        .pulso-status-pill {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 0.85em;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .pulso-status-pill.success { background: #E7F7EF; color: #0F7B4D; }
+        .pulso-status-pill.danger  { background: #FCEEEE; color: #B3261E; }
+        .pulso-status-pill.warning { background: #FFF4DB; color: #8A5A00; }
+        .pulso-status-pill.neutral { background: var(--pulso-line); color: var(--pulso-slate); }
+
+        .pulso-message-content ul,
         .pulso-message-content ol {
-            margin: 10px 0 !important;
-            padding-left: 25px !important;
+            margin: 10px 0;
+            padding-left: 25px;
         }
-        
+
         .pulso-message-content li {
-            margin: 6px 0 !important;
+            margin: 6px 0;
         }
-        
+
         .pulso-message-content p {
-            margin: 10px 0 !important;
+            margin: 10px 0;
         }
-        
+
         .pulso-message-content strong {
             font-weight: 600;
         }
-        
-        /* Estilos para listas formateadas como tarjetas */
-        .pulso-message-content > div > div {
-            padding: 12px 14px;
-            border-radius: 6px;
-            margin-bottom: 10px;
-            border: 1px solid #dee2e6;
-            transition: all 0.2s;
-        }
-        
-        .pulso-message-content > div > div:hover {
-            box-shadow: 0 2px 6px rgba(0, 123, 255, 0.15);
-            transform: translateY(-1px);
-        }
-        
+
         /* ========== FOLLOW-UP QUESTIONS CHIPS (T2.4.12) ========== */
         .pulso-followup-container {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             margin-top: 12px;
-            padding: 10px 0;
+            padding: 10px 0 10px 36px;
         }
-        
+
         .pulso-followup-chip {
-            background: linear-gradient(135deg, #e7f3ff 0%, #f0f8ff 100%);
-            border: 1px solid #b3d9ff;
-            border-radius: 16px;
-            padding: 8px 14px;
-            font-size: 0.9rem;
+            background: #ffffff;
+            border: 1px solid var(--pulso-line);
+            border-radius: 999px;
+            padding: 7px 14px;
+            font-size: 0.84rem;
+            font-family: var(--pulso-font);
             cursor: pointer;
-            transition: all 0.2s ease;
-            color: #0056b3;
+            transition: border-color 0.2s, background 0.2s, transform 0.15s;
+            color: var(--pulso-navy);
             font-weight: 500;
             white-space: normal;
             text-align: left;
             line-height: 1.4;
             max-width: 100%;
         }
-        
+
         .pulso-followup-chip:hover {
-            background: linear-gradient(135deg, #cce5ff 0%, #e0f0ff 100%);
-            border-color: #80b8ff;
-            box-shadow: 0 2px 8px rgba(0, 86, 179, 0.15);
-            transform: translateY(-2px);
-        }
-        
-        .pulso-followup-chip:active {
-            transform: translateY(0);
-            box-shadow: 0 1px 4px rgba(0, 86, 179, 0.1);
-        }
-        
-        .pulso-loading {
-            display: none;
-            text-align: center;
-            padding: 15px;
-            color: #6c757d;
+            border-color: var(--pulso-teal);
+            background: #F2FDFE;
+            transform: translateY(-1px);
         }
 
-        /* ========== STREAMING (respuesta en vivo, estilo ChatGPT) ========== */
+        .pulso-followup-chip:active {
+            transform: translateY(0);
+        }
+
+        /* ========== INDICADOR "PENSANDO" (onda de pulso — firma Pulso) ========== */
+        .pulso-loading {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 16px;
+            color: var(--pulso-slate);
+            font-size: 0.84rem;
+            font-weight: 500;
+            background: var(--pulso-surface);
+        }
+
+        .pulso-loading.show {
+            display: flex;
+        }
+
+        .pulso-pulsewave {
+            color: var(--pulso-teal-ink);
+            flex-shrink: 0;
+        }
+
+        .pulso-pulsewave polyline {
+            stroke-dasharray: 90;
+            stroke-dashoffset: 90;
+            animation: pulso-wave 1.4s linear infinite;
+        }
+
+        @keyframes pulso-wave {
+            to { stroke-dashoffset: -90; }
+        }
+
+        /* ========== STREAMING (respuesta en vivo) ========== */
         .pulso-stream-text {
             white-space: pre-wrap;
             word-break: break-word;
@@ -616,10 +1013,11 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-stream-cursor {
             display: inline-block;
-            width: 8px;
-            height: 1em;
-            margin-left: 2px;
-            background: #007bff;
+            width: 3px;
+            height: 1.05em;
+            margin-left: 3px;
+            border-radius: 2px;
+            background: var(--pulso-teal);
             vertical-align: text-bottom;
             animation: pulso-blink 1s steps(2, start) infinite;
         }
@@ -628,166 +1026,207 @@ function render_chat_simple($courseid, $context) {
             to { visibility: hidden; }
         }
         
-        .pulso-loading.show {
-            display: block;
-        }
-        
-        .pulso-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #007bff;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-right: 8px;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
         .pulso-chat-input-area {
-            border-top: 1px solid #dee2e6;
-            padding: 16px;
-            background: white;
+            border-top: 1px solid var(--pulso-line);
+            padding: 12px 14px;
+            background: #ffffff;
             flex-shrink: 0;
         }
-        
+
         .pulso-input-group {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 8px;
-    }
-        
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
         .pulso-input-group input {
             flex: 1;
-            padding: 12px;
-            border: 1px solid #ced4da;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            font-family: inherit;
+            padding: 11px 16px;
+            border: 1px solid var(--pulso-line);
+            border-radius: 999px;
+            font-size: 0.9rem;
+            font-family: var(--pulso-font);
+            color: var(--pulso-ink);
+            background: var(--pulso-surface);
             min-width: 0;
+            transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
         }
-        
+
+        .pulso-input-group input::placeholder {
+            color: var(--pulso-muted);
+        }
+
         .pulso-input-group input:focus {
             outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+            border-color: var(--pulso-teal);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(10, 188, 201, 0.15);
         }
-        
-        .pulso-input-group button {
-        padding: 10px 16px; 
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: background 0.2s;
-    }
-        
-        .pulso-input-group button:hover {
-            background: #0056b3;
+
+        .pulso-send-btn {
+            width: 42px;
+            height: 42px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--pulso-deep);
+            color: #ffffff;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
         }
-        
-        .pulso-input-group button:active {
-            transform: scale(0.98);
+
+        .pulso-send-btn svg {
+            width: 17px;
+            height: 17px;
+            display: block;
+            margin-left: 2px;
         }
-        
+
+        .pulso-send-btn:hover {
+            background: var(--pulso-navy);
+            box-shadow: 0 0 0 4px rgba(17, 234, 234, 0.18);
+        }
+
+        .pulso-send-btn:active {
+            transform: scale(0.94);
+        }
+
         .pulso-char-count {
-            font-size: 0.8rem;
-            color: #6c757d;
+            font-size: 0.7rem;
+            color: var(--pulso-muted);
             margin-top: 6px;
+            text-align: right;
+            padding-right: 6px;
         }
-        
+
         .pulso-examples {
             display: flex;
             flex-wrap: wrap;
-            padding: 12px 10px;
-            gap: 8px;
+            align-items: center;
+            padding: 10px 14px;
+            gap: 6px;
+            background: #ffffff;
+            border-top: 1px solid var(--pulso-line);
         }
-        
+
+        .pulso-examples-label {
+            width: 100%;
+            font-size: 0.66rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--pulso-muted);
+            margin-bottom: 2px;
+        }
+
         .pulso-chip {
-            padding: 8px 14px;
-            font-size: 0.85rem;
-            background: linear-gradient(135deg, #f0f7ff 0%, #e7f3ff 100%);
-            border: 1px solid #b3d9ff;
-            border-radius: 20px;
+            padding: 6px 13px;
+            font-size: 0.8rem;
+            font-family: var(--pulso-font);
+            background: #ffffff;
+            border: 1px solid var(--pulso-line);
+            border-radius: 999px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            color: #0056b3;
+            transition: border-color 0.2s, background 0.2s, transform 0.15s;
+            color: var(--pulso-navy);
             font-weight: 500;
             display: inline-block;
         }
-        
+
         .pulso-chip:hover {
-            background: linear-gradient(135deg, #cce5ff 0%, #b3d9ff 100%);
-            border-color: #80b8ff;
-            color: #003d82;
-            box-shadow: 0 2px 8px rgba(0, 86, 179, 0.15);
-            transform: translateY(-2px);
+            border-color: var(--pulso-teal);
+            background: #F2FDFE;
+            transform: translateY(-1px);
         }
-        
+
         .pulso-chip:active {
             transform: translateY(0);
-            box-shadow: 0 1px 4px rgba(0, 86, 179, 0.1);
+        }
+
+        /* ========== ACCESIBILIDAD: movimiento reducido ========== */
+        @media (prefers-reduced-motion: reduce) {
+            .pulso-chat-bubble,
+            .pulso-chat-bubble.has-chat,
+            .pulso-chat-container,
+            .pulso-message,
+            .pulso-message.ai .pulso-rich-answer > *,
+            .pulso-pulsewave polyline,
+            .pulso-stream-cursor {
+                animation: none !important;
+                transition: none !important;
+            }
+
+            .pulso-message.ai .pulso-rich-answer > * {
+                opacity: 1;
+            }
         }
 
     </style>
     
     <!-- Botón circular flotante -->
-    <button class="pulso-chat-bubble" id="pulso-chat-bubble" onclick="toggleChat()" title="Pulso AI Analytics">
-        🧠
+    <button class="pulso-chat-bubble" id="pulso-chat-bubble" onclick="toggleChat()" title="Pulso AI — Asistente del curso" aria-label="Abrir el asistente Pulso AI">
+        <img src="https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png" alt="" aria-hidden="true">
     </button>
 
-    <div class="pulso-chat-container" id="pulso-chat-container">
+    <div class="pulso-chat-container" id="pulso-chat-container" role="dialog" aria-label="Pulso AI, asistente del curso">
         <div class="pulso-chat-header" id="pulso-chat-header">
-            <h4>🤖 Pulso Analytics <span class="pulso-version-badge">%%PULSO_VERSION%%</span></h4>
+            <div class="pulso-header-brand">
+                <img class="pulso-header-logo" src="https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png" alt="" aria-hidden="true">
+                <div>
+                    <h4>Pulso AI <span class="pulso-version-badge">%%PULSO_VERSION%%</span></h4>
+                    <span class="pulso-header-sub"><span class="pulso-status-dot" aria-hidden="true"></span>Asistente del curso</span>
+                </div>
+            </div>
             <div class="header-controls">
-                <button class="header-btn" id="pulso-minimize-btn" title="Minimizar" onclick="toggleChat()">&#x2212;</button>
+                <button class="header-btn" id="pulso-clear-btn" title="Nueva conversación" aria-label="Empezar una conversación nueva" onclick="clearConversation()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg>
+                </button>
+                <button class="header-btn" id="pulso-minimize-btn" title="Minimizar" aria-label="Minimizar el chat" onclick="toggleChat()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
             </div>
         </div>
-        
-        <div class="pulso-chat-messages" id="pulso-messages">
+
+        <div class="pulso-chat-messages" id="pulso-messages" role="log" aria-live="polite" aria-label="Conversación con Pulso AI">
             <div class="pulso-message ai">
                 <div class="pulso-message-content">
-                    ¡Hola! 👋 Soy tu asistente de analítica. Pregúntame sobre notas, completitud o estudiantes en riesgo.
+                    ¡Hola! Soy Pulso, el asistente de este curso. Pregúntame por notas, participación, alumnos en riesgo o el contenido de los materiales.
                 </div>
             </div>
         </div>
-        
-        <div class="pulso-loading" id="pulso-loading">
-            <span class="pulso-spinner"></span><span id="pulso-loading-text">Procesando...</span>
+
+        <div class="pulso-loading" id="pulso-loading" role="status">
+            <svg class="pulso-pulsewave" viewBox="0 0 48 16" width="40" height="14" aria-hidden="true">
+                <polyline points="0,8 12,8 17,3 23,13 29,5 33,8 48,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span id="pulso-loading-text">Procesando...</span>
         </div>
-        
+
         <div class="pulso-examples">
-            <button class="pulso-chip" onclick="setMessage('¿Cuál es la tasa de completitud?')">
-                📊 Completitud
-            </button>
-            <button class="pulso-chip" onclick="setMessage('¿Cuáles son las notas promedio?')">
-                📈 Notas
-            </button>
-            <button class="pulso-chip" onclick="setMessage('¿Qué estudiantes están en riesgo?')">
-                ⚠️ En riesgo
-            </button>
-            <button class="pulso-chip" onclick="setMessage('¿Cuál es el engagement?')">
-                👥 Engagement
-            </button>
+            <span class="pulso-examples-label">Prueba a preguntar</span>
+            <button class="pulso-chip" onclick="setMessage('¿Cuál es la tasa de completitud?')">Completitud</button>
+            <button class="pulso-chip" onclick="setMessage('¿Cuáles son las notas promedio?')">Notas medias</button>
+            <button class="pulso-chip" onclick="setMessage('¿Qué estudiantes están en riesgo?')">Alumnos en riesgo</button>
+            <button class="pulso-chip" onclick="setMessage('¿Cuál es el engagement?')">Participación</button>
         </div>
-        
+
         <div class="pulso-chat-input-area">
             <form id="pulso-chat-form" onsubmit="sendMessage(event)">
                 <div class="pulso-input-group">
-                    <input 
-                        type="text" 
-                        id="pulso-input" 
-                        placeholder="Escribe una pregunta..."
+                    <input
+                        type="text"
+                        id="pulso-input"
+                        placeholder="Pregunta sobre el curso..."
                         maxlength="500"
                         autocomplete="off"
+                        aria-label="Escribe tu pregunta sobre el curso"
                     />
-                    <button type="submit">Enviar</button>
+                    <button type="submit" class="pulso-send-btn" aria-label="Enviar pregunta">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.85 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z"/></svg>
+                    </button>
                 </div>
             </form>
             <div class="pulso-char-count">
@@ -831,9 +1270,9 @@ function render_chat_simple($courseid, $context) {
                     console.warn('⚠️ La IA retornó status:', data.status);
                     // Intentar mostrar mensaje útil en vez de solo error
                     if (data.message) {
-                        return `<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; color: #1565c0;">ℹ️ ${escapeHtml(data.message)}</div>`;
+                        return `<div class="pulso-empty">${escapeHtml(data.message)}</div>`;
                     }
-                    return `<div style="padding: 12px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 4px; color: #1565c0;">ℹ️ No se encontraron datos de analítica para este curso. Asegúrate de que el seguimiento de completitud y las calificaciones estén configurados en Moodle.</div>`;
+                    return `<div class="pulso-empty">No se encontraron datos de analítica para este curso. Asegúrate de que el seguimiento de completitud y las calificaciones estén configurados en Moodle.</div>`;
                 }
                 
                 if (!data || !data.type) {
@@ -934,20 +1373,20 @@ function render_chat_simple($courseid, $context) {
                 
                 // Insights
                 if (showAnalysisSections && data.insights && Array.isArray(data.insights) && data.insights.length > 0) {
-                    html += '<div style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">';
-                    html += '<strong style="display: block; margin-bottom: 8px;">💡 Insights:</strong>';
-                    html += '<ul style="margin: 0; padding-left: 20px;">';
+                    html += '<div class="pulso-insights">';
+                    html += '<div class="pulso-section-label">Insights</div>';
+                    html += '<ul>';
                     data.insights.forEach(insight => {
                         html += `<li>${escapeHtml(String(insight))}</li>`;
                     });
                     html += '</ul></div>';
                 }
-                
+
                 // Recommendations
                 if (showAnalysisSections && data.recommendations && Array.isArray(data.recommendations) && data.recommendations.length > 0) {
-                    html += '<div style="margin-top: 15px; padding: 10px; background: #d1ecf1; border-left: 4px solid #17a2b8; border-radius: 4px;">';
-                    html += '<strong style="display: block; margin-bottom: 8px;">⭐ Recomendaciones:</strong>';
-                    html += '<ul style="margin: 0; padding-left: 20px;">';
+                    html += '<div class="pulso-recos">';
+                    html += '<div class="pulso-section-label">Recomendaciones</div>';
+                    html += '<ul>';
                     data.recommendations.forEach(rec => {
                         html += `<li>${escapeHtml(String(rec))}</li>`;
                     });
@@ -1401,105 +1840,71 @@ function render_chat_simple($courseid, $context) {
         
         function formatAsTable(data) {
             if (!data || data.length === 0) {
-                return '<p style="color: #666; font-size: 0.95em; padding: 10px; background: #f0f0f0; border-radius: 6px; border-left: 4px solid #ddd;">📊 No hay datos disponibles para mostrar</p>';
+                return '<p class="pulso-empty">No hay datos disponibles para mostrar.</p>';
             }
-            
+
             const tableId = 'table-' + Math.random().toString(36).substr(2, 9);
             let html = '';
-            
-            // NOTA: Mensaje informativo sobre modo flotante
-            html += '<div style="background: linear-gradient(135deg, #e3f2fd 0%, #f1f5ff 100%); border: 1px solid #90caf9; border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 10px;">';
-            html += '<span style="font-size: 1.2em; flex-shrink: 0;">💡</span>';
-            html += '<div style="flex: 1;">';
-            html += '<p style="margin: 0; font-size: 0.85em; color: #1565c0; font-weight: 500;">Para ver esta tabla sin cortes:</p>';
-            html += '<p style="margin: 4px 0 0 0; font-size: 0.8em; color: #0d47a1;">Haz click en la esquina inferior derecha del chat y arrastra el chat para ver toda la tabla en una ventana expandida.</p>';
-            html += '</div>';
-            html += '</div>';
-            
-            // Contenedor general mejorado
-            html += '<div style="background: white; border-radius: 8px; padding: 0; overflow: hidden; border: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">';
-            
-            // Sección de búsqueda mejorada
-            html += '<div style="padding: 12px 16px; background: #f8f9ff; border-bottom: 1px solid #e0e0e0; display: flex; gap: 10px; align-items: center;">';
-            html += '<input type="text" id="filter-' + tableId + '" placeholder="🔍 Buscar en esta tabla..." style="flex: 1; padding: 10px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em; font-family: inherit; transition: all 0.2s;" onkeyup="filterTable(\'' + tableId + '\')" />';
-            html += '</div>';
-            
-            // Contenedor con scroll horizontal responsivo
-            html += '<div style="overflow-x: auto; overflow-y: visible; -webkit-overflow-scrolling: touch;">';
-            
-            // Tabla con mejor styling y responsivo
-            html += '<table id="' + tableId + '" style="width: 100%; border-collapse: collapse; font-size: 0.92em; min-width: 500px;">';
-            
-            // Headers mejorados
+
             const firstRow = data[0];
-            if (typeof firstRow === 'object') {
-                html += '<thead style="background: linear-gradient(135deg, #2c5aa0 0%, #1e3f60 100%); position: sticky; top: 0; z-index: 10;">';
-                html += '<tr>';
-                Object.keys(firstRow).forEach((key, idx) => {
-                    html += '<th style="padding: 12px 14px; text-align: left; color: white; font-weight: 600; font-size: 0.85em; cursor: pointer; user-select: none; white-space: nowrap; border-right: 1px solid rgba(255,255,255,0.1); transition: background 0.2s;" onclick="sortTable(\'' + tableId + '\', ' + idx + ')" title="Click para ordenar⇅">';
-                    html += escapeHtml(key) + ' <span style="font-size: 0.7em; margin-left: 4px; opacity: 0.7;">⇅</span></th>';
-                });
-                html += '</tr>';
-                html += '</thead>';
-                
-                // Body mejorado
-                html += '<tbody>';
-                data.forEach((row, idx) => {
-                    const isEven = idx % 2 === 0;
-                    const bgColor = isEven ? '#ffffff' : '#f8fbfd';
-                    const hoverColor = '#f0f5ff';
-                    
-                    html += '<tr style="background: ' + bgColor + '; transition: all 0.2s ease; border-bottom: 1px solid #e8eef7;" onmouseover="this.style.background=\'' + hoverColor + '\'; this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.04)\';" onmouseout="this.style.background=\'' + bgColor + '\'; this.style.boxShadow=\'none\';">';
-                    
-                    Object.values(row).forEach((value, colIdx) => {
-                        // Detectar si es un valor de estado/color
-                        const isLastCol = colIdx === Object.keys(firstRow).length - 1;
-                        const valueStr = String(value).toLowerCase();
-                        
-                        let cellStyle = 'padding: 10px 12px; border-right: 1px solid #e8eef7; text-align: left;';
-                        let cellContent = escapeHtml(String(value));
-                        
-                        // Aplicar styling especial según el valor
-                        if (isLastCol && (valueStr === 'success' || valueStr === 'danger' || valueStr === 'warning' || valueStr === 'neutral')) {
-                            const colors = {
-                                'success': { bg: '#d4edda', text: '#155724', icon: '✓' },
-                                'danger': { bg: '#f8d7da', text: '#721c24', icon: '✕' },
-                                'warning': { bg: '#fff3cd', text: '#856404', icon: '⚠' },
-                                'neutral': { bg: '#e2e3e5', text: '#383d41', icon: 'ℹ' }
-                            };
-                            const colorConfig = colors[valueStr] || colors['neutral'];
-                            cellContent = '<span style="display: inline-block; background: ' + colorConfig.bg + '; color: ' + colorConfig.text + '; padding: 4px 10px; border-radius: 12px; font-size: 0.85em; font-weight: 500;">' + colorConfig.icon + ' ' + cellContent + '</span>';
-                            cellStyle += 'text-align: center;';
-                        }
-                        
-                        html += '<td style="' + cellStyle + '">' + cellContent + '</td>';
-                    });
-                    
-                    html += '</tr>';
-                });
-                html += '</tbody>';
-                
-                html += '</table>';
-                
-                // Cerrar contenedor de scroll
-                html += '</div>';
-                
-                // Footer con info de registros
-                html += '<div style="padding: 12px 16px; background: #f8f9ff; border-top: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center;">';
-                html += '<span style="color: #666; font-size: 0.85em;">📋 ' + data.length + ' registros</span>';
-                
-                // Botones de acción
-                html += '<div style="display: flex; gap: 6px;">';
-                html += '<button onclick="exportTableAsExcel(\'' + tableId + '\')" style="padding: 8px 14px; background: #1a7f37; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 500; transition: all 0.2s; display: flex; align-items: center; gap: 6px;" onmouseover="this.style.background=\'#156d2e\'; this.style.transform=\'translateY(-1px)\';" onmouseout="this.style.background=\'#1a7f37\'; this.style.transform=\'translateY(0)\';">📊 Excel</button>';
-                html += '<button onclick="exportTableAsCSV(\'' + tableId + '\')" style="padding: 8px 14px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 500; transition: all 0.2s; display: flex; align-items: center; gap: 6px;" onmouseover="this.style.background=\'#5a6268\'; this.style.transform=\'translateY(-1px)\';" onmouseout="this.style.background=\'#6c757d\'; this.style.transform=\'translateY(0)\';">📥 CSV</button>';
-                html += '</div>';
-                html += '</div>';
-                
-                html += '</div>';
-            } else {
+            if (typeof firstRow !== 'object') {
                 return formatAsList(data);
             }
-            
+
+            html += '<div class="pulso-table-card">';
+
+            // Buscador
+            html += '<div class="pulso-table-toolbar">';
+            html += '<input type="text" class="pulso-table-search" id="filter-' + tableId + '" placeholder="Buscar en esta tabla..." aria-label="Buscar en la tabla" onkeyup="filterTable(\'' + tableId + '\')" />';
+            html += '</div>';
+
+            // Contenedor con scroll horizontal responsivo
+            html += '<div class="pulso-table-scroll">';
+            html += '<table id="' + tableId + '" class="pulso-table">';
+
+            html += '<thead><tr>';
+            Object.keys(firstRow).forEach((key, idx) => {
+                html += '<th onclick="sortTable(\'' + tableId + '\', ' + idx + ')" title="Ordenar por ' + escapeHtml(key) + '">';
+                html += escapeHtml(key) + '<span class="pulso-sort-mark" aria-hidden="true">⇅</span></th>';
+            });
+            html += '</tr></thead>';
+
+            html += '<tbody>';
+            data.forEach((row) => {
+                html += '<tr>';
+                Object.values(row).forEach((value, colIdx) => {
+                    const isLastCol = colIdx === Object.keys(firstRow).length - 1;
+                    const valueStr = String(value).toLowerCase();
+
+                    let cellContent = escapeHtml(String(value));
+                    let cellClass = '';
+
+                    // Estado semántico (success/danger/warning/neutral) → píldora.
+                    if (isLastCol && (valueStr === 'success' || valueStr === 'danger' || valueStr === 'warning' || valueStr === 'neutral')) {
+                        cellContent = '<span class="pulso-status-pill ' + valueStr + '">' + cellContent + '</span>';
+                        cellClass = ' style="text-align:center"';
+                    }
+
+                    html += '<td' + cellClass + '>' + cellContent + '</td>';
+                });
+                html += '</tr>';
+            });
+            html += '</tbody>';
+
+            html += '</table>';
+            html += '</div>';
+
+            // Footer con recuento y exportación
+            html += '<div class="pulso-table-footer">';
+            html += '<span class="pulso-table-count">' + data.length + ' registros</span>';
+            html += '<div class="pulso-table-actions">';
+            html += '<button class="pulso-export-btn" onclick="exportTableAsExcel(\'' + tableId + '\')">Exportar Excel</button>';
+            html += '<button class="pulso-export-btn" onclick="exportTableAsCSV(\'' + tableId + '\')">Exportar CSV</button>';
+            html += '</div>';
+            html += '</div>';
+
+            html += '</div>';
+
             // Inicializar estado de tabla
             setTimeout(() => {
                 const filterInput = document.getElementById('filter-' + tableId);
@@ -1509,7 +1914,7 @@ function render_chat_simple($courseid, $context) {
                 if (!window.tableState) window.tableState = {};
                 window.tableState[tableId] = { sortCol: -1, sortAsc: true };
             }, 0);
-            
+
             return html;
         }
         
@@ -1533,11 +1938,11 @@ function render_chat_simple($courseid, $context) {
             const headers = table.querySelectorAll('th');
             headers.forEach((th, idx) => {
                 if (idx === colIdx) {
-                    th.style.background = '#0056b3';
-                    th.style.fontWeight = 'bold';
+                    th.classList.add('is-sorted');
+                    th.setAttribute('aria-sort', state.sortAsc ? 'ascending' : 'descending');
                 } else {
-                    th.style.background = '#007bff';
-                    th.style.fontWeight = 'normal';
+                    th.classList.remove('is-sorted');
+                    th.removeAttribute('aria-sort');
                 }
             });
             
@@ -1560,10 +1965,9 @@ function render_chat_simple($courseid, $context) {
                 return state.sortAsc ? aCmp.localeCompare(bCmp) : bCmp.localeCompare(aCmp);
             });
             
-            // Re-insert rows sorted
+            // Re-insert rows sorted (el zebra striping lo aporta el CSS via nth-child).
             const tbody = table.querySelector('tbody');
-            rows.forEach((row, idx) => {
-                row.style.background = idx % 2 === 0 ? '#f8f9fa' : 'white';
+            rows.forEach((row) => {
                 tbody.appendChild(row);
             });
         }
@@ -1595,9 +1999,9 @@ function render_chat_simple($courseid, $context) {
                 let msg = table.querySelector('.filter-no-results');
                 if (!msg) {
                     msg = document.createElement('tr');
-                    msg.className = 'filter-no-results';
+                    msg.className = 'filter-no-results pulso-no-results';
                     const cols = table.querySelectorAll('thead th').length;
-                    msg.innerHTML = '<td colspan="' + cols + '" style="padding: 20px; text-align: center; color: #999;">No se encontraron resultados</td>';
+                    msg.innerHTML = '<td colspan="' + cols + '">No se encontraron resultados</td>';
                     table.querySelector('tbody').appendChild(msg);
                 }
             } else {
@@ -1640,7 +2044,7 @@ function render_chat_simple($courseid, $context) {
             xml += '<Styles>\n';
             xml += '  <Style ss:ID="header">\n';
             xml += '    <Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="11"/>\n';
-            xml += '    <Interior ss:Color="#007BFF" ss:Pattern="Solid"/>\n';
+            xml += '    <Interior ss:Color="#012142" ss:Pattern="Solid"/>\n';
             xml += '    <Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1"/>\n';
             xml += '    <Borders>\n';
             xml += '      <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1"/>\n';
@@ -1795,7 +2199,7 @@ function render_chat_simple($courseid, $context) {
         
         function formatAsList(data) {
             if (!data || data.length === 0) {
-                return '<p style="color: #999;">No hay datos para mostrar</p>';
+                return '<p class="pulso-empty">No hay datos disponibles para mostrar.</p>';
             }
             
             // Mapeo de etiquetas amigables en español
@@ -1833,7 +2237,7 @@ function render_chat_simple($courseid, $context) {
                 'firstname': 'nombre'
             };
             
-            let html = '<div style="display: flex; flex-direction: column; gap: 10px; margin: 10px 0;">';
+            let html = '<div class="pulso-list-stack">';
             
             data.forEach((item, idx) => {
                 if (typeof item === 'object') {
@@ -1876,36 +2280,32 @@ function render_chat_simple($courseid, $context) {
                         }
                     }
                     
-                    // Usar colores basados en status/grade si existe
-                    let borderColor = '#dee2e6';
-                    let bgColor = '#f9f9f9';
-                    
-                    if (item.status === 'PASSED' || item.status === '✓ PASSED' || item.status === 'Excellent') {
-                        borderColor = '#28a745';
-                        bgColor = '#f0f8f0';
-                    } else if (item.status === 'FAILED' || item.status === '❌ FAILED' || item.status === 'Good' || item.completion === '100%') {
-                        borderColor = '#007bff';
-                        bgColor = '#f0f7ff';
-                    } else if (item.status === 'BORDERLINE' || item.status === '⚠ BORDERLINE' || item.risk === 'High') {
-                        borderColor = '#ffc107';
-                        bgColor = '#fffef0';
-                    } else if (item.risk === 'High' || item.status === '❌') {
-                        borderColor = '#dc3545';
-                        bgColor = '#fff0f0';
+                    // Clase de acento semántico según status/riesgo.
+                    let accentClass = '';
+
+                    const statusStr = String(item.status || '');
+                    if (statusStr.indexOf('PASSED') !== -1 || statusStr === 'Excellent' || /excelente/i.test(statusStr) || /✓/.test(statusStr)) {
+                        accentClass = ' success';
+                    } else if (item.risk === 'High' || statusStr.indexOf('FAILED') !== -1 || /❌|✕/.test(statusStr)) {
+                        accentClass = ' danger';
+                    } else if (statusStr.indexOf('BORDERLINE') !== -1 || item.risk === 'Medium' || /⚠/.test(statusStr)) {
+                        accentClass = ' warn';
+                    } else if (statusStr === 'Good' || item.completion === '100%') {
+                        accentClass = ' info';
                     }
-                    
-                    html += '<div style="padding: 12px 14px; border-left: 4px solid ' + borderColor + '; background: ' + bgColor + '; border-radius: 6px; border: 1px solid ' + borderColor + ';">';
-                    
+
+                    html += '<div class="pulso-list-card' + accentClass + '">';
+
                     // Título principal
                     if (primaryLabel) {
-                        html += '<div style="font-weight: 600; margin-bottom: 6px; color: #212529;">' + escapeHtml(String(primaryLabel)) + '</div>';
+                        html += '<div class="pulso-list-card-title">' + escapeHtml(String(primaryLabel)) + '</div>';
                     }
-                    
+
                     // Propiedades en dos columnas
-                    html += '<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.9em;">';
+                    html += '<div class="pulso-kv-grid">';
                     for (const [key, value] of Object.entries(keyProps)) {
                         const friendlyLabel = labelMap[key] || key;
-                        html += '<div><span style="color: #6c757d; font-weight: 500;">' + escapeHtml(friendlyLabel) + ':</span> <span style="color: #212529;">' + escapeHtml(String(value)) + '</span></div>';
+                        html += '<div><span class="pulso-kv-key">' + escapeHtml(friendlyLabel) + ':</span> <span class="pulso-kv-val">' + escapeHtml(String(value)) + '</span></div>';
                     }
                     html += '</div>';
                     
@@ -1921,24 +2321,24 @@ function render_chat_simple($courseid, $context) {
                         const longProps = otherProps.filter(([k]) => longTextKeys.includes(k.toLowerCase()));
 
                         if (shortProps.length > 0) {
-                            html += '<div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(0,0,0,0.1); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85em;">';
+                            html += '<div class="pulso-kv-grid secondary">';
                             for (const [key, value] of shortProps) {
                                 const friendlyLabel = labelMap[key] || key;
-                                html += '<div><span style="color: #6c757d; font-weight: 500;">' + escapeHtml(friendlyLabel) + ':</span> <span style="color: #212529;">' + escapeHtml(String(value)) + '</span></div>';
+                                html += '<div><span class="pulso-kv-key">' + escapeHtml(friendlyLabel) + ':</span> <span class="pulso-kv-val">' + escapeHtml(String(value)) + '</span></div>';
                             }
                             html += '</div>';
                         }
                         if (longProps.length > 0) {
                             for (const [key, value] of longProps) {
-                                html += '<div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.06); font-size: 0.93em; color: #3e4c59; line-height: 1.5;">' + escapeHtml(String(value)) + '</div>';
+                                html += '<div class="pulso-list-card-desc">' + escapeHtml(String(value)) + '</div>';
                             }
                         }
                     }
-                    
+
                     html += '</div>';
                 } else {
                     // String simple - renderizar como elemento de lista simple
-                    html += '<div style="padding: 10px 12px; border-left: 4px solid #007bff; background: #f0f7ff; border-radius: 4px;">• ' + escapeHtml(String(item)) + '</div>';
+                    html += '<div class="pulso-list-item-simple">' + escapeHtml(String(item)) + '</div>';
                 }
             });
             
@@ -2428,6 +2828,38 @@ function render_chat_simple($courseid, $context) {
             }
         }
         
+        function clearConversation() {
+            const hasHistory = window.conversationHistory && window.conversationHistory.length > 0;
+            if (hasHistory && !confirm('¿Empezar una conversación nueva? Se borrará el historial de este chat.')) {
+                return;
+            }
+
+            window.conversationHistory = [];
+            try {
+                sessionStorage.removeItem('pulso_history_' + window.courseid);
+            } catch (e) {
+                // sessionStorage no disponible — no pasa nada, el estado en memoria ya está limpio.
+            }
+
+            const messagesDiv = document.getElementById('pulso-messages');
+            if (messagesDiv) {
+                messagesDiv.innerHTML = '';
+            }
+            removeStreamBubble();
+            showLoading(false);
+            addMessage('Conversación nueva. ¿En qué te ayudo?', 'ai');
+
+            const bubble = document.getElementById('pulso-chat-bubble');
+            if (bubble) {
+                bubble.classList.remove('has-chat');
+            }
+
+            const input = document.getElementById('pulso-input');
+            if (input) {
+                input.focus();
+            }
+        }
+
         function startDrag(e) {
             if (e.button !== 0) return;
             if (!floatingState.isOpen) return;

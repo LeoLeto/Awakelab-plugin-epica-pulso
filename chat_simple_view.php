@@ -55,23 +55,25 @@ function render_chat_simple($courseid, $context) {
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
         /* ==================================================================
-           PULSO AI — Identidad Awakelab 2026
-           Azules profundos para jerarquía y fondos; cian vivo como acento
-           SOLO sobre fondos oscuros; superficies claras suaves. Poppins.
+           PULSO AI — Identidad Awakelab 2026, tema OSCURO
+           Fondo casi negro con base azul profundo de marca; cian vivo como
+           acento sobre oscuro (uso canónico de la paleta). Poppins.
            ================================================================== */
         .pulso-chat-bubble,
         .pulso-chat-container {
-            --pulso-ink: #011932;        /* texto principal sobre claro */
-            --pulso-deep: #012142;       /* superficie oscura principal */
-            --pulso-navy: #003670;       /* azul profundo secundario */
-            --pulso-slate: #34547A;      /* texto secundario sobre claro */
-            --pulso-muted: #4E7EA5;      /* texto terciario / hints */
-            --pulso-cyan: #11EAEA;       /* acento vivo (solo sobre oscuro) */
-            --pulso-cyan-soft: #D9FBFF;  /* cian pálido (texto sobre oscuro) */
-            --pulso-teal: #0ABCC9;       /* acento funcional (bordes, focus) */
-            --pulso-teal-ink: #0B93AA;   /* cian oscuro utilitario */
-            --pulso-surface: #F0F3FC;    /* fondo claro suave */
-            --pulso-line: #E2E6F2;       /* bordes y divisores */
+            --pulso-ink: #EDF1FA;                      /* texto principal (claro) */
+            --pulso-deep: #012142;                     /* azul profundo de marca */
+            --pulso-navy: #003670;                     /* azul profundo secundario */
+            --pulso-slate: #A9B6D3;                    /* texto secundario */
+            --pulso-muted: #72A3C4;                    /* texto terciario / hints */
+            --pulso-cyan: #11EAEA;                     /* acento vivo */
+            --pulso-cyan-soft: #D9FBFF;                /* cian pálido (texto) */
+            --pulso-teal: #0ABCC9;                     /* acento funcional (focus) */
+            --pulso-teal-ink: #19F7F1;                 /* marcadores sobre oscuro */
+            --pulso-bg: #0B111C;                       /* fondo base casi negro */
+            --pulso-surface: #151D2C;                  /* tarjetas / superficies */
+            --pulso-surface-2: #1C2739;                /* hover / anidado */
+            --pulso-line: rgba(226, 230, 242, 0.12);   /* bordes y divisores */
             --pulso-font: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
@@ -137,12 +139,12 @@ function render_chat_simple($courseid, $context) {
             max-width: calc(100vw - 48px);
             max-height: calc(100vh - 112px);
             z-index: 9999;
-            background: var(--pulso-surface);
+            background: var(--pulso-bg);
             border: 1px solid var(--pulso-line);
             border-radius: 16px;
             overflow: hidden;
             flex-direction: column;
-            box-shadow: 0 24px 64px rgba(1, 25, 50, 0.28);
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
             font-family: var(--pulso-font);
             font-size: 0.92rem;
             color: var(--pulso-ink);
@@ -288,7 +290,7 @@ function render_chat_simple($courseid, $context) {
             overflow-y: auto;
             overflow-x: auto;
             padding: 16px 14px;
-            background: var(--pulso-surface);
+            background: var(--pulso-bg);
             min-height: 120px;
             width: 100%;
         }
@@ -298,12 +300,151 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-chat-messages::-webkit-scrollbar-thumb {
-            background: #c3cde4;
+            background: rgba(226, 230, 242, 0.18);
             border-radius: 8px;
         }
 
         .pulso-chat-messages::-webkit-scrollbar-thumb:hover {
-            background: var(--pulso-muted);
+            background: rgba(226, 230, 242, 0.32);
+        }
+
+        /* ========== PANTALLA DE INICIO (acciones predefinidas) ========== */
+        .pulso-home {
+            padding: 4px 2px 10px;
+        }
+
+        .pulso-home-hello {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 4px 0 18px;
+        }
+
+        .pulso-home-avatar {
+            flex-shrink: 0;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--pulso-deep) url('https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png') center / 24px 24px no-repeat;
+            border: 1px solid rgba(17, 234, 234, 0.4);
+            box-shadow: 0 0 18px rgba(17, 234, 234, 0.18);
+        }
+
+        .pulso-home-hello h5 {
+            margin: 0;
+            font-size: 1.02rem;
+            font-weight: 600;
+            font-family: var(--pulso-font);
+            color: var(--pulso-ink);
+            line-height: 1.4;
+        }
+
+        .pulso-home-section {
+            margin-bottom: 18px;
+        }
+
+        .pulso-home-section-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+
+        .pulso-home-section-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--pulso-ink);
+        }
+
+        .pulso-home-context-chip {
+            font-size: 0.66rem;
+            font-weight: 500;
+            padding: 3px 10px;
+            border-radius: 999px;
+            background: rgba(226, 230, 242, 0.08);
+            border: 1px solid var(--pulso-line);
+            color: var(--pulso-slate);
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pulso-home-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .pulso-action-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 14px;
+            padding: 14px;
+            background: var(--pulso-surface);
+            border: 1px solid var(--pulso-line);
+            border-radius: 14px;
+            cursor: pointer;
+            text-align: left;
+            color: var(--pulso-ink);
+            font-family: var(--pulso-font);
+            transition: border-color 0.2s, background 0.2s, transform 0.15s;
+        }
+
+        .pulso-action-card:hover {
+            border-color: rgba(17, 234, 234, 0.55);
+            background: var(--pulso-surface-2);
+            transform: translateY(-1px);
+        }
+
+        .pulso-action-card:active {
+            transform: translateY(0);
+        }
+
+        /* Sección de contenido del curso: tarjetas con tinte azul de marca. */
+        .pulso-home-section.course .pulso-action-card {
+            background: #14213A;
+            border-color: rgba(78, 126, 165, 0.35);
+        }
+
+        .pulso-home-section.course .pulso-action-card:hover {
+            border-color: rgba(17, 234, 234, 0.55);
+            background: #182A4A;
+        }
+
+        .pulso-action-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--pulso-cyan);
+        }
+
+        .pulso-action-label {
+            font-size: 0.84rem;
+            font-weight: 500;
+            line-height: 1.3;
+            padding-right: 30px;
+        }
+
+        .pulso-action-chevron {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: rgba(226, 230, 242, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--pulso-slate);
+        }
+
+        .pulso-action-chevron svg {
+            width: 12px;
+            height: 12px;
         }
 
         .pulso-message {
@@ -359,15 +500,15 @@ function render_chat_simple($courseid, $context) {
             color: #ffffff;
             border-bottom-right-radius: 4px;
             max-width: 85%;
-            box-shadow: 0 2px 8px rgba(1, 25, 50, 0.18);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
         .pulso-message.ai .pulso-message-content {
-            background: #ffffff;
+            background: var(--pulso-surface);
             color: var(--pulso-ink);
             border: 1px solid var(--pulso-line);
             border-top-left-radius: 4px;
-            box-shadow: 0 2px 10px rgba(1, 25, 50, 0.06);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
             flex: 1 1 auto;
             min-width: 0;
         }
@@ -399,15 +540,15 @@ function render_chat_simple($courseid, $context) {
         .pulso-rich-title {
             font-size: 1rem;
             font-weight: 600;
-            color: var(--pulso-navy);
+            color: var(--pulso-cyan-soft);
             margin-bottom: 2px;
             line-height: 1.35;
         }
 
         .pulso-rich-summary {
-            background: var(--pulso-surface);
+            background: var(--pulso-surface-2);
             border: 1px solid var(--pulso-line);
-            border-left: 3px solid var(--pulso-teal);
+            border-left: 3px solid var(--pulso-cyan);
             padding: 10px 12px;
             border-radius: 10px;
             color: var(--pulso-ink);
@@ -435,7 +576,7 @@ function render_chat_simple($courseid, $context) {
             padding: 10px 12px;
             border-radius: 10px;
             border: 1px solid var(--pulso-line);
-            background: var(--pulso-surface);
+            background: var(--pulso-surface-2);
             display: flex;
             flex-direction: column;
             gap: 7px;
@@ -446,7 +587,7 @@ function render_chat_simple($courseid, $context) {
             align-self: flex-start;
             padding: 2px 10px;
             border-radius: 999px;
-            background: var(--pulso-deep);
+            background: var(--pulso-navy);
             color: var(--pulso-cyan-soft);
             font-size: 0.72rem;
             font-weight: 600;
@@ -473,7 +614,7 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-meta-card {
-            background: #ffffff;
+            background: var(--pulso-surface-2);
             border: 1px solid var(--pulso-line);
             border-radius: 12px;
             overflow: hidden;
@@ -486,7 +627,7 @@ function render_chat_simple($courseid, $context) {
             gap: 4px 12px;
             align-items: baseline;
             padding: 10px 14px;
-            border-bottom: 1px solid var(--pulso-surface);
+            border-bottom: 1px solid var(--pulso-line);
         }
 
         .pulso-meta-card .pulso-meta-row:last-child {
@@ -495,7 +636,7 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-meta-key {
             font-weight: 600;
-            color: var(--pulso-navy);
+            color: var(--pulso-cyan-soft);
             font-size: 0.85em;
             white-space: nowrap;
             display: flex;
@@ -510,7 +651,7 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-card-item {
             padding: 10px 12px;
-            border-bottom: 1px solid var(--pulso-surface);
+            border-bottom: 1px solid var(--pulso-line);
             width: 100%;
             box-sizing: border-box;
         }
@@ -521,7 +662,7 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-card-item-title {
             font-weight: 600;
-            color: var(--pulso-navy);
+            color: var(--pulso-cyan-soft);
             font-size: 0.95rem;
             margin-bottom: 4px;
             display: flex;
@@ -549,9 +690,8 @@ function render_chat_simple($courseid, $context) {
             gap: 10px;
             padding: 10px 12px;
             border-radius: 10px;
-            background: #ffffff;
+            background: var(--pulso-surface-2);
             border: 1px solid var(--pulso-line);
-            box-shadow: 0 1px 3px rgba(1, 25, 50, 0.05);
         }
 
         .pulso-activity-badge {
@@ -565,29 +705,29 @@ function render_chat_simple($courseid, $context) {
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            background: var(--pulso-surface);
-            color: var(--pulso-navy);
-            border: 1px solid var(--pulso-line);
+            background: rgba(17, 234, 234, 0.1);
+            color: var(--pulso-cyan-soft);
+            border: 1px solid rgba(17, 234, 234, 0.25);
         }
 
         .pulso-activity-badge.resource {
-            background: #E7F7EF;
-            color: #0F7B4D;
-            border-color: #cdeedd;
+            background: rgba(52, 211, 153, 0.12);
+            color: #7EE2B8;
+            border-color: rgba(52, 211, 153, 0.3);
         }
 
         .pulso-activity-badge.label {
-            background: #FFF4DB;
-            color: #8A5A00;
-            border-color: #f3e3b8;
+            background: rgba(245, 212, 143, 0.12);
+            color: #F5D48F;
+            border-color: rgba(245, 212, 143, 0.3);
         }
 
         .pulso-activity-badge.page,
         .pulso-activity-badge.book,
         .pulso-activity-badge.wiki {
-            background: #EFE8FF;
-            color: #5A32A3;
-            border-color: #ded0f5;
+            background: rgba(196, 167, 255, 0.12);
+            color: #C4A7FF;
+            border-color: rgba(196, 167, 255, 0.3);
         }
 
         .pulso-activity-name {
@@ -597,8 +737,8 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-formula {
-            background: var(--pulso-deep);
-            border: none;
+            background: #0A1526;
+            border: 1px solid var(--pulso-line);
             border-left: 3px solid var(--pulso-cyan);
             border-radius: 8px;
             padding: 10px 12px;
@@ -612,10 +752,10 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-result-box {
-            background: #E7F7EF;
-            border: 1px solid #cdeedd;
-            border-left: 3px solid #0F7B4D;
-            color: #124F35;
+            background: rgba(52, 211, 153, 0.1);
+            border: 1px solid rgba(52, 211, 153, 0.25);
+            border-left: 3px solid #34D399;
+            color: #A7EFCE;
             border-radius: 10px;
             padding: 10px 12px;
             font-weight: 500;
@@ -640,12 +780,12 @@ function render_chat_simple($courseid, $context) {
             width: 14px;
             height: 2px;
             border-radius: 2px;
-            background: var(--pulso-teal);
+            background: var(--pulso-cyan);
         }
 
         .pulso-insights,
         .pulso-recos {
-            background: #ffffff;
+            background: var(--pulso-surface-2);
             border: 1px solid var(--pulso-line);
             border-radius: 12px;
             padding: 12px 14px;
@@ -670,7 +810,7 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-recos li::marker {
-            color: var(--pulso-navy);
+            color: var(--pulso-muted);
         }
 
         /* ===== Tarjetas de lista (resultados por alumno/actividad) ===== */
@@ -683,17 +823,16 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-list-card {
             padding: 11px 14px;
-            background: #ffffff;
+            background: var(--pulso-surface-2);
             border: 1px solid var(--pulso-line);
             border-left: 3px solid var(--pulso-muted);
             border-radius: 10px;
-            box-shadow: 0 1px 3px rgba(1, 25, 50, 0.05);
         }
 
-        .pulso-list-card.success { border-left-color: #0F7B4D; }
-        .pulso-list-card.info    { border-left-color: var(--pulso-teal); }
-        .pulso-list-card.warn    { border-left-color: #C98A00; }
-        .pulso-list-card.danger  { border-left-color: #B3261E; }
+        .pulso-list-card.success { border-left-color: #34D399; }
+        .pulso-list-card.info    { border-left-color: var(--pulso-cyan); }
+        .pulso-list-card.warn    { border-left-color: #F5D48F; }
+        .pulso-list-card.danger  { border-left-color: #F28B82; }
 
         .pulso-list-card-title {
             font-weight: 600;
@@ -711,7 +850,7 @@ function render_chat_simple($courseid, $context) {
         .pulso-kv-grid.secondary {
             margin-top: 8px;
             padding-top: 8px;
-            border-top: 1px solid var(--pulso-surface);
+            border-top: 1px solid var(--pulso-line);
             font-size: 0.82em;
         }
 
@@ -727,7 +866,7 @@ function render_chat_simple($courseid, $context) {
         .pulso-list-card-desc {
             margin-top: 8px;
             padding-top: 8px;
-            border-top: 1px solid var(--pulso-surface);
+            border-top: 1px solid var(--pulso-line);
             font-size: 0.88em;
             color: var(--pulso-slate);
             line-height: 1.5;
@@ -735,8 +874,8 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-list-item-simple {
             padding: 10px 12px;
-            border-left: 3px solid var(--pulso-teal);
-            background: #ffffff;
+            border-left: 3px solid var(--pulso-cyan);
+            background: var(--pulso-surface-2);
             border-top: 1px solid var(--pulso-line);
             border-right: 1px solid var(--pulso-line);
             border-bottom: 1px solid var(--pulso-line);
@@ -748,25 +887,24 @@ function render_chat_simple($courseid, $context) {
             color: var(--pulso-slate);
             font-size: 0.9em;
             padding: 12px 14px;
-            background: var(--pulso-surface);
+            background: var(--pulso-surface-2);
             border-radius: 10px;
-            border: 1px dashed var(--pulso-line);
+            border: 1px dashed rgba(226, 230, 242, 0.25);
             margin: 4px 0;
         }
         
         /* ========== TABLA DE DATOS ========== */
         .pulso-table-card {
-            background: #ffffff;
+            background: var(--pulso-surface-2);
             border-radius: 12px;
             overflow: hidden;
             border: 1px solid var(--pulso-line);
-            box-shadow: 0 1px 4px rgba(1, 25, 50, 0.06);
             margin: 4px 0;
         }
 
         .pulso-table-toolbar {
             padding: 10px 12px;
-            background: var(--pulso-surface);
+            background: rgba(226, 230, 242, 0.04);
             border-bottom: 1px solid var(--pulso-line);
         }
 
@@ -779,14 +917,14 @@ function render_chat_simple($courseid, $context) {
             font-size: 0.85em;
             font-family: var(--pulso-font);
             color: var(--pulso-ink);
-            background: #ffffff;
+            background: var(--pulso-bg);
             transition: border-color 0.2s, box-shadow 0.2s;
         }
 
         .pulso-table-search:focus {
             outline: none;
             border-color: var(--pulso-teal);
-            box-shadow: 0 0 0 3px rgba(10, 188, 201, 0.15);
+            box-shadow: 0 0 0 3px rgba(17, 234, 234, 0.15);
         }
 
         .pulso-table-search::placeholder {
@@ -843,12 +981,12 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-table td {
             padding: 10px 14px;
-            border-bottom: 1px solid var(--pulso-surface);
+            border-bottom: 1px solid var(--pulso-line);
             color: var(--pulso-ink);
         }
 
         .pulso-table tbody tr:nth-child(even) {
-            background: #F7F9FE;
+            background: rgba(226, 230, 242, 0.03);
         }
 
         .pulso-table tbody tr {
@@ -856,7 +994,7 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-table tbody tr:hover {
-            background: #E9FBFC;
+            background: rgba(17, 234, 234, 0.07);
         }
 
         .pulso-no-results td {
@@ -867,7 +1005,7 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-table-footer {
             padding: 10px 12px;
-            background: var(--pulso-surface);
+            background: rgba(226, 230, 242, 0.04);
             border-top: 1px solid var(--pulso-line);
             display: flex;
             justify-content: space-between;
@@ -889,8 +1027,8 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-export-btn {
             padding: 6px 14px;
-            background: #ffffff;
-            color: var(--pulso-navy);
+            background: transparent;
+            color: var(--pulso-cyan-soft);
             border: 1px solid var(--pulso-line);
             border-radius: 8px;
             cursor: pointer;
@@ -901,8 +1039,8 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-export-btn:hover {
-            border-color: var(--pulso-teal);
-            background: #F2FDFE;
+            border-color: rgba(17, 234, 234, 0.55);
+            background: rgba(17, 234, 234, 0.08);
         }
 
         /* Píldoras de estado en celdas */
@@ -915,10 +1053,10 @@ function render_chat_simple($courseid, $context) {
             white-space: nowrap;
         }
 
-        .pulso-status-pill.success { background: #E7F7EF; color: #0F7B4D; }
-        .pulso-status-pill.danger  { background: #FCEEEE; color: #B3261E; }
-        .pulso-status-pill.warning { background: #FFF4DB; color: #8A5A00; }
-        .pulso-status-pill.neutral { background: var(--pulso-line); color: var(--pulso-slate); }
+        .pulso-status-pill.success { background: rgba(52, 211, 153, 0.14); color: #7EE2B8; }
+        .pulso-status-pill.danger  { background: rgba(242, 139, 130, 0.14); color: #F5A9A2; }
+        .pulso-status-pill.warning { background: rgba(245, 212, 143, 0.14); color: #F5D48F; }
+        .pulso-status-pill.neutral { background: rgba(226, 230, 242, 0.1); color: var(--pulso-slate); }
 
         .pulso-message-content ul,
         .pulso-message-content ol {
@@ -948,7 +1086,7 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-followup-chip {
-            background: #ffffff;
+            background: var(--pulso-surface);
             border: 1px solid var(--pulso-line);
             border-radius: 999px;
             padding: 7px 14px;
@@ -956,7 +1094,7 @@ function render_chat_simple($courseid, $context) {
             font-family: var(--pulso-font);
             cursor: pointer;
             transition: border-color 0.2s, background 0.2s, transform 0.15s;
-            color: var(--pulso-navy);
+            color: var(--pulso-cyan-soft);
             font-weight: 500;
             white-space: normal;
             text-align: left;
@@ -965,8 +1103,8 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-followup-chip:hover {
-            border-color: var(--pulso-teal);
-            background: #F2FDFE;
+            border-color: rgba(17, 234, 234, 0.55);
+            background: var(--pulso-surface-2);
             transform: translateY(-1px);
         }
 
@@ -983,7 +1121,7 @@ function render_chat_simple($courseid, $context) {
             color: var(--pulso-slate);
             font-size: 0.84rem;
             font-weight: 500;
-            background: var(--pulso-surface);
+            background: var(--pulso-bg);
         }
 
         .pulso-loading.show {
@@ -991,7 +1129,7 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-pulsewave {
-            color: var(--pulso-teal-ink);
+            color: var(--pulso-cyan);
             flex-shrink: 0;
         }
 
@@ -1017,7 +1155,7 @@ function render_chat_simple($courseid, $context) {
             height: 1.05em;
             margin-left: 3px;
             border-radius: 2px;
-            background: var(--pulso-teal);
+            background: var(--pulso-cyan);
             vertical-align: text-bottom;
             animation: pulso-blink 1s steps(2, start) infinite;
         }
@@ -1029,7 +1167,7 @@ function render_chat_simple($courseid, $context) {
         .pulso-chat-input-area {
             border-top: 1px solid var(--pulso-line);
             padding: 12px 14px;
-            background: #ffffff;
+            background: var(--pulso-bg);
             flex-shrink: 0;
         }
 
@@ -1058,9 +1196,9 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-input-group input:focus {
             outline: none;
-            border-color: var(--pulso-teal);
-            background: #ffffff;
-            box-shadow: 0 0 0 3px rgba(10, 188, 201, 0.15);
+            border-color: rgba(17, 234, 234, 0.6);
+            background: var(--pulso-surface-2);
+            box-shadow: 0 0 0 3px rgba(17, 234, 234, 0.14);
         }
 
         .pulso-send-btn {
@@ -1070,8 +1208,8 @@ function render_chat_simple($courseid, $context) {
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--pulso-deep);
-            color: #ffffff;
+            background: var(--pulso-cyan);
+            color: var(--pulso-deep);
             border: none;
             border-radius: 50%;
             cursor: pointer;
@@ -1086,8 +1224,8 @@ function render_chat_simple($courseid, $context) {
         }
 
         .pulso-send-btn:hover {
-            background: var(--pulso-navy);
-            box-shadow: 0 0 0 4px rgba(17, 234, 234, 0.18);
+            background: #19F7F1;
+            box-shadow: 0 0 16px rgba(17, 234, 234, 0.4);
         }
 
         .pulso-send-btn:active {
@@ -1102,50 +1240,6 @@ function render_chat_simple($courseid, $context) {
             padding-right: 6px;
         }
 
-        .pulso-examples {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            padding: 10px 14px;
-            gap: 6px;
-            background: #ffffff;
-            border-top: 1px solid var(--pulso-line);
-        }
-
-        .pulso-examples-label {
-            width: 100%;
-            font-size: 0.66rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--pulso-muted);
-            margin-bottom: 2px;
-        }
-
-        .pulso-chip {
-            padding: 6px 13px;
-            font-size: 0.8rem;
-            font-family: var(--pulso-font);
-            background: #ffffff;
-            border: 1px solid var(--pulso-line);
-            border-radius: 999px;
-            cursor: pointer;
-            transition: border-color 0.2s, background 0.2s, transform 0.15s;
-            color: var(--pulso-navy);
-            font-weight: 500;
-            display: inline-block;
-        }
-
-        .pulso-chip:hover {
-            border-color: var(--pulso-teal);
-            background: #F2FDFE;
-            transform: translateY(-1px);
-        }
-
-        .pulso-chip:active {
-            transform: translateY(0);
-        }
-
         /* ========== ACCESIBILIDAD: movimiento reducido ========== */
         @media (prefers-reduced-motion: reduce) {
             .pulso-chat-bubble,
@@ -1154,7 +1248,8 @@ function render_chat_simple($courseid, $context) {
             .pulso-message,
             .pulso-message.ai .pulso-rich-answer > *,
             .pulso-pulsewave polyline,
-            .pulso-stream-cursor {
+            .pulso-stream-cursor,
+            .pulso-action-card {
                 animation: none !important;
                 transition: none !important;
             }
@@ -1191,9 +1286,77 @@ function render_chat_simple($courseid, $context) {
         </div>
 
         <div class="pulso-chat-messages" id="pulso-messages" role="log" aria-live="polite" aria-label="Conversación con Pulso AI">
-            <div class="pulso-message ai">
-                <div class="pulso-message-content">
-                    ¡Hola! Soy Pulso, el asistente de este curso. Pregúntame por notas, participación, alumnos en riesgo o el contenido de los materiales.
+            <div class="pulso-home" id="pulso-home">
+                <div class="pulso-home-hello">
+                    <div class="pulso-home-avatar" aria-hidden="true"></div>
+                    <h5>¡Hola, %%PULSO_FIRSTNAME%%! ¿Qué quieres saber de tu curso?</h5>
+                </div>
+
+                <div class="pulso-home-section">
+                    <div class="pulso-home-section-head">
+                        <span class="pulso-home-section-title">Analítica del curso</span>
+                        <span class="pulso-home-context-chip">%%PULSO_COURSENAME%%</span>
+                    </div>
+                    <div class="pulso-home-grid">
+                        <button class="pulso-action-card" onclick="askPreset('¿Cuál es la tasa de completitud?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                            <span class="pulso-action-label">Completitud</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('¿Cuáles son las notas promedio?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>
+                            <span class="pulso-action-label">Notas medias</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('¿Qué estudiantes están en riesgo?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span class="pulso-action-label">Alumnos en riesgo</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('¿Cuál es el engagement?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span class="pulso-action-label">Participación</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('¿Cuáles son los mejores alumnos del curso?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <span class="pulso-action-label">Mejores alumnos</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('¿Qué alumnos llevan más de una semana sin acceder?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span class="pulso-action-label">Alumnos inactivos</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pulso-home-section course">
+                    <div class="pulso-home-section-head">
+                        <span class="pulso-home-section-title">Contenido del curso</span>
+                    </div>
+                    <div class="pulso-home-grid">
+                        <button class="pulso-action-card" onclick="askPreset('¿De qué trata este curso?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            <span class="pulso-action-label">Resumen del curso</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('¿Qué actividades y recursos tiene el curso?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                            <span class="pulso-action-label">Actividades y recursos</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('¿Qué secciones tiene el curso?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            <span class="pulso-action-label">Secciones</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('¿Qué cuestionarios hay en el curso?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span class="pulso-action-label">Cuestionarios</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1203,14 +1366,6 @@ function render_chat_simple($courseid, $context) {
                 <polyline points="0,8 12,8 17,3 23,13 29,5 33,8 48,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
             <span id="pulso-loading-text">Procesando...</span>
-        </div>
-
-        <div class="pulso-examples">
-            <span class="pulso-examples-label">Prueba a preguntar</span>
-            <button class="pulso-chip" onclick="setMessage('¿Cuál es la tasa de completitud?')">Completitud</button>
-            <button class="pulso-chip" onclick="setMessage('¿Cuáles son las notas promedio?')">Notas medias</button>
-            <button class="pulso-chip" onclick="setMessage('¿Qué estudiantes están en riesgo?')">Alumnos en riesgo</button>
-            <button class="pulso-chip" onclick="setMessage('¿Cuál es el engagement?')">Participación</button>
         </div>
 
         <div class="pulso-chat-input-area">
@@ -1984,7 +2139,7 @@ function render_chat_simple($courseid, $context) {
             let visibleCount = 0;
             
             rows.forEach(row => {
-                if (row.className === 'filter-no-results') return;
+                if (row.classList.contains('filter-no-results')) return;
                 const text = row.textContent.toLowerCase();
                 if (text.includes(filterText)) {
                     row.style.display = '';
@@ -2025,7 +2180,7 @@ function render_chat_simple($courseid, $context) {
             // Extraer filas visibles
             const rows = [];
             table.querySelectorAll('tbody tr').forEach(tr => {
-                if (tr.className === 'filter-no-results') return;
+                if (tr.classList.contains('filter-no-results')) return;
                 if (tr.style.display === 'none') return;
                 const rowData = [];
                 tr.querySelectorAll('td').forEach(td => {
@@ -2152,7 +2307,7 @@ function render_chat_simple($courseid, $context) {
             const rows = [];
             table.querySelectorAll('tbody tr').forEach(tr => {
                 // Saltar filas de "no resultados"
-                if (tr.className === 'filter-no-results') return;
+                if (tr.classList.contains('filter-no-results')) return;
                 // Solo incluir filas visibles
                 if (tr.style.display === 'none') return;
                 
@@ -2359,6 +2514,22 @@ function render_chat_simple($courseid, $context) {
             document.getElementById('pulso-input').value = text;
             updateCharCount();
         }
+
+        // Tarjeta de acción de la pantalla de inicio: enviar pregunta predefinida.
+        function askPreset(question) {
+            const input = document.getElementById('pulso-input');
+            input.value = question;
+            updateCharCount();
+            sendMessage(new Event('submit'));
+        }
+
+        // La pantalla de inicio (saludo + tarjetas) solo se muestra sin conversación.
+        function setHomeVisible(visible) {
+            const home = document.getElementById('pulso-home');
+            if (home) {
+                home.style.display = visible ? '' : 'none';
+            }
+        }
         
         function updateCharCount() {
             const input = document.getElementById('pulso-input');
@@ -2422,6 +2593,7 @@ function render_chat_simple($courseid, $context) {
             }
 
             // Agregar mensaje del usuario
+            setHomeVisible(false);
             addMessage(message, 'user');
             input.value = '';
             updateCharCount();
@@ -2841,13 +3013,17 @@ function render_chat_simple($courseid, $context) {
                 // sessionStorage no disponible — no pasa nada, el estado en memoria ya está limpio.
             }
 
+            // Quitar solo los mensajes y sugerencias; el panel de inicio
+            // (#pulso-home) vive dentro del contenedor y debe conservarse.
             const messagesDiv = document.getElementById('pulso-messages');
             if (messagesDiv) {
-                messagesDiv.innerHTML = '';
+                messagesDiv.querySelectorAll('.pulso-message, .pulso-followup-container').forEach(function(el) {
+                    el.remove();
+                });
             }
             removeStreamBubble();
             showLoading(false);
-            addMessage('Conversación nueva. ¿En qué te ayudo?', 'ai');
+            setHomeVisible(true);
 
             const bubble = document.getElementById('pulso-chat-bubble');
             if (bubble) {
@@ -3032,8 +3208,18 @@ function render_chat_simple($courseid, $context) {
     </script>
     HTML;
     
-    // Inyectar versión en el header (el bloque HTML es un nowdoc sin interpolación).
+    // Inyectar versión, nombre y curso (el bloque HTML es un nowdoc sin interpolación).
     $html = str_replace('%%PULSO_VERSION%%', s($pulso_release), $html);
+
+    $firstname = trim((string)($USER->firstname ?? ''));
+    $html = str_replace('%%PULSO_FIRSTNAME%%', s($firstname !== '' ? $firstname : 'profe'), $html);
+
+    try {
+        $coursename = format_string(get_course($courseid)->fullname);
+    } catch (\Throwable $e) {
+        $coursename = '';
+    }
+    $html = str_replace('%%PULSO_COURSENAME%%', s($coursename), $html);
 
     // Retornar con variables inicializadas
     return $js_init . $html;

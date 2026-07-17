@@ -2,7 +2,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026071609; // Retira debug temporal de errores: debuginfo solo al log del servidor
-$plugin->release   = '1.3.2';       // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026071610; // Tema oscuro + pantalla de inicio con acciones predefinidas
+$plugin->release   = '1.4.0';       // Semver visible en el header del chat — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;

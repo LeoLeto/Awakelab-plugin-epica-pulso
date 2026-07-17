@@ -207,14 +207,12 @@ try {
     }
 
 } catch (\Throwable $e) {
-    $error_message = 'Error: ' . $e->getMessage();
-    // TEMPORAL — diagnóstico bug error_api_response tras migración a Anthropic (v1.2.2).
-    // Quitar este bloque en cuanto confirmemos la causa real del fallo.
+    // El detalle técnico (debuginfo) va solo al log del servidor, no al cliente.
     if ($e instanceof \moodle_exception && !empty($e->debuginfo)) {
-        $error_message .= ' | DEBUG: ' . $e->debuginfo;
+        error_log('block_pulso api_chat_stream error: ' . $e->debuginfo);
     }
     pulso_sse('error', [
-        'message' => $error_message,
+        'message' => 'Error: ' . $e->getMessage(),
         'error_code' => get_class($e)
     ]);
 }

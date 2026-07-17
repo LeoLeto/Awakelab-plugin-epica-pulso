@@ -893,13 +893,78 @@ class chat_pipeline {
     }
 
     /**
-     * Strip markdown code fences the AI sometimes wraps around JSON.
+     * Extrae el primer objeto JSON balanceado ({...}) de un texto, ignorando
+     * cualquier preámbulo/postámbulo (fences de markdown, frases tipo "Aquí
+     * tienes:", etc.) que el modelo pueda añadir alrededor. El escaneo respeta
+     * el contenido de los strings JSON (comillas y escapes) para no cortar mal
+     * si hay '{' o '}' sueltos dentro de un valor de texto.
+     *
+     * @param string $text
+     * @return string|null El substring del objeto JSON, o null si no se encontró
+     *                      uno balanceado.
+     */
+    private static function extract_json_object(string $text): ?string {
+        $start = strpos($text, '{');
+        if ($start === false) {
+            return null;
+        }
+
+        $depth = 0;
+        $in_string = false;
+        $escaped = false;
+        $len = strlen($text);
+
+        for ($i = $start; $i < $len; $i++) {
+            $ch = $text[$i];
+
+            if ($in_string) {
+                if ($escaped) {
+                    $escaped = false;
+                } else if ($ch === '\\') {
+                    $escaped = true;
+                } else if ($ch === '"') {
+                    $in_string = false;
+                }
+                continue;
+            }
+
+            if ($ch === '"') {
+                $in_string = true;
+            } else if ($ch === '{') {
+                $depth++;
+            } else if ($ch === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    return substr($text, $start, $i - $start + 1);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Limpiar la respuesta de la IA para quedarnos solo con el objeto JSON,
+     * aunque venga envuelto en fences de markdown y/o con texto antes o
+     * después (algunos modelos añaden preámbulos tipo "Aquí tienes:" pese a
+     * las instrucciones del system prompt).
      *
      * @param string $answer
      * @return string
      */
     public static function clean_answer(string $answer): string {
         $answer = trim($answer);
+
+        $extracted = self::extract_json_object($answer);
+        if ($extracted !== null) {
+            json_decode($extracted, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                return $extracted;
+            }
+        }
+
+        // Fallback: si no se encontró un objeto JSON válido, al menos quitar
+        // fences de markdown si estaban al principio/final del texto.
         if (preg_match('/^\s*```[a-z]*\s*/i', $answer)) {
             $answer = preg_replace('/^\s*```[a-z]*\s*/i', '', $answer);
             $answer = preg_replace('/\s*```\s*$/i', '', $answer);

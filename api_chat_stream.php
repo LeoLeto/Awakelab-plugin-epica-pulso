@@ -167,7 +167,8 @@ try {
         $system_prompt,
         $history,
         800,
-        $ondelta
+        $ondelta,
+        true // prefill_json: fuerza que la respuesta empiece en '{' (sin preámbulo).
     );
 
     $answer = chat_pipeline::clean_answer($ai_response['answer']);

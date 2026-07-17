@@ -130,6 +130,11 @@ class anthropic_connector {
      * @param string $system_prompt El prompt del sistema que define el rol de la IA
      * @param array $conversation_history Historial de conversación anterior (opcional)
      * @param int $max_tokens Máximo de tokens en la respuesta (defecto 500)
+     * @param bool $prefill_json Si es true, añade un turno "assistant" que ya
+     *             empieza en '{' para forzar estructuralmente que la respuesta
+     *             sea JSON puro (sin preámbulo ni fences posibles). Solo debe
+     *             usarse cuando se espera JSON (respuestas analíticas), NUNCA
+     *             para texto libre (resúmenes, Q&A de documentos).
      * @return array Array con 'answer' y 'tokens_used'
      * @throws \moodle_exception Si falla la API
      */
@@ -137,14 +142,22 @@ class anthropic_connector {
         string $user_message,
         string $system_prompt,
         array $conversation_history = [],
-        int $max_tokens = 500
+        int $max_tokens = 500,
+        bool $prefill_json = false
     ): array {
         global $CFG;
+
+        $messages = $this->build_messages($conversation_history, $user_message);
+        if ($prefill_json) {
+            // Anthropic no repite este prefill en la respuesta: solo devuelve
+            // la continuación, así que hay que anteponer '{' manualmente más abajo.
+            $messages[] = ['role' => 'assistant', 'content' => '{'];
+        }
 
         $payload = [
             'model' => $this->model,
             'system' => $system_prompt,
-            'messages' => $this->build_messages($conversation_history, $user_message),
+            'messages' => $messages,
             'max_tokens' => $max_tokens,
             // Sin temperature/top_p: Claude Sonnet 5 / Opus 4.8 rechazan (400) valores
             // no-default de estos parámetros; se omiten para funcionar con cualquier
@@ -181,9 +194,9 @@ class anthropic_connector {
         }
 
         $stop_reason = $response['stop_reason'] ?? 'unknown';
-        $answer = trim($this->extract_text($response['content'] ?? []));
+        $text = trim($this->extract_text($response['content'] ?? []));
 
-        if ($answer === '') {
+        if ($text === '') {
             if ($stop_reason === 'refusal') {
                 throw new \moodle_exception('error_refusal', 'block_pulso');
             }
@@ -198,7 +211,7 @@ class anthropic_connector {
         $tokens_used = ($response['usage']['input_tokens'] ?? 0) + ($response['usage']['output_tokens'] ?? 0);
 
         return [
-            'answer' => $answer,
+            'answer' => $prefill_json ? '{' . $text : $text,
             'tokens_used' => (int)$tokens_used,
             'model' => $this->model,
             'finish_reason' => $stop_reason,
@@ -217,6 +230,9 @@ class anthropic_connector {
      * @param array $conversation_history
      * @param int $max_tokens
      * @param callable $ondelta fn(string $textdelta): void
+     * @param bool $prefill_json Igual que en send_query_with_context(): fuerza
+     *             que la respuesta empiece en '{'. El '{' se emite como primer
+     *             delta antes de reenviar los fragmentos reales del modelo.
      * @return array ['answer', 'tokens_used', 'model', 'finish_reason']
      * @throws \moodle_exception
      */
@@ -225,17 +241,30 @@ class anthropic_connector {
         string $system_prompt,
         array $conversation_history,
         int $max_tokens,
-        callable $ondelta
+        callable $ondelta,
+        bool $prefill_json = false
     ): array {
+        $messages = $this->build_messages($conversation_history, $user_message);
+        if ($prefill_json) {
+            $messages[] = ['role' => 'assistant', 'content' => '{'];
+        }
+
         $payload = [
             'model' => $this->model,
             'system' => $system_prompt,
-            'messages' => $this->build_messages($conversation_history, $user_message),
+            'messages' => $messages,
             'max_tokens' => $max_tokens,
             'stream' => true,
         ];
 
-        $answer = '';
+        if ($prefill_json) {
+            // Anthropic no repite el prefill en el stream: lo emitimos nosotros
+            // como primer fragmento para que el preview progresivo del frontend
+            // vea un JSON válido desde el primer carácter.
+            $ondelta('{');
+        }
+
+        $model_text = '';
         $tokens_in = 0;
         $tokens_out = 0;
         $finish_reason = 'unknown';
@@ -251,7 +280,7 @@ class anthropic_connector {
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (
-                &$sse_buffer, &$answer, &$tokens_in, &$tokens_out, &$finish_reason, &$error_body, $ondelta
+                &$sse_buffer, &$model_text, &$tokens_in, &$tokens_out, &$finish_reason, &$error_body, $ondelta
             ) {
                 // Con error HTTP, Anthropic devuelve un body JSON normal: acumularlo.
                 $httpcode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
@@ -281,7 +310,7 @@ class anthropic_connector {
                             if (($event['delta']['type'] ?? '') === 'text_delta') {
                                 $delta = (string)($event['delta']['text'] ?? '');
                                 if ($delta !== '') {
-                                    $answer .= $delta;
+                                    $model_text .= $delta;
                                     $ondelta($delta);
                                 }
                             }
@@ -307,7 +336,7 @@ class anthropic_connector {
 
         if ($curl_errno) {
             // Si ya llegó parte de la respuesta, devolver lo acumulado en vez de fallar.
-            if ($answer === '') {
+            if ($model_text === '') {
                 throw new \moodle_exception('error_api_connection', 'block_pulso', '', 'cURL error: ' . $curl_error);
             }
         }
@@ -322,15 +351,17 @@ class anthropic_connector {
             );
         }
 
-        if ($answer === '') {
+        if ($model_text === '') {
             if ($finish_reason === 'refusal') {
                 throw new \moodle_exception('error_refusal', 'block_pulso');
             }
             throw new \moodle_exception('error_empty_response', 'block_pulso', '', 'No content in Anthropic stream');
         }
 
+        $model_text = trim($model_text);
+
         return [
-            'answer' => trim($answer),
+            'answer' => $prefill_json ? '{' . $model_text : $model_text,
             'tokens_used' => $tokens_in + $tokens_out,
             'model' => $this->model,
             'finish_reason' => $finish_reason,
@@ -362,7 +393,8 @@ class anthropic_connector {
             $user_query,
             $system_prompt,
             $conversation_history,
-            $max_tokens
+            $max_tokens,
+            true // prefill_json: esta ruta siempre espera JSON con schema.
         );
 
         $is_valid = system_prompt_designer::validate_response($response['answer']);

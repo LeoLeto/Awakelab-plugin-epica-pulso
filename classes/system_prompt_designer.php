@@ -508,8 +508,19 @@ PROMPT;
             $base_prompt .= $rag_context;
         }
 
+        // Regla de formato de salida: va SIEMPRE al final del prompt (lo último
+        // que lee el modelo) para maximizar que la respete. Necesaria porque
+        // Claude, a diferencia de GPT-4o, tiende a añadir preámbulos ("Aquí
+        // tienes:") o envolver el JSON en fences pese a los ejemplos previos.
+        $format_reinforcement = "\n\n## FORMATO DE SALIDA — REGLA ABSOLUTA\n";
+        $format_reinforcement .= "Tu respuesta COMPLETA debe ser ÚNICAMENTE el objeto JSON del schema anterior, sin nada más.\n";
+        $format_reinforcement .= "- Empieza tu respuesta directamente por el carácter '{' y termínala en '}'.\n";
+        $format_reinforcement .= "- NO escribas ningún texto antes del JSON (nada de \"Aquí tienes\", \"Claro,\", saludos, explicaciones).\n";
+        $format_reinforcement .= "- NO escribas ningún texto después del JSON.\n";
+        $format_reinforcement .= "- NO envuelvas el JSON en bloques de código markdown (nada de ```json ni ```).\n";
+
         if (empty($course_context)) {
-            return $base_prompt;
+            return $base_prompt . $format_reinforcement;
         }
 
         // Append analytics JSON context.
@@ -528,7 +539,7 @@ PROMPT;
             $context_section .= "\nEste usuario NO tiene permiso para ver datos individuales de alumnos. Los datos de 'course_completions', 'grades_and_quizzes', 'module_completions' y 'access_logs' son SOLO AGREGADOS (sin nombres, marcados con 'aggregate_only'). Si pregunta por un ranking, la nota de un alumno concreto o cualquier otro dato identificable, respóndele con amabilidad que no tiene permisos para ver datos individuales y ofrécele los agregados disponibles en su lugar. NUNCA inventes nombres ni notas de alumnos.\n";
         }
 
-        return $base_prompt . $context_section;
+        return $base_prompt . $context_section . $format_reinforcement;
     }
 
     /**

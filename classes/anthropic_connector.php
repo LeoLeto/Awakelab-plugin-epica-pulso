@@ -185,11 +185,17 @@ class anthropic_connector {
         $response = json_decode($response_raw, true);
 
         if (isset($response['error'])) {
+            // NOTA: el 4º argumento de moodle_exception es $a (interpolación de
+            // get_string), NO debuginfo — el detalle real va en el 5º argumento.
+            $http_status = $curl->info['http_code'] ?? '?';
+            $err_message = $response['error']['message'] ?? 'Unknown API error';
+            $err_type = $response['error']['type'] ?? null;
             throw new \moodle_exception(
                 'error_api_response',
                 'block_pulso',
                 '',
-                $response['error']['message'] ?? 'Unknown API error'
+                $err_message,
+                'HTTP ' . $http_status . ($err_type ? " ({$err_type})" : '') . ': ' . $err_message
             );
         }
 
@@ -270,6 +276,7 @@ class anthropic_connector {
         $finish_reason = 'unknown';
         $sse_buffer = '';
         $error_body = '';
+        $error_http_status = null;
 
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -280,11 +287,13 @@ class anthropic_connector {
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (
-                &$sse_buffer, &$model_text, &$tokens_in, &$tokens_out, &$finish_reason, &$error_body, $ondelta
+                &$sse_buffer, &$model_text, &$tokens_in, &$tokens_out, &$finish_reason, &$error_body,
+                &$error_http_status, $ondelta
             ) {
                 // Con error HTTP, Anthropic devuelve un body JSON normal: acumularlo.
                 $httpcode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
                 if ($httpcode >= 400) {
+                    $error_http_status = $httpcode;
                     $error_body .= $data;
                     return strlen($data);
                 }
@@ -343,11 +352,14 @@ class anthropic_connector {
 
         if ($error_body !== '') {
             $err = json_decode($error_body, true);
+            $err_message = $err['error']['message'] ?? 'Unknown API error';
+            $err_type = $err['error']['type'] ?? null;
             throw new \moodle_exception(
                 'error_api_response',
                 'block_pulso',
                 '',
-                $err['error']['message'] ?? 'Unknown API error'
+                $err_message,
+                'HTTP ' . ($error_http_status ?? '?') . ($err_type ? " ({$err_type})" : '') . ': ' . $err_message
             );
         }
 

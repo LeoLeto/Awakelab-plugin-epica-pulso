@@ -189,9 +189,15 @@ try {
 } catch (\Throwable $e) {
     // Manejo de errores
     http_response_code(500);
+    $error_message = 'Error: ' . $e->getMessage();
+    // TEMPORAL — diagnóstico bug error_api_response tras migración a Anthropic (v1.2.2).
+    // Quitar este bloque en cuanto confirmemos la causa real del fallo.
+    if ($e instanceof \moodle_exception && !empty($e->debuginfo)) {
+        $error_message .= ' | DEBUG: ' . $e->debuginfo;
+    }
     $response = [
         'success' => false,
-        'message' => 'Error: ' . $e->getMessage(),
+        'message' => $error_message,
         'answer' => null,
         'tokens_used' => 0,
         'error_code' => get_class($e)

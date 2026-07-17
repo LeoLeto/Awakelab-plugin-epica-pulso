@@ -208,8 +208,14 @@ try {
     }
 
 } catch (\Throwable $e) {
+    $error_message = 'Error: ' . $e->getMessage();
+    // TEMPORAL — diagnóstico bug error_api_response tras migración a Anthropic (v1.2.2).
+    // Quitar este bloque en cuanto confirmemos la causa real del fallo.
+    if ($e instanceof \moodle_exception && !empty($e->debuginfo)) {
+        $error_message .= ' | DEBUG: ' . $e->debuginfo;
+    }
     pulso_sse('error', [
-        'message' => 'Error: ' . $e->getMessage(),
+        'message' => $error_message,
         'error_code' => get_class($e)
     ]);
 }

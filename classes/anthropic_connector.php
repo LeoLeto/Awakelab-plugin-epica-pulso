@@ -130,11 +130,6 @@ class anthropic_connector {
      * @param string $system_prompt El prompt del sistema que define el rol de la IA
      * @param array $conversation_history Historial de conversación anterior (opcional)
      * @param int $max_tokens Máximo de tokens en la respuesta (defecto 500)
-     * @param bool $prefill_json Si es true, añade un turno "assistant" que ya
-     *             empieza en '{' para forzar estructuralmente que la respuesta
-     *             sea JSON puro (sin preámbulo ni fences posibles). Solo debe
-     *             usarse cuando se espera JSON (respuestas analíticas), NUNCA
-     *             para texto libre (resúmenes, Q&A de documentos).
      * @return array Array con 'answer' y 'tokens_used'
      * @throws \moodle_exception Si falla la API
      */
@@ -142,22 +137,19 @@ class anthropic_connector {
         string $user_message,
         string $system_prompt,
         array $conversation_history = [],
-        int $max_tokens = 500,
-        bool $prefill_json = false
+        int $max_tokens = 500
     ): array {
         global $CFG;
 
-        $messages = $this->build_messages($conversation_history, $user_message);
-        if ($prefill_json) {
-            // Anthropic no repite este prefill en la respuesta: solo devuelve
-            // la continuación, así que hay que anteponer '{' manualmente más abajo.
-            $messages[] = ['role' => 'assistant', 'content' => '{'];
-        }
-
+        // NOTA: NO añadir un turno "assistant" de prefill aquí — claude-sonnet-5
+        // (y otros modelos Claude 4.x/5) lo rechazan con 400 invalid_request_error:
+        // "This model does not support assistant message prefill. The conversation
+        // must end with a user message." La conversación SIEMPRE debe terminar en
+        // "user" (ver build_messages()).
         $payload = [
             'model' => $this->model,
             'system' => $system_prompt,
-            'messages' => $messages,
+            'messages' => $this->build_messages($conversation_history, $user_message),
             'max_tokens' => $max_tokens,
             // Sin temperature/top_p: Claude Sonnet 5 / Opus 4.8 rechazan (400) valores
             // no-default de estos parámetros; se omiten para funcionar con cualquier
@@ -217,7 +209,7 @@ class anthropic_connector {
         $tokens_used = ($response['usage']['input_tokens'] ?? 0) + ($response['usage']['output_tokens'] ?? 0);
 
         return [
-            'answer' => $prefill_json ? '{' . $text : $text,
+            'answer' => $text,
             'tokens_used' => (int)$tokens_used,
             'model' => $this->model,
             'finish_reason' => $stop_reason,
@@ -236,9 +228,6 @@ class anthropic_connector {
      * @param array $conversation_history
      * @param int $max_tokens
      * @param callable $ondelta fn(string $textdelta): void
-     * @param bool $prefill_json Igual que en send_query_with_context(): fuerza
-     *             que la respuesta empiece en '{'. El '{' se emite como primer
-     *             delta antes de reenviar los fragmentos reales del modelo.
      * @return array ['answer', 'tokens_used', 'model', 'finish_reason']
      * @throws \moodle_exception
      */
@@ -247,28 +236,16 @@ class anthropic_connector {
         string $system_prompt,
         array $conversation_history,
         int $max_tokens,
-        callable $ondelta,
-        bool $prefill_json = false
+        callable $ondelta
     ): array {
-        $messages = $this->build_messages($conversation_history, $user_message);
-        if ($prefill_json) {
-            $messages[] = ['role' => 'assistant', 'content' => '{'];
-        }
-
+        // NOTA: sin prefill de "assistant" — ver comentario en send_query_with_context().
         $payload = [
             'model' => $this->model,
             'system' => $system_prompt,
-            'messages' => $messages,
+            'messages' => $this->build_messages($conversation_history, $user_message),
             'max_tokens' => $max_tokens,
             'stream' => true,
         ];
-
-        if ($prefill_json) {
-            // Anthropic no repite el prefill en el stream: lo emitimos nosotros
-            // como primer fragmento para que el preview progresivo del frontend
-            // vea un JSON válido desde el primer carácter.
-            $ondelta('{');
-        }
 
         $model_text = '';
         $tokens_in = 0;
@@ -373,7 +350,7 @@ class anthropic_connector {
         $model_text = trim($model_text);
 
         return [
-            'answer' => $prefill_json ? '{' . $model_text : $model_text,
+            'answer' => $model_text,
             'tokens_used' => $tokens_in + $tokens_out,
             'model' => $this->model,
             'finish_reason' => $finish_reason,
@@ -405,8 +382,7 @@ class anthropic_connector {
             $user_query,
             $system_prompt,
             $conversation_history,
-            $max_tokens,
-            true // prefill_json: esta ruta siempre espera JSON con schema.
+            $max_tokens
         );
 
         $is_valid = system_prompt_designer::validate_response($response['answer']);

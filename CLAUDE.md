@@ -22,6 +22,15 @@ but the `$plugin->version` bump is still mandatory every time.
   `block_pulso.php`). Sends messages to `api_chat_stream.php` via fetch + SSE
   (ChatGPT-style token streaming, progressive preview of partial JSON) and falls
   back automatically to `api_chat.php` (XHR/JSON) if streaming is unavailable.
+  Design (v1.4+): DARK theme with Awakelab 2026 brand (deep blues bg, vivid cyan
+  accents on dark, Poppins via Google Fonts, isotipo logo from
+  media.awakelab.world); Phia-style home screen (`#pulso-home`) with preset
+  action cards (`askPreset()`) in two sections (Analítica / Contenido) that
+  hides on first message and returns via the "Nueva conversación" header button
+  (`clearConversation()` — removes only `.pulso-message`/followups, NOT the home
+  node). Table/card field keys are translated via `PULSO_FIELD_LABELS` +
+  `pulsoFieldLabel()` fallback. Design tokens are CSS vars (`--pulso-*`) on
+  `.pulso-chat-container`.
 - `api_chat_stream.php` — SSE endpoint. Events: `status`, `delta`, `final`
   (same JSON shape as api_chat.php), `followups` (deferred, off the critical
   path), `error`.
@@ -61,9 +70,14 @@ but the `$plugin->version` bump is still mandatory every time.
   `top_p` / `top_k` with 400. Omit them in main-answer payloads.
   `claude-haiku-4-5` (follow-ups) does accept `temperature`.
 - Claude pretty-prints JSON by default (unlike gpt-4o) — much longer output.
-  Main answers use `max_tokens` 2000 (800 truncated long rankings mid-array →
-  invalid JSON → raw-text fallback in the UI) and the system prompt demands
-  compact single-line JSON, capping `data` at ~10 items.
+  Main answers use `max_tokens` 3000 (800/2000 truncated long rankings
+  mid-array → invalid JSON → raw-text fallback in the UI) and the system prompt
+  demands compact single-line JSON, flat `data` array, capping at ~10 items.
+- The model occasionally emits malformed JSON anyway (seen live:
+  `"data":[[{...}]` — double bracket closed once). `chat_pipeline::clean_answer()`
+  runs a validated repair pass (`repair_json_object()`): flatten accidental
+  `[[`, strip trailing commas, close truncated strings/brackets — each candidate
+  must pass `json_decode` or the original text is kept.
 - `moodle_exception` signature: 4th arg is `$a` (lang-string interpolation),
   5th is `$debuginfo`. API error details must go in the 5th.
 - Frontend note: `formatRichTextResponse()` in `chat_simple_view.php` escapes

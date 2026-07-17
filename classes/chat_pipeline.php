@@ -963,6 +963,14 @@ class chat_pipeline {
             }
         }
 
+        // El texto contiene un JSON roto (array anidado accidental, truncado,
+        // comas colgantes): intentar repararlo antes de rendirse. Sin esto, el
+        // frontend recibe el JSON crudo y lo pinta como texto plano.
+        $repaired = self::repair_json_object($extracted !== null ? $extracted : $answer);
+        if ($repaired !== null) {
+            return $repaired;
+        }
+
         // Fallback: si no se encontró un objeto JSON válido, al menos quitar
         // fences de markdown si estaban al principio/final del texto.
         if (preg_match('/^\s*```[a-z]*\s*/i', $answer)) {
@@ -971,5 +979,123 @@ class chat_pipeline {
             $answer = trim($answer);
         }
         return $answer;
+    }
+
+    /**
+     * Intenta reparar un JSON casi-válido producido por el modelo. Cubre las
+     * clases de error observadas en producción:
+     *  - Array anidado accidental en "data" ("data":[[{...}] cerrado con un
+     *    solo corchete) — visto con claude-sonnet-5 en respuestas tipo tabla.
+     *  - Comas colgantes antes de un cierre.
+     *  - JSON truncado por max_tokens (string/llaves/corchetes sin cerrar).
+     * Cada candidato de reparación se valida con json_decode antes de
+     * aceptarse; si ninguno es válido devuelve null (el llamador conserva el
+     * texto original).
+     *
+     * @param string $text Texto que contiene (o casi contiene) un objeto JSON.
+     * @return string|null JSON válido reparado, o null si no se pudo.
+     */
+    private static function repair_json_object(string $text): ?string {
+        $start = strpos($text, '{');
+        if ($start === false) {
+            return null;
+        }
+        $json = substr($text, $start);
+
+        // Variantes base: tal cual, y con el "[[" accidental aplanado.
+        $variants = [$json];
+        $flat = preg_replace('/("data"\s*:\s*)\[\s*\[/', '$1[', $json, 1);
+        if ($flat !== null && $flat !== $json) {
+            $variants[] = $flat;
+        }
+
+        // Por cada variante, probar también su versión con cierres añadidos.
+        $candidates = [];
+        foreach ($variants as $v) {
+            $candidates[] = $v;
+            $closed = self::close_unbalanced_json($v);
+            if ($closed !== null) {
+                $candidates[] = $closed;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $noTrailingCommas = preg_replace('/,\s*([\]\}])/', '$1', $candidate);
+            foreach ([$candidate, $noTrailingCommas] as $c) {
+                if (!is_string($c) || $c === '') {
+                    continue;
+                }
+                json_decode($c, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    return $c;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Cierra las estructuras abiertas de un JSON truncado: termina el string
+     * sin cerrar si lo hay, poda restos colgantes (",", '"clave":') y añade
+     * los ']' / '}' que falten según la pila de aperturas.
+     *
+     * @param string $json Texto que empieza en '{'.
+     * @return string|null Candidato cerrado, o null si ya estaba balanceado.
+     */
+    private static function close_unbalanced_json(string $json): ?string {
+        $stack = [];
+        $in_string = false;
+        $escaped = false;
+        $len = strlen($json);
+
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $json[$i];
+            if ($in_string) {
+                if ($escaped) {
+                    $escaped = false;
+                } else if ($ch === '\\') {
+                    $escaped = true;
+                } else if ($ch === '"') {
+                    $in_string = false;
+                }
+                continue;
+            }
+            if ($ch === '"') {
+                $in_string = true;
+            } else if ($ch === '{' || $ch === '[') {
+                $stack[] = $ch;
+            } else if ($ch === '}' || $ch === ']') {
+                array_pop($stack);
+            }
+        }
+
+        if (empty($stack) && !$in_string) {
+            return null; // Ya balanceado: no hay nada que cerrar.
+        }
+
+        $result = $json;
+        if ($in_string) {
+            $result .= '"';
+        }
+
+        // Podar restos colgantes tras el último valor completo.
+        $result = rtrim($result);
+        $result = preg_replace('/,\s*"[^"]*"\s*:\s*$/', '', $result);   // ,"clave": colgante
+        $result = preg_replace('/([\{\[,])\s*"[^"]*"$/', '$1', $result); // "clave" sin ':' colgante
+        $result = rtrim($result);
+        if (substr($result, -1) === ',') {
+            $result = substr($result, 0, -1);
+        } else if (substr($result, -1) === ':') {
+            $result = preg_replace('/"[^"]*"\s*:\s*$/', '', $result);
+            $result = rtrim($result);
+        }
+
+        while (!empty($stack)) {
+            $open = array_pop($stack);
+            $result .= ($open === '{') ? '}' : ']';
+        }
+
+        return $result;
     }
 }

@@ -133,7 +133,7 @@ try {
         $user_query,
         $course_context,
         $history,
-        2000, // max_tokens para respuesta JSON (con 800 se truncaban rankings/listas largas)
+        3000, // max_tokens para respuesta JSON (con 800/2000 se truncaban rankings/listas largas)
         $system_prompt
     );
 

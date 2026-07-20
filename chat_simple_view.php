@@ -1156,16 +1156,30 @@ function render_chat_simple($courseid, $context) {
             height: 8px;
             border-radius: 50%;
             background: var(--pulso-cyan);
-            opacity: 0.4;
-            animation: pulso-typing-bounce 1.3s ease-in-out infinite;
+            opacity: 0.35;
+            animation: pulso-typing-bounce 1.2s ease-in-out infinite;
         }
 
-        .pulso-typing-dots span:nth-child(2) { animation-delay: 0.18s; }
-        .pulso-typing-dots span:nth-child(3) { animation-delay: 0.36s; }
+        .pulso-typing-dots span:nth-child(2) { animation-delay: 0.16s; }
+        .pulso-typing-dots span:nth-child(3) { animation-delay: 0.32s; }
 
         @keyframes pulso-typing-bounce {
-            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
-            30%           { transform: translateY(-5px); opacity: 1; }
+            0%, 70%, 100% {
+                transform: translateY(0) scale(1);
+                opacity: 0.35;
+                box-shadow: none;
+            }
+            35% {
+                transform: translateY(-7px) scale(1.18);
+                opacity: 1;
+                box-shadow: 0 0 8px rgba(17, 234, 234, 0.6);
+            }
+        }
+
+        /* Latido suave (solo opacidad) para movimiento reducido. */
+        @keyframes pulso-typing-fade {
+            0%, 100% { opacity: 0.3; }
+            50%      { opacity: 1; }
         }
 
         /* ========== STREAMING (respuesta en vivo) ========== */
@@ -1319,7 +1333,6 @@ function render_chat_simple($courseid, $context) {
             .pulso-pulsewave polyline,
             .pulso-stream-cursor,
             .pulso-mic-btn.pulso-mic-recording,
-            .pulso-typing-dots span,
             .pulso-action-card {
                 animation: none !important;
                 transition: none !important;
@@ -1329,8 +1342,11 @@ function render_chat_simple($courseid, $context) {
                 opacity: 1;
             }
 
+            /* Sin desplazamiento, pero mantiene un latido de opacidad para que se note "pensando". */
             .pulso-typing-dots span {
-                opacity: 0.7;
+                animation: pulso-typing-fade 1.4s ease-in-out infinite !important;
+                transform: none !important;
+                box-shadow: none !important;
             }
         }
 

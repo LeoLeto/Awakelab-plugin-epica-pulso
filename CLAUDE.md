@@ -31,6 +31,18 @@ but the `$plugin->version` bump is still mandatory every time.
   node). Table/card field keys are translated via `PULSO_FIELD_LABELS` +
   `pulsoFieldLabel()` fallback. Design tokens are CSS vars (`--pulso-*`) on
   `.pulso-chat-container`.
+  Voice input (v1.5+): mic button (`#pulso-mic-btn`, `toggleMic()`) does
+  client-side speech-to-text via the Web Speech API (`SpeechRecognition`,
+  `lang='es-ES'`, interim results streamed into `#pulso-input`). No backend / no
+  API key. Auto-hidden (`initPulsoMic()` shows it only if the API exists — so
+  Firefox just doesn't get the button) and only works in a secure context
+  (HTTPS or localhost). Stops on send; friendly es/en alert if mic permission is
+  blocked. Typing indicator (v1.6+): while the bot thinks, a WhatsApp-style AI
+  bubble with three animated cyan dots (`showTyping()`/`hideTyping()`, driven by
+  the existing `showLoading()` calls) appears in the message flow and is removed
+  as soon as the first stream tokens / final answer arrive. This replaced the old
+  `#pulso-loading` status bar (element removed; its `.pulso-loading`/
+  `.pulso-pulsewave` CSS is now inert).
 - `api_chat_stream.php` — SSE endpoint. Events: `status`, `delta`, `final`
   (same JSON shape as api_chat.php), `followups` (deferred, off the critical
   path), `error`.

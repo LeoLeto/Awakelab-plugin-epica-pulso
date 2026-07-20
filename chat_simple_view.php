@@ -1232,6 +1232,50 @@ function render_chat_simple($courseid, $context) {
             transform: scale(0.94);
         }
 
+        .pulso-mic-btn {
+            width: 42px;
+            height: 42px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--pulso-surface);
+            color: var(--pulso-cyan);
+            border: 1px solid var(--pulso-line);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.15s;
+        }
+
+        .pulso-mic-btn svg {
+            width: 18px;
+            height: 18px;
+            display: block;
+        }
+
+        .pulso-mic-btn:hover {
+            background: var(--pulso-surface-2);
+            border-color: rgba(17, 234, 234, 0.5);
+        }
+
+        .pulso-mic-btn:active {
+            transform: scale(0.94);
+        }
+
+        /* Estado grabando: acento cian con anillo pulsante */
+        .pulso-mic-btn.pulso-mic-recording {
+            background: var(--pulso-cyan);
+            color: var(--pulso-deep);
+            border-color: var(--pulso-cyan);
+            animation: pulso-mic-pulse 1.4s ease-out infinite;
+        }
+
+        @keyframes pulso-mic-pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(17, 234, 234, 0.5); }
+            70%  { box-shadow: 0 0 0 10px rgba(17, 234, 234, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(17, 234, 234, 0); }
+        }
+
         .pulso-char-count {
             font-size: 0.7rem;
             color: var(--pulso-muted);
@@ -1249,6 +1293,7 @@ function render_chat_simple($courseid, $context) {
             .pulso-message.ai .pulso-rich-answer > *,
             .pulso-pulsewave polyline,
             .pulso-stream-cursor,
+            .pulso-mic-btn.pulso-mic-recording,
             .pulso-action-card {
                 animation: none !important;
                 transition: none !important;
@@ -1379,6 +1424,9 @@ function render_chat_simple($courseid, $context) {
                         autocomplete="off"
                         aria-label="Escribe tu pregunta sobre el curso"
                     />
+                    <button type="button" id="pulso-mic-btn" class="pulso-mic-btn" style="display:none;" aria-label="Dictar pregunta por voz" aria-pressed="false" title="Dictar por voz" onclick="toggleMic()">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+                    </button>
                     <button type="submit" class="pulso-send-btn" aria-label="Enviar pregunta">
                         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.85 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z"/></svg>
                     </button>
@@ -2567,7 +2615,96 @@ function render_chat_simple($courseid, $context) {
                 document.getElementById('pulso-char-count').textContent = '500';
             }
         }
-        
+
+        // ========== DICTADO POR VOZ (Web Speech API, transcripción en cliente) ==========
+
+        let pulsoRecognition = null;   // instancia de SpeechRecognition (una sola)
+        let pulsoMicRecording = false; // ¿grabando ahora mismo?
+        let pulsoMicBase = '';         // texto ya escrito antes de empezar a dictar
+
+        function initPulsoMic() {
+            const btn = document.getElementById('pulso-mic-btn');
+            if (!btn) return;
+
+            const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SR) {
+                // Navegador sin soporte (p. ej. Firefox): dejar el botón oculto.
+                return;
+            }
+
+            pulsoRecognition = new SR();
+            pulsoRecognition.lang = 'es-ES';
+            pulsoRecognition.interimResults = true;
+            pulsoRecognition.continuous = false;
+            pulsoRecognition.maxAlternatives = 1;
+
+            pulsoRecognition.onresult = function(event) {
+                const input = document.getElementById('pulso-input');
+                if (!input) return;
+                let transcript = '';
+                for (let i = 0; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                let combined = (pulsoMicBase + transcript).slice(0, 500);
+                input.value = combined;
+                updateCharCount();
+            };
+
+            pulsoRecognition.onerror = function(event) {
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    const lang = navigator.language.startsWith('en') ? 'en' : 'es';
+                    alert(lang === 'en'
+                        ? 'Microphone access is blocked. Allow it in your browser to dictate.'
+                        : 'El micrófono está bloqueado. Permite el acceso en tu navegador para dictar.');
+                }
+                // 'no-speech' / 'aborted' se ignoran silenciosamente.
+                stopPulsoMic();
+            };
+
+            pulsoRecognition.onend = function() {
+                stopPulsoMic();
+            };
+
+            // Soportado: mostrar el botón.
+            btn.style.display = '';
+        }
+
+        function toggleMic() {
+            if (!pulsoRecognition) return;
+            if (pulsoMicRecording) {
+                pulsoRecognition.stop();
+                return;
+            }
+            const input = document.getElementById('pulso-input');
+            // Conservar lo ya escrito y añadir un espacio de separación si hace falta.
+            pulsoMicBase = input && input.value ? (input.value.replace(/\s+$/, '') + ' ') : '';
+            try {
+                pulsoRecognition.start();
+            } catch (err) {
+                // start() lanza si ya estaba activo; reintentar limpio.
+                return;
+            }
+            pulsoMicRecording = true;
+            const btn = document.getElementById('pulso-mic-btn');
+            if (btn) {
+                btn.classList.add('pulso-mic-recording');
+                btn.setAttribute('aria-pressed', 'true');
+                btn.setAttribute('aria-label', 'Detener dictado');
+            }
+            if (input) input.focus();
+        }
+
+        function stopPulsoMic() {
+            if (!pulsoMicRecording) return;
+            pulsoMicRecording = false;
+            const btn = document.getElementById('pulso-mic-btn');
+            if (btn) {
+                btn.classList.remove('pulso-mic-recording');
+                btn.setAttribute('aria-pressed', 'false');
+                btn.setAttribute('aria-label', 'Dictar pregunta por voz');
+            }
+        }
+
         function detectLanguage(text) {
             // Palabras clave en inglés
             const englishKeywords = ['are', 'students', 'grades', 'how', 'what', 'completion', 'quiz', 'assignments', 'progress', 'performance', 'risk', 'going', 'doing', 'activity', 'engagement'];
@@ -2608,6 +2745,7 @@ function render_chat_simple($courseid, $context) {
         function sendMessage(e) {
             e.preventDefault();
             if (pulsoSending) return;
+            if (pulsoMicRecording && pulsoRecognition) pulsoRecognition.stop();
             const input = document.getElementById('pulso-input');
             const message = input.value.trim();
 
@@ -3219,6 +3357,9 @@ function render_chat_simple($courseid, $context) {
                 drawerObserver.observe(rightDrawer, { attributes: true, attributeFilter: ['class', 'style', 'aria-hidden'] });
             }
             
+            // Dictado por voz (se auto-oculta si el navegador no lo soporta)
+            initPulsoMic();
+
             // Listener para contador de caracteres en tiempo real
             const inputElement = document.getElementById('pulso-input');
             if (inputElement) {

@@ -1143,6 +1143,31 @@ function render_chat_simple($courseid, $context) {
             to { stroke-dashoffset: -90; }
         }
 
+        /* ========== BURBUJA "ESCRIBIENDO" (tres puntos estilo WhatsApp) ========== */
+        .pulso-typing-dots {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 2px;
+        }
+
+        .pulso-typing-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--pulso-cyan);
+            opacity: 0.4;
+            animation: pulso-typing-bounce 1.3s ease-in-out infinite;
+        }
+
+        .pulso-typing-dots span:nth-child(2) { animation-delay: 0.18s; }
+        .pulso-typing-dots span:nth-child(3) { animation-delay: 0.36s; }
+
+        @keyframes pulso-typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30%           { transform: translateY(-5px); opacity: 1; }
+        }
+
         /* ========== STREAMING (respuesta en vivo) ========== */
         .pulso-stream-text {
             white-space: pre-wrap;
@@ -1294,6 +1319,7 @@ function render_chat_simple($courseid, $context) {
             .pulso-pulsewave polyline,
             .pulso-stream-cursor,
             .pulso-mic-btn.pulso-mic-recording,
+            .pulso-typing-dots span,
             .pulso-action-card {
                 animation: none !important;
                 transition: none !important;
@@ -1301,6 +1327,10 @@ function render_chat_simple($courseid, $context) {
 
             .pulso-message.ai .pulso-rich-answer > * {
                 opacity: 1;
+            }
+
+            .pulso-typing-dots span {
+                opacity: 0.7;
             }
         }
 
@@ -1404,13 +1434,6 @@ function render_chat_simple($courseid, $context) {
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="pulso-loading" id="pulso-loading" role="status">
-            <svg class="pulso-pulsewave" viewBox="0 0 48 16" width="40" height="14" aria-hidden="true">
-                <polyline points="0,8 12,8 17,3 23,13 29,5 33,8 48,8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span id="pulso-loading-text">Procesando...</span>
         </div>
 
         <div class="pulso-chat-input-area">
@@ -2741,6 +2764,7 @@ function render_chat_simple($courseid, $context) {
 
         let pulsoSending = false;
         let streamBubble = null;
+        let typingBubble = null;
 
         function sendMessage(e) {
             e.preventDefault();
@@ -3037,16 +3061,41 @@ function render_chat_simple($courseid, $context) {
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
         
-        function showLoading(show, label) {
-            const loading = document.getElementById('pulso-loading');
-            const labelEl = document.getElementById('pulso-loading-text');
-            if (labelEl) {
-                labelEl.textContent = label || 'Procesando...';
+        // Burbuja "escribiendo" estilo WhatsApp: se muestra mientras el bot
+        // piensa y desaparece en cuanto llegan los primeros tokens / la respuesta.
+        function showTyping() {
+            if (typingBubble && typingBubble.isConnected) return;
+            const messagesDiv = document.getElementById('pulso-messages');
+            if (!messagesDiv) return;
+            const messageEl = document.createElement('div');
+            messageEl.className = 'pulso-message ai pulso-typing';
+            messageEl.setAttribute('role', 'status');
+            messageEl.setAttribute('aria-label', 'Pulso está escribiendo');
+            const contentEl = document.createElement('div');
+            contentEl.className = 'pulso-message-content';
+            const dots = document.createElement('span');
+            dots.className = 'pulso-typing-dots';
+            dots.setAttribute('aria-hidden', 'true');
+            dots.innerHTML = '<span></span><span></span><span></span>';
+            contentEl.appendChild(dots);
+            messageEl.appendChild(contentEl);
+            messagesDiv.appendChild(messageEl);
+            typingBubble = messageEl;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function hideTyping() {
+            if (typingBubble && typingBubble.parentNode) {
+                typingBubble.parentNode.removeChild(typingBubble);
             }
+            typingBubble = null;
+        }
+
+        function showLoading(show, label) {
             if (show) {
-                loading.classList.add('show');
+                showTyping();
             } else {
-                loading.classList.remove('show');
+                hideTyping();
             }
         }
         

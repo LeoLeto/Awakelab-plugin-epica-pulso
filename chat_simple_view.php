@@ -339,6 +339,80 @@ function render_chat_simple($courseid, $context) {
             line-height: 1.4;
         }
 
+        /* Botón "¿Qué puede hacer Pulso?" — descubrimiento rápido para recién llegados. */
+        .pulso-home-help-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            margin: 0 0 18px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(17, 234, 234, 0.35);
+            background: linear-gradient(135deg, rgba(17, 234, 234, 0.14), rgba(17, 234, 234, 0.04));
+            color: var(--pulso-ink);
+            font-family: var(--pulso-font);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+        }
+
+        .pulso-home-help-btn:hover {
+            border-color: rgba(17, 234, 234, 0.7);
+            box-shadow: 0 0 16px rgba(17, 234, 234, 0.22);
+        }
+
+        .pulso-home-help-btn:active {
+            transform: scale(0.99);
+        }
+
+        .pulso-home-help-btn svg {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            color: var(--pulso-cyan);
+        }
+
+        .pulso-home-help-btn .pulso-home-help-sub {
+            display: block;
+            font-weight: 400;
+            font-size: 0.76rem;
+            color: var(--pulso-slate);
+            margin-top: 1px;
+        }
+
+        /* Bloque de preguntas sugeridas en lista (evita el corte en 2 columnas). */
+        .pulso-suggest {
+            padding: 10px 14px;
+        }
+
+        .pulso-suggest-title {
+            font-weight: 600;
+            color: var(--pulso-cyan-soft);
+            font-size: 0.88rem;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pulso-suggest ul {
+            margin: 0;
+            padding-left: 20px;
+            line-height: 1.55;
+        }
+
+        .pulso-suggest li {
+            margin: 5px 0;
+        }
+
+        .pulso-suggest li::marker {
+            color: var(--pulso-cyan);
+        }
+
         .pulso-home-section {
             margin-bottom: 18px;
         }
@@ -623,7 +697,7 @@ function render_chat_simple($courseid, $context) {
 
         .pulso-meta-row {
             display: grid;
-            grid-template-columns: auto 1fr;
+            grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
             gap: 4px 12px;
             align-items: baseline;
             padding: 10px 14px;
@@ -638,15 +712,18 @@ function render_chat_simple($courseid, $context) {
             font-weight: 600;
             color: var(--pulso-cyan-soft);
             font-size: 0.85em;
-            white-space: nowrap;
             display: flex;
             align-items: center;
             gap: 5px;
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
 
         .pulso-meta-value {
             color: var(--pulso-ink);
             line-height: 1.55;
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
 
         .pulso-card-item {
@@ -1383,6 +1460,11 @@ function render_chat_simple($courseid, $context) {
                     <h5>¡Hola, %%PULSO_FIRSTNAME%%! ¿Qué quieres saber de tu curso?</h5>
                 </div>
 
+                <button type="button" class="pulso-home-help-btn" onclick="showCapabilities()" aria-label="Descubre qué puede hacer Pulso">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span>¿Qué puede hacer Pulso?<span class="pulso-home-help-sub">Descúbrelo en 10 segundos</span></span>
+                </button>
+
                 <div class="pulso-home-section">
                     <div class="pulso-home-section-head">
                         <span class="pulso-home-section-title">Analítica del curso</span>
@@ -1987,6 +2069,25 @@ function render_chat_simple($courseid, $context) {
             return '';
         }
 
+        // Trocea un valor que sea una ristra de preguntas en una lista.
+        // Devuelve null si no parece un listado de preguntas.
+        function pulsoSplitQuestions(value) {
+            const s = String(value || '');
+            // Preguntas en español delimitadas por ¿ … ?
+            const spanish = s.match(/¿[^¿?]*\?/g);
+            if (spanish && spanish.length >= 2) {
+                return spanish.map(function(q) { return q.trim(); });
+            }
+            // Fallback (inglés o sin ¿): solo si hay 2+ signos de interrogación.
+            if ((s.match(/\?/g) || []).length >= 2) {
+                const parts = s.split('?').map(function(p) { return p.trim(); }).filter(Boolean);
+                if (parts.length >= 2) {
+                    return parts.map(function(p) { return p + '?'; });
+                }
+            }
+            return null;
+        }
+
         function renderMetaRow(line) {
             const raw = String(line);
 
@@ -2056,6 +2157,17 @@ function render_chat_simple($courseid, $context) {
             };
 
             const info = translations[key] || { label: key, icon: 'ℹ️' };
+
+            // Si el valor es una ristra de preguntas (p. ej. las sugerencias del
+            // saludo), pintarlas como lista en vez de una fila de 2 columnas que
+            // se estruja y se corta en anchos pequeños.
+            const questions = pulsoSplitQuestions(value);
+            if (questions && questions.length >= 2) {
+                const items = questions.map(function(q) {
+                    return '<li>' + highlightResultPhrases(q) + '</li>';
+                }).join('');
+                return '<div class="pulso-suggest"><div class="pulso-suggest-title"><span>' + info.icon + '</span> ' + info.label + '</div><ul>' + items + '</ul></div>';
+            }
 
             return '<div class="pulso-meta-row"><div class="pulso-meta-key"><span>' + info.icon + '</span> ' + info.label + '</div><div class="pulso-meta-value">' + highlightResultPhrases(value) + '</div></div>';
         }
@@ -2634,6 +2746,30 @@ function render_chat_simple($courseid, $context) {
             input.value = question;
             updateCharCount();
             sendMessage(new Event('submit'));
+        }
+
+        // Botón "¿Qué puede hacer Pulso?": explicación instantánea (sin LLM),
+        // formateada como lista, para que un recién llegado lo entienda rápido.
+        function showCapabilities() {
+            setHomeVisible(false);
+            const html = ''
+                + '<div class="pulso-rich-answer">'
+                + '<p>Soy <strong>Pulso AI</strong>, tu asistente del curso. Esto es lo que puedo hacer por ti:</p>'
+                + '<ul class="pulso-rich-bullets">'
+                + '<li>📊 <strong>Analítica del curso:</strong> tasa de completitud, notas medias, ranking de mejores alumnos y nivel de participación.</li>'
+                + '<li>⚠️ <strong>Alerta temprana:</strong> detecto alumnos en riesgo o que llevan días sin acceder.</li>'
+                + '<li>📚 <strong>Contenido del curso:</strong> resumen, secciones, actividades, recursos y cuestionarios.</li>'
+                + '<li>📄 <strong>Documentos:</strong> leo y resumo PDFs y materiales, y respondo sobre lo que dicen.</li>'
+                + '<li>🎤 <strong>Voz o texto:</strong> pregúntame en lenguaje natural escribiendo o usando el micrófono.</li>'
+                + '</ul>'
+                + '<p>👉 Toca una tarjeta de la pantalla de inicio o prueba con una de estas preguntas:</p>'
+                + '</div>';
+            addMessage(html, 'ai', true);
+            showFollowupQuestions([
+                '¿Cuál es la tasa de completitud del curso?',
+                '¿Qué estudiantes están en riesgo?',
+                '¿De qué trata este curso?'
+            ]);
         }
 
         // La pantalla de inicio (saludo + tarjetas) solo se muestra sin conversación.

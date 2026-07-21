@@ -28,8 +28,14 @@ but the `$plugin->version` bump is still mandatory every time.
   action cards (`askPreset()`) in two sections (Analítica / Contenido) that
   hides on first message and returns via the "Nueva conversación" header button
   (`clearConversation()` — removes only `.pulso-message`/followups, NOT the home
-  node). Table/card field keys are translated via `PULSO_FIELD_LABELS` +
-  `pulsoFieldLabel()` fallback. Design tokens are CSS vars (`--pulso-*`) on
+  node). The home also has a "¿Qué puede hacer Pulso?" button
+  (`showCapabilities()`) that renders a hardcoded, client-side capabilities list
+  (no LLM/no cost, always well-formatted) + example follow-up chips, for quick
+  onboarding of new users. Table/card field keys are translated via
+  `PULSO_FIELD_LABELS` + `pulsoFieldLabel()` fallback. A meta-row value that is a
+  run-on of ≥2 questions (e.g. the greeting's "preguntas que puedes hacerme") is
+  rendered as a `<ul>` list (`pulsoSplitQuestions()` in `renderMetaRow`) instead
+  of the 2-column `key|value` grid, which clipped/broke in narrow chat widths. Design tokens are CSS vars (`--pulso-*`) on
   `.pulso-chat-container`.
   Voice input (v1.5+): mic button (`#pulso-mic-btn`, `toggleMic()`) does
   client-side speech-to-text via the Web Speech API (`SpeechRecognition`,

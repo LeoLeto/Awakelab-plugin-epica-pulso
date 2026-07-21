@@ -25,7 +25,10 @@ but the `$plugin->version` bump is still mandatory every time.
   Design (v1.4+): DARK theme with Awakelab 2026 brand (deep blues bg, vivid cyan
   accents on dark, Poppins via Google Fonts, isotipo logo from
   media.awakelab.world); Phia-style home screen (`#pulso-home`) with preset
-  action cards (`askPreset()`) in two sections (Analítica / Contenido) that
+  action cards (`askPreset()`) in two sections (Analítica / Contenido; each card
+  injects a full natural-language question into the pipeline — phrase new ones to
+  hit analytics/structural intents, not generic single words, to avoid backlog
+  bug #2's activity-matcher misfire) that
   hides on first message and returns via the "Nueva conversación" header button
   (`clearConversation()` — removes only `.pulso-message`/followups, NOT the home
   node). The home also has a "¿Qué puede hacer Pulso?" button

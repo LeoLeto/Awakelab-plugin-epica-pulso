@@ -130,10 +130,11 @@ function render_chat_simple($courseid, $context) {
         .pulso-chat-container {
             display: none;
             position: fixed;
-            top: 12px;
+            top: auto;
             bottom: 100px;
             right: 32px;
-            width: min(460px, calc(100vw - 48px));
+            width: min(640px, calc(100vw - 48px));
+            height: min(600px, calc(100vh - 130px));
             min-width: 300px;
             min-height: 300px;
             max-width: calc(100vw - 48px);

@@ -28,8 +28,25 @@ pulso ECG en cian (firma del producto). Tablas oscuras con píldoras de estado, 
 de columnas traducidas (`PULSO_FIELD_LABELS`/`pulsoFieldLabel`). Accesibilidad: aria,
 focus-visible, prefers-reduced-motion. Botón "Nueva conversación" en header.
 
-**Pendiente**: el bug backlog #1–#6 de CLAUDE.md (evaluación jul-2026) sigue SIN empezar
-— el trabajo de esta sesión fue migración + estabilidad + UI, no el backlog.
+**Estado real del bug backlog #1–#6** (corregido 2026-08-03 leyendo git log + código; la
+nota anterior "sigue SIN empezar" era incorrecta — el backlog se atacó ANTES de la
+migración a Anthropic, en los commits `24fcc60`…`da3cda5`):
+
+| Bug | Commit | Estado en código |
+|---|---|---|
+| #1 keywords analíticas en `is_pdf_content_query` | `24fcc60` | hecho (regex ya sin `nota media`/`cuántos alumnos`…) |
+| #2 matcher engancha por palabra genérica | `5d12e1c` | hecho (`match_activity_by_name_fuzzy`: stopwords, ≥2 hits o cobertura total, números como discriminador) |
+| #3 contaminación history-hint | `03013ba` | hecho (`build_direct_query` exige anáfora/ordinal + `is_course_analytics_query` corta el hint) |
+| #4 extracción PDF (CID/Identity-H) | `b7b08c4` | hecho SIN tocar servidor: `smalot/pdfparser` vendorizado en `lib/pdfparser/` + validación `is_extracted_text_useful()`; `pdftotext` queda como fallback opcional |
+| #5 referencias ordinales | `8286f63` | hecho (`detect_ordinal_reference` + `list_distinct_resources_in_history`) |
+| #6 mejoras | `e01bda0`, `4585a41`, `da3cda5` | docx/pptx ✓, ranking con permisos ✓, indexación SCORM ✓ — **FALTA** el modo "resumen/explicación de unidad" acotado al SCORM actual (P55/P56): `rag_retriever` no tiene ninguna rama scorm |
+
+**No verificado**: ninguno de esos fixes se ha re-validado ejecutando de nuevo las 56
+preguntas de `Pulso_AI_matriz_evaluacion.xlsx`. "Hecho en código" ≠ "cerrado".
+
+**Pendiente real**: (a) re-ejecutar la evaluación de 56 preguntas y actualizar la matriz;
+(b) modo alumno sobre SCORM (P55/P56); (c) opcional, mejorar RAG con Voyage AI + reranker
+(análisis en `Embeddings_A_vs_B.md`, decisión tomada = opción A, OpenAI para embeddings).
 
 **Convención de flujo**: Marcos quiere commit+push a origin/main tras CADA cambio, sin
 preguntar. Mensajes de commit ≤10 palabras. Versioning rule en cada cambio.

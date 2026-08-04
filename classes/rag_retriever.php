@@ -31,6 +31,13 @@ class rag_retriever {
     /** Max characters of chunk text to include per chunk in the prompt. */
     const MAX_CHUNK_CHARS = 800;
 
+    /**
+     * Segundos mínimos entre dos peticiones de indexación en background para el
+     * mismo curso. Protege de reindexar en bucle un curso cuyo contenido no
+     * genera fragmentos recuperables (cada pasada reparsea PDFs y paga embeddings).
+     */
+    const INDEX_REQUEST_THROTTLE = 6 * HOURSECS;
+
     // ----------------------------------------------------------------
     // Query-time retrieval
     // ----------------------------------------------------------------
@@ -1914,10 +1921,7 @@ class rag_retriever {
             'rag_enabled' => (bool)get_config('block_pulso', 'rag_enabled'),
             'rag_table_exists' => false,
             'initially_indexed' => false,
-            'on_demand_index_ran' => false,
-            'on_demand_index_stats' => null,
-            'forced_reindex_ran' => false,
-            'forced_reindex_stats' => null,
+            'index_queued' => false,
             'chunks_found' => 0,
             'chunk_sources' => [],
             'direct_structure_context' => false,
@@ -1948,10 +1952,11 @@ class rag_retriever {
         try {
             $diagnostics['initially_indexed'] = self::is_indexed($courseid);
 
-            // If this course was never indexed, perform on-demand indexing.
+            // Si el curso no está indexado, encolar la indexación en BACKGROUND.
+            // Nunca en línea: extraer los PDFs + generar embeddings tarda minutos
+            // y cuesta dinero, y antes ocurría en la propia petición del chat.
             if (!$diagnostics['initially_indexed']) {
-                $diagnostics['on_demand_index_ran'] = true;
-                $diagnostics['on_demand_index_stats'] = self::index_course($courseid);
+                $diagnostics['index_queued'] = self::request_background_index($courseid);
             } else {
                 // Backward compatibility: older indexes may not contain course metadata/sections.
                 // Reindex once to include course_meta and course_section chunks.
@@ -1961,19 +1966,20 @@ class rag_retriever {
                     ['courseid' => $courseid, 'meta' => 'course_meta', 'section' => 'course_section']
                 );
                 if (!$hasStructure) {
-                    $diagnostics['on_demand_index_ran'] = true;
-                    $diagnostics['on_demand_index_stats'] = self::index_course($courseid);
+                    $diagnostics['index_queued'] = self::request_background_index($courseid);
                 }
             }
 
             $manager = new embedding_manager();
             $chunks  = $manager->find_relevant_chunks($courseid, $query, self::TOP_K);
 
-            // If retrieval is empty, try one forced re-index in case content changed.
+            // Recuperación vacía: puede que el contenido haya cambiado, así que
+            // se pide una reindexación — pero en background y con límite de
+            // frecuencia. Reindexar aquí en línea hacía que un curso sin
+            // fragmentos recuperables reindexase el curso COMPLETO en cada
+            // mensaje, dos veces, indefinidamente.
             if (empty($chunks)) {
-                $diagnostics['forced_reindex_ran'] = true;
-                $diagnostics['forced_reindex_stats'] = self::index_course($courseid);
-                $chunks = $manager->find_relevant_chunks($courseid, $query, self::TOP_K);
+                $diagnostics['index_queued'] = self::request_background_index($courseid);
             }
         } catch (\Throwable $e) {
             // Never break the chat if RAG fails.
@@ -2000,7 +2006,10 @@ class rag_retriever {
                 ];
             }
             $diagnostics['status'] = 'no_context';
-            $diagnostics['message'] = 'RAG activo, pero no se encontraron fragmentos relevantes. Verifica indexación/contenido del recurso.';
+            $diagnostics['message'] = $diagnostics['index_queued']
+                ? 'RAG activo. El contenido del curso se está indexando en segundo plano (tarea del cron); '
+                    . 'vuelve a preguntar en unos minutos.'
+                : 'RAG activo, pero no se encontraron fragmentos relevantes. Verifica indexación/contenido del recurso.';
             return ['context' => '', 'diagnostics' => $diagnostics];
         }
 
@@ -2424,6 +2433,42 @@ class rag_retriever {
     // ----------------------------------------------------------------
 
     /**
+     * Encola la indexación del curso como tarea adhoc, para que corra en el cron
+     * y NO dentro de la petición de chat del usuario.
+     *
+     * Limitado por frecuencia (INDEX_REQUEST_THROTTLE): sin este límite, un curso
+     * cuyo contenido no produce fragmentos recuperables volvería a encolarse en
+     * cada mensaje, y cada ejecución reparsea todos los PDFs y paga embeddings.
+     * queue_adhoc_task() con $checkforexisting evita además duplicados mientras
+     * la tarea siga pendiente.
+     *
+     * @param int $courseid
+     * @return bool true si se ha encolado ahora, false si se omitió por el límite.
+     */
+    private static function request_background_index(int $courseid): bool {
+        $throttlekey = 'lastindexqueue_' . $courseid;
+        $last = (int)get_config('block_pulso', $throttlekey);
+        $now = time();
+
+        if ($last > 0 && ($now - $last) < self::INDEX_REQUEST_THROTTLE) {
+            return false;
+        }
+
+        try {
+            $task = new \block_pulso\task\index_course_adhoc();
+            $task->set_component('block_pulso');
+            $task->set_custom_data(['courseid' => $courseid]);
+            \core\task\manager::queue_adhoc_task($task, true);
+            set_config($throttlekey, $now, 'block_pulso');
+            return true;
+        } catch (\Throwable $e) {
+            // Nunca romper el chat porque no se pueda encolar la indexación.
+            error_log('Pulso RAG: could not queue adhoc index for course ' . $courseid . ': ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Extract and embed all content for a course.
      *
      * @param int $courseid
@@ -2458,6 +2503,10 @@ class rag_retriever {
      */
     public static function delete_course_index(int $courseid): void {
         global $DB;
+        // Limpiar tambien el limitador de frecuencia: si el indice se borra a
+        // proposito, la siguiente consulta debe poder reencolar la indexacion
+        // sin esperar la ventana de INDEX_REQUEST_THROTTLE.
+        unset_config('lastindexqueue_' . $courseid, 'block_pulso');
         if (!self::rag_table_exists()) {
             return;
         }

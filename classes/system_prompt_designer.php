@@ -49,7 +49,9 @@ Tienes acceso a los siguientes campos de datos del curso:
 ### Grades and Quizzes
 - userid: ID del usuario
 - item_name: Nombre de la tarea/quiz/módulo
-- item_type: Tipo (assignment, quiz, mod)
+- item_type: Tipo real del ítem: `quiz`, `assign`, `forum`… para actividades, o
+  `manual` si es un ítem calificado a mano en el libro de calificaciones. No
+  incluye agregados de categoría ni el total del curso.
 - grade_obtained: Nota obtenida
 - grade_max: Nota máxima
 - grade_pass: Nota de corte del ítem, o null si el profesor no la ha configurado

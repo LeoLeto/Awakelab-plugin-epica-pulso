@@ -114,6 +114,7 @@ class data_retriever {
                     u.lastname,
                     gi.itemname,
                     gi.itemtype,
+                    gi.itemmodule,
                     gi.grademax,
                     gi.gradepass,
                     gg.rawgrade,
@@ -134,7 +135,14 @@ class data_retriever {
                 JOIN {grade_items} gi ON gg.itemid = gi.id
                 JOIN {user} u ON gg.userid = u.id
                 WHERE gi.courseid = :courseid
-                  AND gi.itemtype IN ('assignment', 'quiz', 'mod')
+                  -- Los valores reales de grade_items.itemtype en Moodle son
+                  -- mod / manual / category / course / outcome. El filtro anterior
+                  -- pedia 'assignment' y 'quiz', que NO existen (eso va en
+                  -- itemmodule), asi que en la practica solo entraba 'mod' y los
+                  -- items calificados a mano en el libro de calificaciones eran
+                  -- invisibles. Se excluyen category/course a proposito: son
+                  -- agregados y falsearian las medias por doble conteo.
+                  AND gi.itemtype IN ('mod', 'manual')
                 ORDER BY u.firstname ASC, u.lastname ASC, gi.itemname ASC";
 
         $params = ['courseid' => $courseid];
@@ -158,7 +166,11 @@ class data_retriever {
                     'firstname' => $record->firstname,
                     'lastname' => $record->lastname,
                     'item_name' => $record->itemname,
-                    'item_type' => $record->itemtype,
+                    // Para itemtype='mod' el tipo util esta en itemmodule
+                    // (quiz, assign, forum...); 'manual' se queda tal cual.
+                    'item_type' => $record->itemtype === 'mod' && !empty($record->itemmodule)
+                        ? $record->itemmodule
+                        : $record->itemtype,
                     'grade_obtained' => $finalgrade,
                     'grade_max' => $grademax,
                     'grade_pass' => $record->gradepass !== null && (float)$record->gradepass > 0

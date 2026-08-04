@@ -31,6 +31,21 @@ class content_extractor {
     const SCORM_MAX_CHARS = 80000;
 
     /**
+     * Espacio reservado por curso para los cmid SINTETICOS de los chunks que no
+     * pertenecen a ningun modulo real (metadatos del curso y secciones). Los cmid
+     * reales son positivos, asi que estos van en negativo:
+     *
+     *   metadatos del curso C  ->  -(C * SYNTHETIC_CMID_STRIDE)
+     *   seccion S del curso C  ->  -(C * SYNTHETIC_CMID_STRIDE + S + 1)
+     *
+     * Con S+1 acotado a [1, STRIDE-1] ningun par (curso, seccion) puede colisionar
+     * con los metadatos de otro curso. El esquema anterior usaba -C para los
+     * metadatos, que chocaba con la seccion 4 del curso C/1000 (p. ej. el curso
+     * 1005 contra la seccion 4 del curso 1).
+     */
+    const SYNTHETIC_CMID_STRIDE = 1000;
+
+    /**
      * Extract all content from a course and return as an array of chunks.
      *
      * Each chunk is an associative array:
@@ -121,7 +136,7 @@ class content_extractor {
         if ($overviewtext !== '') {
             $chunks = array_merge($chunks, $this->chunk_text(
                 $overviewtext,
-                -1 * $courseid,
+                $this->course_meta_cmid($courseid),
                 'course_meta',
                 mb_substr((string)$course->fullname, 0, 255)
             ));
@@ -196,16 +211,39 @@ class content_extractor {
                 continue;
             }
 
-            $fakecmid = -1 * (($courseid * 1000) + (int)$sec->section + 1);
             $chunks = array_merge($chunks, $this->chunk_text(
                 $sectiontext,
-                $fakecmid,
+                $this->course_section_cmid($courseid, (int)$sec->section),
                 'course_section',
                 mb_substr($title, 0, 255)
             ));
         }
 
         return $chunks;
+    }
+
+    /**
+     * cmid sintetico para el chunk de metadatos de un curso.
+     *
+     * @param int $courseid
+     * @return int negativo, nunca colisiona con un cmid real
+     */
+    private function course_meta_cmid(int $courseid): int {
+        return -1 * ($courseid * self::SYNTHETIC_CMID_STRIDE);
+    }
+
+    /**
+     * cmid sintetico para el chunk de una seccion. El offset dentro del curso se
+     * acota a [1, STRIDE-1] para que no pueda desbordar al espacio del curso
+     * siguiente ni chocar con sus metadatos.
+     *
+     * @param int $courseid
+     * @param int $sectionnum
+     * @return int negativo, nunca colisiona con un cmid real
+     */
+    private function course_section_cmid(int $courseid, int $sectionnum): int {
+        $offset = min(max($sectionnum, 0), self::SYNTHETIC_CMID_STRIDE - 2) + 1;
+        return -1 * (($courseid * self::SYNTHETIC_CMID_STRIDE) + $offset);
     }
 
     /**

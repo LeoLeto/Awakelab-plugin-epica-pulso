@@ -86,8 +86,12 @@ class embedding_manager {
         foreach ($chunks as $chunk) {
             $hash = hash('sha256', $chunk['chunk_text']);
 
-            // Check existing record.
+            // Check existing record. El courseid es OBLIGATORIO en el filtro:
+            // sin él, un chunk sintético de un curso (cmid negativo, ver
+            // content_extractor::extract_course_structure) podía resolverse
+            // contra la fila de OTRO curso y sobrescribirla al hacer el update.
             $existing = $DB->get_record('block_pulso_content_chunks', [
+                'courseid'    => $courseid,
                 'cmid'        => $chunk['cmid'],
                 'chunk_index' => $chunk['chunk_index'],
             ]);

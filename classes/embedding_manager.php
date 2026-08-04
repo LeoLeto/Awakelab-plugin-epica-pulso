@@ -233,7 +233,33 @@ class embedding_manager {
     }
 
     /**
+     * Palabras vacías del español (más las genéricas de este dominio) que no sirven
+     * como discriminadores: aparecen en casi cualquier pregunta y en casi cualquier
+     * fragmento, así que puntuar con ellas equivale a puntuar al azar.
+     */
+    private const LEXICAL_STOPWORDS = [
+        'que', 'qué', 'como', 'cómo', 'cual', 'cuál', 'cuales', 'cuáles', 'donde', 'dónde',
+        'cuando', 'cuándo', 'cuanto', 'cuánto', 'cuantos', 'cuántos', 'cuantas', 'cuántas',
+        'quien', 'quién', 'quienes', 'para', 'por', 'con', 'sin', 'los', 'las', 'del', 'una',
+        'unos', 'unas', 'este', 'esta', 'esto', 'estos', 'estas', 'ese', 'esa', 'eso', 'esos',
+        'esas', 'hay', 'tiene', 'tienen', 'son', 'está', 'esta', 'están', 'ser', 'hacer',
+        'dame', 'dime', 'puedes', 'quiero', 'sobre', 'todo', 'toda', 'todos', 'todas',
+        'más', 'mas', 'muy', 'pero', 'porque', 'también', 'tambien',
+        // Genéricas del dominio: presentes en el prefijo de casi todos los fragmentos.
+        'curso', 'cursos', 'seccion', 'sección', 'secciones', 'actividad', 'actividades',
+        'contenido', 'contenidos', 'alumno', 'alumnos', 'estudiante', 'estudiantes',
+    ];
+
+    /**
      * Lexical fallback retrieval when embeddings are unavailable.
+     *
+     * Devuelve [] cuando no hay una coincidencia real. ANTES devolvía los primeros
+     * N fragmentos del curso —arbitrarios— tanto si la pregunta no dejaba términos
+     * útiles como si ninguno puntuaba; esos fragmentos se inyectaban en el prompt
+     * bajo el título "CONTENIDO RELEVANTE DEL CURSO" y, combinado con la regla
+     * "si existe la sección RAG, SÍ tienes acceso", empujaban al modelo a responder
+     * con material que no venía a cuento. Sin coincidencia es mejor no dar contexto:
+     * el llamador ya trata el vacío (cae al contexto estructural o avisa).
      *
      * @param int $courseid
      * @param string $query
@@ -242,6 +268,12 @@ class embedding_manager {
      */
     private function find_relevant_chunks_lexical(int $courseid, string $query, int $top_k = 5): array {
         global $DB;
+
+        $terms = $this->tokenize_query($query);
+        if (empty($terms)) {
+            // Pregunta sin ningún término significativo: no hay nada que buscar.
+            return [];
+        }
 
         $chunks = $DB->get_records_select(
             'block_pulso_content_chunks',
@@ -255,29 +287,39 @@ class embedding_manager {
             return [];
         }
 
-        $terms = $this->tokenize_query($query);
-        if (empty($terms)) {
-            return array_slice(array_values($chunks), 0, $top_k);
-        }
+        // Con una sola palabra significativa hay que aceptarla; con varias se exigen
+        // al menos 2 términos DISTINTOS, para que una palabra suelta no arrastre un
+        // fragmento cualquiera (mismo criterio que match_activity_by_name_fuzzy).
+        $minDistinct = count($terms) === 1 ? 1 : 2;
 
         $scored = [];
         foreach ($chunks as $chunk) {
-            $score = $this->lexical_score($chunk->chunk_text, $terms);
-            if ($score > 0) {
-                $scored[] = ['record' => $chunk, 'score' => $score];
+            [$distinct, $occurrences] = $this->lexical_score($chunk->chunk_text, $terms);
+            if ($distinct < $minDistinct) {
+                continue;
             }
+            $scored[] = [
+                'record' => $chunk,
+                'distinct' => $distinct,
+                'occurrences' => $occurrences,
+            ];
         }
 
         if (empty($scored)) {
-            return array_slice(array_values($chunks), 0, min($top_k, count($chunks)));
+            return [];
         }
 
-        usort($scored, fn($a, $b) => $b['score'] <=> $a['score']);
+        // Ordenar por cobertura de términos distintos y, a igualdad, por frecuencia:
+        // cubrir 3 términos una vez cada uno es mejor señal que repetir uno 10 veces.
+        usort($scored, function($a, $b) {
+            return [$b['distinct'], $b['occurrences']] <=> [$a['distinct'], $a['occurrences']];
+        });
+
         return array_map(fn($s) => $s['record'], array_slice($scored, 0, $top_k));
     }
 
     /**
-     * Tokenize query into normalized terms.
+     * Tokenize query into normalized terms, descartando palabras vacías.
      *
      * @param string $query
      * @return array
@@ -287,25 +329,31 @@ class embedding_manager {
         $q = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $q);
         $parts = preg_split('/\s+/u', trim($q));
         $parts = array_filter($parts, function($t) {
-            return mb_strlen($t, 'UTF-8') >= 3;
+            return mb_strlen($t, 'UTF-8') >= 4
+                && !in_array($t, self::LEXICAL_STOPWORDS, true);
         });
         return array_values(array_unique($parts));
     }
 
     /**
-     * Simple term-frequency score.
+     * Puntuación léxica: cuántos términos DISTINTOS aparecen y cuántas veces en total.
      *
      * @param string $text
      * @param array $terms
-     * @return int
+     * @return array [terminos_distintos, ocurrencias_totales]
      */
-    private function lexical_score(string $text, array $terms): int {
+    private function lexical_score(string $text, array $terms): array {
         $t = mb_strtolower($text, 'UTF-8');
-        $score = 0;
+        $distinct = 0;
+        $occurrences = 0;
         foreach ($terms as $term) {
-            $score += substr_count($t, $term);
+            $count = substr_count($t, $term);
+            if ($count > 0) {
+                $distinct++;
+                $occurrences += $count;
+            }
         }
-        return $score;
+        return [$distinct, $occurrences];
     }
 
     // ----------------------------------------------------------------

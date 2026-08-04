@@ -487,7 +487,7 @@ PROMPT;
      * Generate the full system prompt with analytics context AND optional RAG content.
      *
      * @param array  $course_context Output of data_retriever::get_unified_course_context()
-     * @param string $rag_context    Formatted string from rag_retriever::get_context_for_query()
+     * @param string $rag_context    Formatted string from chat_pipeline::get_rag()['context']
      * @return string
      */
     public static function generate_prompt_with_context_and_rag($course_context = [], string $rag_context = '') {
@@ -571,55 +571,4 @@ PROMPT;
         }
     }
 
-    /**
-     * Obtener ejemplo de schema JSON
-     * 
-     * @param string $type table|list|text
-     * @return array Ejemplo de estructura JSON
-     */
-    public static function get_schema_example($type = 'table') {
-        $examples = [
-            'table' => [
-                'type' => 'table',
-                'title' => 'Course Metrics',
-                'summary' => 'Key performance indicators',
-                'data' => [
-                    ['metric' => 'Total Students', 'value' => '32', 'color' => 'neutral'],
-                    ['metric' => 'Completion Rate', 'value' => '78%', 'color' => 'success']
-                ],
-                'insights' => ['Insight 1', 'Insight 2'],
-                'recommendations' => ['Action 1', 'Action 2'],
-                'language' => 'en',
-                'confidence' => 0.95
-            ],
-            'list' => [
-                'type' => 'list',
-                'title' => 'Student List',
-                'summary' => 'Students ranked by performance',
-                'data' => [
-                    ['name' => 'John Smith', 'grade' => '8.5/10', 'status' => 'Excellent'],
-                    ['name' => 'Jane Doe', 'grade' => '7.2/10', 'status' => 'Good']
-                ],
-                'insights' => ['Insight 1', 'Insight 2'],
-                'recommendations' => [],
-                'language' => 'en',
-                'confidence' => 0.95
-            ],
-            'text' => [
-                'type' => 'text',
-                'title' => 'Detailed Analysis',
-                'summary' => 'In-depth narrative analysis',
-                'data' => [
-                    ['paragraph' => 'First paragraph of analysis...'],
-                    ['paragraph' => 'Second paragraph with insights...']
-                ],
-                'insights' => ['Key observation 1', 'Key observation 2'],
-                'recommendations' => ['Recommendation 1'],
-                'language' => 'en',
-                'confidence' => 0.95
-            ]
-        ];
-
-        return $examples[$type] ?? $examples['table'];
-    }
 }

@@ -85,45 +85,6 @@ class anthropic_connector {
     }
 
     /**
-     * Envía una consulta básica a la IA para verificar la conexión.
-     *
-     * @param string $user_prompt El texto que escribe el usuario.
-     * @return stdClass La respuesta cruda de Anthropic desglosada.
-     */
-    public function send_basic_test_query(string $user_prompt) {
-        global $CFG;
-
-        $payload = [
-            'model' => $this->model,
-            'system' => 'Eres Pulso AI, un asistente de analítica para Moodle. Responde de forma concisa y educada.',
-            'messages' => [
-                ['role' => 'user', 'content' => $user_prompt],
-            ],
-            'max_tokens' => 150, // Anthropic exige max_tokens en cada petición.
-        ];
-
-        require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-
-        $curl->setHeader($this->headers());
-
-        $json_payload = json_encode($payload);
-        $response_raw = $curl->post($this->apiurl, $json_payload);
-
-        if ($curl->errno) {
-            throw new \moodle_exception('error_api_connection', 'block_pulso', '', $curl->error);
-        }
-
-        $response = json_decode($response_raw);
-
-        if (isset($response->error)) {
-            throw new \moodle_exception('error_api_response', 'block_pulso', '', $response->error->message);
-        }
-
-        return $response;
-    }
-
-    /**
      * Envía una consulta con contexto del curso para análisis inteligente.
      *
      * @param string $user_message El mensaje del usuario con contexto del curso

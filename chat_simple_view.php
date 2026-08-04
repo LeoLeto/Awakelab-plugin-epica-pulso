@@ -1190,37 +1190,6 @@ function render_chat_simple($courseid, $context) {
             transform: translateY(0);
         }
 
-        /* ========== INDICADOR "PENSANDO" (onda de pulso — firma Pulso) ========== */
-        .pulso-loading {
-            display: none;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 16px;
-            color: var(--pulso-slate);
-            font-size: 0.84rem;
-            font-weight: 500;
-            background: var(--pulso-bg);
-        }
-
-        .pulso-loading.show {
-            display: flex;
-        }
-
-        .pulso-pulsewave {
-            color: var(--pulso-cyan);
-            flex-shrink: 0;
-        }
-
-        .pulso-pulsewave polyline {
-            stroke-dasharray: 90;
-            stroke-dashoffset: 90;
-            animation: pulso-wave 1.4s linear infinite;
-        }
-
-        @keyframes pulso-wave {
-            to { stroke-dashoffset: -90; }
-        }
-
         /* ========== BURBUJA "ESCRIBIENDO" (tres puntos estilo WhatsApp) ========== */
         .pulso-typing-dots {
             display: inline-flex;
@@ -1408,7 +1377,6 @@ function render_chat_simple($courseid, $context) {
             .pulso-chat-container,
             .pulso-message,
             .pulso-message.ai .pulso-rich-answer > *,
-            .pulso-pulsewave polyline,
             .pulso-stream-cursor,
             .pulso-mic-btn.pulso-mic-recording,
             .pulso-action-card {

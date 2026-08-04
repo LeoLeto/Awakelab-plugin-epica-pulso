@@ -5,8 +5,9 @@
  * Combines content_extractor + embedding_manager into a single API
  * that api_chat.php uses:
  *
- *   1. rag_retriever::get_context_for_query($courseid, $query)
- *      → returns a formatted string ready to inject into the system prompt.
+ *   1. rag_retriever::get_context_and_diagnostics_for_query($courseid, $query)
+ *      → returns ['context' => string ready to inject into the system prompt,
+ *                 'diagnostics' => array for the client].
  *
  *   2. rag_retriever::index_course($courseid)
  *      → called by the scheduled task to (re-)index a course.
@@ -33,22 +34,6 @@ class rag_retriever {
     // ----------------------------------------------------------------
     // Query-time retrieval
     // ----------------------------------------------------------------
-
-    /**
-     * Retrieve the most relevant content chunks for a user query and
-     * return a formatted context block ready to append to the system prompt.
-     *
-     * Returns an empty string when RAG is disabled, not indexed, or the
-     * embeddings API fails (so the chat still works without RAG context).
-     *
-     * @param int    $courseid
-     * @param string $query    User's natural-language question.
-     * @return string
-     */
-    public static function get_context_for_query(int $courseid, string $query): string {
-        $result = self::get_context_and_diagnostics_for_query($courseid, $query);
-        return $result['context'];
-    }
 
     /**
      * Resolve course structure queries directly from Moodle data.

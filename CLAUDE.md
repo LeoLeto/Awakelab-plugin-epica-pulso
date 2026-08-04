@@ -50,8 +50,8 @@ but the `$plugin->version` bump is still mandatory every time.
   bubble with three animated cyan dots (`showTyping()`/`hideTyping()`, driven by
   the existing `showLoading()` calls) appears in the message flow and is removed
   as soon as the first stream tokens / final answer arrive. This replaced the old
-  `#pulso-loading` status bar (element removed; its `.pulso-loading`/
-  `.pulso-pulsewave` CSS is now inert).
+  `#pulso-loading` status bar (element and its `.pulso-loading`/
+  `.pulso-pulsewave` CSS both removed in v1.8.1).
 - `api_chat_stream.php` — SSE endpoint. Events: `status`, `delta`, `final`
   (same JSON shape as api_chat.php), `followups` (deferred, off the critical
   path), `error`.

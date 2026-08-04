@@ -381,6 +381,9 @@ class embedding_manager {
         ]);
 
         $curl = new \curl();
+        // Sin timeout explícito, una llamada colgada a OpenAI cuelga con ella la
+        // petición completa (indexación o consulta de chat) sin límite.
+        $curl->setopt(['CURLOPT_TIMEOUT' => 60, 'CURLOPT_CONNECTTIMEOUT' => 10]);
         $curl->setHeader([
             'Content-Type: application/json',
             'Authorization: Bearer ' . $this->apikey,

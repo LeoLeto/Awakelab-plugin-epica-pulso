@@ -19,6 +19,16 @@ class anthropic_connector {
     /** Versión de la API de Anthropic requerida por cabecera. */
     const API_VERSION = '2023-06-01';
 
+    /** Reintentos máximos ante sobrecarga transitoria de la API. */
+    const MAX_RETRIES = 2;
+
+    /**
+     * Códigos HTTP que merecen reintento: 429 (rate limit), 529 (overloaded) y los
+     * 5xx transitorios. Un 400/401/403 NO se reintenta — es un fallo de la petición
+     * y repetirla da exactamente el mismo error.
+     */
+    const RETRYABLE_STATUSES = [429, 500, 502, 503, 504, 529];
+
     private $apikey;
     private $model;
     private $apiurl = 'https://api.anthropic.com/v1/messages';
@@ -67,6 +77,69 @@ class anthropic_connector {
         }
         $messages[] = ['role' => 'user', 'content' => $user_message];
         return $messages;
+    }
+
+    /**
+     * ¿Merece la pena reintentar esta respuesta?
+     *
+     * @param int $httpstatus
+     * @param int $attempt Reintentos ya consumidos.
+     * @return bool
+     */
+    private function should_retry(int $httpstatus, int $attempt): bool {
+        return $attempt < self::MAX_RETRIES
+            && in_array($httpstatus, self::RETRYABLE_STATUSES, true);
+    }
+
+    /**
+     * Espera antes del siguiente intento, creciente (1s, 2s). Se mantiene corta a
+     * propósito: el usuario está esperando la respuesta del chat.
+     *
+     * @param int $attempt Número de reintento (1-based).
+     * @return int segundos
+     */
+    private function retry_delay(int $attempt): int {
+        return min(4, (int)pow(2, $attempt - 1));
+    }
+
+    /**
+     * Aplica la configuración de proxy de Moodle a un handle de cURL crudo.
+     *
+     * El streaming y las preguntas de seguimiento no pueden usar el wrapper `\curl`
+     * de Moodle (necesitan CURLOPT_WRITEFUNCTION para ir emitiendo los tokens), pero
+     * al usar curl_init() directamente se saltaban `$CFG->proxyhost`: en un Moodle
+     * detrás de proxy el endpoint clásico funcionaba y el streaming no, con un fallo
+     * de conexión difícil de atribuir.
+     *
+     * @param \CurlHandle|resource $handle
+     * @param string $url URL destino, para respetar la lista de excepciones del proxy.
+     */
+    private function apply_proxy_settings($handle, string $url): void {
+        global $CFG;
+
+        if (empty($CFG->proxyhost)) {
+            return;
+        }
+
+        // Respetar $CFG->proxybypass (is_proxybypass() vive en moodlelib).
+        if (function_exists('is_proxybypass') && is_proxybypass($url)) {
+            return;
+        }
+
+        if (empty($CFG->proxyport)) {
+            curl_setopt($handle, CURLOPT_PROXY, $CFG->proxyhost);
+        } else {
+            curl_setopt($handle, CURLOPT_PROXY, $CFG->proxyhost . ':' . $CFG->proxyport);
+        }
+
+        if (!empty($CFG->proxytype) && $CFG->proxytype === 'SOCKS5') {
+            curl_setopt($handle, CURLOPT_PROXYTYPE, CURLPROXY_SOCKS5);
+        }
+
+        if (!empty($CFG->proxyuser) && !empty($CFG->proxypassword)) {
+            curl_setopt($handle, CURLOPT_PROXYUSERPWD, $CFG->proxyuser . ':' . $CFG->proxypassword);
+            curl_setopt($handle, CURLOPT_PROXYAUTH, CURLAUTH_BASIC | CURLAUTH_NTLM);
+        }
     }
 
     /**
@@ -176,21 +249,36 @@ class anthropic_connector {
         ];
 
         require_once($CFG->libdir . '/filelib.php');
-        $curl = new \curl();
-        $curl->setopt(['CURLOPT_TIMEOUT' => 55]);
-
-        $curl->setHeader($this->headers());
-
         $json_payload = $this->encode_payload($payload);
-        $response_raw = $curl->post($this->apiurl, $json_payload);
 
-        if ($curl->errno) {
-            throw new \moodle_exception(
-                'error_api_connection',
-                'block_pulso',
-                '',
-                'cURL error: ' . $curl->error
-            );
+        // Reintento con espera creciente ante sobrecarga transitoria de la API
+        // (429 rate limit, 529 overloaded, 5xx). Sin esto, un pico de carga en
+        // Anthropic llegaba al profesor como un error seco.
+        $attempt = 0;
+        while (true) {
+            $curl = new \curl();
+            $curl->setopt(['CURLOPT_TIMEOUT' => 55]);
+            $curl->setHeader($this->headers());
+
+            $response_raw = $curl->post($this->apiurl, $json_payload);
+            $http_status = (int)($curl->info['http_code'] ?? 0);
+
+            if ($curl->errno) {
+                throw new \moodle_exception(
+                    'error_api_connection',
+                    'block_pulso',
+                    '',
+                    'cURL error: ' . $curl->error
+                );
+            }
+
+            if (!$this->should_retry($http_status, $attempt)) {
+                break;
+            }
+
+            $attempt++;
+            error_log("Pulso: Anthropic HTTP {$http_status}, reintento {$attempt} de " . self::MAX_RETRIES);
+            sleep($this->retry_delay($attempt));
         }
 
         $response = json_decode($response_raw, true);
@@ -269,6 +357,12 @@ class anthropic_connector {
         // se lanza la excepción sin dejar un handle de cURL sin cerrar.
         $json_payload = $this->encode_payload($payload);
 
+        // Bucle de reintento ante sobrecarga transitoria. SOLO se reintenta si no se
+        // ha emitido ni un token todavía: una vez el usuario ha visto texto en
+        // pantalla, repetir la petición duplicaría la respuesta. Los acumuladores se
+        // reinician en cada intento para no mezclar estado entre ellos.
+        $attempt = 0;
+        while (true) {
         $model_text = '';
         $tokens_in = 0;
         $tokens_out = 0;
@@ -344,10 +438,23 @@ class anthropic_connector {
             }
         ]);
 
+        $this->apply_proxy_settings($curl, $this->apiurl);
+
         curl_exec($curl);
         $curl_errno = curl_errno($curl);
         $curl_error = curl_error($curl);
         curl_close($curl);
+
+            if ($model_text === '' && $error_http_status !== null
+                    && $this->should_retry((int)$error_http_status, $attempt)) {
+                $attempt++;
+                error_log("Pulso: Anthropic stream HTTP {$error_http_status}, reintento {$attempt} de "
+                    . self::MAX_RETRIES);
+                sleep($this->retry_delay($attempt));
+                continue;
+            }
+            break;
+        }
 
         if ($curl_errno) {
             // Si ya llegó parte de la respuesta, devolver lo acumulado en vez de fallar.
@@ -578,6 +685,8 @@ PROMPT;
                 CURLOPT_POSTFIELDS => $this->encode_payload($payload),
                 CURLOPT_HTTPHEADER => $this->headers(),
             ]);
+
+            $this->apply_proxy_settings($curl, $this->apiurl);
 
             $response = curl_exec($curl);
             $http_code = curl_getinfo($curl, CURLINFO_HTTP_CODE);

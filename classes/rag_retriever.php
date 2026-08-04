@@ -38,6 +38,13 @@ class rag_retriever {
      */
     const INDEX_REQUEST_THROTTLE = 6 * HOURSECS;
 
+    /**
+     * Tope de fragmentos que reconstruye el catálogo de problemas. Sin tope, una
+     * pregunta con la palabra "problema" concatenaba en memoria el texto extraído de
+     * TODOS los recursos del curso para luego quedarse con 8 problemas.
+     */
+    const PROBLEM_CATALOG_MAX_CHUNKS = 120;
+
     // ----------------------------------------------------------------
     // Query-time retrieval
     // ----------------------------------------------------------------
@@ -305,6 +312,14 @@ class rag_retriever {
         $isContentIntent = !$isSummaryIntent && self::is_pdf_content_query($query);
         $isAnalyticsIntent = self::is_course_analytics_query($query);
 
+        // Atajo: en una pregunta de analitica de curso solo puede ganar un match
+        // EXACTO de nombre (el difuso se descarta unas lineas mas abajo). Comprobar
+        // primero si la pregunta contiene algun nombre de actividad evita barrer las
+        // 13 tablas de tipos de modulo en cada mensaje para nada.
+        if ($isAnalyticsIntent && !self::query_mentions_any_activity_name($courseid, $query)) {
+            return null;
+        }
+
         $resources = $DB->get_records('resource', ['course' => $courseid], 'name ASC', 'id, name, intro');
 
         // También buscar quizzes y tareas (assign).
@@ -507,6 +522,45 @@ class rag_retriever {
         }
 
         return $result;
+    }
+
+    /**
+     * ¿Menciona la pregunta el nombre de ALGUNA actividad del curso, como palabra
+     * completa?
+     *
+     * Usa get_fast_modinfo(), que Moodle ya mantiene en caché y expone el nombre de
+     * cada modulo (OJO: {course_modules} NO tiene columna `name`; el nombre vive en
+     * la tabla de cada tipo de modulo, que es justo lo que queremos evitar barrer).
+     *
+     * Deliberadamente permisiva: si dice que si, el flujo normal decide de verdad.
+     *
+     * @param int $courseid
+     * @param string $query Pregunta en minusculas.
+     * @return bool
+     */
+    private static function query_mentions_any_activity_name(int $courseid, string $query): bool {
+        if (!function_exists('\get_fast_modinfo')) {
+            // Sin modinfo no se descarta nada: sigue el camino largo de siempre.
+            return true;
+        }
+
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+        } catch (\Throwable $e) {
+            return true;
+        }
+
+        foreach ($modinfo->get_cms() as $cm) {
+            $name = mb_strtolower(trim((string)$cm->name), 'UTF-8');
+            if ($name === '') {
+                continue;
+            }
+            if (preg_match('/(?<![\pL\pN])' . preg_quote($name, '/') . '(?![\pL\pN])/ui', $query)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -2365,18 +2419,25 @@ class rag_retriever {
         global $DB;
 
         $q = mb_strtolower($query, 'UTF-8');
-        $is_problem_query = preg_match('/problema|problemas|ejercicio|ejercicios|enunciado|pdf/u', $q);
+        // "pdf" a secas ya NO dispara este catálogo: es la palabra más común en las
+        // preguntas de contenido y hacía que cualquiera de ellas reconstruyera el
+        // texto completo de todos los recursos del curso. Hace falta hablar de
+        // problemas/ejercicios/enunciados de verdad.
+        $is_problem_query = preg_match('/problema|problemas|ejercicio|ejercicios|enunciado/u', $q);
         if (!$is_problem_query) {
             return '';
         }
 
-        // Join resource chunks in order to reconstruct a wider window.
+        // Join resource chunks in order to reconstruct a wider window. El tope de
+        // filas evita reconstruir en memoria el texto íntegro de un curso entero.
         $rows = $DB->get_records_select(
             'block_pulso_content_chunks',
             'courseid = :courseid AND module_type = :mod',
             ['courseid' => $courseid, 'mod' => 'resource'],
             'chunk_index ASC, id ASC',
-            'chunk_text'
+            'chunk_text',
+            0,
+            self::PROBLEM_CATALOG_MAX_CHUNKS
         );
 
         if (empty($rows)) {
@@ -2626,11 +2687,23 @@ class rag_retriever {
      */
     private static function rag_table_exists(): bool {
         global $DB;
-        try {
-            $tables = $DB->get_tables(false);
-            return in_array('block_pulso_content_chunks', $tables, true);
-        } catch (\Throwable $e) {
-            return false;
+
+        // Memorizado por petición: `get_tables(false)` fuerza un listado COMPLETO del
+        // esquema sin usar la caché de Moodle, y esto se llamaba varias veces en cada
+        // mensaje del chat. La respuesta no puede cambiar dentro de una petición.
+        static $exists = null;
+        if ($exists !== null) {
+            return $exists;
         }
+
+        try {
+            // Sin `false`: se usa la caché de esquema de Moodle, que es justo para esto.
+            $tables = $DB->get_tables();
+            $exists = in_array('block_pulso_content_chunks', $tables, true);
+        } catch (\Throwable $e) {
+            $exists = false;
+        }
+
+        return $exists;
     }
 }

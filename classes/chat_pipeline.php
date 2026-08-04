@@ -277,13 +277,20 @@ class chat_pipeline {
     private static function aggregate_module_completions(array $rows): array {
         $total = count($rows);
         $byStatus = [];
+        $completed = 0;
         foreach ($rows as $row) {
             $status = $row['completion_status'] ?? 'unknown';
             $byStatus[$status] = ($byStatus[$status] ?? 0) + 1;
+            // 'completed', 'completed_pass' y 'completed_fail' son todos
+            // actividad completada — ver data_retriever::get_module_completions().
+            if (!empty($row['is_completed'])) {
+                $completed++;
+            }
         }
         return [
             'aggregate_only' => true,
             'total_records' => $total,
+            'completed_count' => $completed,
             'by_status' => $byStatus,
         ];
     }

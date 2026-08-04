@@ -209,11 +209,18 @@ class data_retriever {
                     cm.instance,
                     cmc.timemodified,
                     cmc.completionstate,
-                    CASE 
+                    -- Constantes reales de Moodle (lib/completionlib.php):
+                    -- 0 COMPLETION_INCOMPLETE, 1 COMPLETION_COMPLETE,
+                    -- 2 COMPLETION_COMPLETE_PASS, 3 COMPLETION_COMPLETE_FAIL.
+                    -- Los estados 2 y 3 SI son actividad completada (con aprobado o
+                    -- con suspenso); antes se traducian como 'incomplete'/'started',
+                    -- asi que toda actividad con completitud por nota llegaba al
+                    -- modelo con el estado equivocado.
+                    CASE
                         WHEN cmc.completionstate = 1 THEN 'completed'
-                        WHEN cmc.completionstate = 2 THEN 'incomplete'
-                        WHEN cmc.completionstate = 3 THEN 'started'
-                        ELSE 'not_started'
+                        WHEN cmc.completionstate = 2 THEN 'completed_pass'
+                        WHEN cmc.completionstate = 3 THEN 'completed_fail'
+                        ELSE 'not_completed'
                     END AS completion_status
                 FROM {course_modules_completion} cmc
                 JOIN {course_modules} cm ON cmc.coursemoduleid = cm.id
@@ -239,6 +246,9 @@ class data_retriever {
                     'module_instance' => (int)$record->instance,
                     'completion_state_code' => (int)$record->completionstate,
                     'completion_status' => $record->completion_status,
+                    // Booleano explicito para que el modelo no tenga que
+                    // interpretar la semantica de los 4 estados.
+                    'is_completed' => (int)$record->completionstate > 0 ? 1 : 0,
                     'time_modified' => $record->timemodified ? userdate($record->timemodified, '%Y-%m-%d %H:%M:%S') : null,
                     'timestamp_modified_unix' => (int)$record->timemodified
                 ];

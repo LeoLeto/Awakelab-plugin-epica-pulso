@@ -59,7 +59,10 @@ Tienes acceso a los siguientes campos de datos del curso:
 - userid: ID del usuario
 - module_type: Tipo de módulo (assign, quiz, resource, etc)
 - module_id: ID del módulo
-- completion_status: completed/incomplete/started/not_started
+- completion_status: completed | completed_pass | completed_fail | not_completed
+  (OJO: `completed_pass` y `completed_fail` son actividad COMPLETADA — con
+  aprobado o con suspenso. Solo `not_completed` está sin completar.)
+- is_completed: 1=completada (cualquiera de los tres estados anteriores), 0=no
 - time_modified: Última modificación
 
 ### Access Logs

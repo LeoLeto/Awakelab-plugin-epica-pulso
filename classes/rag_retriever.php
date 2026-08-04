@@ -2167,37 +2167,118 @@ class rag_retriever {
             }
         }
 
+        // Fase 2: el nombre completo de la sección aparece literalmente en la
+        // pregunta. Se elige el nombre MÁS LARGO de los que coinciden, no el
+        // primero de la lista: con nombres que se solapan ("Nominas" y "Nominas y
+        // seguros sociales", "Evaluacion" y "Evaluacion final") devolver el primero
+        // hacía ganar siempre al más corto, aunque la pregunta citara el largo.
+        $exactMatch = null;
+        $exactLength = 0;
         foreach ($sections as $section) {
             $name = mb_strtolower(trim((string)$section->name), 'UTF-8');
             if ($name === '') {
+                continue;
+            }
+            $length = mb_strlen($name, 'UTF-8');
+            if ($length <= $exactLength) {
                 continue;
             }
             if (preg_match('/(?<![\pL\pN])' . preg_quote($name, '/') . '(?![\pL\pN])/ui', $query)) {
-                return $section;
+                $exactMatch = $section;
+                $exactLength = $length;
             }
         }
+        if ($exactMatch !== null) {
+            return $exactMatch;
+        }
 
+        // Fase 3: match difuso por tokens del nombre. MISMO criterio que
+        // match_activity_by_name_fuzzy() — este era el bug #2 del backlog todavía
+        // vivo para secciones: bastaba UNA palabra de ≥4 letras del nombre de la
+        // sección en cualquier parte de la pregunta para devolverla, así que
+        // "cuántos alumnos han hecho la investigación" enganchaba la sección
+        // "Introducción a la investigación". Ahora hay que cubrir el nombre entero
+        // o acertar ≥2 palabras significativas, y se elige la MEJOR candidata en
+        // vez de la primera de la lista.
+        $stopwords = [
+            'curso', 'tema', 'unidad', 'modulo', 'módulo', 'bloque', 'seccion', 'sección',
+            'parte', 'apartado', 'introduccion', 'introducción', 'general', 'basico',
+            'básico', 'contenido', 'contenidos', 'actividad', 'actividades', 'material',
+            'materiales', 'alumno', 'alumnos', 'estudiante', 'estudiantes',
+        ];
+
+        preg_match_all('/\d+/u', $query, $qm);
+        $queryNumbers = $qm[0];
+
+        $bestSection = null;
+        $bestScore = 0;
         foreach ($sections as $section) {
             $name = mb_strtolower(trim((string)$section->name), 'UTF-8');
             if ($name === '') {
                 continue;
             }
+
             $tokens = preg_split('/\s+/u', $name);
-            $matched = 0;
+            $significantTokens = 0;
+            $hits = 0;      // palabras significativas del nombre presentes en la pregunta
+            $anyHits = 0;   // idem contando también las genéricas ("tema", "unidad"...)
+            $nameNumbers = [];
             foreach ($tokens as $token) {
+                if (preg_match('/^\d+$/u', $token)) {
+                    $nameNumbers[] = $token;
+                    continue;
+                }
                 if (mb_strlen($token, 'UTF-8') < 4) {
                     continue;
                 }
-                if (strpos($query, $token) !== false) {
-                    $matched++;
+                $present = strpos($query, $token) !== false;
+                if ($present) {
+                    $anyHits++;
+                }
+                if (in_array($token, $stopwords, true)) {
+                    continue;
+                }
+                $significantTokens++;
+                if ($present) {
+                    $hits++;
                 }
             }
-            if ($matched > 0) {
-                return $section;
+
+            // Un número en el nombre discrimina fuerte: si la pregunta cita otro
+            // número distinto, esta sección queda descartada ("Tema 3" vs "tema 5").
+            $numberMatch = !empty($nameNumbers) && !empty($queryNumbers)
+                && !empty(array_intersect($nameNumbers, $queryNumbers));
+            if (!empty($nameNumbers) && !empty($queryNumbers) && !$numberMatch) {
+                continue;
+            }
+
+            if ($numberMatch) {
+                // El número coincide, pero exigimos además alguna palabra compartida
+                // del nombre (aunque sea genérica, tipo "tema") para no enganchar por
+                // un número que la pregunta menciona por otro motivo — "cuántos de
+                // los 3 alumnos aprobaron" no debe apuntar a "Tema 3".
+                if ($anyHits === 0) {
+                    continue;
+                }
+                $score = 3 + $hits;
+            } else {
+                // Sin número: hacen falta 2 palabras significativas SIEMPRE. Los
+                // nombres de una sola palabra ya los resuelve el match exacto de la
+                // fase 2 (nombre completo con límites de palabra); aceptarlos aquí
+                // por una coincidencia de substring es justo el bug #2.
+                if ($significantTokens === 0 || $hits < 2) {
+                    continue;
+                }
+                $score = $hits + ($hits >= $significantTokens ? 1 : 0);
+            }
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestSection = $section;
             }
         }
 
-        return null;
+        return $bestSection;
     }
 
     /**

@@ -106,6 +106,41 @@ but the `$plugin->version` bump is still mandatory every time.
   `extractFinalAnswerBlock`) receive already-escaped text — re-escaping there
   renders literal `&quot;`.
 
+## Invariantes que NO se pueden romper (v1.8.2–1.8.5)
+
+Cuatro fallos críticos arreglados tras la auditoría del 2026-08-04. Las reglas
+que los evitan son poco intuitivas, así que quedan escritas aquí:
+
+- **Nunca cortar texto con `substr`/`strlen`** en nada que acabe en un payload de
+  Anthropic (historial, respuestas, texto de PDF). Los contenidos son UTF-8 en
+  español: cortar por bytes parte un acento en dos, `json_encode()` devuelve
+  `false`, se POSTea un cuerpo vacío y la API responde 400 **en cada mensaje
+  siguiente** hasta que el usuario limpia la conversación. Usar siempre `mb_substr`
+  / `mb_strlen`. El payload se serializa solo vía
+  `anthropic_connector::encode_payload()` (aplica `JSON_INVALID_UTF8_SUBSTITUTE`
+  y falla ruidosamente); no llamar a `json_encode()` a pelo para las peticiones.
+- **La indexación RAG jamás corre dentro de la petición de chat.** Extraer PDFs +
+  embeddings tarda minutos y cuesta dinero. `rag_retriever` solo puede *encolar*
+  (`request_background_index()` → tarea adhoc `index_course_adhoc`), nunca llamar
+  a `index_course()` en línea; esa función es exclusiva de las dos tareas de cron.
+  El throttle `INDEX_REQUEST_THROTTLE` (6 h, marca en config `lastindexqueue_N`)
+  existe porque un curso sin fragmentos recuperables se reencolaría en cada
+  mensaje. Efecto secundario aceptado: un curso recién creado no tiene contexto
+  RAG hasta que pase el cron.
+- **Los cmid sintéticos de los chunks que no son de un módulo** (`course_meta`,
+  `course_section`) se calculan SOLO con `content_extractor::course_meta_cmid()` /
+  `course_section_cmid()` (espaciado `SYNTHETIC_CMID_STRIDE`). El esquema anterior
+  (`-$courseid` para metadatos) chocaba con la sección 4 del curso `id/1000`, y
+  como el upsert de `embedding_manager` buscaba por `(cmid, chunk_index)` sin
+  `courseid`, **sobrescribía filas de otro curso**. El filtro del upsert debe
+  incluir siempre `courseid`.
+- **Los tres endpoints exigen `require_sesskey()`** (`api_chat.php`,
+  `api_chat_stream.php`, `toggle_course.php`) y el orden de validación es
+  autenticar → sesskey → permisos → `check_enabled()`. `check_enabled()` no puede
+  volver a subir antes de `require_login()` (filtraba a anónimos si Pulso estaba
+  activo en un curso). El cliente manda el token desde `window.pulsoSesskey` en
+  `buildChatFormData()`: cualquier endpoint nuevo debe recibirlo por ahí.
+
 ## Bug backlog — evaluación jul-2026 (arreglar en este orden)
 
 Evaluación de 56 preguntas reales (resultados y prompts de arreglo detallados en

@@ -134,6 +134,23 @@ que los evitan son poco intuitivas, así que quedan escritas aquí:
   como el upsert de `embedding_manager` buscaba por `(cmid, chunk_index)` sin
   `courseid`, **sobrescribía filas de otro curso**. El filtro del upsert debe
   incluir siempre `courseid`.
+- **El `system` va en BLOQUES, no en un string, y el orden importa** (v1.9.0). El
+  prompt base (~4.500-5.100 tokens, idéntico para todos los cursos y profesores)
+  lleva `cache_control: {type: ephemeral}` en
+  `system_prompt_designer::generate_system_blocks()`. El caché de Anthropic es un
+  match de **prefijo**: cualquier byte que cambie antes del breakpoint lo invalida
+  todo, así que en el bloque cacheado **solo** puede ir texto invariable. Las reglas
+  RAG y el JSON de analítica van después *aunque parte de su texto sea fijo*, porque
+  son **condicionales** y una sección condicional dentro del bloque cacheado crearía
+  una entrada distinta por combinación. Dos trampas silenciosas: (a) el mínimo
+  cacheable depende del modelo y **no es monótono** — 1024 tokens en `claude-sonnet-5`
+  y `claude-opus-4-8`, pero **4096 en `claude-haiku-4-5`**, y por debajo del umbral el
+  caché no se crea sin dar ningún error (hoy hay solo ~10% de margen sobre el 4096, así
+  que recortar el prompt base tiene un coste oculto); (b) con caché activo
+  `input_tokens` cuenta **solo el resto no cacheado**, así que `tokens_used` suma
+  `input + output + cache_creation + cache_read` — no volver a sumar solo input+output.
+  Para comprobar que funciona: `cache_read_input_tokens` en la respuesta debe ser > 0 a
+  partir del segundo mensaje; si es 0 siempre, algo está rompiendo el prefijo estable.
 - **Los tres endpoints exigen `require_sesskey()`** (`api_chat.php`,
   `api_chat_stream.php`, `toggle_course.php`) y el orden de validación es
   autenticar → sesskey → permisos → `check_enabled()`. `check_enabled()` no puede

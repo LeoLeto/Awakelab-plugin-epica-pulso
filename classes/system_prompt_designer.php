@@ -502,23 +502,86 @@ PROMPT;
     }
 
     /**
+     * Genera el system prompt partido en BLOQUES para la Messages API de Anthropic,
+     * con un breakpoint de prompt caching al final de la parte estática.
+     *
+     * El prompt base son ~4.500-5.100 tokens IDÉNTICOS en cada petición de cada
+     * profesor y de cada curso. Sin caché se reenvía y se paga entero cada vez;
+     * marcándolo con `cache_control` se paga ~0,1x en las lecturas (y 1,25x la
+     * escritura), y la caché es de la organización, así que la comparten todos los
+     * usuarios del plugin.
+     *
+     * REGLAS DE COLOCACIÓN — no reordenar sin leer esto:
+     *  - El caché es un match de PREFIJO: cualquier byte que cambie antes del
+     *    breakpoint lo invalida todo. Por eso el bloque cacheado es SOLO el prompt
+     *    base invariable.
+     *  - Las reglas RAG y el bloque de analítica van DESPUÉS del breakpoint aunque
+     *    parte de su texto sea fijo: son condicionales, y una sección condicional
+     *    dentro del bloque cacheado crearía una entrada de caché distinta por cada
+     *    combinación (con RAG / sin RAG), partiendo el reaprovechamiento.
+     *  - La regla de FORMATO DE SALIDA sigue siendo lo último que lee el modelo
+     *    (ver "Anthropic API constraints" en CLAUDE.md); no subirla al bloque
+     *    cacheado.
+     *  - El mínimo cacheable depende del modelo y NO es monótono: 1024 tokens en
+     *    claude-sonnet-5 y claude-opus-4-8, pero 4096 en claude-haiku-4-5. Si el
+     *    prompt base baja de esos umbrales, el caché deja de crearse EN SILENCIO
+     *    (sin error, con cache_creation_input_tokens a 0). Hoy hay ~10% de margen
+     *    sobre el 4096 de Haiku: recortar el prompt base tiene ese coste oculto.
+     *
+     * @param array  $course_context
+     * @param string $rag_context
+     * @return array Bloques de contenido tal cual los espera el campo `system`.
+     */
+    public static function generate_system_blocks($course_context = [], string $rag_context = ''): array {
+        return [
+            [
+                'type' => 'text',
+                'text' => self::generate_system_prompt(),
+                // Breakpoint: todo lo anterior (aquí, solo este bloque) se cachea.
+                'cache_control' => ['type' => 'ephemeral'],
+            ],
+            [
+                'type' => 'text',
+                'text' => self::build_dynamic_prompt_section($course_context, $rag_context),
+            ],
+        ];
+    }
+
+    /**
      * Generate the full system prompt with analytics context AND optional RAG content.
+     *
+     * Se mantiene por compatibilidad y para las rutas que necesitan el prompt como
+     * un único string; produce exactamente la concatenación de generate_system_blocks().
      *
      * @param array  $course_context Output of data_retriever::get_unified_course_context()
      * @param string $rag_context    Formatted string from chat_pipeline::get_rag()['context']
      * @return string
      */
     public static function generate_prompt_with_context_and_rag($course_context = [], string $rag_context = '') {
-        $base_prompt = self::generate_system_prompt();
+        return self::generate_system_prompt()
+            . self::build_dynamic_prompt_section($course_context, $rag_context);
+    }
+
+    /**
+     * Construye la parte VARIABLE del system prompt (reglas RAG + fragmentos +
+     * contexto de analítica + regla de formato). Va siempre después del breakpoint
+     * de caché.
+     *
+     * @param array  $course_context
+     * @param string $rag_context
+     * @return string
+     */
+    private static function build_dynamic_prompt_section($course_context = [], string $rag_context = ''): string {
+        $base_prompt = '';
 
         if (!empty($rag_context)) {
-        $base_prompt .= "\n\n## REGLA CRÍTICA DE CONSISTENCIA\n";
-        $base_prompt .= "Si existe la sección de CONTENIDO RELEVANTE DEL CURSO (RAG), entonces SÍ tienes acceso a contenido del curso para esta consulta.\n";
-        $base_prompt .= "En ese caso, NO puedes afirmar frases como: 'no tengo acceso', 'no dispongo de acceso', 'no hay acceso al PDF' o similares.\n";
-        $base_prompt .= "Debes responder usando los fragmentos RAG recuperados y, si falta algún dato exacto, indicarlo sin negar el acceso completo.\n";
-          $base_prompt .= "Para preguntas de contenido (enunciados, ejercicios, soluciones): usa SOLO texto literal presente en los fragmentos.\n";
-          $base_prompt .= "NO completes partes faltantes con suposiciones. NO inventes frases que no aparezcan en el texto recuperado.\n";
-          $base_prompt .= "Si el enunciado aparece incompleto o fragmentado, dilo explícitamente y cita exactamente la parte disponible.\n";
+            $base_prompt .= "\n\n## REGLA CRÍTICA DE CONSISTENCIA\n";
+            $base_prompt .= "Si existe la sección de CONTENIDO RELEVANTE DEL CURSO (RAG), entonces SÍ tienes acceso a contenido del curso para esta consulta.\n";
+            $base_prompt .= "En ese caso, NO puedes afirmar frases como: 'no tengo acceso', 'no dispongo de acceso', 'no hay acceso al PDF' o similares.\n";
+            $base_prompt .= "Debes responder usando los fragmentos RAG recuperados y, si falta algún dato exacto, indicarlo sin negar el acceso completo.\n";
+            $base_prompt .= "Para preguntas de contenido (enunciados, ejercicios, soluciones): usa SOLO texto literal presente en los fragmentos.\n";
+            $base_prompt .= "NO completes partes faltantes con suposiciones. NO inventes frases que no aparezcan en el texto recuperado.\n";
+            $base_prompt .= "Si el enunciado aparece incompleto o fragmentado, dilo explícitamente y cita exactamente la parte disponible.\n";
             $base_prompt .= "Si existe la sección 'ÍNDICE DE PROBLEMAS DETECTADOS', úsala como fuente principal para responder preguntas sobre primer/segundo/tercer problema.\n";
 
             // Insert RAG block BEFORE the analytics JSON so the model sees

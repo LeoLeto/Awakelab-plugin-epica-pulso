@@ -117,10 +117,36 @@ class anthropic_connector {
     }
 
     /**
+     * Extrae las métricas de uso de tokens, incluyendo las de prompt caching.
+     *
+     * OJO con `input_tokens`: cuando hay caché, cuenta SOLO el resto no cacheado.
+     * El tamaño real del prompt es input + cache_creation + cache_read, así que
+     * sumar solo input+output infravaloraría el consumo al activar el caché.
+     *
+     * @param array $usage Objeto `usage` de la respuesta de Anthropic.
+     * @return array
+     */
+    private function extract_usage(array $usage): array {
+        $input = (int)($usage['input_tokens'] ?? 0);
+        $output = (int)($usage['output_tokens'] ?? 0);
+        $cachewrite = (int)($usage['cache_creation_input_tokens'] ?? 0);
+        $cacheread = (int)($usage['cache_read_input_tokens'] ?? 0);
+
+        return [
+            'tokens_used' => $input + $output + $cachewrite + $cacheread,
+            'cache_creation_input_tokens' => $cachewrite,
+            'cache_read_input_tokens' => $cacheread,
+            'uncached_input_tokens' => $input,
+        ];
+    }
+
+    /**
      * Envía una consulta con contexto del curso para análisis inteligente.
      *
      * @param string $user_message El mensaje del usuario con contexto del curso
-     * @param string $system_prompt El prompt del sistema que define el rol de la IA
+     * @param array|string $system_prompt System prompt: string, o array de bloques
+     *                     de contenido cuando se usa prompt caching (ver
+     *                     system_prompt_designer::generate_system_blocks()).
      * @param array $conversation_history Historial de conversación anterior (opcional)
      * @param int $max_tokens Máximo de tokens en la respuesta (defecto 500)
      * @return array Array con 'answer' y 'tokens_used'
@@ -128,7 +154,7 @@ class anthropic_connector {
      */
     public function send_query_with_context(
         string $user_message,
-        string $system_prompt,
+        $system_prompt,
         array $conversation_history = [],
         int $max_tokens = 500
     ): array {
@@ -199,14 +225,13 @@ class anthropic_connector {
             );
         }
 
-        $tokens_used = ($response['usage']['input_tokens'] ?? 0) + ($response['usage']['output_tokens'] ?? 0);
+        $usage = $this->extract_usage($response['usage'] ?? []);
 
-        return [
+        return array_merge([
             'answer' => $text,
-            'tokens_used' => (int)$tokens_used,
             'model' => $this->model,
             'finish_reason' => $stop_reason,
-        ];
+        ], $usage);
     }
 
     /**
@@ -217,7 +242,7 @@ class anthropic_connector {
      * reenviarlo al navegador sin esperar la respuesta completa.
      *
      * @param string $user_message
-     * @param string $system_prompt
+     * @param array|string $system_prompt String, o array de bloques con cache_control.
      * @param array $conversation_history
      * @param int $max_tokens
      * @param callable $ondelta fn(string $textdelta): void
@@ -226,7 +251,7 @@ class anthropic_connector {
      */
     public function stream_query_with_context(
         string $user_message,
-        string $system_prompt,
+        $system_prompt,
         array $conversation_history,
         int $max_tokens,
         callable $ondelta
@@ -247,6 +272,8 @@ class anthropic_connector {
         $model_text = '';
         $tokens_in = 0;
         $tokens_out = 0;
+        $cache_write = 0;
+        $cache_read = 0;
         $finish_reason = 'unknown';
         $sse_buffer = '';
         $error_body = '';
@@ -261,8 +288,8 @@ class anthropic_connector {
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (
-                &$sse_buffer, &$model_text, &$tokens_in, &$tokens_out, &$finish_reason, &$error_body,
-                &$error_http_status, $ondelta
+                &$sse_buffer, &$model_text, &$tokens_in, &$tokens_out, &$cache_write, &$cache_read,
+                &$finish_reason, &$error_body, &$error_http_status, $ondelta
             ) {
                 // Con error HTTP, Anthropic devuelve un body JSON normal: acumularlo.
                 $httpcode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
@@ -287,7 +314,12 @@ class anthropic_connector {
 
                     switch ($event['type']) {
                         case 'message_start':
-                            $tokens_in = (int)($event['message']['usage']['input_tokens'] ?? 0);
+                            // Las metricas de caché solo llegan aquí, en el usage
+                            // inicial — message_delta no las repite.
+                            $startusage = $event['message']['usage'] ?? [];
+                            $tokens_in = (int)($startusage['input_tokens'] ?? 0);
+                            $cache_write = (int)($startusage['cache_creation_input_tokens'] ?? 0);
+                            $cache_read = (int)($startusage['cache_read_input_tokens'] ?? 0);
                             break;
                         case 'content_block_delta':
                             if (($event['delta']['type'] ?? '') === 'text_delta') {
@@ -348,7 +380,10 @@ class anthropic_connector {
 
         return [
             'answer' => $model_text,
-            'tokens_used' => $tokens_in + $tokens_out,
+            'tokens_used' => $tokens_in + $tokens_out + $cache_write + $cache_read,
+            'cache_creation_input_tokens' => $cache_write,
+            'cache_read_input_tokens' => $cache_read,
+            'uncached_input_tokens' => $tokens_in,
             'model' => $this->model,
             'finish_reason' => $finish_reason,
         ];
@@ -361,6 +396,8 @@ class anthropic_connector {
      * @param array $course_context Contexto del curso desde data_retriever
      * @param array $conversation_history Historial anterior (opcional)
      * @param int $max_tokens Máximo de tokens (defecto 800 para respuestas JSON)
+     * @param array|string|null $custom_system_prompt String, o array de bloques con
+     *                          cache_control (system_prompt_designer::generate_system_blocks()).
      * @return array Respuesta con structure [answer, tokens_used, schema_valid]
      * @throws \moodle_exception
      */
@@ -369,11 +406,15 @@ class anthropic_connector {
         array $course_context = [],
         array $conversation_history = [],
         int $max_tokens = 800,
-        ?string $custom_system_prompt = null
+        $custom_system_prompt = null
     ): array {
         require_once(__DIR__ . '/system_prompt_designer.php');
 
-        $system_prompt = $custom_system_prompt ?: system_prompt_designer::generate_prompt_with_context($course_context);
+        // Cuidado: `?:` trataría un array vacío como falsy. Se comprueba null/''
+        // explícitamente para no descartar unos bloques válidos.
+        $system_prompt = ($custom_system_prompt === null || $custom_system_prompt === '')
+            ? system_prompt_designer::generate_prompt_with_context($course_context)
+            : $custom_system_prompt;
 
         $response = $this->send_query_with_context(
             $user_query,
@@ -387,6 +428,8 @@ class anthropic_connector {
         return [
             'answer' => $response['answer'],
             'tokens_used' => $response['tokens_used'],
+            'cache_creation_input_tokens' => $response['cache_creation_input_tokens'] ?? 0,
+            'cache_read_input_tokens' => $response['cache_read_input_tokens'] ?? 0,
             'model' => $response['model'],
             'schema_valid' => $is_valid ? true : false,
             'schema_data' => $is_valid,

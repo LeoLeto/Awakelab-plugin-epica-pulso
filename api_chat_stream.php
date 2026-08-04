@@ -163,7 +163,9 @@ try {
     // 6. Ruta LLM: streaming de la respuesta principal.
     pulso_sse('status', ['stage' => 'generating']);
 
-    $system_prompt = system_prompt_designer::generate_prompt_with_context_and_rag(
+    // Bloques (no string): el prompt base va marcado con cache_control para que
+    // Anthropic lo sirva de caché en vez de recobrarlo entero en cada mensaje.
+    $system_prompt = system_prompt_designer::generate_system_blocks(
         $course_context,
         $rag_context
     );
@@ -187,6 +189,10 @@ try {
         'message' => 'Query procesado exitosamente',
         'answer' => $answer,
         'tokens_used' => $ai_response['tokens_used'] ?? 0,
+        // Métricas de prompt caching: si cache_read_input_tokens es 0 mensaje tras
+        // mensaje, el caché no está funcionando (algo rompe el prefijo estable).
+        'cache_read_input_tokens' => $ai_response['cache_read_input_tokens'] ?? 0,
+        'cache_creation_input_tokens' => $ai_response['cache_creation_input_tokens'] ?? 0,
         'model' => $ai_response['model'] ?? 'claude-sonnet-5',
         'schema_valid' => $schema_data ? true : false,
         'schema_data' => $schema_data,

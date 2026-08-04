@@ -129,7 +129,9 @@ try {
     // 3. LLAMAR A OPENAI CON CONTEXTO DINÁMICO
     // ============================================================
 
-    $system_prompt = system_prompt_designer::generate_prompt_with_context_and_rag(
+    // Bloques (no string): el prompt base va marcado con cache_control — ver
+    // system_prompt_designer::generate_system_blocks().
+    $system_prompt = system_prompt_designer::generate_system_blocks(
         $course_context,
         $rag_context
     );
@@ -181,6 +183,9 @@ try {
         'message' => 'Query procesado exitosamente',
         'answer' => $answer,
         'tokens_used' => $ai_response['tokens_used'] ?? 0,
+        // Métricas de prompt caching (ver api_chat_stream.php).
+        'cache_read_input_tokens' => $ai_response['cache_read_input_tokens'] ?? 0,
+        'cache_creation_input_tokens' => $ai_response['cache_creation_input_tokens'] ?? 0,
         'model' => $ai_response['model'] ?? 'claude-sonnet-5',
         'schema_valid' => $schema_data ? true : false,
         'schema_data' => $schema_data,

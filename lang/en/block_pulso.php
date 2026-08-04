@@ -39,6 +39,10 @@ $string['error_invalid_course'] = 'Invalid course ID.';
 $string['error_no_permission'] = 'You do not have permission to use this feature.';
 $string['error_timeout'] = 'Request timed out. Please try again.';
 $string['error_refusal'] = 'The AI declined to answer this request for policy reasons. Try rephrasing your question.';
+$string['error_api_connection'] = 'Could not reach the AI service. Please try again in a moment.';
+$string['error_api_response'] = 'The AI service returned an error: {$a}';
+$string['error_empty_response'] = 'The AI service returned an empty response. Please try again.';
+$string['error_payload_encoding'] = 'The request could not be prepared. Start a new conversation ("Nueva conversación") and try again.';
 
 // === ACCESSIBILITY ===
 $string['send_message'] = 'Send message';

@@ -350,10 +350,15 @@ class chat_pipeline {
         // Usar historial del cliente si tiene más mensajes, sino el de sesión.
         $history = count($client_history) >= count($session_history) ? $client_history : $session_history;
 
-        // Validar estructura de cada mensaje.
+        // Validar estructura de cada mensaje. El historial viene del cliente
+        // (sessionStorage), asi que no se asume nada: 'content' debe ser un
+        // string NO vacio — la Messages API de Anthropic rechaza con 400 los
+        // bloques de contenido vacios, y strlen() sobre un array seria un
+        // TypeError fatal en PHP 8.
         $history = array_filter($history, function($msg) {
             return is_array($msg) && isset($msg['role']) && isset($msg['content'])
-                && in_array($msg['role'], ['user', 'assistant']);
+                && in_array($msg['role'], ['user', 'assistant'], true)
+                && is_string($msg['content']) && trim($msg['content']) !== '';
         });
         $history = array_values($history);
 
@@ -362,9 +367,15 @@ class chat_pipeline {
         }
 
         // Truncar contenido de mensajes largos en historial.
+        // OBLIGATORIO usar mb_*: con strlen()/substr() el corte cae a mitad de
+        // un caracter multibyte (cualquier acento del español) y deja UTF-8
+        // invalido en el historial; entonces json_encode() del payload devuelve
+        // false, se envia un cuerpo vacio a Anthropic y la API responde 400 en
+        // CADA mensaje siguiente hasta que el usuario limpia la conversacion.
         foreach ($history as &$msg) {
-            if (strlen($msg['content']) > self::MAX_HISTORY_CONTENT_LENGTH) {
-                $msg['content'] = substr($msg['content'], 0, self::MAX_HISTORY_CONTENT_LENGTH) . '...[truncated]';
+            if (mb_strlen($msg['content'], 'UTF-8') > self::MAX_HISTORY_CONTENT_LENGTH) {
+                $msg['content'] = mb_substr($msg['content'], 0, self::MAX_HISTORY_CONTENT_LENGTH, 'UTF-8')
+                    . '...[truncated]';
             }
         }
         unset($msg);

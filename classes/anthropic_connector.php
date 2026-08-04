@@ -70,6 +70,38 @@ class anthropic_connector {
     }
 
     /**
+     * Serializa el payload de la petición a JSON de forma segura.
+     *
+     * json_encode() devuelve false ante CUALQUIER byte UTF-8 inválido (texto
+     * extraído de PDFs, historial truncado a mitad de un carácter...). Sin este
+     * control el cuerpo enviado quedaba vacío y Anthropic respondía 400 con un
+     * mensaje que no apuntaba a la causa real. JSON_INVALID_UTF8_SUBSTITUTE
+     * sustituye los bytes rotos en vez de tirar la petición entera.
+     *
+     * @param array $payload
+     * @return string
+     * @throws \moodle_exception si ni con sustitución se puede serializar.
+     */
+    private function encode_payload(array $payload): string {
+        $json = json_encode(
+            $payload,
+            JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR
+        );
+
+        if ($json === false || $json === '') {
+            throw new \moodle_exception(
+                'error_payload_encoding',
+                'block_pulso',
+                '',
+                null,
+                'json_encode failed: ' . json_last_error_msg()
+            );
+        }
+
+        return $json;
+    }
+
+    /**
      * Extrae el primer bloque de texto de la respuesta de Anthropic.
      *
      * @param array $content Array "content" de la respuesta.
@@ -123,7 +155,7 @@ class anthropic_connector {
 
         $curl->setHeader($this->headers());
 
-        $json_payload = json_encode($payload);
+        $json_payload = $this->encode_payload($payload);
         $response_raw = $curl->post($this->apiurl, $json_payload);
 
         if ($curl->errno) {
@@ -208,6 +240,10 @@ class anthropic_connector {
             'stream' => true,
         ];
 
+        // Serializar ANTES de abrir el handle: si el payload no es serializable
+        // se lanza la excepción sin dejar un handle de cURL sin cerrar.
+        $json_payload = $this->encode_payload($payload);
+
         $model_text = '';
         $tokens_in = 0;
         $tokens_out = 0;
@@ -220,7 +256,7 @@ class anthropic_connector {
         curl_setopt_array($curl, [
             CURLOPT_URL => $this->apiurl,
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_POSTFIELDS => $json_payload,
             CURLOPT_HTTPHEADER => array_merge($this->headers(), ['Accept: text/event-stream']),
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT => 120,
@@ -467,8 +503,11 @@ Retorna SOLO un JSON válido sin texto adicional:
 }
 PROMPT;
 
-            // Preparar el mensaje del usuario para generar preguntas (truncar respuesta si es muy larga)
-            $truncated_response = substr($ai_response, 0, 500);
+            // Preparar el mensaje del usuario para generar preguntas (truncar
+            // respuesta si es muy larga). mb_substr, no substr: cortar bytes
+            // parte un acento en dos y json_encode() devolvía false, con lo que
+            // esta llamada fallaba en silencio y nunca había sugerencias.
+            $truncated_response = mb_substr($ai_response, 0, 500, 'UTF-8');
             $followup_prompt = "Pregunta original: \"$user_query\"\n\nRespuesta anterior: \"$truncated_response\"\n\nGenera 2-3 preguntas de seguimiento relevantes.";
 
             // Llamar a Claude para generar las preguntas.
@@ -493,7 +532,7 @@ PROMPT;
                 CURLOPT_TIMEOUT => 15,
                 CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
                 CURLOPT_CUSTOMREQUEST => 'POST',
-                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_POSTFIELDS => $this->encode_payload($payload),
                 CURLOPT_HTTPHEADER => $this->headers(),
             ]);
 

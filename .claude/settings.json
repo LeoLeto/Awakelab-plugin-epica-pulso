@@ -8,7 +8,8 @@
       "Bash(curl -sI --max-time 10 https://github.com)",
       "Bash(curl -sI --max-time 10 https://raw.githubusercontent.com)",
       "Bash(curl -sI --max-time 15 https://codeload.github.com/smalot/pdfparser/tar.gz/refs/tags/v2.12.0)",
-      "Bash(curl -s --max-time 15 https://api.github.com/repos/smalot/pdfparser/releases/latest)"
+      "Bash(curl -s --max-time 15 https://api.github.com/repos/smalot/pdfparser/releases/latest)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

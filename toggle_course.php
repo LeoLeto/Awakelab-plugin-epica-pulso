@@ -21,6 +21,9 @@ try {
     $context = context_course::instance($courseid);
 
     require_login($course);
+    // Endpoint de ESCRITURA (set_config): sin sesskey, un CSRF podia activar o
+    // desactivar Pulso en cualquier curso donde la victima pudiera editar.
+    require_sesskey();
     require_capability('moodle/course:update', $context);
 
     // Sanitize: only 0 or 1

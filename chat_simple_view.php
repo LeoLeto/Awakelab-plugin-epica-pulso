@@ -31,6 +31,9 @@ function render_chat_simple($courseid, $context) {
     include(__DIR__ . '/version.php');
     $pulso_release = 'v' . ($plugin->release ?? $plugin->version ?? '?');
 
+    // Token anti-CSRF de la sesión: los endpoints lo exigen con require_sesskey().
+    $pulso_sesskey = sesskey();
+
     // Inyectar variables globales JavaScript
     $js_init = <<<JSINIT
     <script>
@@ -38,7 +41,8 @@ function render_chat_simple($courseid, $context) {
         window.courseid = {$courseid};
         window.apiUrl = '{$api_url}';
         window.streamApiUrl = '{$stream_url}';
-        
+        window.pulsoSesskey = '{$pulso_sesskey}';
+
         // T2.5.3: Recuperar historial de sessionStorage (persiste entre recargas)
         try {
             var savedHistory = sessionStorage.getItem('pulso_history_' + {$courseid});
@@ -2944,6 +2948,8 @@ function render_chat_simple($courseid, $context) {
             formData.append('courseid', window.courseid || 2);
             formData.append('user_query', message);
             formData.append('conversation_history', JSON.stringify(window.conversationHistory || []));
+            // Obligatorio: los endpoints validan con require_sesskey().
+            formData.append('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
             return formData;
         }
 

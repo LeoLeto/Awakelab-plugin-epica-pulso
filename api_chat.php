@@ -62,15 +62,21 @@ try {
         throw new Exception('Course not found');
     }
 
-    // T2.6.1: Verificar si Pulso está habilitado para este curso.
-    chat_pipeline::check_enabled($courseid);
+    // Orden obligatorio: autenticar -> validar sesskey -> permisos -> estado del
+    // plugin (mismo criterio que api_chat_stream.php). require_sesskey() cierra
+    // el CSRF: sin el, una web externa podia disparar consultas —y gasto de
+    // tokens— con la sesion del profesor.
+    require_login($course);
+    require_sesskey();
 
     // T2.6.2: Verificar permisos del usuario.
-    require_login($course);
     $context = context_course::instance($courseid);
     if (!has_capability('block/pulso:viewanalytics', $context)) {
         throw new Exception('You do not have permission to use analytics');
     }
+
+    // T2.6.1: Verificar si Pulso está habilitado para este curso.
+    chat_pipeline::check_enabled($courseid);
 
     // ============================================================
     // 1. CONTEXTO DEL CURSO (con cache corta) + RAG + HISTORIAL

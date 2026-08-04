@@ -52,13 +52,20 @@ try {
         throw new Exception('Course not found');
     }
 
-    chat_pipeline::check_enabled($courseid);
-
+    // Orden obligatorio: autenticar -> validar sesskey -> permisos -> estado del
+    // plugin. check_enabled() iba ANTES de require_login(), asi que un anonimo
+    // podia averiguar si Pulso estaba activo en un curso. Y sin require_sesskey()
+    // cualquier web externa podia forzar peticiones (y gasto de tokens) con la
+    // sesion del profesor.
     require_login($course);
+    require_sesskey();
+
     $context = context_course::instance($courseid);
     if (!has_capability('block/pulso:viewanalytics', $context)) {
         throw new Exception('You do not have permission to use analytics');
     }
+
+    chat_pipeline::check_enabled($courseid);
 } catch (\Throwable $e) {
     header('Content-Type: application/json; charset=utf-8');
     http_response_code(400);

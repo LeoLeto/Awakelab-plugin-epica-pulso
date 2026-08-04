@@ -127,7 +127,7 @@ try {
     // 3. Historial (lee $SESSION, por eso va antes de cerrar la sesión).
     $history = chat_pipeline::prepare_history($courseid, $conversation_history, $rag_context);
 
-    // 4. Liberar el lock de sesión de Moodle ANTES de llamar a OpenAI.
+    // 4. Liberar el lock de sesión de Moodle ANTES de llamar a Anthropic.
     //    Sin esto, todas las demás páginas/pestañas del usuario quedan
     //    congeladas mientras la IA genera la respuesta.
     \core\session\manager::write_close();

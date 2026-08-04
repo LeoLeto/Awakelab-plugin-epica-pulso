@@ -1,6 +1,6 @@
 <?php
 /**
- * System Prompt Designer para OpenAI
+ * System Prompt Designer para Anthropic (Claude)
  * Task T2.3.3: Design system prompt with schema and examples
  * 
  * Crea un prompt del sistema completo con:
@@ -616,7 +616,11 @@ PROMPT;
         $context_section .= "\n```\n";
         $context_section .= "\nUsando los datos anteriores, responde las preguntas del usuario con cifras reales.\n";
 
-        $individual_data_visible = $course_context['analytics']['individual_data_visible'] ?? true;
+        // Por defecto NO visible: si la marca falta (payload inesperado), es más seguro
+        // que el modelo se comporte como si el usuario no pudiera ver datos
+        // individuales que asumir que sí. La redacción real la hace de todos modos
+        // chat_pipeline::apply_privacy_redaction() sobre los datos.
+        $individual_data_visible = $course_context['analytics']['individual_data_visible'] ?? false;
         if ($individual_data_visible) {
             $context_section .= "\nEste usuario SÍ tiene permiso para ver notas y datos individuales de alumnos: puedes nombrar estudiantes concretos y dar rankings usando 'student_ranking_by_average_grade'.\n";
         } else {

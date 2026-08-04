@@ -80,8 +80,7 @@ class embedding_manager {
         }
 
         // Separate new chunks from unchanged ones and collect batches for embedding.
-        $to_embed   = []; // chunks that need a new embedding
-        $to_upsert  = []; // all chunks that need DB upsert
+        $to_embed = []; // chunks that need a new embedding (y su upsert posterior)
 
         foreach ($chunks as $chunk) {
             $hash = hash('sha256', $chunk['chunk_text']);
@@ -119,8 +118,7 @@ class embedding_manager {
                 $record->id = $existing->id;
             }
 
-            $to_upsert[] = $record;
-            $to_embed[]  = ['record' => $record, 'text' => $chunk['chunk_text']];
+            $to_embed[] = ['record' => $record, 'text' => $chunk['chunk_text']];
         }
 
         if (empty($to_embed)) {

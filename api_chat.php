@@ -91,7 +91,7 @@ try {
 
     $history = chat_pipeline::prepare_history($courseid, $conversation_history, $rag_context);
 
-    // Liberar el lock de sesión de Moodle ANTES de las llamadas a OpenAI:
+    // Liberar el lock de sesión de Moodle ANTES de las llamadas a Anthropic:
     // sin esto, el resto de páginas/pestañas del usuario quedan bloqueadas
     // mientras se genera la respuesta.
     \core\session\manager::write_close();
@@ -127,7 +127,7 @@ try {
     }
 
     // ============================================================
-    // 3. LLAMAR A OPENAI CON CONTEXTO DINÁMICO
+    // 3. LLAMAR A ANTHROPIC CON CONTEXTO DINÁMICO
     // ============================================================
 
     // Bloques (no string): el prompt base va marcado con cache_control — ver
@@ -147,7 +147,7 @@ try {
     );
 
     if (!$ai_response) {
-        throw new Exception('No response from OpenAI API');
+        throw new Exception('No response from Anthropic API');
     }
 
     // ============================================================

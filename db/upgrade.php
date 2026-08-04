@@ -41,5 +41,27 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026031600, 'pulso');
     }
 
+    if ($oldversion < 2026080417) {
+        // block_pulso_history se definió en install.xml desde el primer día pero
+        // ningún código la escribió ni la leyó nunca (el historial vive en $SESSION
+        // y en el sessionStorage del cliente). Se elimina para no dejar esquema
+        // muerto.
+        //
+        // Se borra SOLO si está vacía: aunque no debería tener filas jamás, borrar
+        // datos de un sitio en producción sin comprobarlo no es aceptable. Si alguien
+        // llegó a escribir ahí, la tabla se conserva y queda un aviso en el log.
+        $table = new xmldb_table('block_pulso_history');
+        if ($dbman->table_exists($table)) {
+            if ($DB->count_records('block_pulso_history') == 0) {
+                $dbman->drop_table($table);
+            } else {
+                mtrace('block_pulso: block_pulso_history tiene filas, NO se elimina. '
+                    . 'Revísala y bórrala a mano si no la necesitas.');
+            }
+        }
+
+        upgrade_block_savepoint(true, 2026080417, 'pulso');
+    }
+
     return true;
 }

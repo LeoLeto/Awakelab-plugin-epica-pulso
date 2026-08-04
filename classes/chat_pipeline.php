@@ -381,7 +381,7 @@ class chat_pipeline {
      * @return array
      */
     public static function prepare_history(int $courseid, string $conversation_history, string $rag_context): array {
-        global $SESSION, $USER;
+        global $SESSION;
 
         $client_history = json_decode($conversation_history, true) ?? [];
         if (!is_array($client_history)) {

@@ -52,8 +52,12 @@ Tienes acceso a los siguientes campos de datos del curso:
 - item_type: Tipo (assignment, quiz, mod)
 - grade_obtained: Nota obtenida
 - grade_max: Nota máxima
+- grade_pass: Nota de corte del ítem, o null si el profesor no la ha configurado
 - percentage: Porcentaje (0-100%)
-- is_passed: 1=aprobado, 0=reprobado
+- is_passed: 1=aprobado, 0=reprobado, **null=no se puede saber** porque el ítem no
+  tiene nota de corte configurada (o no hay nota todavía). NUNCA cuentes los `null`
+  como reprobados: si te preguntan por el % de aprobados y hay `null`, calcúlalo
+  solo sobre los ítems que sí tienen `grade_pass` y avisa de cuántos quedan fuera.
 
 ### Module Completions
 - userid: ID del usuario

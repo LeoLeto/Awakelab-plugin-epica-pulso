@@ -115,13 +115,20 @@ class data_retriever {
                     gi.itemname,
                     gi.itemtype,
                     gi.grademax,
+                    gi.gradepass,
                     gg.rawgrade,
                     gg.finalgrade,
                     gg.timemodified,
-                    CASE 
-                        WHEN gg.finalgrade >= gi.gradepass AND gi.gradepass > 0 THEN 1
-                        WHEN gg.finalgrade IS NULL THEN 0
-                        ELSE 0 
+                    -- Tres estados, NO dos. gradepass vale 0 cuando el profesor no
+                    -- ha configurado nota de corte (lo normal), y antes ese caso
+                    -- caia en el ELSE como reprobado: en cualquier curso sin corte
+                    -- definido TODO el mundo salia suspendido y el porcentaje de
+                    -- aprobados daba 0%. Sin corte -> NULL (desconocido).
+                    CASE
+                        WHEN gg.finalgrade IS NULL THEN NULL
+                        WHEN gi.gradepass IS NULL OR gi.gradepass <= 0 THEN NULL
+                        WHEN gg.finalgrade >= gi.gradepass THEN 1
+                        ELSE 0
                     END AS is_passed
                 FROM {grade_grades} gg
                 JOIN {grade_items} gi ON gg.itemid = gi.id
@@ -154,8 +161,13 @@ class data_retriever {
                     'item_type' => $record->itemtype,
                     'grade_obtained' => $finalgrade,
                     'grade_max' => $grademax,
+                    'grade_pass' => $record->gradepass !== null && (float)$record->gradepass > 0
+                        ? (float)$record->gradepass
+                        : null,
                     'percentage' => $percentage,
-                    'is_passed' => (int)$record->is_passed,
+                    // null = no se puede saber (sin nota, o sin nota de corte
+                    // configurada en el item). NO confundir con reprobado.
+                    'is_passed' => $record->is_passed !== null ? (int)$record->is_passed : null,
                     'time_graded' => $record->timemodified ? userdate($record->timemodified, '%Y-%m-%d %H:%M:%S') : null,
                     'timestamp_graded_unix' => (int)$record->timemodified
                 ];

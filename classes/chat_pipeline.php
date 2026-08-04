@@ -249,6 +249,7 @@ class chat_pipeline {
     private static function aggregate_grades(array $rows): array {
         $total = count($rows);
         $passed = 0;
+        $failed = 0;
         $withGrade = 0;
         $sumPercentage = 0.0;
         foreach ($rows as $row) {
@@ -257,16 +258,30 @@ class chat_pipeline {
                 $sumPercentage += (float)$pct;
                 $withGrade++;
             }
-            if (!empty($row['is_passed'])) {
+            // is_passed puede ser null = "no se puede saber" (sin nota de corte
+            // configurada). El porcentaje de aprobados debe calcularse SOLO sobre
+            // los items que si tienen corte, no sobre el total.
+            $ispassed = $row['is_passed'] ?? null;
+            if ($ispassed === null) {
+                continue;
+            }
+            if ((int)$ispassed === 1) {
                 $passed++;
+            } else {
+                $failed++;
             }
         }
+
+        $withPassMark = $passed + $failed;
+
         return [
             'aggregate_only' => true,
             'total_grade_records' => $total,
             'average_percentage' => $withGrade > 0 ? round($sumPercentage / $withGrade, 2) : null,
             'passed_count' => $passed,
-            'passed_percentage' => $total > 0 ? round(($passed / $total) * 100, 2) : null,
+            'failed_count' => $failed,
+            'records_with_pass_mark' => $withPassMark,
+            'passed_percentage' => $withPassMark > 0 ? round(($passed / $withPassMark) * 100, 2) : null,
         ];
     }
 

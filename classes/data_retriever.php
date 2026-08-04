@@ -20,6 +20,33 @@ defined('MOODLE_INTERNAL') || die();
 class data_retriever {
 
     /**
+     * Fragmento SQL que exige que el usuario tenga una matricula ACTIVA en el curso.
+     *
+     * Se usa como EXISTS y no como JOIN a proposito: un usuario puede estar
+     * matriculado por varios metodos a la vez (manual + auto-matriculacion), y un
+     * JOIN multiplicaria sus filas de notas/completitud falseando cualquier media.
+     *
+     * Filtra dos cosas distintas: ue.status = 0 (matricula del usuario activa, no
+     * suspendida) y e.status = 0 (el metodo de matriculacion sigue habilitado).
+     * Sin esto, los ex-alumnos seguian entrando en las estadisticas.
+     *
+     * @param string $useridfield Campo con el id de usuario en la consulta externa.
+     * @param string $paramname   Nombre del parametro para el courseid (unico por consulta).
+     * @return string
+     */
+    private static function active_enrolment_exists_sql(string $useridfield, string $paramname): string {
+        return "EXISTS (
+                    SELECT 1
+                      FROM {user_enrolments} ue
+                      JOIN {enrol} e ON e.id = ue.enrolid
+                     WHERE ue.userid = {$useridfield}
+                       AND e.courseid = :{$paramname}
+                       AND ue.status = 0
+                       AND e.status = 0
+                )";
+    }
+
+    /**
      * T2.2.2: Obtiene el estado de finalización del curso para cada usuario enrolado.
      *
      * Consulta la tabla {course_completions} para obtener:
@@ -49,9 +76,11 @@ class data_retriever {
                 FROM {course_completions} cc
                 JOIN {user} u ON cc.userid = u.id
                 WHERE cc.course = :courseid
+                  AND u.deleted = 0
+                  AND " . self::active_enrolment_exists_sql('u.id', 'ccourseid') . "
                 ORDER BY u.firstname ASC, u.lastname ASC";
 
-        $params = ['courseid' => $courseid];
+        $params = ['courseid' => $courseid, 'ccourseid' => $courseid];
 
         try {
             $records = $DB->get_records_sql($sql, $params);
@@ -143,9 +172,11 @@ class data_retriever {
                   -- invisibles. Se excluyen category/course a proposito: son
                   -- agregados y falsearian las medias por doble conteo.
                   AND gi.itemtype IN ('mod', 'manual')
+                  AND u.deleted = 0
+                  AND " . self::active_enrolment_exists_sql('u.id', 'gcourseid') . "
                 ORDER BY u.firstname ASC, u.lastname ASC, gi.itemname ASC";
 
-        $params = ['courseid' => $courseid];
+        $params = ['courseid' => $courseid, 'gcourseid' => $courseid];
 
         try {
             $records = $DB->get_records_sql($sql, $params);
@@ -251,9 +282,11 @@ class data_retriever {
                 JOIN {modules} m ON cm.module = m.id
                 JOIN {user} u ON cmc.userid = u.id
                 WHERE cm.course = :courseid
+                  AND u.deleted = 0
+                  AND " . self::active_enrolment_exists_sql('u.id', 'mcourseid') . "
                 ORDER BY u.firstname ASC, u.lastname ASC, cm.id ASC";
 
-        $params = ['courseid' => $courseid];
+        $params = ['courseid' => $courseid, 'mcourseid' => $courseid];
 
         try {
             $records = $DB->get_records_sql($sql, $params);
@@ -372,6 +405,7 @@ class data_retriever {
             'access_logs' => $logs,
             'metadata' => [
                 'total_enrolled_users' => $this->count_enrolled_users($courseid),
+                'total_students' => $this->count_students($courseid),
                 'days_back_for_logs' => $daysback,
                 'data_retriever_version' => '1.0.0',
                 'moodle_version' => $GLOBALS['CFG']->version ?? 'unknown'
@@ -391,17 +425,61 @@ class data_retriever {
         global $DB;
 
         try {
-            // Contar usuarios activos enrolados en el curso
+            // Contar usuarios con matricula activa: incluye profesorado. Para el
+            // numero de ALUMNOS, ver count_students().
             $sql = "SELECT COUNT(DISTINCT ue.userid) as count
                    FROM {user_enrolments} ue
                    JOIN {enrol} e ON ue.enrolid = e.id
+                   JOIN {user} u ON u.id = ue.userid
                    WHERE e.courseid = :courseid
-                     AND ue.status = 0"; // 0 = activo
+                     AND ue.status = 0
+                     AND e.status = 0
+                     AND u.deleted = 0";
 
             $result = $DB->get_record_sql($sql, ['courseid' => $courseid]);
             return (int)($result->count ?? 0);
         } catch (\Exception $e) {
             return 0;
+        }
+    }
+
+    /**
+     * Numero de ALUMNOS del curso: matriculados activos MENOS el personal docente.
+     *
+     * "Cuantos alumnos hay" es una de las preguntas centrales del chat, y
+     * total_enrolled_users incluye a profesores y gestores, asi que respondia de
+     * mas. Se usa moodle/grade:viewall como discriminador de staff — la misma
+     * capacidad con la que chat_pipeline decide si enseñar datos individuales, para
+     * que ambos criterios no se contradigan.
+     *
+     * @param int $courseid
+     * @return int|null null si no se pudo determinar (mejor que mentir con un 0).
+     */
+    private function count_students(int $courseid): ?int {
+        global $DB;
+
+        try {
+            $context = \context_course::instance($courseid);
+
+            [$esql, $eparams] = get_enrolled_sql($context, '', 0, true);
+            $enrolledids = $DB->get_fieldset_sql(
+                "SELECT u.id
+                   FROM {user} u
+                   JOIN ({$esql}) je ON je.id = u.id
+                  WHERE u.deleted = 0",
+                $eparams
+            );
+
+            if (empty($enrolledids)) {
+                return 0;
+            }
+
+            $staff = get_users_by_capability($context, 'moodle/grade:viewall', 'u.id');
+            $staffids = is_array($staff) ? array_keys($staff) : [];
+
+            return count(array_diff($enrolledids, $staffids));
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 }

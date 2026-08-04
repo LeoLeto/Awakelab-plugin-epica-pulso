@@ -20,6 +20,21 @@ defined('MOODLE_INTERNAL') || die();
 class data_retriever {
 
     /**
+     * Tope de filas que se TRAEN de la BD por cada consulta de analitica.
+     *
+     * Antes las tres consultas hacian get_records_sql() sin limite y el recorte a
+     * 250 se aplicaba despues, ya en PHP (chat_pipeline::MAX_ANALYTICS_ROWS): un
+     * curso de 3.000 alumnos con 50 items calificables cargaba cientos de miles de
+     * filas en memoria para tirar el 99%. El limite se aplica ahora en SQL, y el
+     * total REAL se obtiene con un COUNT(*) aparte para no mentirle al modelo sobre
+     * la magnitud de los datos.
+     *
+     * Debe ser >= chat_pipeline::MAX_ANALYTICS_ROWS para que el tope de allí siga
+     * siendo la referencia semantica y no oculte filas que aqui si cabrian.
+     */
+    const MAX_ROWS = 250;
+
+    /**
      * Fragmento SQL que exige que el usuario tenga una matricula ACTIVA en el curso.
      *
      * Se usa como EXISTS y no como JOIN a proposito: un usuario puede estar
@@ -65,6 +80,12 @@ class data_retriever {
         // SQL: Obtener completions del curso
         // Joinea {course_completions} con {user} para obtener nombres
         // y con {course_modules} para información de módulos
+        $from = "FROM {course_completions} cc
+                 JOIN {user} u ON cc.userid = u.id
+                WHERE cc.course = :courseid
+                  AND u.deleted = 0
+                  AND " . self::active_enrolment_exists_sql('u.id', 'ccourseid');
+
         $sql = "SELECT
                     cc.id,
                     u.id AS userid,
@@ -73,18 +94,15 @@ class data_retriever {
                     cc.timecompleted,
                     cc.timeenrolled,
                     CASE WHEN cc.timecompleted > 0 THEN 1 ELSE 0 END AS is_completed
-                FROM {course_completions} cc
-                JOIN {user} u ON cc.userid = u.id
-                WHERE cc.course = :courseid
-                  AND u.deleted = 0
-                  AND " . self::active_enrolment_exists_sql('u.id', 'ccourseid') . "
+                {$from}
                 ORDER BY u.firstname ASC, u.lastname ASC";
 
         $params = ['courseid' => $courseid, 'ccourseid' => $courseid];
 
         try {
-            $records = $DB->get_records_sql($sql, $params);
-            
+            $total = (int)$DB->count_records_sql("SELECT COUNT(*) {$from}", $params);
+            $records = $DB->get_records_sql($sql, $params, 0, self::MAX_ROWS);
+
             // Convertir registros a array asociativo formateable
             $result = [];
             foreach ($records as $record) {
@@ -102,9 +120,11 @@ class data_retriever {
             return [
                 'status' => 'success',
                 'data' => $result,
-                'count' => count($result)
+                // `count` es el total REAL en BD, no el numero de filas devueltas.
+                'count' => $total,
+                'truncated' => $total > count($result)
             ];
-            
+
         } catch (\moodle_exception $e) {
             return [
                 'status' => 'error',
@@ -135,7 +155,21 @@ class data_retriever {
         // {grade_grades} → datos de calificación
         // {grade_items} → información del ítem (nombre, tipo)
         // {user} → información del usuario
-        // {course_modules} → información de módulos
+        $from = "FROM {grade_grades} gg
+                 JOIN {grade_items} gi ON gg.itemid = gi.id
+                 JOIN {user} u ON gg.userid = u.id
+                WHERE gi.courseid = :courseid
+                  -- Los valores reales de grade_items.itemtype en Moodle son
+                  -- mod / manual / category / course / outcome. El filtro anterior
+                  -- pedia 'assignment' y 'quiz', que NO existen (eso va en
+                  -- itemmodule), asi que en la practica solo entraba 'mod' y los
+                  -- items calificados a mano en el libro de calificaciones eran
+                  -- invisibles. Se excluyen category/course a proposito: son
+                  -- agregados y falsearian las medias por doble conteo.
+                  AND gi.itemtype IN ('mod', 'manual')
+                  AND u.deleted = 0
+                  AND " . self::active_enrolment_exists_sql('u.id', 'gcourseid');
+
         $sql = "SELECT
                     gg.id,
                     u.id AS userid,
@@ -160,27 +194,15 @@ class data_retriever {
                         WHEN gg.finalgrade >= gi.gradepass THEN 1
                         ELSE 0
                     END AS is_passed
-                FROM {grade_grades} gg
-                JOIN {grade_items} gi ON gg.itemid = gi.id
-                JOIN {user} u ON gg.userid = u.id
-                WHERE gi.courseid = :courseid
-                  -- Los valores reales de grade_items.itemtype en Moodle son
-                  -- mod / manual / category / course / outcome. El filtro anterior
-                  -- pedia 'assignment' y 'quiz', que NO existen (eso va en
-                  -- itemmodule), asi que en la practica solo entraba 'mod' y los
-                  -- items calificados a mano en el libro de calificaciones eran
-                  -- invisibles. Se excluyen category/course a proposito: son
-                  -- agregados y falsearian las medias por doble conteo.
-                  AND gi.itemtype IN ('mod', 'manual')
-                  AND u.deleted = 0
-                  AND " . self::active_enrolment_exists_sql('u.id', 'gcourseid') . "
+                {$from}
                 ORDER BY u.firstname ASC, u.lastname ASC, gi.itemname ASC";
 
         $params = ['courseid' => $courseid, 'gcourseid' => $courseid];
 
         try {
-            $records = $DB->get_records_sql($sql, $params);
-            
+            $total = (int)$DB->count_records_sql("SELECT COUNT(*) {$from}", $params);
+            $records = $DB->get_records_sql($sql, $params, 0, self::MAX_ROWS);
+
             // Convertir y formatear registros
             $result = [];
             foreach ($records as $record) {
@@ -219,9 +241,10 @@ class data_retriever {
             return [
                 'status' => 'success',
                 'data' => $result,
-                'count' => count($result)
+                'count' => $total,
+                'truncated' => $total > count($result)
             ];
-            
+
         } catch (\moodle_exception $e) {
             return [
                 'status' => 'error',
@@ -253,6 +276,14 @@ class data_retriever {
         // {course_modules} → información del módulo
         // {modules} → tipo de módulo
         // {user} → información del usuario
+        $from = "FROM {course_modules_completion} cmc
+                 JOIN {course_modules} cm ON cmc.coursemoduleid = cm.id
+                 JOIN {modules} m ON cm.module = m.id
+                 JOIN {user} u ON cmc.userid = u.id
+                WHERE cm.course = :courseid
+                  AND u.deleted = 0
+                  AND " . self::active_enrolment_exists_sql('u.id', 'mcourseid');
+
         $sql = "SELECT
                     cmc.id,
                     u.id AS userid,
@@ -277,20 +308,15 @@ class data_retriever {
                         WHEN cmc.completionstate = 3 THEN 'completed_fail'
                         ELSE 'not_completed'
                     END AS completion_status
-                FROM {course_modules_completion} cmc
-                JOIN {course_modules} cm ON cmc.coursemoduleid = cm.id
-                JOIN {modules} m ON cm.module = m.id
-                JOIN {user} u ON cmc.userid = u.id
-                WHERE cm.course = :courseid
-                  AND u.deleted = 0
-                  AND " . self::active_enrolment_exists_sql('u.id', 'mcourseid') . "
+                {$from}
                 ORDER BY u.firstname ASC, u.lastname ASC, cm.id ASC";
 
         $params = ['courseid' => $courseid, 'mcourseid' => $courseid];
 
         try {
-            $records = $DB->get_records_sql($sql, $params);
-            
+            $total = (int)$DB->count_records_sql("SELECT COUNT(*) {$from}", $params);
+            $records = $DB->get_records_sql($sql, $params, 0, self::MAX_ROWS);
+
             // Convertir y formatear registros
             $result = [];
             foreach ($records as $record) {
@@ -314,9 +340,10 @@ class data_retriever {
             return [
                 'status' => 'success',
                 'data' => $result,
-                'count' => count($result)
+                'count' => $total,
+                'truncated' => $total > count($result)
             ];
-            
+
         } catch (\moodle_exception $e) {
             return [
                 'status' => 'error',
@@ -395,12 +422,17 @@ class data_retriever {
                 'course_startdate_unix' => (int)$course->startdate
             ],
             'analytics' => [
+                // *_count es el total REAL en BD; *_truncated avisa de que la lista
+                // adjunta es una muestra (tope MAX_ROWS aplicado en SQL).
                 'course_completions' => $completions['data'] ?? [],
                 'course_completions_count' => $completions['count'] ?? 0,
+                'course_completions_truncated' => !empty($completions['truncated']),
                 'grades_and_quizzes' => $grades['data'] ?? [],
                 'grades_and_quizzes_count' => $grades['count'] ?? 0,
+                'grades_and_quizzes_truncated' => !empty($grades['truncated']),
                 'module_completions' => $modules['data'] ?? [],
-                'module_completions_count' => $modules['count'] ?? 0
+                'module_completions_count' => $modules['count'] ?? 0,
+                'module_completions_truncated' => !empty($modules['truncated'])
             ],
             'access_logs' => $logs,
             'metadata' => [

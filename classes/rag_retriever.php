@@ -533,13 +533,27 @@ class rag_retriever {
      * @return object|null
      */
     private static function match_activity_by_name_exact(array $records, string $query) {
+        // Se elige el nombre MÁS LARGO de los que coinciden, no el primero de la
+        // lista: con nombres que se solapan ("Tarea 1" y "Tarea 1 corregida") devolver
+        // el primero hacía ganar siempre al más corto aunque la pregunta citara el
+        // largo. Mismo criterio que find_matching_section_for_query().
+        $best = null;
+        $bestLength = 0;
         foreach ($records as $record) {
             $name = mb_strtolower(trim((string)$record->name), 'UTF-8');
-            if ($name !== '' && preg_match('/(?<![\pL\pN])' . preg_quote($name, '/') . '(?![\pL\pN])/ui', $query)) {
-                return $record;
+            if ($name === '') {
+                continue;
+            }
+            $length = mb_strlen($name, 'UTF-8');
+            if ($length <= $bestLength) {
+                continue;
+            }
+            if (preg_match('/(?<![\pL\pN])' . preg_quote($name, '/') . '(?![\pL\pN])/ui', $query)) {
+                $best = $record;
+                $bestLength = $length;
             }
         }
-        return null;
+        return $best;
     }
 
     /**
@@ -608,14 +622,18 @@ class rag_retriever {
                 continue;
             }
 
-            // Ya no basta una palabra generica suelta: o cubre el nombre entero,
-            // o hay al menos 2 palabras significativas independientes.
-            $covers = $hits >= $significantTokens;
-            if (!$covers && $hits < 2) {
+            // Hacen falta 2 palabras significativas SIEMPRE. Antes valia "o cubre el
+            // nombre entero", y eso era una puerta trasera: un nombre con UNA sola
+            // palabra significativa la cubria con un solo hit, que es justo el bug #2
+            // que este umbral debia cerrar ("Introduccion a la investigacion"
+            // enganchaba cualquier pregunta que dijera "investigacion"). Los nombres
+            // de una sola palabra ya los resuelve match_activity_by_name_exact(),
+            // que compara el nombre completo con limites de palabra.
+            if ($hits < 2) {
                 continue;
             }
 
-            $score = $hits + ($covers ? 1 : 0);
+            $score = $hits + ($hits >= $significantTokens ? 1 : 0);
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $bestRecord = $record;

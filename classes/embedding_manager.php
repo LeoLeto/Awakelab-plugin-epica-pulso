@@ -193,9 +193,19 @@ class embedding_manager {
             return $this->find_relevant_chunks_lexical($courseid, $query, $top_k);
         }
 
-        // Embed the query.
+        // Embed the query. Memorizado por petición: la misma consulta se embebe una
+        // sola vez aunque el pipeline la pida más de una vez (p. ej. tras una
+        // reindexación), ahorrando una llamada a la API de OpenAI.
+        static $querycache = [];
+        $cachekey = sha1($query);
+
         try {
-            $query_vectors = $this->generate_embeddings([$query]);
+            if (isset($querycache[$cachekey])) {
+                $query_vectors = $querycache[$cachekey];
+            } else {
+                $query_vectors = $this->generate_embeddings([$query]);
+                $querycache[$cachekey] = $query_vectors;
+            }
         } catch (\Throwable $e) {
             error_log('Pulso RAG query embedding failed, fallback to lexical retrieval: ' . $e->getMessage());
             return $this->find_relevant_chunks_lexical($courseid, $query, $top_k);

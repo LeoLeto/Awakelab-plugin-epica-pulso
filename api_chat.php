@@ -31,7 +31,8 @@ use block_pulso\anthropic_connector;
 use block_pulso\system_prompt_designer;
 
 $courseid = optional_param('courseid', 0, PARAM_INT);
-$user_query = optional_param('user_query', '', PARAM_RAW);
+// PARAM_RAW no acota longitud: el tope real se aplica en servidor.
+$user_query = chat_pipeline::sanitize_query(optional_param('user_query', '', PARAM_RAW));
 $conversation_history = optional_param('conversation_history', '[]', PARAM_RAW);
 
 // Headers JSON

@@ -34,6 +34,32 @@ class chat_pipeline {
     /** Seconds the unified course context stays valid in the application cache. */
     const CONTEXT_CACHE_TTL = 120;
 
+    /**
+     * Tope de caracteres de la pregunta del usuario.
+     *
+     * El cliente ya limita el textarea a 500, pero eso solo protege del usuario
+     * despistado: los endpoints reciben `user_query` como PARAM_RAW, así que una
+     * petición hecha a mano podía enviar megas de texto y pagarlos en tokens. Se
+     * recorta en servidor, que es el único sitio donde el límite es real.
+     */
+    const MAX_QUERY_LENGTH = 2000;
+
+    /**
+     * Recorta la pregunta del usuario al tope permitido.
+     *
+     * @param string $user_query
+     * @return string
+     */
+    public static function sanitize_query(string $user_query): string {
+        $trimmed = trim($user_query);
+        if (mb_strlen($trimmed, 'UTF-8') <= self::MAX_QUERY_LENGTH) {
+            return $trimmed;
+        }
+        // mb_substr, no substr: cortar bytes deja UTF-8 inválido (ver la regla de
+        // encode_payload en anthropic_connector).
+        return mb_substr($trimmed, 0, self::MAX_QUERY_LENGTH, 'UTF-8');
+    }
+
     /** Cap per analytics array injected into the prompt (protects the context window). */
     const MAX_ANALYTICS_ROWS = 250;
 

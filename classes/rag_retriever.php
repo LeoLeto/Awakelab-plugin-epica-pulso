@@ -945,11 +945,21 @@ class rag_retriever {
                     AND asub.latest = 1",
                 ['assignid' => $assign->id, 'status' => 'submitted']
             );
+            // Solo el ULTIMO intento calificado de cada alumno: {assign_grades}
+            // guarda una fila por intento, asi que promediar todas las filas mezcla
+            // las notas de intentos ya superados y baja la media artificialmente.
             $gradeStats = $DB->get_record_sql(
                 "SELECT COUNT(*) AS graded, AVG(ag.grade) AS avg_grade
                    FROM {assign_grades} ag
                   WHERE ag.assignment = :assignid
-                    AND ag.grade >= 0",
+                    AND ag.grade >= 0
+                    AND ag.attemptnumber = (
+                        SELECT MAX(ag2.attemptnumber)
+                          FROM {assign_grades} ag2
+                         WHERE ag2.assignment = ag.assignment
+                           AND ag2.userid = ag.userid
+                           AND ag2.grade >= 0
+                    )",
                 ['assignid' => $assign->id]
             );
             if ($gradeStats) {
@@ -1043,9 +1053,6 @@ class rag_retriever {
             if ($completedUsers > 0) {
                 $contentLines[] = 'Estudiantes que han completado la actividad: ' . $completedUsers;
             }
-        }
-        if ($completedUsers > 0) {
-            $contentLines[] = 'Estudiantes que han completado la actividad: ' . $completedUsers;
         }
 
         return [

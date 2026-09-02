@@ -648,6 +648,40 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             line-height: 1.6;
         }
 
+        /* Enlace directo "Ir a ..." de una actividad o recurso del curso. */
+        .pulso-goto-wrap {
+            margin-top: 4px;
+        }
+
+        .pulso-goto-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 14px;
+            border-radius: 10px;
+            background: var(--pulso-cyan);
+            color: var(--pulso-deep) !important;
+            font-weight: 600;
+            font-size: 0.9rem;
+            line-height: 1.2;
+            text-decoration: none !important;
+            border: 1px solid var(--pulso-cyan);
+            transition: filter 0.15s ease, transform 0.15s ease;
+        }
+
+        .pulso-goto-link:hover,
+        .pulso-goto-link:focus {
+            filter: brightness(1.08);
+            transform: translateY(-1px);
+            text-decoration: none !important;
+            color: var(--pulso-deep) !important;
+        }
+
+        .pulso-goto-icon {
+            font-size: 1rem;
+            line-height: 1;
+        }
+
         .pulso-rich-paragraph {
             margin: 2px 0;
             line-height: 1.65;
@@ -1742,6 +1776,20 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                         html += `<li>${escapeHtml(String(rec))}</li>`;
                     });
                     html += '</ul></div>';
+                }
+
+                // Enlace directo a la actividad/recurso. La URL la construye SIEMPRE el
+                // servidor con moodle_url y solo llega si el usuario puede verla
+                // (uservisible), asi que aqui solo hay que pintarla. Se escapa por si
+                // acaso y se trata como campo aparte para no pasar por
+                // formatRichTextResponse() (que escapa el bloque entero una sola vez).
+                if (data.link && data.link.url) {
+                    const linkUrl = String(data.link.url);
+                    const linkLabel = data.link.label ? String(data.link.label) : 'Abrir en el curso';
+                    html += `<div class="pulso-goto-wrap">`
+                        + `<a class="pulso-goto-link" href="${escapeHtml(linkUrl)}">`
+                        + `<span class="pulso-goto-icon">↗</span>${escapeHtml(linkLabel)}`
+                        + `</a></div>`;
                 }
 
                 html += '</div>';

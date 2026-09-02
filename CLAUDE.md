@@ -276,6 +276,31 @@ eso no puede resumir ni explicar el material de un SCORM; es la principal ventaj
 plugin Phia) + modo "resumen/explicación de unidad" orientado al alumno acotado al SCORM
 actual (P55, P56).
 
+## Enlaces directos a actividades (v1.11.0)
+
+Las respuestas directas que resuelven una actividad o recurso llevan un campo
+`link` en el payload (`['url' => ..., 'label' => ...]`), que `chat_simple_view.php`
+pinta como botón "Ir a…" (`.pulso-goto-link`) al final de la respuesta. Reglas:
+
+- La URL se construye SIEMPRE en el servidor con `moodle_url` desde
+  `rag_retriever::build_activity_link()`. **Nunca** la genera el LLM (se las
+  inventa).
+- Ese helper comprueba `get_fast_modinfo($courseid)->get_cm($cmid)->uservisible`:
+  si la actividad está oculta o restringida para el usuario, **no** devuelve
+  enlace. Es lo que evita que el modo alumno se salte la visibilidad.
+- `attach_activity_link()` decora el payload en los cuatro constructores
+  (`build_quiz_answer`, `build_assign_answer`, `build_generic_activity_answer` y
+  la rama de recursos de `resolve_direct_resource_query`). Si la pregunta es de
+  ubicación/acceso (`is_location_query()`), añade además la línea
+  `Ubicacion: Seccion N: Nombre` y el texto determinista de "cómo usarlo"
+  (`activity_usage_hint()`, sin coste de IA).
+- El payload entero se serializa con `json_encode($direct_course_answer)` en
+  `chat_pipeline::resolve_direct_answer()`, así que cualquier campo nuevo llega
+  al frontend como `data.<campo>` sin tocar los endpoints.
+- El botón se pinta como campo aparte, NO dentro de
+  `formatRichTextResponse()` (que escapa el bloque entero una sola vez y
+  convertiría el `<a>` en texto literal).
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

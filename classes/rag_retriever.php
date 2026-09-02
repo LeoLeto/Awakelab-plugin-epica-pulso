@@ -521,7 +521,15 @@ class rag_retriever {
             }
         }
 
-        return $result;
+        return self::attach_activity_link(
+            $result,
+            $courseid,
+            'resource',
+            $cm ? (int)$cm->id : null,
+            $resourceName,
+            'Recurso',
+            $query
+        );
     }
 
     /**
@@ -936,7 +944,15 @@ class rag_retriever {
             }
         }
 
-        return $result;
+        return self::attach_activity_link(
+            $result,
+            $courseid,
+            'quiz',
+            $cm ? (int)$cm->id : null,
+            $quizName,
+            'Cuestionario',
+            $query
+        );
     }
 
     /**
@@ -1152,12 +1168,22 @@ class rag_retriever {
             }
         }
 
-        return [
+        $result = [
             'type' => 'text',
             'title' => 'Tarea: ' . $assignName,
             'summary' => 'He localizado la tarea dentro del curso.',
             'content' => implode("\n", $contentLines)
         ];
+
+        return self::attach_activity_link(
+            $result,
+            $courseid,
+            'assign',
+            $cm ? (int)$cm->id : null,
+            $assignName,
+            'Tarea',
+            $query
+        );
     }
 
     /**
@@ -1296,12 +1322,22 @@ class rag_retriever {
             $contentLines[] = 'Estudiantes que han completado la actividad: ' . $completedUsers;
         }
 
-        return [
+        $result = [
             'type' => 'text',
             'title' => $typeLabel . ': ' . $activityName,
             'summary' => 'He localizado la actividad dentro del curso.',
             'content' => implode("\n", $contentLines)
         ];
+
+        return self::attach_activity_link(
+            $result,
+            $courseid,
+            $modType,
+            $cm ? (int)$cm->id : null,
+            $activityName,
+            $typeLabel,
+            $query
+        );
     }
 
     /**
@@ -1841,6 +1877,173 @@ class rag_retriever {
      */
     private static function is_explicit_section_query(string $query): bool {
         return (bool)preg_match('/secci[oó]n|secciones|apartado|tema\s+\d+|contenido\s+de\s+la\s+secci[oó]n|actividades\s+de\s+la\s+secci[oó]n/u', $query);
+    }
+
+    /**
+     * ¿El usuario pregunta por la UBICACIÓN o el ACCESO a algo?
+     * ("¿dónde está X?", "¿cómo accedo al foro?", "¿cómo entrego la tarea?")
+     *
+     * @param string $query
+     * @return bool
+     */
+    private static function is_location_query(string $query): bool {
+        return (bool)preg_match(
+            '/d[oó]nde\s+(est[aá]|est[aá]n|encuentro|puedo\s+(ver|encontrar|acceder))' .
+            '|c[oó]mo\s+(accedo|acceder|llego|llegar|entro|entrar|abro|abrir|participo|participar' .
+            '|entrego|entregar|env[ií]o|enviar|hago|hacer|puedo\s+(acceder|entrar|participar|entregar|ver|abrir|hablar|escribir))' .
+            '|(enlace|link|url)\s+(de|a|del|para|hacia)' .
+            '|ll[eé]vame\s+a|c[oó]mo\s+se\s+(accede|entra|participa)/u',
+            $query
+        );
+    }
+
+    /**
+     * Texto breve y determinista de "cómo usarlo" según el tipo de módulo.
+     * No usa IA: son los pasos reales de la interfaz de Moodle.
+     *
+     * @param string $modname
+     * @return string
+     */
+    private static function activity_usage_hint(string $modname): string {
+        $hints = [
+            'forum'    => 'Para participar, abre el foro y pulsa "Anadir un nuevo tema de debate", o responde a un tema ya existente.',
+            'assign'   => 'Para entregar, abre la tarea y pulsa "Agregar entrega"; adjunta tu trabajo y guarda los cambios antes de la fecha limite.',
+            'quiz'     => 'Para realizarlo, abrelo y pulsa "Intentar el cuestionario ahora".',
+            'scorm'    => 'Abrelo y pulsa "Entrar" para lanzar el contenido.',
+            'resource' => 'Abrelo para consultar o descargar el archivo.',
+            'page'     => 'Abrela para leer el contenido.',
+            'url'      => 'Abrelo para ir al enlace externo.',
+            'book'     => 'Abrelo y navega por los capitulos desde el indice.',
+            'folder'   => 'Abrela para ver y descargar los archivos.',
+            'glossary' => 'Abrelo para consultar las entradas del glosario.',
+            'wiki'     => 'Abrela para leer o editar sus paginas.',
+            'choice'   => 'Abrela para elegir tu opcion y enviarla.',
+            'feedback' => 'Abrelo para responder al cuestionario de feedback.',
+            'lesson'   => 'Abrela y sigue los pasos que te vaya presentando.',
+        ];
+        return $hints[$modname] ?? '';
+    }
+
+    /**
+     * Construir el enlace directo a un módulo del curso.
+     *
+     * IMPORTANTE: la URL se construye SIEMPRE aquí con moodle_url (nunca la
+     * genera el LLM, que se las inventaría) y se comprueba la visibilidad real
+     * para el usuario actual con get_fast_modinfo()->uservisible, para no
+     * enlazar actividades ocultas o restringidas (clave en modo alumno).
+     *
+     * @param int $courseid
+     * @param string $modname Tipo de módulo Moodle ('forum', 'quiz', 'assign'...)
+     * @param int $cmid
+     * @param string $activityname
+     * @param string $typelabel Etiqueta legible del tipo ('Foro', 'Cuestionario'...)
+     * @return array|null ['url', 'label', 'section'] o null si no es visible
+     */
+    private static function build_activity_link(
+        int $courseid,
+        string $modname,
+        int $cmid,
+        string $activityname = '',
+        string $typelabel = ''
+    ): ?array {
+        if ($cmid <= 0 || $modname === '') {
+            return null;
+        }
+        if (!function_exists('\get_fast_modinfo')) {
+            return null;
+        }
+
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+            $cminfo = $modinfo->get_cm($cmid);
+            if (empty($cminfo) || empty($cminfo->uservisible)) {
+                // Oculta o restringida para este usuario: no dar enlace.
+                return null;
+            }
+
+            $url = new \moodle_url('/mod/' . $modname . '/view.php', ['id' => $cmid]);
+
+            $label = 'Ir a ' . ($typelabel !== '' ? \core_text::strtolower($typelabel) : 'la actividad');
+            if ($activityname !== '') {
+                $label .= ' "' . $activityname . '"';
+            }
+
+            // Ubicación legible: nombre de la sección o "Seccion N".
+            $sectiondesc = '';
+            $sectionnum = (int)($cminfo->sectionnum ?? 0);
+            try {
+                $secinfo = $modinfo->get_section_info($sectionnum);
+                $secname = $secinfo ? trim((string)($secinfo->name ?? '')) : '';
+                $sectiondesc = ($secname !== '')
+                    ? ('Seccion ' . $sectionnum . ': ' . $secname)
+                    : ('Seccion ' . $sectionnum);
+            } catch (\Throwable $e) {
+                $sectiondesc = 'Seccion ' . $sectionnum;
+            }
+
+            return [
+                'url' => $url->out(false),
+                'label' => $label,
+                'section' => $sectiondesc,
+            ];
+        } catch (\Throwable $e) {
+            // cmid inexistente o cualquier problema de modinfo: sin enlace, sin romper.
+            return null;
+        }
+    }
+
+    /**
+     * Añadir a un payload de respuesta directa el enlace a la actividad y,
+     * si la pregunta era de ubicación/acceso, dónde está y cómo usarla.
+     *
+     * @param array $result Payload de respuesta directa (se devuelve decorado)
+     * @param int $courseid
+     * @param string $modname
+     * @param int|null $cmid
+     * @param string $activityname
+     * @param string $typelabel
+     * @param string $query Pregunta original del usuario
+     * @return array
+     */
+    private static function attach_activity_link(
+        array $result,
+        int $courseid,
+        string $modname,
+        ?int $cmid,
+        string $activityname = '',
+        string $typelabel = '',
+        string $query = ''
+    ): array {
+        if (empty($cmid)) {
+            return $result;
+        }
+
+        $link = self::build_activity_link($courseid, $modname, (int)$cmid, $activityname, $typelabel);
+        if ($link === null) {
+            return $result;
+        }
+
+        $result['link'] = [
+            'url' => $link['url'],
+            'label' => $link['label'],
+        ];
+
+        // Si preguntaba por ubicación/acceso, explicar dónde está y cómo usarlo.
+        if ($query !== '' && self::is_location_query($query)) {
+            $extra = [];
+            if (!empty($link['section'])) {
+                $extra[] = 'Ubicacion: ' . $link['section'];
+            }
+            $hint = self::activity_usage_hint($modname);
+            if ($hint !== '') {
+                $extra[] = $hint;
+            }
+            if (!empty($extra) && isset($result['content']) && is_string($result['content'])) {
+                $result['content'] = rtrim($result['content']) . "\n" . implode("\n", $extra);
+            }
+        }
+
+        return $result;
     }
 
     /**

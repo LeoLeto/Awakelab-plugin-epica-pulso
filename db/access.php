@@ -11,6 +11,22 @@ defined('MOODLE_INTERNAL') || die();
 
 $capabilities = [
 
+    // Uso del chat para preguntas de CONTENIDO del curso (resumenes, materiales,
+    // secciones, actividades). La tienen tambien los alumnos: es el permiso
+    // minimo para que el bloque se renderice y los endpoints acepten la peticion.
+    // NO da acceso a ningun dato analitico ni a datos de otros usuarios: eso lo
+    // sigue guardando 'block/pulso:viewanalytics', que solo tiene el profesorado.
+    'block/pulso:usechat' => [
+        'captype' => 'read',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes' => [
+            'student' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+            'teacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
+        ],
+    ],
+
     // T2.6.2: Capability to view analytics data via Pulso chat
     'block/pulso:viewanalytics' => [
         'captype' => 'read',

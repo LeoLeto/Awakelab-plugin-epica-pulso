@@ -61,10 +61,13 @@ try {
     require_login($course);
     require_sesskey();
 
+    // Permiso mínimo: 'usechat' (contenido, también alumnos). La analítica
+    // sigue exigiendo 'viewanalytics'.
     $context = context_course::instance($courseid);
-    if (!has_capability('block/pulso:viewanalytics', $context)) {
-        throw new Exception('You do not have permission to use analytics');
+    if (!has_capability('block/pulso:usechat', $context)) {
+        throw new Exception('You do not have permission to use this feature');
     }
+    $isteacher = chat_pipeline::user_can_view_analytics($courseid);
 
     chat_pipeline::check_enabled($courseid);
 } catch (\Throwable $e) {
@@ -113,6 +116,29 @@ if (ob_get_level() > 0) {
 flush();
 
 try {
+    // Modo alumno: una pregunta de analítica se corta antes de leer contexto,
+    // RAG o llamar a Anthropic. Se responde por el propio stream (evento
+    // 'final') para no forzar el fallback al endpoint clásico.
+    if (!$isteacher && chat_pipeline::is_teacher_only_query($user_query)) {
+        $refusal = chat_pipeline::teacher_only_refusal($user_query);
+        pulso_sse('final', [
+            'success' => true,
+            'message' => 'Consulta de analítica bloqueada por rol (modo alumno)',
+            'answer' => $refusal['answer'],
+            'tokens_used' => 0,
+            'model' => 'role-restricted',
+            'schema_valid' => true,
+            'schema_data' => $refusal['schema_data'],
+            'rag_diagnostics' => [],
+            'followup_questions' => $refusal['followup_questions'],
+            'history_length' => 0,
+            'course_id' => $courseid,
+            'course_name' => $course->fullname,
+            'timestamp' => date('Y-m-d H:i:s')
+        ]);
+        exit;
+    }
+
     // Primer byte inmediato: el cliente sabe que el stream está vivo.
     pulso_sse('status', ['stage' => 'retrieving']);
 
@@ -168,7 +194,8 @@ try {
     // Anthropic lo sirva de caché en vez de recobrarlo entero en cada mensaje.
     $system_prompt = system_prompt_designer::generate_system_blocks(
         $course_context,
-        $rag_context
+        $rag_context,
+        $isteacher
     );
 
     $connector = new anthropic_connector();
@@ -211,8 +238,12 @@ try {
         $followup_questions = $connector->generate_followup_questions(
             $user_query,
             $answer,
-            $course_context
+            $course_context,
+            $isteacher
         );
+        if (!$isteacher) {
+            $followup_questions = chat_pipeline::filter_student_followups($followup_questions);
+        }
         if (!empty($followup_questions)) {
             pulso_sse('followups', ['questions' => $followup_questions]);
         }

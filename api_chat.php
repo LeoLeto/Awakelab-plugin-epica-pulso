@@ -70,14 +70,39 @@ try {
     require_login($course);
     require_sesskey();
 
-    // T2.6.2: Verificar permisos del usuario.
+    // T2.6.2: Verificar permisos del usuario. El permiso mínimo es 'usechat'
+    // (preguntas de contenido, lo tienen los alumnos); la analítica exige
+    // 'viewanalytics'.
     $context = context_course::instance($courseid);
-    if (!has_capability('block/pulso:viewanalytics', $context)) {
-        throw new Exception('You do not have permission to use analytics');
+    if (!has_capability('block/pulso:usechat', $context)) {
+        throw new Exception('You do not have permission to use this feature');
     }
+    $isteacher = chat_pipeline::user_can_view_analytics($courseid);
 
     // T2.6.1: Verificar si Pulso está habilitado para este curso.
     chat_pipeline::check_enabled($courseid);
+
+    // Modo alumno: las preguntas de analítica se cortan AQUÍ, antes de leer
+    // contexto, RAG o llamar a Anthropic. Ni un dato ni un token.
+    if (!$isteacher && chat_pipeline::is_teacher_only_query($user_query)) {
+        $refusal = chat_pipeline::teacher_only_refusal($user_query);
+        echo json_encode([
+            'success' => true,
+            'message' => 'Consulta de analítica bloqueada por rol (modo alumno)',
+            'answer' => $refusal['answer'],
+            'tokens_used' => 0,
+            'model' => 'role-restricted',
+            'schema_valid' => true,
+            'schema_data' => $refusal['schema_data'],
+            'rag_diagnostics' => [],
+            'followup_questions' => $refusal['followup_questions'],
+            'history_length' => 0,
+            'course_id' => $courseid,
+            'course_name' => $course->fullname,
+            'timestamp' => date('Y-m-d H:i:s')
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 
     // ============================================================
     // 1. CONTEXTO DEL CURSO (con cache corta) + RAG + HISTORIAL
@@ -134,7 +159,8 @@ try {
     // system_prompt_designer::generate_system_blocks().
     $system_prompt = system_prompt_designer::generate_system_blocks(
         $course_context,
-        $rag_context
+        $rag_context,
+        $isteacher
     );
 
     $connector = new anthropic_connector();
@@ -166,8 +192,12 @@ try {
         $followup_questions = $connector->generate_followup_questions(
             $user_query,
             $answer,
-            $course_context
+            $course_context,
+            $isteacher
         );
+        if (!$isteacher) {
+            $followup_questions = chat_pipeline::filter_student_followups($followup_questions);
+        }
     } catch (Exception $e) {
         // Si falla la generación de preguntas, continuar sin ellas.
         error_log('Follow-up questions generation failed: ' . $e->getMessage());

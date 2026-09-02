@@ -83,8 +83,39 @@ class chat_pipeline {
     }
 
     /**
+     * Memo por petición de la capability de analítica, indexado por curso.
+     *
+     * @var array<int,bool>
+     */
+    private static $analyticscap = [];
+
+    /**
+     * ¿El usuario actual puede ver datos analíticos de ESTE curso?
+     *
+     * Única fuente de verdad del "modo alumno": todo lo que exponga datos del
+     * grupo (notas, completitud, intentos, accesos, recuentos de alumnos) tiene
+     * que consultarla antes de construir el dato, no solo antes de pintarlo.
+     *
+     * @param int $courseid
+     * @return bool
+     */
+    public static function user_can_view_analytics(int $courseid): bool {
+        if (!array_key_exists($courseid, self::$analyticscap)) {
+            self::$analyticscap[$courseid] = has_capability(
+                'block/pulso:viewanalytics',
+                \context_course::instance($courseid)
+            );
+        }
+        return self::$analyticscap[$courseid];
+    }
+
+    /**
      * Obtener contexto del curso (F2.2 - data_retriever) con cache corta y
      * filtrado por toggles de categorías de datos (T2.6.2).
+     *
+     * Sin `block/pulso:viewanalytics` (alumnos) el contexto se construye SIN
+     * analítica: las consultas pesadas no se ejecutan siquiera, así que no hay
+     * dato del grupo que se pueda filtrar por accidente al prompt.
      *
      * @param int $courseid
      * @return array
@@ -93,12 +124,17 @@ class chat_pipeline {
     public static function get_course_context(int $courseid): array {
         $course_context = null;
         $cache = null;
+        $canviewanalytics = self::user_can_view_analytics($courseid);
+
+        // La clave de caché DEBE distinguir el rol: la versión sin analítica de
+        // un alumno no puede servirse a un profesor (ni al revés).
+        $cachekey = $canviewanalytics ? (string)$courseid : $courseid . ':nostats';
 
         // Short-lived application cache: analytics context is course-wide and
         // rebuilding it runs several heavy queries on every chat message.
         try {
             $cache = \cache::make('block_pulso', 'coursecontext');
-            $cached = $cache->get($courseid);
+            $cached = $cache->get($cachekey);
             if (is_array($cached)
                     && isset($cached['time'], $cached['payload'])
                     && (time() - $cached['time']) < self::CONTEXT_CACHE_TTL) {
@@ -111,10 +147,10 @@ class chat_pipeline {
 
         if ($course_context === null) {
             $retriever = new data_retriever();
-            $course_context = $retriever->get_unified_course_context($courseid, 7);
+            $course_context = $retriever->get_unified_course_context($courseid, 7, $canviewanalytics);
             if ($cache !== null && ($course_context['status'] ?? '') === 'success') {
                 try {
-                    $cache->set($courseid, ['time' => time(), 'payload' => $course_context]);
+                    $cache->set($cachekey, ['time' => time(), 'payload' => $course_context]);
                 } catch (\Throwable $e) {
                     // Never break the chat because of a cache store issue.
                 }
@@ -161,14 +197,237 @@ class chat_pipeline {
             }
         }
 
+        // Modo alumno: fuera cualquier resto analítico y los recuentos de
+        // personas. total_students/total_enrolled_users son dato de gestión, así
+        // que la regla queda coherente: nada del grupo.
+        if (!$canviewanalytics) {
+            $course_context['analytics'] = [
+                'course_completions' => [],
+                'course_completions_count' => 0,
+                'grades_and_quizzes' => [],
+                'grades_and_quizzes_count' => 0,
+                'module_completions' => [],
+                'module_completions_count' => 0,
+                'analytics_available' => false,
+            ];
+            $course_context['access_logs'] = [];
+            unset($course_context['metadata']['total_students'],
+                  $course_context['metadata']['total_enrolled_users']);
+        }
+
         // Privacidad (RGPD/LOPD): solo quien puede calificar el curso ve datos
         // identificables por alumno. Se comprueba SIEMPRE aqui (nunca en la cache
         // compartida por curso) porque depende del usuario de la peticion actual.
+        // Tercera capa: con el modo alumno no queda dato que redactar, pero se
+        // mantiene para quien tiene analítica sin poder calificar.
         $permctx = \context_course::instance($courseid);
         $canseegrades = has_capability('moodle/grade:viewall', $permctx);
         $course_context = self::apply_privacy_redaction($course_context, $canseegrades);
 
         return $course_context;
+    }
+
+    /**
+     * Detecta preguntas cuya respuesta es dato del PROFESORADO: notas, medias,
+     * completitud, entregas, intentos, accesos, alumnos en riesgo, rankings o
+     * recuentos de alumnos.
+     *
+     * Criterio deliberadamente CONSERVADOR (privacidad > cobertura): ante la
+     * duda se niega. Para no atrapar preguntas legítimas de contenido que
+     * mencionan "nota" o "actividad" de pasada, buena parte de los patrones
+     * exigen co-ocurrencia: un término de grupo (alumnos, clase, compañeros) con
+     * uno de métrica, o un término agregado ("ha habido", "de media", "esta
+     * semana") con uno de participación. Solo lo inequívocamente docente niega
+     * por sí solo.
+     *
+     * Calibrado contra las 56 preguntas de Pulso_AI_matriz_evaluacion.xlsx más
+     * un juego de variantes de alumno; ver memory/session-history.md.
+     *
+     * @param string $query
+     * @return bool
+     */
+    public static function is_teacher_only_query(string $query): bool {
+        $q = mb_strtolower(trim($query), 'UTF-8');
+        if ($q === '') {
+            return false;
+        }
+
+        // El detector ya existente de analítica de curso (nota media, matriculados,
+        // en riesgo, ranking, % aprobados, "cuántos alumnos"...).
+        if (rag_retriever::is_course_analytics_query($q)) {
+            return true;
+        }
+
+        // Inequívocamente docente: no necesita co-ocurrencia.
+        $teacherOnly = '/\ben\s+riesgo\b|\branking\b|\bengagement\b|tasa\s+de\s+completitud'
+            . '|mejor(es)?\s+(alumn|estudiant)|peor(es)?\s+(alumn|estudiant)'
+            . '|sin\s+acceder|no\s+han\s+(accedido|entrado)|llevan\s+.*sin\s+(acceder|entrar)'
+            . '|inactiv[oa]s?\b|abandon|libro\s+de\s+calificaciones|informe\s+de\s+(notas|calificaciones)'
+            . '|listado\s+de\s+(notas|calificaciones)|panorama\s+general\s+del\s+curso'
+            . '|porcentaje\s+de\s+(aprobad|suspend|entregad|complet)'
+            . '|cu[aá]nt[oa]s?\s+(han|ha)\s+(complet|entregad|aprobad|suspend|realizad|acced|visto|visualizad|le[ií]do|descargad)'
+            . '|comp[aá]ra(me|rme|ci[oó]n)?\s+.*(clase|resto|compa[nñ]er|media|grupo)|resto\s+de\s+(la\s+)?clase'
+            . '|qui[eé]n(es)?\s+(se\s+)?(no\s+)?(ha|han)\s+(complet|entregad|aprobad|suspend|realizad|acced|hecho|conectad|le[ií]do)'
+            . '|estad[ií]sticas\s+(del|de\s+la|de\s+los)?\s*(curso|clase|actividad|cuestionario|tarea)'
+            // "de media" en una pregunta de contenido es rarísimo; en una de
+            // analítica es la forma habitual de pedir un promedio del grupo.
+            . '|\bde\s+media\b'
+            // Recuentos de actividad del grupo. Se excluye la configuración
+            // pública de la actividad ("cuántos intentos permite", "cuántos me
+            // quedan"), que un alumno sí puede consultar. "respuestas" queda
+            // fuera de esta lista porque "cuántas respuestas tiene la pregunta 3"
+            // es contenido; el caso agregado lo cazan las reglas de abajo.
+            . '|cu[aá]nt[oa]s?\s+(entregas|intentos|accesos)\b(?!\s+(permite|permitid|permiten|puede|se\s+permit|quedan|me\s+quedan))'
+            // Inglés: la matriz incluye preguntas en inglés (P42/P43).
+            . '|how\s+many\s+students|which\s+students|who\s+(has|have)\s+(completed|submitted|passed|accessed)'
+            . '|students?\s+(passed|failed)|average\s+grade|at.risk\s+students|students?\s+at.risk'
+            . '|who\s+(is|are)\s+at.risk|completion\s+rate/u';
+        if (preg_match($teacherOnly, $q)) {
+            return true;
+        }
+
+        // Notas propias: fuera de alcance en esta versión (el alumno las tiene en
+        // el libro de calificaciones del curso).
+        if (self::asks_own_grades($q)) {
+            return true;
+        }
+
+        // Co-ocurrencia grupo + métrica. OJO: "todos" NO cuenta como término de
+        // grupo — "la mejor forma de hacer todos los ejercicios" es contenido.
+        $group = '/\balumn|\bestudiant|compa[nñ]er|participant|matricul|\bclase\b|\bgrupo\b|\bgente\b/u';
+        $metric = '/complet|entregad|entrega\b|entregas\b|aprobad|suspend|\bnota|calificaci|puntuaci'
+            . '|intento|acced|acceso|progres|avance|participaci|asistenc|media\b|promedio|porcentaje'
+            . '|cu[aá]ntos|\bmejor\b|\bpeor\b|nombres?\b/u';
+        if (preg_match($group, $q) && preg_match($metric, $q)) {
+            return true;
+        }
+
+        // Co-ocurrencia agregado + participación: capta el engagement del grupo
+        // sin nombrar a los alumnos ("¿cuál es la actividad de las últimas
+        // semanas?", "¿cuánta gente ha accedido esta semana?").
+        // "hoy" queda FUERA a propósito: "¿qué actividad de la sección 2 tengo
+        // que hacer hoy?" es contenido. Los casos con "hoy" que sí son analítica
+        // ("¿quién se ha conectado hoy?", "¿cuántos accesos hoy?") ya los cazan
+        // los patrones inequívocos de arriba.
+        $aggregate = '/\bha\s+habido\b|\bse\s+han\b|\btotal(es)?\b|\bpromedio\b'
+            . '|[uú]ltim[ao]s?\s+(d[ií]as|semanas|meses)|\best[ae]\s+(mes|semana|a[nñ]o)\b/u';
+        $engagement = '/\bintentos?\b|\bentregas?\b|\baccesos?\b|conexion|conectad|\brespuestas\b'
+            . '|completad|participaci|\bactividad\s+de\b/u';
+        if (preg_match($aggregate, $q) && preg_match($engagement, $q)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * ¿Pregunta el usuario por SUS propias notas/progreso?
+     *
+     * Se niega igual en esta versión (decisión de alcance), pero con un mensaje
+     * distinto: redirigir al libro de calificaciones es más útil que decirle que
+     * el dato es del profesorado.
+     *
+     * @param string $q Consulta ya en minúsculas
+     * @return bool
+     */
+    public static function asks_own_grades(string $q): bool {
+        return (bool)preg_match(
+            '/\bmis\s+(notas|calificaciones|resultados|entregas|intentos)\b'
+            . '|\bmi\s+(nota|calificaci[oó]n|progreso|avance|media|expediente)\b'
+            . '|(qu[eé]|cu[aá]l).*\b(he|tengo)\b.*\b(sacado|nota|aprobad|suspend)'
+            . '|\bc[oó]mo\s+(voy|llevo)\b/u',
+            $q
+        );
+    }
+
+    /**
+     * Respuesta de negativa educada para un alumno que pregunta datos del
+     * profesorado. Misma forma de payload que las respuestas directas, para que
+     * la UI la pinte como una tarjeta normal.
+     *
+     * Se resuelve ANTES de tocar contexto, RAG o Anthropic: coste cero y ningún
+     * dato expuesto. El mensaje invita a reformular para que un falso positivo
+     * sobre una pregunta de contenido no deje al usuario en vía muerta.
+     *
+     * @param string $user_query
+     * @return array ['answer' => string(JSON), 'schema_data' => array, 'followup_questions' => array]
+     */
+    public static function teacher_only_refusal(string $user_query): array {
+        $payload = self::teacher_only_payload($user_query);
+
+        return [
+            'answer' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'schema_data' => $payload,
+            'followup_questions' => self::student_content_followups(),
+        ];
+    }
+
+    /**
+     * Payload (forma de respuesta directa) de la negativa por rol. Separado de
+     * teacher_only_refusal() porque rag_retriever lo devuelve tal cual desde la
+     * ruta directa, donde el JSON y los follow-ups los arma el llamador.
+     *
+     * @param string $user_query
+     * @return array
+     */
+    public static function teacher_only_payload(string $user_query): array {
+        $q = mb_strtolower(trim($user_query), 'UTF-8');
+
+        if (self::asks_own_grades($q)) {
+            $title = 'No puedo mostrar calificaciones';
+            $content = 'No puedo mostrar calificaciones desde el chat. Tus notas están en '
+                . 'el libro de calificaciones del curso. Si tu pregunta era sobre el '
+                . 'contenido, vuelve a preguntármela mencionando el material o la sección.';
+        } else {
+            $title = 'Solo disponible para el profesorado';
+            $content = 'Esa información solo está disponible para el profesorado del curso. '
+                . 'Si tu pregunta era sobre el contenido, vuelve a preguntármela mencionando '
+                . 'el material o la sección.';
+        }
+
+        return [
+            'type' => 'text',
+            'title' => $title,
+            'content' => $content,
+        ];
+    }
+
+    /**
+     * Sugerencias de contenido para el alumno (nunca analítica).
+     *
+     * @return array
+     */
+    public static function student_content_followups(): array {
+        return [
+            '¿De qué trata este curso?',
+            '¿Qué materiales hay en el curso?',
+            '¿Puedes resumirme una sección concreta?',
+        ];
+    }
+
+    /**
+     * Quita de una lista de preguntas sugeridas las que pedirían datos del
+     * profesorado. Se aplica a las sugerencias del alumno, vengan del catálogo
+     * determinista o del modelo rápido.
+     *
+     * @param array $questions
+     * @return array
+     */
+    public static function filter_student_followups(array $questions): array {
+        $clean = [];
+        foreach ($questions as $question) {
+            if (!is_string($question) || trim($question) === '') {
+                continue;
+            }
+            if (self::is_teacher_only_query($question)) {
+                continue;
+            }
+            $clean[] = $question;
+        }
+        if (empty($clean)) {
+            return self::student_content_followups();
+        }
+        return array_slice($clean, 0, 3);
     }
 
     /**
@@ -856,6 +1115,13 @@ class chat_pipeline {
 
         $answer = json_encode($direct_course_answer, JSON_UNESCAPED_UNICODE);
         $followup_questions = self::build_direct_followups($direct_course_answer, $qnorm, $isContentSpecificQuery);
+
+        // El catálogo determinista propone cosas como "¿cuántos alumnos han
+        // entregado esta tarea?": a un alumno no se le ofrece lo que se le va a
+        // negar.
+        if (!self::user_can_view_analytics($courseid)) {
+            $followup_questions = self::filter_student_followups($followup_questions);
+        }
 
         return [
             'answer' => $answer,

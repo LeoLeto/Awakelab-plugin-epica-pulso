@@ -367,10 +367,15 @@ class data_retriever {
      *
      * @param int $courseid El ID del curso a analizar (obligatorio).
      * @param int $daysback Cuántos días atrás obtener los logs de acceso (por defecto 7).
+     * @param bool $includeanalytics false = modo alumno: NO se ejecutan las
+     *                               consultas de analítica ni los recuentos de
+     *                               personas, y el payload sale con la analítica
+     *                               vacía. No es un filtro posterior: el dato ni
+     *                               se lee de la BD.
      * @return array Array asociativo con el contexto unificado del curso en formato JSON-listo.
      * @throws \moodle_exception Si hay error en la base de datos.
      */
-    public function get_unified_course_context(int $courseid, int $daysback = 7): array {
+    public function get_unified_course_context(int $courseid, int $daysback = 7, bool $includeanalytics = true): array {
         global $DB;
 
         // Obtener información básica del curso
@@ -384,28 +389,35 @@ class data_retriever {
             ];
         }
 
-        // Obtener todos los datos usando los métodos anteriores
-        $completions = $this->get_course_completions($courseid);
-        $grades = $this->get_grades_and_quizzes($courseid);
-        $modules = $this->get_module_completions($courseid);
-
-        // Intentar obtener logs de acceso si el módulo access_log_reader está disponible
+        // Obtener todos los datos usando los métodos anteriores. En modo alumno
+        // se saltan: privacidad y, de paso, cuatro consultas pesadas menos.
+        $completions = ['data' => [], 'count' => 0, 'truncated' => false];
+        $grades = $completions;
+        $modules = $completions;
         $logs = [];
-        try {
-            $access_reader = new access_log_reader();
-            $logs_json = $access_reader->get_recent_access_logs_json($courseid, $daysback);
-            // Parsear el JSON devuelto en array
-            if (is_string($logs_json)) {
-                $logs = json_decode($logs_json, true) ?: [];
-            } else {
-                $logs = $logs_json;
+
+        if ($includeanalytics) {
+            $completions = $this->get_course_completions($courseid);
+            $grades = $this->get_grades_and_quizzes($courseid);
+            $modules = $this->get_module_completions($courseid);
+
+            // Intentar obtener logs de acceso si el módulo access_log_reader está disponible
+            try {
+                $access_reader = new access_log_reader();
+                $logs_json = $access_reader->get_recent_access_logs_json($courseid, $daysback);
+                // Parsear el JSON devuelto en array
+                if (is_string($logs_json)) {
+                    $logs = json_decode($logs_json, true) ?: [];
+                } else {
+                    $logs = $logs_json;
+                }
+            } catch (\Exception $e) {
+                // Si no está disponible, continuar sin logs
+                $logs = [
+                    'status' => 'unavailable',
+                    'message' => 'Access logs not available'
+                ];
             }
-        } catch (\Exception $e) {
-            // Si no está disponible, continuar sin logs
-            $logs = [
-                'status' => 'unavailable',
-                'message' => 'Access logs not available'
-            ];
         }
 
         // Construir el payload unificado
@@ -432,17 +444,22 @@ class data_retriever {
                 'grades_and_quizzes_truncated' => !empty($grades['truncated']),
                 'module_completions' => $modules['data'] ?? [],
                 'module_completions_count' => $modules['count'] ?? 0,
-                'module_completions_truncated' => !empty($modules['truncated'])
+                'module_completions_truncated' => !empty($modules['truncated']),
+                'analytics_available' => $includeanalytics
             ],
             'access_logs' => $logs,
             'metadata' => [
-                'total_enrolled_users' => $this->count_enrolled_users($courseid),
-                'total_students' => $this->count_students($courseid),
                 'days_back_for_logs' => $daysback,
                 'data_retriever_version' => '1.0.0',
                 'moodle_version' => $GLOBALS['CFG']->version ?? 'unknown'
             ]
         ];
+
+        // Recuentos de personas: dato de gestión, solo con analítica.
+        if ($includeanalytics) {
+            $payload['metadata']['total_enrolled_users'] = $this->count_enrolled_users($courseid);
+            $payload['metadata']['total_students'] = $this->count_students($courseid);
+        }
 
         return $payload;
     }

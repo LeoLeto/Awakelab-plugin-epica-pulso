@@ -530,21 +530,124 @@ PROMPT;
      *
      * @param array  $course_context
      * @param string $rag_context
+     * @param bool   $isteacher false = modo alumno: prompt base distinto (solo
+     *                          contenido) y sin bloque de analítica. El bloque
+     *                          base del profesorado NO cambia ni un byte, así que
+     *                          su prefijo cacheado sigue siendo el mismo.
      * @return array Bloques de contenido tal cual los espera el campo `system`.
      */
-    public static function generate_system_blocks($course_context = [], string $rag_context = ''): array {
+    public static function generate_system_blocks($course_context = [], string $rag_context = '', bool $isteacher = true): array {
+        // Dos prefijos estables distintos (profesor / alumno), cada uno con su
+        // propia entrada de caché. OJO: el prompt de alumno es mucho más corto y
+        // puede quedar por debajo del mínimo cacheable (1024 tokens en
+        // claude-sonnet-5); si no llega, el caché simplemente no se crea, sin
+        // error y sin coste extra.
+        $base = $isteacher ? self::generate_system_prompt() : self::generate_student_system_prompt();
+
         return [
             [
                 'type' => 'text',
-                'text' => self::generate_system_prompt(),
+                'text' => $base,
                 // Breakpoint: todo lo anterior (aquí, solo este bloque) se cachea.
                 'cache_control' => ['type' => 'ephemeral'],
             ],
             [
                 'type' => 'text',
-                'text' => self::build_dynamic_prompt_section($course_context, $rag_context),
+                'text' => self::build_dynamic_prompt_section($course_context, $rag_context, $isteacher),
             ],
         ];
+    }
+
+    /**
+     * Prompt base del MODO ALUMNO: asistente de contenido del curso, sin ningún
+     * dato de analítica ni de otros alumnos.
+     *
+     * El bloqueo real de los datos está en servidor (chat_pipeline y
+     * data_retriever ni los leen de la BD); este prompt existe para que el tono y
+     * las capacidades que el modelo ofrece sean coherentes con lo que el alumno
+     * puede pedir — con el prompt de profesor, el modelo ofrecería en el saludo
+     * analítica que después se le niega.
+     *
+     * @return string
+     */
+    public static function generate_student_system_prompt(): string {
+        return <<<'PROMPT'
+# PULSO AI — MODO ALUMNO (CONTENIDO DEL CURSO)
+
+Eres Pulso AI, el asistente de estudio de un curso de Moodle. Hablas con un
+ALUMNO del curso. Tu trabajo es ayudarle a entender el CONTENIDO: explicar,
+resumir, aclarar dudas y orientarle por los materiales y la estructura del curso.
+
+## LO QUE SÍ PUEDES HACER
+
+- Explicar y resumir el contenido de los materiales del curso (PDFs, páginas,
+  libros, presentaciones, paquetes SCORM) usando los fragmentos que recibas en la
+  sección de CONTENIDO RELEVANTE DEL CURSO (RAG).
+- Describir de qué trata el curso, qué secciones tiene y qué actividades y
+  recursos hay en cada una.
+- Dar información pública de una actividad: nombre, descripción, instrucciones,
+  fechas de entrega, número de preguntas de un cuestionario, intentos permitidos.
+- Aclarar dudas de estudio sobre ese contenido, con ejemplos y explicaciones paso
+  a paso, y sugerir por dónde seguir estudiando.
+
+## LO QUE NO PUEDES HACER — REGLA ABSOLUTA
+
+NO tienes acceso a datos de rendimiento, y no debes darlos ni estimarlos:
+
+- Notas, medias, porcentajes de aprobados, intentos o entregas — de nadie, ni de
+  otros alumnos ni del propio usuario.
+- Quién ha completado, entregado, aprobado o suspendido algo.
+- Accesos, actividad, tiempo de conexión, alumnos en riesgo o inactivos.
+- Rankings, comparativas entre alumnos, listados de matriculados o número de
+  alumnos del curso.
+- Cualquier nombre de otro alumno.
+
+Si te piden algo de esa lista, responde con amabilidad que esa información solo
+está disponible para el profesorado del curso, e invítale a reformular la
+pregunta mencionando el material o la sección si en realidad iba de contenido. Si
+te pregunta por SUS propias notas, dile que puede consultarlas en el libro de
+calificaciones del curso. NUNCA inventes cifras, nombres ni estimaciones, y no
+expliques qué datos tendrías si tuvieras otro rol.
+
+## CÓMO RESPONDER
+
+1. Basa las explicaciones SOLO en los fragmentos de contenido recuperados. Si el
+   fragmento está incompleto, dilo y cita lo que sí hay.
+2. Si no hay contenido recuperado para la pregunta, dilo con claridad y sugiere
+   qué material o sección mencionar para que puedas buscarlo.
+3. NO inventes contenido, ejercicios ni soluciones que no aparezcan en el texto.
+4. Tono cercano y didáctico, en el idioma de la pregunta (español por defecto).
+   Máximo 400 palabras.
+5. En 'recommendations' da consejos de ESTUDIO para el alumno (qué repasar, qué
+   material leer después), nunca acciones de profesor.
+
+## JSON RESPONSE SCHEMA
+
+Todas tus respuestas DEBEN ser JSON con esta estructura:
+
+```json
+{
+  "type": "table|list|text",
+  "title": "Título descriptivo",
+  "summary": "Resumen en 1-2 líneas",
+  "data": [],
+  "insights": ["Idea clave 1", "Idea clave 2"],
+  "recommendations": ["Consejo de estudio 1", "Consejo de estudio 2"],
+  "language": "es|en",
+  "confidence": 0.95
+}
+```
+
+- **type: "text"** → explicación o resumen narrativo. 'data' es un array de
+  objetos {paragraph: "..."}.
+- **type: "list"** → enumeraciones (secciones, materiales, pasos). 'data' es un
+  array de objetos con propiedades relevantes.
+- **type: "table"** → datos comparables del contenido (por ejemplo, actividad y
+  fecha de entrega). 2-5 filas.
+
+'data' es SIEMPRE un array PLANO de objetos. 'insights' son ideas clave del
+contenido, no observaciones sobre alumnos.
+PROMPT;
     }
 
     /**
@@ -557,9 +660,9 @@ PROMPT;
      * @param string $rag_context    Formatted string from chat_pipeline::get_rag()['context']
      * @return string
      */
-    public static function generate_prompt_with_context_and_rag($course_context = [], string $rag_context = '') {
-        return self::generate_system_prompt()
-            . self::build_dynamic_prompt_section($course_context, $rag_context);
+    public static function generate_prompt_with_context_and_rag($course_context = [], string $rag_context = '', bool $isteacher = true) {
+        $base = $isteacher ? self::generate_system_prompt() : self::generate_student_system_prompt();
+        return $base . self::build_dynamic_prompt_section($course_context, $rag_context, $isteacher);
     }
 
     /**
@@ -569,9 +672,12 @@ PROMPT;
      *
      * @param array  $course_context
      * @param string $rag_context
+     * @param bool   $isteacher false = modo alumno: no se inyecta el JSON de
+     *                          analítica (que además llega vacío), solo los datos
+     *                          públicos del curso.
      * @return string
      */
-    private static function build_dynamic_prompt_section($course_context = [], string $rag_context = ''): string {
+    private static function build_dynamic_prompt_section($course_context = [], string $rag_context = '', bool $isteacher = true): string {
         $base_prompt = '';
 
         if (!empty($rag_context)) {
@@ -605,6 +711,25 @@ PROMPT;
 
         if (empty($course_context)) {
             return $base_prompt . $format_reinforcement;
+        }
+
+        // Modo alumno: solo los datos PÚBLICOS del curso (nombre, resumen, fecha
+        // de inicio). La analítica llega vacía de chat_pipeline, pero tampoco se
+        // inyecta el bloque: menos tokens y ninguna pista de que existan datos
+        // que el modelo pudiera intentar completar.
+        if (!$isteacher) {
+            $public_context = [
+                'course_context' => $course_context['course_context'] ?? [],
+                'timestamp_generated' => $course_context['timestamp_generated'] ?? '',
+            ];
+            $student_section  = "\n\n## DATOS DEL CURSO (JSON)\n\n";
+            $student_section .= "```json\n";
+            $student_section .= json_encode($public_context, JSON_UNESCAPED_UNICODE);
+            $student_section .= "\n```\n";
+            $student_section .= "\nNo tienes ningún dato de notas, entregas, accesos ni de otros alumnos: "
+                . "si te los piden, aplica la regla absoluta del modo alumno.\n";
+
+            return $base_prompt . $student_section . $format_reinforcement;
         }
 
         // Append analytics JSON context.

@@ -16,8 +16,17 @@ defined('MOODLE_INTERNAL') || die();
 
 /**
  * Renderizar chat simple
+ *
+ * @param int $courseid
+ * @param object $context Contexto del curso
+ * @param bool $isteacher ¿Tiene 'block/pulso:viewanalytics'? Con false se
+ *                        renderiza la versión de ALUMNO: sin tarjetas de
+ *                        analítica, saludo y capacidades de contenido. Es solo
+ *                        presentación — el bloqueo de datos está en servidor
+ *                        (chat_pipeline / data_retriever / rag_retriever).
+ * @return string
  */
-function render_chat_simple($courseid, $context) {
+function render_chat_simple($courseid, $context, $isteacher = true) {
     global $OUTPUT, $USER, $CFG;
     
     // Construir URL base correcta para AJAX
@@ -34,6 +43,9 @@ function render_chat_simple($courseid, $context) {
     // Token anti-CSRF de la sesión: los endpoints lo exigen con require_sesskey().
     $pulso_sesskey = sesskey();
 
+    // Rol para la UI (capacidades y sugerencias). No es un control de acceso.
+    $pulso_isteacher = !empty($isteacher) ? 'true' : 'false';
+
     // Inyectar variables globales JavaScript
     $js_init = <<<JSINIT
     <script>
@@ -42,6 +54,8 @@ function render_chat_simple($courseid, $context) {
         window.apiUrl = '{$api_url}';
         window.streamApiUrl = '{$stream_url}';
         window.pulsoSesskey = '{$pulso_sesskey}';
+        // Solo para adaptar la UI: el servidor decide qué datos se devuelven.
+        window.pulsoIsTeacher = {$pulso_isteacher};
 
         // T2.5.3: Recuperar historial de sessionStorage (persiste entre recargas)
         try {
@@ -1430,7 +1444,7 @@ function render_chat_simple($courseid, $context) {
             <div class="pulso-home" id="pulso-home">
                 <div class="pulso-home-hello">
                     <div class="pulso-home-avatar" aria-hidden="true"></div>
-                    <h5>¡Hola, %%PULSO_FIRSTNAME%%! ¿Qué quieres saber de tu curso?</h5>
+                    <h5>%%PULSO_GREETING%%</h5>
                 </div>
 
                 <button type="button" class="pulso-home-help-btn" onclick="showCapabilities()" aria-label="Descubre qué puede hacer Pulso">
@@ -1438,6 +1452,7 @@ function render_chat_simple($courseid, $context) {
                     <span>¿Qué puede hacer Pulso?<span class="pulso-home-help-sub">Descúbrelo en 10 segundos</span></span>
                 </button>
 
+                <!--PULSO_TEACHER_ONLY_START-->
                 <div class="pulso-home-section">
                     <div class="pulso-home-section-head">
                         <span class="pulso-home-section-title">Analítica del curso</span>
@@ -1491,10 +1506,12 @@ function render_chat_simple($courseid, $context) {
                         </button>
                     </div>
                 </div>
+                <!--PULSO_TEACHER_ONLY_END-->
 
                 <div class="pulso-home-section course">
                     <div class="pulso-home-section-head">
                         <span class="pulso-home-section-title">Contenido del curso</span>
+                        <!--PULSO_STUDENT_ONLY_START--><span class="pulso-home-context-chip">%%PULSO_COURSENAME%%</span><!--PULSO_STUDENT_ONLY_END-->
                     </div>
                     <div class="pulso-home-grid">
                         <button class="pulso-action-card" onclick="askPreset('¿De qué trata este curso?')">
@@ -1522,6 +1539,23 @@ function render_chat_simple($courseid, $context) {
                             <span class="pulso-action-label">Tareas del curso</span>
                             <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                         </button>
+                        <!--PULSO_STUDENT_ONLY_START-->
+                        <button class="pulso-action-card" onclick="askPreset('¿Qué materiales y documentos hay disponibles en el curso para estudiar?')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            <span class="pulso-action-label">Materiales de estudio</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('Explícame de qué trata la sección 1 del curso y qué contenidos incluye.')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                            <span class="pulso-action-label">Explícame un tema</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" onclick="askPreset('Resume los conceptos principales del material del curso para repasar.')">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11H5a2 2 0 0 0-2 2v7h18v-7a2 2 0 0 0-2-2h-4"/><path d="M9 11V5a3 3 0 0 1 6 0v6"/></svg>
+                            <span class="pulso-action-label">Repaso rápido</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <!--PULSO_STUDENT_ONLY_END-->
                     </div>
                 </div>
             </div>
@@ -2745,24 +2779,55 @@ function render_chat_simple($courseid, $context) {
         // formateada como lista, para que un recién llegado lo entienda rápido.
         function showCapabilities() {
             setHomeVisible(false);
-            const html = ''
-                + '<div class="pulso-rich-answer">'
-                + '<p>Soy <strong>Pulso AI</strong>, tu asistente del curso. Esto es lo que puedo hacer por ti:</p>'
-                + '<ul class="pulso-rich-bullets">'
-                + '<li>📊 <strong>Analítica del curso:</strong> tasa de completitud, notas medias, ranking de mejores alumnos y nivel de participación.</li>'
-                + '<li>⚠️ <strong>Alerta temprana:</strong> detecto alumnos en riesgo o que llevan días sin acceder.</li>'
-                + '<li>📚 <strong>Contenido del curso:</strong> resumen, secciones, actividades, recursos y cuestionarios.</li>'
-                + '<li>📄 <strong>Documentos:</strong> leo y resumo PDFs y materiales, y respondo sobre lo que dicen.</li>'
-                + '<li>🎤 <strong>Voz o texto:</strong> pregúntame en lenguaje natural escribiendo o usando el micrófono.</li>'
-                + '</ul>'
-                + '<p>👉 Toca una tarjeta de la pantalla de inicio o prueba con una de estas preguntas:</p>'
-                + '</div>';
+
+            // Dos versiones: el alumno no puede pedir analítica, así que no se le
+            // ofrece (se le rechazaría en servidor).
+            const isTeacher = window.pulsoIsTeacher !== false;
+            let html;
+            let examples;
+
+            if (isTeacher) {
+                html = ''
+                    + '<div class="pulso-rich-answer">'
+                    + '<p>Soy <strong>Pulso AI</strong>, tu asistente del curso. Esto es lo que puedo hacer por ti:</p>'
+                    + '<ul class="pulso-rich-bullets">'
+                    + '<li>📊 <strong>Analítica del curso:</strong> tasa de completitud, notas medias, ranking de mejores alumnos y nivel de participación.</li>'
+                    + '<li>⚠️ <strong>Alerta temprana:</strong> detecto alumnos en riesgo o que llevan días sin acceder.</li>'
+                    + '<li>📚 <strong>Contenido del curso:</strong> resumen, secciones, actividades, recursos y cuestionarios.</li>'
+                    + '<li>📄 <strong>Documentos:</strong> leo y resumo PDFs y materiales, y respondo sobre lo que dicen.</li>'
+                    + '<li>🎤 <strong>Voz o texto:</strong> pregúntame en lenguaje natural escribiendo o usando el micrófono.</li>'
+                    + '</ul>'
+                    + '<p>👉 Toca una tarjeta de la pantalla de inicio o prueba con una de estas preguntas:</p>'
+                    + '</div>';
+                examples = [
+                    '¿Cuál es la tasa de completitud del curso?',
+                    '¿Qué estudiantes están en riesgo?',
+                    '¿De qué trata este curso?'
+                ];
+            } else {
+                html = ''
+                    + '<div class="pulso-rich-answer">'
+                    + '<p>Soy <strong>Pulso AI</strong>, tu asistente de estudio. Esto es lo que puedo hacer por ti:</p>'
+                    + '<ul class="pulso-rich-bullets">'
+                    + '<li>📚 <strong>Contenido del curso:</strong> te cuento de qué trata, qué secciones tiene y qué materiales hay en cada una.</li>'
+                    + '<li>📄 <strong>Resúmenes y explicaciones:</strong> leo los PDFs y materiales del curso y te los resumo o te los explico paso a paso.</li>'
+                    + '<li>❓ <strong>Dudas de estudio:</strong> pregúntame sobre lo que dice el material y te lo aclaro con ejemplos.</li>'
+                    + '<li>🗂️ <strong>Actividades:</strong> te digo qué cuestionarios y tareas hay, sus instrucciones y sus fechas.</li>'
+                    + '<li>🎤 <strong>Voz o texto:</strong> pregúntame en lenguaje natural escribiendo o usando el micrófono.</li>'
+                    + '</ul>'
+                    + '<p>Las notas y los datos de la clase los gestiona el profesorado, así que eso no te lo puedo dar. '
+                    + 'Tus propias calificaciones están en el libro de calificaciones del curso.</p>'
+                    + '<p>👉 Toca una tarjeta de la pantalla de inicio o prueba con una de estas preguntas:</p>'
+                    + '</div>';
+                examples = [
+                    '¿De qué trata este curso?',
+                    '¿Qué materiales hay en el curso?',
+                    'Explícame de qué trata la sección 1 del curso.'
+                ];
+            }
+
             addMessage(html, 'ai', true);
-            showFollowupQuestions([
-                '¿Cuál es la tasa de completitud del curso?',
-                '¿Qué estudiantes están en riesgo?',
-                '¿De qué trata este curso?'
-            ]);
+            showFollowupQuestions(examples);
         }
 
         // La pantalla de inicio (saludo + tarjetas) solo se muestra sin conversación.
@@ -3571,11 +3636,36 @@ function render_chat_simple($courseid, $context) {
     </script>
     HTML;
     
+    // Modo alumno / modo profesor: se ELIMINAN del HTML los bloques del otro rol
+    // en vez de ocultarlos con CSS, para que las tarjetas de analítica no lleguen
+    // siquiera al navegador del alumno.
+    $strip = $isteacher ? 'STUDENT' : 'TEACHER';
+    $html = preg_replace(
+        '/<!--PULSO_' . $strip . '_ONLY_START-->.*?<!--PULSO_' . $strip . '_ONLY_END-->/s',
+        '',
+        $html
+    );
+    // Quitar los marcadores del rol que sí se renderiza.
+    $html = preg_replace('/<!--PULSO_(TEACHER|STUDENT)_ONLY_(START|END)-->/', '', $html);
+
     // Inyectar versión, nombre y curso (el bloque HTML es un nowdoc sin interpolación).
     $html = str_replace('%%PULSO_VERSION%%', s($pulso_release), $html);
 
+    // El nombre ya solo se usa dentro del saludo (%%PULSO_GREETING%%).
     $firstname = trim((string)($USER->firstname ?? ''));
-    $html = str_replace('%%PULSO_FIRSTNAME%%', s($firstname !== '' ? $firstname : 'profe'), $html);
+
+    // El saludo del profesor pregunta por el curso; el del alumno, por el
+    // contenido: el anterior ofrecía notas y alumnos en riesgo, que ahora se le
+    // niegan.
+    if ($isteacher) {
+        $greeting = '¡Hola, ' . ($firstname !== '' ? $firstname : 'profe')
+            . '! ¿Qué quieres saber de tu curso?';
+    } else {
+        $greeting = ($firstname !== '' ? '¡Hola, ' . $firstname . '! ' : '¡Hola! ')
+            . 'Pregúntame sobre el contenido del curso: pídeme un resumen, '
+            . 'una explicación o dudas sobre los materiales.';
+    }
+    $html = str_replace('%%PULSO_GREETING%%', s($greeting), $html);
 
     try {
         $coursename = format_string(get_course($courseid)->fullname);

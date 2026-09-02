@@ -789,6 +789,37 @@ class rag_retriever {
         $asksAboutContent = $isSummaryIntent || (bool)preg_match('/de\s+qu[eé]|qu[eé]\s+tipo|sobre\s+qu[eé]|qu[eé]\s+temas?|de\s+qu[eé]\s+va/u', $q);
         $asksSpecific = $asksQuestionCount || $asksCompletionData || $asksAttemptData || $asksGradeData;
 
+        // Modo alumno: esta rama responde SIN pasar por el LLM y con datos leídos
+        // de la BD, así que el permiso hay que comprobarlo aquí, donde se
+        // construye el dato, no solo en el gate del pipeline.
+        if (!chat_pipeline::user_can_view_analytics($courseid)) {
+            if ($asksCompletionData || $asksGradeData) {
+                return chat_pipeline::teacher_only_payload($query);
+            }
+            if ($asksAttemptData) {
+                // "¿cuántos intentos permite?" sí es configuración pública; el
+                // recuento de alumnos que lo han intentado, no.
+                $contentLines[] = 'Cuestionario: ' . $quizName;
+                if ($attempts !== '') {
+                    $contentLines[] = 'Intentos permitidos: ' . ($attempts === '0' ? 'ilimitados' : $attempts);
+                } else {
+                    $contentLines[] = 'Intentos permitidos: sin limite configurado.';
+                }
+                return [
+                    'type' => 'text',
+                    'title' => 'Cuestionario: ' . $quizName,
+                    'summary' => 'He localizado el cuestionario dentro del curso.',
+                    'content' => implode("\n", $contentLines)
+                ];
+            }
+            // Y en la vista general, ni una cifra del grupo: a 0/null para que
+            // las líneas correspondientes no se impriman.
+            $totalAttempts = 0;
+            $uniqueUsers = 0;
+            $completedUsers = 0;
+            $avgGrade = null;
+        }
+
         if ($asksQuestionCount) {
             // Respuesta directa: número de preguntas.
             $contentLines[] = 'Cuestionario: ' . $quizName;
@@ -1044,6 +1075,18 @@ class rag_retriever {
 
         $contentLines = [];
 
+        // Modo alumno: entregas, calificadas y completitud son dato del
+        // profesorado (misma regla que en build_quiz_answer).
+        if (!chat_pipeline::user_can_view_analytics($courseid)) {
+            if ($asksCompletionData || $asksSubmissionData || $asksGradeData) {
+                return chat_pipeline::teacher_only_payload($query);
+            }
+            $submittedCount = 0;
+            $gradedCount = 0;
+            $completedUsers = 0;
+            $avgGrade = null;
+        }
+
         if ($asksCompletionData || $asksSubmissionData) {
             $contentLines[] = 'Tarea: ' . $assignName;
             if ($submittedCount > 0) {
@@ -1163,6 +1206,12 @@ class rag_retriever {
             }
         } catch (\Throwable $e) {}
 
+        // Modo alumno: nada de recuentos de participación del grupo.
+        $canviewanalytics = chat_pipeline::user_can_view_analytics($courseid);
+        if (!$canviewanalytics) {
+            $completedUsers = 0;
+        }
+
         $contentLines = [];
         $contentLines[] = $typeLabel . ': ' . $activityName;
 
@@ -1231,9 +1280,12 @@ class rag_retriever {
         } else if ($modType === 'choice') {
             try {
                 $optionCount = (int)$DB->count_records('choice_options', ['choiceid' => $activity->id]);
-                $answerCount = (int)$DB->count_records('choice_answers', ['choiceid' => $activity->id]);
                 $contentLines[] = 'Opciones: ' . $optionCount;
-                $contentLines[] = 'Respuestas recibidas: ' . $answerCount;
+                if ($canviewanalytics) {
+                    // Cuántos han respondido la encuesta es dato del profesorado.
+                    $answerCount = (int)$DB->count_records('choice_answers', ['choiceid' => $activity->id]);
+                    $contentLines[] = 'Respuestas recibidas: ' . $answerCount;
+                }
             } catch (\Throwable $e) {}
         }
 

@@ -624,16 +624,22 @@ class anthropic_connector {
      * @param string $user_query Pregunta original del usuario
      * @param string $ai_response Respuesta anterior de la IA
      * @param array $course_context Contexto del curso
+     * @param bool $isteacher false = modo alumno: solo sugerencias de contenido.
+     *                        El llamador filtra además el resultado con
+     *                        chat_pipeline::filter_student_followups(), porque el
+     *                        modelo no siempre respeta la restricción.
      * @return array Array con 2-3 preguntas sugeridas
      */
     public function generate_followup_questions(
         string $user_query,
         string $ai_response,
-        array $course_context = []
+        array $course_context = [],
+        bool $isteacher = true
     ): array {
         try {
             // System prompt para generar preguntas de seguimiento
-            $system_prompt = <<<'PROMPT'
+            if ($isteacher) {
+                $system_prompt = <<<'PROMPT'
 Eres un asistente educativo inteligente. Basándote en la pregunta del usuario y la respuesta anterior,
 genera exactamente 2-3 preguntas de seguimiento naturales y relevantes que el profesor podría hacer a continuación.
 
@@ -652,6 +658,33 @@ Retorna SOLO un JSON válido sin texto adicional:
     ]
 }
 PROMPT;
+            } else {
+                $system_prompt = <<<'PROMPT'
+Eres un asistente educativo inteligente. Hablas con un ALUMNO del curso.
+Basándote en la pregunta del usuario y la respuesta anterior, genera exactamente 2-3 preguntas de
+seguimiento naturales que el alumno podría hacer a continuación SOBRE EL CONTENIDO del curso
+(resúmenes, explicaciones, materiales, secciones, actividades).
+
+Las preguntas deben:
+- Ser breves (máx 80 caracteres)
+- Explorar diferentes aspectos del contenido
+- Ser fáciles de entender
+- Estar en el mismo idioma que la pregunta original
+
+PROHIBIDO sugerir preguntas sobre notas, calificaciones, medias, entregas, intentos, accesos,
+alumnos en riesgo, rankings, número de alumnos o cualquier dato de otros estudiantes: el alumno
+no tiene permiso para verlos y esas sugerencias se le rechazarían.
+
+Retorna SOLO un JSON válido sin texto adicional:
+{
+    "followup_questions": [
+        "¿Pregunta 1?",
+        "¿Pregunta 2?",
+        "¿Pregunta 3?"
+    ]
+}
+PROMPT;
+            }
 
             // Preparar el mensaje del usuario para generar preguntas (truncar
             // respuesta si es muy larga). mb_substr, no substr: cortar bytes

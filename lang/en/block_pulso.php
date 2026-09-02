@@ -57,6 +57,12 @@ $string['plugin_disabled_course'] = 'Pulso AI is not enabled for this course.';
 
 // === T2.6.2: Data access permission controls ===
 $string['pulso:viewanalytics'] = 'View Pulso analytics data';
+$string['pulso:usechat'] = 'Use the Pulso chat for course content questions';
+
+// === Student mode (content-only chat) ===
+$string['student_analytics_denied'] = 'That information is only available to the teaching staff of this course. If your question was about the course content, ask it again mentioning the material or the section.';
+$string['student_own_grades_denied'] = 'I cannot show grades from the chat. You can check your own grades in the course gradebook. If your question was about the course content, ask it again mentioning the material or the section.';
+$string['student_analytics_denied_title'] = 'Only available to teaching staff';
 $string['dataaccess_heading'] = 'Data Access Controls';
 $string['dataaccess_heading_desc'] = 'Choose which data categories are available for AI analysis. Disabling a category will prevent it from being sent to the AI (Anthropic).';
 $string['data_completion'] = 'Completion data';

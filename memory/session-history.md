@@ -1,5 +1,47 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-02 — Modo alumno: el chat se abre a estudiantes solo para contenido (v1.10.0)
+
+Antes de esto, un alumno no podía usar el plugin en absoluto (`block_pulso.php`
+exigía `viewanalytics`). Ahora entra con la capability nueva `block/pulso:usechat`
+y tiene un chat de CONTENIDO, con la analítica cerrada en servidor. Las reglas
+resultantes (dos capabilities, tres capas, prompt de alumno, qué queda fuera de
+alcance) están en `CLAUDE.md` → "Modo alumno"; aquí solo lo que no se deduce del
+código:
+
+**Decisiones de producto tomadas con Marcos**:
+- El alumno **no ve nada del grupo**, y tampoco sus propios datos individuales.
+  Se descartó a propósito la opción "solo mis notas": la regla "nada del grupo" es
+  coherente y más fácil de defender en reunión que una lista de excepciones.
+  `total_students` / `total_enrolled_users` caen con ella.
+- Ante la duda, **negar**: privacidad > cobertura. Para que un falso positivo no
+  deje al usuario en vía muerta delante de un cliente, el mensaje de negativa
+  **invita a reformular** mencionando el material o la sección. Si pregunta por sus
+  propias notas, el mensaje cambia y le redirige al libro de calificaciones.
+
+**Cómo se validó** (no hay Moodle ni PHP local; PHP 8.3 portátil en el scratchpad,
+con `mbstring` activado a mano vía `php.ini` — sin él, `mb_strtolower` no existe y
+nada de esto se puede probar):
+- Detector contra las **56 preguntas reales** de `Pulso_AI_matriz_evaluacion.xlsx`
+  (parseado el xlsx con SimpleXML, sin librerías): 24 negadas, y son exactamente
+  las 24 de analítica; las 32 de contenido pasan.
+- **33 variantes de alumno** escritas a mano (15 que deben negarse, 18 de contenido
+  con palabras trampa como "la nota al pie", "nota de crédito", "media aritmética",
+  "promedio de ventas del ejercicio 4"): 15/15 y 18/18.
+- **16 casos frontera** que cazaron 4 fallos reales antes de dar el cambio por
+  bueno: "cuántas respuestas tiene la pregunta 3" y "cuántos intentos me quedan" se
+  negaban sin motivo; "cuántos han visto el vídeo", "compárame con el resto de la
+  clase" y "show me the students at risk" se colaban.
+- Render por rol: 17 comprobaciones sobre el HTML generado (el alumno recibe 8
+  tarjetas, ninguna de analítica; el profesor 14 y su saludo intacto).
+- Prompt: 19 comprobaciones (sin `grades_and_quizzes`/`course_completions`/
+  `access_logs`/`total_students` en el prompt del alumno) y **md5 del prompt base
+  del profesor idéntico al de HEAD** (normalizando CRLF, que `git show` convierte a
+  LF: si no se normaliza, los hashes parecen distintos sin serlo).
+
+**Pendiente de verificación real**: probarlo en el Moodle de Marcos con un usuario
+ESTUDIANTE y otro PROFESOR. Las pruebas de arriba son de lógica, no de integración.
+
 ## 2026-07-16/17 — Migración a Anthropic + estabilización + rediseño UI (v1.1.10 → v1.4.1)
 
 **Migración chat a Anthropic (v1.2.0)**: `openai_connector.php` → `anthropic_connector.php`

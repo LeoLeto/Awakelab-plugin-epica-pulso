@@ -158,7 +158,65 @@ que los evitan son poco intuitivas, así que quedan escritas aquí:
   activo en un curso). El cliente manda el token desde `window.pulsoSesskey` en
   `buildChatFormData()`: cualquier endpoint nuevo debe recibirlo por ahí.
 
+## Modo alumno — dos capabilities, tres capas (v1.10.0)
+
+Desde v1.10.0 un ALUMNO puede usar el chat, pero solo para CONTENIDO. Las reglas:
+
+- **Dos capabilities, no una.** `block/pulso:usechat` (student + profesorado) es el
+  permiso mínimo: renderiza el bloque y admite la petición en los dos endpoints.
+  `block/pulso:viewanalytics` (solo editingteacher/teacher/manager) es lo que
+  habilita cualquier dato del grupo. Un endpoint nuevo pide `usechat` y calcula el
+  rol con `chat_pipeline::user_can_view_analytics()` (memoizada por petición); no
+  volver a comprobar `viewanalytics` a mano en sitios nuevos.
+- **La UI no es un control de acceso.** `render_chat_simple($courseid, $context,
+  $isteacher)` elimina del HTML el bloque del otro rol (marcadores
+  `<!--PULSO_TEACHER_ONLY_START/END-->` y `<!--PULSO_STUDENT_ONLY_*-->`, borrados con
+  `preg_replace`) y expone `window.pulsoIsTeacher` solo para adaptar textos. El
+  bloqueo real está en las tres capas de servidor de abajo. Si añades un bloque
+  para un rol, envuélvelo en esos marcadores; si añades un texto de capacidades en
+  el JS, recuerda que el del otro rol SÍ viaja en el fuente (es copy estático, sin
+  dato de curso: aceptado a propósito).
+- **Capa 1 — el gate.** `chat_pipeline::is_teacher_only_query()` corta la pregunta
+  en los dos endpoints ANTES de contexto, RAG y Anthropic (coste 0, dato 0) y
+  responde con `teacher_only_refusal()`. Detector deliberadamente conservador
+  (privacidad > cobertura), calibrado contra las 56 preguntas de la matriz + un
+  juego de variantes de alumno: patrones inequívocos que niegan solos, más
+  co-ocurrencia grupo+métrica y agregado+participación. `hoy` y `todos` quedaron
+  FUERA a propósito (falsos positivos de contenido); si tocas las regex, vuelve a
+  pasar las pruebas antes de dar por bueno el cambio.
+- **Capa 2 — el contexto.** `get_unified_course_context($courseid, $daysback,
+  $includeanalytics)` con `false` **no ejecuta** las consultas de analítica ni los
+  recuentos de personas: el dato no se lee de la BD, no es un filtro posterior. La
+  clave de la caché MUC incluye el rol (`$courseid` vs `$courseid . ':nostats'`) —
+  sin eso, la versión sin analítica de un alumno se serviría a un profesor. Y
+  `total_students`/`total_enrolled_users` no se dan al alumno (decisión de producto:
+  "nada del grupo", más fácil de explicar que una lista de excepciones).
+- **Capa 3 — la ruta directa.** `build_quiz_answer()`, `build_assign_answer()` y
+  `build_generic_activity_answer()` responden desde la BD **sin pasar por el LLM**,
+  así que consultan el permiso en el punto donde construyen el dato y devuelven
+  `chat_pipeline::teacher_only_payload()` o ponen los contadores a 0/null. Lo que un
+  alumno sí sigue viendo de una actividad: nombre, descripción, fechas, nº de
+  preguntas e intentos PERMITIDOS (configuración pública).
+- **El prompt base del profesorado no cambia ni un byte** — su prefijo cacheado
+  sigue siendo el mismo (verificado por md5). El alumno tiene su propio bloque base
+  (`generate_student_system_prompt()`), también marcado con `cache_control`, pero con
+  ~860 tokens está por debajo del mínimo de 1024: no se cachea, en silencio y sin
+  coste extra. Si algún día se alarga, empezará a cachearse solo.
+- Las sugerencias de seguimiento del alumno se filtran con
+  `filter_student_followups()` **además** de pedírselas al modelo con el prompt de
+  alumno: el catálogo determinista propone "¿cuántos alumnos han entregado…?" y no
+  se le ofrece a alguien a quien se le va a negar.
+
+Fuera de alcance a propósito en esta versión: el alumno no ve NI SUS PROPIOS datos
+individuales (se le redirige al libro de calificaciones). Si se quiere "solo mis
+notas", es una cuarta capa nueva, no un relajamiento de las tres actuales.
+
 ## Bug backlog — evaluación jul-2026 (arreglar en este orden)
+
+**OJO: esta sección está desactualizada** — #1 a #5 y casi todo #6 ya se arreglaron
+antes de la migración a Anthropic. El estado real está en
+`memory/session-history.md`; lo único vivo de #6 es el modo "resumen de unidad"
+sobre SCORM (P55/P56).
 
 Evaluación de 56 preguntas reales (resultados y prompts de arreglo detallados en
 `Pulso_AI_matriz_evaluacion.xlsx`, pestaña "Preguntas"). Los fallos se agrupan en

@@ -376,7 +376,13 @@ class rag_retriever {
         global $DB;
 
         $isSummaryIntent = (bool)preg_match('/resumen|resumir|s[ií]ntesis|sintesis|resum[eé]n|de\s+qu[eé]\s+va|de\s+qu[eé]\s+trata/u', $query);
-        $isContentIntent = !$isSummaryIntent && self::is_pdf_content_query($query);
+        // Regla: si la pregunta nombra un recurso Y pide algo de su CONTENIDO, la
+        // respuesta de solo-metadatos no vale. Los metadatos quedan para las
+        // preguntas de identificación ("¿qué es X?", "¿en qué formato está?") y de
+        // ubicación/acceso ("¿dónde está?", "¿cómo accedo?").
+        $isIdentificationIntent = self::is_identification_query($query);
+        $isContentIntent = !$isSummaryIntent && !$isIdentificationIntent
+            && (self::is_pdf_content_query($query) || self::is_resource_content_question($query));
         $isAnalyticsIntent = self::is_course_analytics_query($query);
 
         // Atajo: en una pregunta de analitica de curso solo puede ganar un match
@@ -580,10 +586,14 @@ class rag_retriever {
                 $result['content_mode'] = true;
                 $result['raw_content_source'] = $extText;
             } else {
-                // Sin texto disponible — mostrar metadatos en lugar del placeholder.
+                // Sin texto disponible: se dice explícitamente, en vez de dejar
+                // caer unos metadatos que parecen una respuesta.
                 $fallbackLines = ['Recurso: ' . $resourceName];
                 if ($filename !== '') { $fallbackLines[] = 'Archivo: ' . $filename; }
                 if ($mimetype !== '') { $fallbackLines[] = 'Tipo: ' . $mimetype; }
+                $fallbackLines[] = 'No he podido leer el texto de este documento, '
+                    . 'asi que no puedo responder sobre su contenido. Si es un PDF escaneado, '
+                    . 'no tiene texto seleccionable.';
                 $result['content'] = implode("\n", $fallbackLines);
             }
         }
@@ -1608,6 +1618,10 @@ class rag_retriever {
         global $DB;
 
         $isSummaryIntent = (bool)preg_match('/resumen|resumir|s[ií]ntesis|sintesis|resum[eé]n|de\s+qu[eé]\s+va|de\s+qu[eé]\s+trata/u', $query);
+        // Misma regla que en resolve_direct_resource_query: si pide contenido, no
+        // se contesta con metadatos.
+        $isContentIntent = !$isSummaryIntent && !self::is_identification_query($query)
+            && (self::is_pdf_content_query($query) || self::is_resource_content_question($query));
 
         $resources = $DB->get_records_sql(
             "SELECT r.id, r.name, r.intro, cm.id AS cmid
@@ -1650,6 +1664,13 @@ class rag_retriever {
         }
 
         if ($picked === null) {
+            // Sin match de nombre: solo se asume el recurso si la sección tiene UNO.
+            // Devolver el primero de varios era coger uno al azar — el fallo de
+            // "¿qué actividades hay en la sección RECURSOS?", que contestaba con un
+            // único PDF. Con varios, que responda el listado de la sección.
+            if (count($resources) !== 1) {
+                return null;
+            }
             $picked = array_values($resources)[0];
         }
 
@@ -1682,6 +1703,9 @@ class rag_retriever {
         if ($isSummaryIntent) {
             $summaryText = self::build_resource_summary($joined, $intro, $filename);
             $contentLines[] = 'Resumen: ' . ($summaryText !== '' ? $summaryText : 'No se pudo extraer suficiente texto para resumir el PDF con precisión.');
+        } else if ($isContentIntent) {
+            // Placeholder — chat_pipeline lo reemplaza con la respuesta del modelo.
+            $contentLines[] = 'Buscando la respuesta en el documento...';
         } else {
             $contentLines[] = 'Seccion: ' . $sectionTitle;
             $contentLines[] = 'Recurso: ' . $resourceName;
@@ -1706,6 +1730,22 @@ class rag_retriever {
         if ($isSummaryIntent) {
             $result['summary_mode'] = true;
             $result['raw_summary_source'] = self::build_summary_source_text($joined, $intro, $filename);
+        }
+        if ($isContentIntent) {
+            $extText = self::get_resource_chunks_extended(
+                $courseid, (int)$picked->cmid, (int)$picked->id, (string)$picked->name
+            );
+            if ($extText !== '') {
+                $result['content_mode'] = true;
+                $result['raw_content_source'] = $extText;
+                $result['title'] = $resourceName;
+            } else {
+                $fallbackLines = ['Seccion: ' . $sectionTitle, 'Recurso: ' . $resourceName];
+                if ($filename !== '') { $fallbackLines[] = 'Archivo: ' . $filename; }
+                $fallbackLines[] = 'No he podido leer el texto de este documento, '
+                    . 'asi que no puedo responder sobre su contenido.';
+                $result['content'] = implode("\n", $fallbackLines);
+            }
         }
 
         return $result;
@@ -1915,7 +1955,56 @@ class rag_retriever {
     }
 
     /**
-     * Detecta si el usuario pide contenido específico de un documento (enunciados, problemas, ejercicios...).
+     * ¿Pregunta el usuario por el CONTENIDO de un recurso con un fraseo que no
+     * cubre is_pdf_content_query()?
+     *
+     * "¿Qué dice el documento MATERIAL 1 sobre la investigación cuantitativa?"
+     * devolvía solo los metadatos del recurso (nombre, archivo, mimetype) porque
+     * ningún patrón de contenido cubría "qué dice ... sobre ...", mientras que
+     * "hazme un resumen del MATERIAL 1" sí funcionaba: el texto estaba indexado y
+     * era recuperable, fallaba la clasificación de intención.
+     *
+     * @param string $query Consulta ya en minúsculas
+     * @return bool
+     */
+    private static function is_resource_content_question(string $query): bool {
+        return (bool)preg_match(
+            '/qu[eé]\s+(dice|dicen|explica|cuenta|menciona|pone|indica|aporta|recoge|contiene\s+sobre)' .
+            '|qu[eé]\s+informaci[oó]n\s+(hay|tiene|contiene|aporta|da)' .
+            '|habla\s+(de|sobre)|trata\s+sobre|se\s+habla\s+de|se\s+dice\s+(de|sobre)' .
+            '|de\s+qu[eé]\s+(habla|se\s+habla)|qu[eé]\s+temas?\s+(trata|aborda|cubre)' .
+            '|expl[ií]came|expl[ií]ca\s|acl[aá]rame|det[aá]llame|cu[eé]ntame\s+(qu[eé]|sobre|de)' .
+            '|seg[uú]n\s+(el|la|los|las)\s+(documento|pdf|material|archivo|recurso|apuntes|temario)' .
+            '|\bsobre\s+(la|el|los|las)\s+\w{4,}/u',
+            $query
+        );
+    }
+
+    /**
+     * ¿Es una pregunta de IDENTIFICACIÓN o de UBICACIÓN del recurso? En ese caso
+     * los metadatos (nombre, archivo, formato) SÍ son la respuesta correcta, y no
+     * hay que abrir el documento.
+     *
+     * @param string $query Consulta ya en minúsculas
+     * @return bool
+     */
+    private static function is_identification_query(string $query): bool {
+        if (self::is_location_query($query)) {
+            return true;
+        }
+        return (bool)preg_match(
+            '/\bqu[eé]\s+es\s+(el|la|los|las)?\s*\w' .
+            '|en\s+qu[eé]\s+formato|qu[eé]\s+(tipo|formato)\s+de\s+(archivo|documento|fichero)' .
+            '|nombre\s+del\s+(archivo|fichero)|c[oó]mo\s+se\s+llama\s+el\s+(archivo|fichero)' .
+            '|cu[aá]nto\s+pesa|tama[nñ]o\s+del\s+(archivo|fichero)/u',
+            $query
+        );
+    }
+
+    /**
+     * Detecta si el usuario pide contenido específico de un documento (enunciados,
+     * problemas, ejercicios...). Los fraseos de tipo "qué dice X sobre Y" los cubre
+     * is_resource_content_question().
      *
      * @param string $query
      * @return bool

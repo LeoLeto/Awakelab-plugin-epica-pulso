@@ -1,5 +1,37 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-04 — Los 6 arreglos de la evaluación del curso SANS0001 (v1.11.1 → v1.13.3)
+
+Evaluación de 34 preguntas sobre el curso id 92 (`PROMPTS_ARREGLO_v1.11.1.md`, sin
+versionar). Un commit por bug, en el orden 6 → 2 → 3 → 4 → 5 → 1. Las reglas que
+deben persistir están en `CLAUDE.md` ("El historial NUNCA contiene JSON" y
+"Enrutado: sección vs recurso vs metadatos"); aquí, solo el diagnóstico que costó
+encontrar y lo que queda sin verificar:
+
+- **El bug crítico (repetía la respuesta anterior) NO era el history-hint.** El hint
+  ya estaba bien acotado desde v1.9.x (con "dame un ranking de notas de los alumnos"
+  ni se activa, por `is_course_analytics_query`). La causa real: el historial
+  guardaba el JSON crudo de cada respuesta y `prepare_history()` lo cortaba a 500
+  caracteres, así que los turnos de asistente eran objetos JSON **sin cerrar**; con
+  el prompt exigiendo "tu respuesta COMPLETA debe ser solo el objeto JSON", el modelo
+  continuaba ese objeto en lugar de responder. Explica que fuese intermitente, que
+  empeorase con los turnos y que se arreglase recargando.
+- **La caché MUC quedó descartada** como causa: solo guarda el contexto de curso, no
+  respuestas, y su clave ya incluía el rol desde v1.10.0.
+- El "coge el primer recurso de la sección" (`array_values($resources)[0]`) era el
+  responsable real de responder con UN PDF a un listado de sección: la sección se
+  identificaba bien. Buscar bugs de "matcher" en el matcher no habría dado con él.
+- **Verificado con pruebas de lógica** (PHP 8.3 portátil del scratchpad, `mbstring`
+  activado a mano): 16 comprobaciones del digest de historial (incluye que el
+  history-hint sigue localizando el recurso del turno anterior — el digest une con
+  salto de línea justo por eso), 12 de sección vs recurso, 17 de intención
+  contenido/metadatos, 16 del enrutado de "resúmeme el curso" y 6 de reparación de
+  JSON con el fragmento roto real capturado en la evaluación. El md5 del prompt base
+  del profesorado sigue intacto.
+- **Sin verificar en Moodle**: las 34 preguntas hay que volver a pasarlas en el curso
+  92. En especial, los 4 casos de control del bug 3 y que
+  `cache_read_input_tokens` siga > 0 desde el segundo mensaje.
+
 ## 2026-09-02 — Modo alumno: el chat se abre a estudiantes solo para contenido (v1.10.0)
 
 Antes de esto, un alumno no podía usar el plugin en absoluto (`block_pulso.php`

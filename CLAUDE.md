@@ -227,6 +227,46 @@ Fuera de alcance a propósito en esta versión: el alumno no ve NI SUS PROPIOS d
 individuales (se le redirige al libro de calificaciones). Si se quiere "solo mis
 notas", es una cuarta capa nueva, no un relajamiento de las tres actuales.
 
+## Enrutado: sección vs recurso vs metadatos (v1.13.x)
+
+Tres reglas de desempate en `rag_retriever`, salidas de la evaluación del
+2026-09-04 (curso SANS0001). Si se toca una, hay que volver a pasar los cuatro
+casos de control: listado de sección, "¿qué hay en el tema N?", resumen de un
+recurso por nombre y nº de preguntas de un cuestionario.
+
+- **El listado de sección gana al match de recurso.** `is_section_listing_query()`
+  (referencia a sección/tema/unidad/bloque + cuantificador de listado: "qué hay
+  en", "qué actividades", "qué contiene", "lista") corta el match por nombre de
+  actividad y responde con `build_section_listing_answer()`. Sin eso, "¿qué
+  actividades hay en la sección RECURSOS?" contestaba con UN PDF: la sección se
+  identificaba bien y luego `resolve_direct_resource_in_section_query()` devolvía
+  `array_values($resources)[0]`. Ese "coge el primero" ahora solo se aplica si la
+  sección tiene UN único recurso. Si la pregunta pide contenido o una acción
+  ("resume", "el enunciado de", "qué dice"), no hay cuantificador de listado y gana
+  el recurso — que es lo que se quiere.
+- **"tema N" / "unidad N" / "bloque N" es la sección N.** Fase 2b de
+  `find_matching_section_for_query()`, después del match por nombre exacto (si
+  existe una sección llamada literalmente "Tema 2", gana ella). Sin esto, "¿qué hay
+  en el tema 2?" enganchaba un recurso llamado "MIC Tema 2".
+- **Metadatos solo para identificación o ubicación.** `is_identification_query()`
+  (que incluye `is_location_query()`) decide cuándo la respuesta correcta es
+  nombre/archivo/formato. Para todo lo demás, si la pregunta nombra un recurso y
+  pide algo de su contenido —incluidos los fraseos de
+  `is_resource_content_question()`: "qué dice", "qué explica", "qué información
+  hay", "de qué habla", "según el documento"— se abre el documento
+  (`content_mode`). Si no hay texto extraíble, se dice explícitamente en vez de
+  devolver metadatos que parecen una respuesta.
+- Las **stopwords del matcher difuso** incluyen ya las genéricas de nombre de
+  recurso (`material`, `recurso`, `documento`, `archivo`, `contenido`, `unidad`…):
+  un PDF llamado "MATERIAL 1" no puede engancharse por la palabra "material" de la
+  pregunta.
+- **"Resúmeme el curso" es contenido, no analítica.** La ruta directa ya devolvía
+  `null` (`is_course_about_query()`), pero el prompt base es de analítica educativa
+  y el modelo contestaba con secciones, matriculados y tasa de aprobación. Ahora
+  `generate_system_blocks()` recibe el `$user_query` y añade al bloque **dinámico**
+  una sección que obliga a responder con el temario (y permite al profesorado UNA
+  sola línea de contexto analítico; al alumno, ninguna).
+
 ## Bug backlog — evaluación jul-2026 (arreglar en este orden)
 
 **OJO: esta sección está desactualizada** — #1 a #5 y casi todo #6 ya se arreglaron

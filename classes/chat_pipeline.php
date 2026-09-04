@@ -1431,12 +1431,22 @@ class chat_pipeline {
             }
         }
 
-        // El texto contiene un JSON roto (array anidado accidental, truncado,
-        // comas colgantes): intentar repararlo antes de rendirse. Sin esto, el
-        // frontend recibe el JSON crudo y lo pinta como texto plano.
+        // El texto contiene un JSON roto (array anidado accidental, par
+        // clave/valor huérfano, truncado, comas colgantes): intentar repararlo
+        // antes de rendirse. Sin esto, el frontend recibe el JSON crudo y lo pinta
+        // como texto plano.
         $repaired = self::repair_json_object($extracted !== null ? $extracted : $answer);
         if ($repaired !== null) {
+            // Traza para medir cuántas respuestas necesitan reparación. Solo se
+            // escribe con el modo depuración de Moodle activo.
+            if (function_exists('debugging')) {
+                debugging('block_pulso: JSON del modelo reparado en clean_answer()', DEBUG_DEVELOPER);
+            }
             return $repaired;
+        }
+
+        if (function_exists('debugging')) {
+            debugging('block_pulso: JSON del modelo irreparable; se devuelve texto', DEBUG_DEVELOPER);
         }
 
         // Fallback: si no se encontró un objeto JSON válido, al menos quitar
@@ -1475,6 +1485,27 @@ class chat_pipeline {
         $flat = preg_replace('/("data"\s*:\s*)\[\s*\[/', '$1[', $json, 1);
         if ($flat !== null && $flat !== $json) {
             $variants[] = $flat;
+        }
+
+        // Par clave/valor huérfano: el modelo empieza `"clave":` y, en lugar del
+        // valor, abre otro par — visto en producción en un ranking:
+        //   "rank":"4","name":"rank":"3","name":"MARIED ROMELIA..."
+        // Si el "valor" de un par va seguido de ':', en realidad era una clave: se
+        // descarta la clave huérfana anterior y se conserva el par bueno. Es la
+        // reparación más conservadora posible (no inventa valores) y, como todas,
+        // solo se acepta si json_decode la valida.
+        foreach ($variants as $variant) {
+            $fixed = $variant;
+            for ($i = 0; $i < 20; $i++) {
+                $next = preg_replace('/"[^"\\\\]*"\s*:\s*("[^"\\\\]*"\s*:)/', '$1', $fixed, 1);
+                if ($next === null || $next === $fixed) {
+                    break;
+                }
+                $fixed = $next;
+            }
+            if ($fixed !== $variant) {
+                $variants[] = $fixed;
+            }
         }
 
         // Por cada variante, probar también su versión con cierres añadidos.

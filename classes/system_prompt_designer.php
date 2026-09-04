@@ -746,6 +746,10 @@ PROMPT;
         $format_reinforcement .= "- Escribe el JSON COMPACTO, en una sola línea: sin indentación ni saltos de línea entre claves. La indentación solo desperdicia tokens y puede truncar la respuesta.\n";
         $format_reinforcement .= "- 'data' debe ser SIEMPRE un array PLANO de objetos: \"data\":[{...},{...}]. PROHIBIDO anidar arrays (\"data\":[[...]] es un error de sintaxis).\n";
         $format_reinforcement .= "- Si la lista de resultados es muy larga, limita 'data' a los 10 elementos más relevantes e indícalo en 'summary', antes que arriesgarte a dejar el JSON sin cerrar.\n";
+        // El modelo ha emitido en producción pares clave/valor huérfanos dentro de
+        // un ranking largo ("rank":"4","name":"rank":"3",...), que invalidan el JSON.
+        $format_reinforcement .= "- Cada par es \"clave\":\"valor\": después de los dos puntos va SIEMPRE un valor, nunca otra clave. Está PROHIBIDO escribir \"clave1\":\"clave2\":\"valor\".\n";
+        $format_reinforcement .= "- Todos los objetos de 'data' deben tener EXACTAMENTE las mismas claves, y el objeto JSON debe quedar cerrado con '}'.\n";
 
         if (empty($course_context)) {
             return $base_prompt . $format_reinforcement;

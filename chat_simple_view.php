@@ -1799,6 +1799,18 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             } catch (e) {
                 console.warn('⚠️ Error al parsear JSON:', e.message);
                 console.warn('⚠️ Texto que intentó parsear:', answer.substring(0, 200));
+
+                // Red de seguridad: si el texto SIGUE pareciendo JSON (empieza por
+                // { o [) y no se ha podido parsear ni reparar en servidor, no se
+                // pinta en crudo — el usuario vería un objeto JSON en la burbuja.
+                // Ocurre raras veces, cuando el modelo emite JSON malformado.
+                const looksLikeJson = /^\s*[\{\[]/.test(String(answer || ''));
+                if (looksLikeJson) {
+                    console.warn('⚠️ JSON no renderizable, se muestra aviso al usuario. Respuesta completa:', answer);
+                    return '<div class="pulso-empty">No he podido formatear la respuesta. '
+                        + 'Inténtalo de nuevo o reformula la pregunta.</div>';
+                }
+
                 // Si no es JSON, retornar como está
                 return formatRichTextResponse(answer);
             }

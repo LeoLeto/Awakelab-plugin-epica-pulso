@@ -1906,20 +1906,20 @@ class rag_retriever {
      */
     private static function activity_usage_hint(string $modname): string {
         $hints = [
-            'forum'    => 'Para participar, abre el foro y pulsa "Anadir un nuevo tema de debate", o responde a un tema ya existente.',
-            'assign'   => 'Para entregar, abre la tarea y pulsa "Agregar entrega"; adjunta tu trabajo y guarda los cambios antes de la fecha limite.',
-            'quiz'     => 'Para realizarlo, abrelo y pulsa "Intentar el cuestionario ahora".',
-            'scorm'    => 'Abrelo y pulsa "Entrar" para lanzar el contenido.',
-            'resource' => 'Abrelo para consultar o descargar el archivo.',
-            'page'     => 'Abrela para leer el contenido.',
-            'url'      => 'Abrelo para ir al enlace externo.',
-            'book'     => 'Abrelo y navega por los capitulos desde el indice.',
-            'folder'   => 'Abrela para ver y descargar los archivos.',
-            'glossary' => 'Abrelo para consultar las entradas del glosario.',
-            'wiki'     => 'Abrela para leer o editar sus paginas.',
-            'choice'   => 'Abrela para elegir tu opcion y enviarla.',
-            'feedback' => 'Abrelo para responder al cuestionario de feedback.',
-            'lesson'   => 'Abrela y sigue los pasos que te vaya presentando.',
+            'forum'    => 'Para participar, abre el foro y pulsa "Añadir un nuevo tema de debate", o responde a un tema ya existente.',
+            'assign'   => 'Para entregar, abre la tarea y pulsa "Agregar entrega"; adjunta tu trabajo y guarda los cambios antes de la fecha límite.',
+            'quiz'     => 'Para realizarlo, ábrelo y pulsa "Intentar el cuestionario ahora".',
+            'scorm'    => 'Ábrelo y pulsa "Entrar" para lanzar el contenido.',
+            'resource' => 'Ábrelo para consultar o descargar el archivo.',
+            'page'     => 'Ábrela para leer el contenido.',
+            'url'      => 'Ábrelo para ir al enlace externo.',
+            'book'     => 'Ábrelo y navega por los capítulos desde el índice.',
+            'folder'   => 'Ábrela para ver y descargar los archivos.',
+            'glossary' => 'Ábrelo para consultar las entradas del glosario.',
+            'wiki'     => 'Ábrela para leer o editar sus páginas.',
+            'choice'   => 'Ábrela para elegir tu opción y enviarla.',
+            'feedback' => 'Ábrelo para responder al cuestionario de feedback.',
+            'lesson'   => 'Ábrela y sigue los pasos que te vaya presentando.',
         ];
         return $hints[$modname] ?? '';
     }

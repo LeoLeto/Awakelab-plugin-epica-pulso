@@ -2,7 +2,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026090201; // Enlaces directos: ubicacion + boton "Ir a" de actividades/recursos
-$plugin->release   = '1.11.0';      // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026090400; // Ortografia de los textos de "como usar" (tildes y enes)
+$plugin->release   = '1.11.1';      // Semver visible en el header del chat — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;

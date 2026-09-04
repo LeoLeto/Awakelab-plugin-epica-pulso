@@ -536,7 +536,12 @@ PROMPT;
      *                          su prefijo cacheado sigue siendo el mismo.
      * @return array Bloques de contenido tal cual los espera el campo `system`.
      */
-    public static function generate_system_blocks($course_context = [], string $rag_context = '', bool $isteacher = true): array {
+    public static function generate_system_blocks(
+        $course_context = [],
+        string $rag_context = '',
+        bool $isteacher = true,
+        string $user_query = ''
+    ): array {
         // Dos prefijos estables distintos (profesor / alumno), cada uno con su
         // propia entrada de caché. OJO: el prompt de alumno es mucho más corto y
         // puede quedar por debajo del mínimo cacheable (1024 tokens en
@@ -553,7 +558,7 @@ PROMPT;
             ],
             [
                 'type' => 'text',
-                'text' => self::build_dynamic_prompt_section($course_context, $rag_context, $isteacher),
+                'text' => self::build_dynamic_prompt_section($course_context, $rag_context, $isteacher, $user_query),
             ],
         ];
     }
@@ -677,8 +682,32 @@ PROMPT;
      *                          públicos del curso.
      * @return string
      */
-    private static function build_dynamic_prompt_section($course_context = [], string $rag_context = '', bool $isteacher = true): string {
+    private static function build_dynamic_prompt_section(
+        $course_context = [],
+        string $rag_context = '',
+        bool $isteacher = true,
+        string $user_query = ''
+    ): string {
         $base_prompt = '';
+
+        // "Resúmeme el curso" / "¿de qué trata?" son preguntas de CONTENIDO. El
+        // prompt base es de analítica educativa, así que sin esta indicación el
+        // modelo contestaba con secciones, matriculados y tasa de aprobación en vez
+        // del temario (que sí está en los fragmentos RAG).
+        if ($user_query !== '' && rag_retriever::is_course_about_query(mb_strtolower(trim($user_query), 'UTF-8'))) {
+            $base_prompt .= "\n\n## ESTA PREGUNTA ES DE CONTENIDO, NO DE ANALÍTICA\n";
+            $base_prompt .= "El usuario pide de qué trata el curso o un resumen del curso. El cuerpo de la respuesta "
+                . "debe ser el TEMARIO y los contenidos reales: de qué trata, qué temas cubre, cómo se organiza. "
+                . "Usa los fragmentos de CONTENIDO RELEVANTE DEL CURSO (RAG) como fuente principal.\n";
+            $base_prompt .= "- NO respondas con métricas del grupo (número de alumnos, tasas de completitud o "
+                . "aprobación, notas medias) como cuerpo de la respuesta.\n";
+            if ($isteacher) {
+                $base_prompt .= "- Puedes cerrar con UNA sola línea de contexto analítico al final "
+                    . "(por ejemplo, cuántos alumnos hay matriculados), nunca más de una.\n";
+            } else {
+                $base_prompt .= "- No incluyas ningún dato del grupo, ni siquiera una línea.\n";
+            }
+        }
 
         if (!empty($rag_context)) {
             $base_prompt .= "\n\n## REGLA CRÍTICA DE CONSISTENCIA\n";

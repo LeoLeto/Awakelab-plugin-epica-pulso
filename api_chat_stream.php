@@ -195,7 +195,8 @@ try {
     $system_prompt = system_prompt_designer::generate_system_blocks(
         $course_context,
         $rag_context,
-        $isteacher
+        $isteacher,
+        $user_query
     );
 
     $connector = new anthropic_connector();

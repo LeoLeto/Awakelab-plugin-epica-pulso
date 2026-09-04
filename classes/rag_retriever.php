@@ -1914,7 +1914,7 @@ class rag_retriever {
      * @param string $query Lowercased query
      * @return bool
      */
-    private static function is_course_about_query(string $query): bool {
+    public static function is_course_about_query(string $query): bool {
         return (bool)preg_match(
             '/de\s+qu[eé]\s+(se\s+)?(trata|va)\s+(este\s+|el\s+)?curso' .
             '|sobre\s+qu[eé]\s+(trata|va|es)\s+(este\s+|el\s+)?curso' .

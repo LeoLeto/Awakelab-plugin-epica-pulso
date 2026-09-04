@@ -82,9 +82,15 @@ class rag_retriever {
         $isSectionCountQuery = (bool)preg_match('/cu[aá]ntas?\s+secciones|n[uú]mero\s+de\s+secciones|total\s+de\s+secciones/u', $q);
         $isCourseContentQuery = self::is_course_content_query($q);
 
+        // "¿Qué hay en la sección X?" / "¿qué actividades tiene el tema 2?" es un
+        // LISTADO de sección: gana siempre la sección, nunca un recurso suelto con
+        // nombre parecido. Ver is_section_listing_query().
+        $isSectionListing = self::is_section_listing_query($q);
+
         // Siempre intentar buscar actividades por nombre antes de sección.
-        // Solo omitir para consultas de nivel de curso (contenido, nombre, secciones).
-        if (!$isCourseContentQuery && !$isCourseNameQuery && !$isSectionCountQuery) {
+        // Solo omitir para consultas de nivel de curso (contenido, nombre, secciones)
+        // y para los listados de sección.
+        if (!$isCourseContentQuery && !$isCourseNameQuery && !$isSectionCountQuery && !$isSectionListing) {
             $directResource = self::resolve_direct_resource_query($courseid, $q);
             if ($directResource !== null) {
                 return $directResource;
@@ -129,6 +135,15 @@ class rag_retriever {
             } catch (\Throwable $e) {
                 $modinfo = null;
             }
+        }
+
+        if ($matched && $isSectionListing) {
+            // Listado explícito de la sección: NO se pasa por los resolutores de
+            // label/quiz/tarea/genérica/recurso, que devuelven UN elemento. Ese
+            // atajo era el fallo real de "¿qué actividades hay en la sección
+            // RECURSOS?": la sección se identificaba bien y luego
+            // resolve_direct_resource_in_section_query() devolvía un solo PDF.
+            return self::build_section_listing_answer($courseid, $matched, $modinfo);
         }
 
         if ($matched) {
@@ -191,36 +206,7 @@ class rag_retriever {
                 }
             }
 
-            $title = trim((string)$matched->name);
-            if ($title === '') {
-                $title = 'Seccion ' . (int)$matched->section;
-            }
-
-            $activities = self::list_section_activities($courseid, $matched->id, (int)$matched->section, $modinfo);
-            $summary = trim(strip_tags((string)$matched->summary));
-
-            $lines = [];
-            $lines[] = 'Seccion: ' . $title;
-            $lines[] = 'Numero de seccion: ' . (int)$matched->section;
-            if ($summary !== '') {
-                $lines[] = 'Resumen: ' . preg_replace('/\s+/u', ' ', $summary);
-            }
-            $lines[] = 'Numero de actividades: ' . count($activities);
-            if (!empty($activities)) {
-                $lines[] = 'Contenidos dentro de esta seccion:';
-                foreach ($activities as $activity) {
-                    $lines[] = '- ' . $activity;
-                }
-            } else {
-                $lines[] = 'No se detectaron actividades visibles en esta seccion.';
-            }
-
-            return [
-                'type' => 'text',
-                'title' => 'Contenido de la sección ' . $title,
-                'summary' => 'He encontrado la sección consultada dentro del curso.',
-                'content' => implode("\n", $lines)
-            ];
+            return self::build_section_listing_answer($courseid, $matched, $modinfo);
         }
 
         if ($isSectionCountQuery) {
@@ -296,6 +282,87 @@ class rag_retriever {
         }
 
         return null;
+    }
+
+    /**
+     * ¿La pregunta pide el LISTADO del contenido de una sección?
+     *
+     * Regla de desempate cuando una sección y un recurso tienen nombres
+     * parecidos (curso real: sección "RECURSOS" y recurso "MATERIAL 1"; sección 2
+     * y recurso "MIC Tema 2"):
+     *  - gana la SECCIÓN si la pregunta lleva un cuantificador de listado
+     *    ("qué hay en", "qué actividades", "qué contiene", "lista");
+     *  - gana el RECURSO si pide contenido o una acción sobre él ("resume",
+     *    "ábreme", "el enunciado de", "qué dice"), porque entonces no hay
+     *    cuantificador de listado y esta función devuelve false.
+     *
+     * @param string $query Consulta ya en minúsculas
+     * @return bool
+     */
+    private static function is_section_listing_query(string $query): bool {
+        $mentionsSection = (bool)preg_match(
+            '/\b(secci[oó]n|seccion|secciones|apartado|tema|temas|unidad|bloque|m[oó]dulo|modulo)\b/u',
+            $query
+        );
+        if (!$mentionsSection) {
+            return false;
+        }
+
+        return (bool)preg_match(
+            '/qu[eé]\s+(hay|actividades|contenidos?|recursos?|materiales?|elementos|documentos?|archivos?)' .
+            '|qu[eé]\s+\w+\s+(hay|tiene|contiene|incluye)' .
+            '|(contiene|incluye|tiene)\s+(la|el)\s+(secci[oó]n|seccion|tema|unidad|bloque|m[oó]dulo)' .
+            '|list(a|ar|ame|ado)\b' .
+            '|ens[eé][nñ]ame\s+(el\s+|las\s+|los\s+)?(contenido|actividades|recursos|materiales)' .
+            '|contenido\s+(de|del)\s+(la\s+)?(secci[oó]n|seccion|tema|unidad|bloque|m[oó]dulo)' .
+            '|dime\s+qu[eé]\s+(hay|actividades|contenidos?)' .
+            '|todo\s+lo\s+que\s+hay/u',
+            $query
+        );
+    }
+
+    /**
+     * Listado completo del contenido de una sección (con el tipo de cada
+     * elemento). Es la respuesta canónica para un listado de sección: se usa
+     * tanto cuando la pregunta lo pide explícitamente como cuando ningún
+     * resolutor más específico ha respondido.
+     *
+     * @param int $courseid
+     * @param object $section Registro de course_sections
+     * @param mixed $modinfo
+     * @return array
+     */
+    private static function build_section_listing_answer(int $courseid, $section, $modinfo = null): array {
+        $title = trim((string)$section->name);
+        if ($title === '') {
+            $title = 'Seccion ' . (int)$section->section;
+        }
+
+        $activities = self::list_section_activities($courseid, $section->id, (int)$section->section, $modinfo);
+        $summary = trim(strip_tags((string)$section->summary));
+
+        $lines = [];
+        $lines[] = 'Seccion: ' . $title;
+        $lines[] = 'Numero de seccion: ' . (int)$section->section;
+        if ($summary !== '') {
+            $lines[] = 'Resumen: ' . preg_replace('/\s+/u', ' ', $summary);
+        }
+        $lines[] = 'Numero de actividades: ' . count($activities);
+        if (!empty($activities)) {
+            $lines[] = 'Contenidos dentro de esta seccion:';
+            foreach ($activities as $activity) {
+                $lines[] = '- ' . $activity;
+            }
+        } else {
+            $lines[] = 'No se detectaron actividades visibles en esta seccion.';
+        }
+
+        return [
+            'type' => 'text',
+            'title' => 'Contenido de la sección ' . $title,
+            'summary' => 'He encontrado la sección consultada dentro del curso.',
+            'content' => implode("\n", $lines)
+        ];
     }
 
     /**
@@ -632,10 +699,15 @@ class rag_retriever {
         // Words that appear in virtually every Moodle activity name or teacher query
         // are useless as discriminators and must not contribute to the score.
         $stopwords = [
-            'curso', 'foro', 'tarea', 'tema', 'quiz', 'link', 'book', 'page',
+            'curso', 'foro', 'tarea', 'tema', 'temas', 'quiz', 'link', 'book', 'page',
             'tipo', 'test', 'nota', 'notas', 'alumno', 'alumnos', 'estudiante', 'estudiantes',
             'resumen', 'participante', 'participantes', 'guia', 'manual', 'cuestionario',
-            'actividad', 'pregunta', 'preguntas',
+            'actividad', 'actividades', 'pregunta', 'preguntas',
+            // Genéricas de nombre de recurso/sección: un PDF llamado "MATERIAL 1"
+            // no puede engancharse por la palabra "material" de la pregunta.
+            'material', 'materiales', 'recurso', 'recursos', 'documento', 'documentos',
+            'archivo', 'archivos', 'apartado', 'seccion', 'sección', 'unidad',
+            'bloque', 'modulo', 'módulo', 'contenido', 'contenidos',
         ];
         $ordinalMap = [
             'primer' => '1', 'primero' => '1', 'primera' => '1',
@@ -2524,6 +2596,20 @@ class rag_retriever {
         }
         if ($exactMatch !== null) {
             return $exactMatch;
+        }
+
+        // Fase 2b: "tema 2", "unidad 3", "bloque 1"... como referencia al NÚMERO de
+        // sección. Va después del match por nombre a propósito: si existe una
+        // sección llamada literalmente "Tema 2", gana ella (la fase 2 ya la habría
+        // devuelto). Sin esto, "¿qué hay en el tema 2?" no encontraba sección y
+        // acababa enganchando un recurso llamado "MIC Tema 2".
+        if (preg_match('/\b(tema|unidad|bloque|m[oó]dulo|modulo|apartado)\s+(\d{1,2})\b/u', $query, $mnum)) {
+            $target = (int)$mnum[2];
+            foreach ($sections as $section) {
+                if ((int)$section->section === $target) {
+                    return $section;
+                }
+            }
         }
 
         // Fase 3: match difuso por tokens del nombre. MISMO criterio que

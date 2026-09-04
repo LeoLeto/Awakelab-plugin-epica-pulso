@@ -695,11 +695,20 @@ PROMPT;
             $base_prompt .= $rag_context;
         }
 
+        // Regla de conversación: los turnos anteriores llegan como texto resumido
+        // (chat_pipeline::history_digest()). Va en el bloque dinámico, no en el
+        // base, para no tocar el prefijo cacheado.
+        $conversation_rule = "\n\n## CONVERSACIÓN — REGLA ABSOLUTA\n";
+        $conversation_rule .= "Los turnos anteriores de la conversación son SOLO contexto y llegan resumidos en texto.\n";
+        $conversation_rule .= "- Responde ÚNICAMENTE a la última pregunta del usuario.\n";
+        $conversation_rule .= "- NUNCA repitas, continúes ni completes una respuesta anterior, aunque parezca cortada.\n";
+        $conversation_rule .= "- Si la pregunta nueva es de otro tema que la anterior, ignora por completo el tema anterior.\n";
+
         // Regla de formato de salida: va SIEMPRE al final del prompt (lo último
         // que lee el modelo) para maximizar que la respete. Necesaria porque
         // Claude, a diferencia de GPT-4o, tiende a añadir preámbulos ("Aquí
         // tienes:") o envolver el JSON en fences pese a los ejemplos previos.
-        $format_reinforcement = "\n\n## FORMATO DE SALIDA — REGLA ABSOLUTA\n";
+        $format_reinforcement = $conversation_rule . "\n\n## FORMATO DE SALIDA — REGLA ABSOLUTA\n";
         $format_reinforcement .= "Tu respuesta COMPLETA debe ser ÚNICAMENTE el objeto JSON del schema anterior, sin nada más.\n";
         $format_reinforcement .= "- Empieza tu respuesta directamente por el carácter '{' y termínala en '}'.\n";
         $format_reinforcement .= "- NO escribas ningún texto antes del JSON (nada de \"Aquí tienes\", \"Claro,\", saludos, explicaciones).\n";

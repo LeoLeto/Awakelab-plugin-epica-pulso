@@ -151,6 +151,22 @@ que los evitan son poco intuitivas, así que quedan escritas aquí:
   `input + output + cache_creation + cache_read` — no volver a sumar solo input+output.
   Para comprobar que funciona: `cache_read_input_tokens` en la respuesta debe ser > 0 a
   partir del segundo mensaje; si es 0 siempre, algo está rompiendo el prefijo estable.
+- **El historial NUNCA contiene JSON** (v1.12.0). Antes se guardaba la respuesta
+  cruda (el JSON del esquema) y `prepare_history()` la cortaba a 500 caracteres: el
+  payload acababa con turnos de asistente que eran objetos JSON **sin cerrar**, y con
+  el prompt exigiendo "tu respuesta COMPLETA debe ser solo el objeto JSON", el modelo
+  continuaba ese objeto en vez de responder a la pregunta nueva — devolvía la
+  respuesta anterior entera. Ahora todo turno de asistente pasa por
+  `chat_pipeline::history_digest()` (título + summary + content + unas filas de
+  `data`, en TEXTO), tanto al guardar como al recibir el historial del cliente (el
+  `sessionStorage` de los usuarios ya tenía JSON sucio) y también en el JS
+  (`pulsoHistoryDigest()`). Dos detalles que hay que respetar si se toca: el digest
+  une las partes con **salto de línea, no con punto**, porque el history-hint localiza
+  el recurso del turno anterior con anclas de línea (`^Recurso:`, `^Seccion:`); y un
+  JSON que no decodifica se limpia con `strip_json_noise()` en vez de guardarse tal
+  cual. La regla "responde solo a la última pregunta" vive en el bloque **dinámico**
+  del prompt (`build_dynamic_prompt_section`), no en el base, para no invalidar el
+  prefijo cacheado.
 - **Los tres endpoints exigen `require_sesskey()`** (`api_chat.php`,
   `api_chat_stream.php`, `toggle_course.php`) y el orden de validación es
   autenticar → sesskey → permisos → `check_enabled()`. `check_enabled()` no puede

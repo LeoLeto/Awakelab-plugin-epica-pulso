@@ -673,19 +673,35 @@ class chat_pipeline {
             $history = array_slice($history, -self::MAX_HISTORY_MESSAGES);
         }
 
-        // Truncar contenido de mensajes largos en historial.
-        // OBLIGATORIO usar mb_*: con strlen()/substr() el corte cae a mitad de
-        // un caracter multibyte (cualquier acento del español) y deja UTF-8
-        // invalido en el historial; entonces json_encode() del payload devuelve
-        // false, se envia un cuerpo vacio a Anthropic y la API responde 400 en
-        // CADA mensaje siguiente hasta que el usuario limpia la conversacion.
+        // Las respuestas del asistente pasan SIEMPRE por history_digest(): se
+        // guardan como texto, nunca como JSON. Se aplica tambien aqui (no solo al
+        // guardar) porque el sessionStorage de los usuarios ya contiene JSON crudo
+        // de versiones anteriores, y un JSON cortado a la mitad en un turno de
+        // asistente hacia que el modelo continuase la respuesta anterior en vez de
+        // contestar la pregunta nueva (bug critico del 2026-09-04).
+        //
+        // El recorte usa mb_* obligatoriamente: con strlen()/substr() el corte cae
+        // a mitad de un caracter multibyte (cualquier acento del español) y deja
+        // UTF-8 invalido en el historial; entonces json_encode() del payload
+        // devuelve false, se envia un cuerpo vacio a Anthropic y la API responde
+        // 400 en CADA mensaje siguiente hasta que el usuario limpia la conversacion.
         foreach ($history as &$msg) {
+            if (($msg['role'] ?? '') === 'assistant') {
+                $msg['content'] = self::history_digest($msg['content']);
+                continue;
+            }
             if (mb_strlen($msg['content'], 'UTF-8') > self::MAX_HISTORY_CONTENT_LENGTH) {
                 $msg['content'] = mb_substr($msg['content'], 0, self::MAX_HISTORY_CONTENT_LENGTH, 'UTF-8')
                     . '...[truncated]';
             }
         }
         unset($msg);
+
+        // history_digest() puede dejar vacio un turno (respuesta que era solo un
+        // JSON ilegible): la Messages API rechaza con 400 los bloques vacios.
+        $history = array_values(array_filter($history, function ($msg) {
+            return trim((string)($msg['content'] ?? '')) !== '';
+        }));
 
         // Evitar contradicciones: si hay contexto RAG actual, no reutilizar
         // respuestas antiguas del asistente que decían que no tenía acceso.
@@ -721,7 +737,9 @@ class chat_pipeline {
         global $SESSION;
 
         $history[] = ['role' => 'user', 'content' => $user_query];
-        $history[] = ['role' => 'assistant', 'content' => $answer];
+        // El historial guarda TEXTO, nunca el JSON de la respuesta: ver
+        // history_digest().
+        $history[] = ['role' => 'assistant', 'content' => self::history_digest($answer)];
         if (count($history) > self::MAX_HISTORY_MESSAGES) {
             $history = array_slice($history, -self::MAX_HISTORY_MESSAGES);
         }
@@ -739,6 +757,123 @@ class chat_pipeline {
     private static function session_key(int $courseid): string {
         global $USER;
         return 'pulso_chat_history_' . $courseid . '_' . $USER->id;
+    }
+
+    /**
+     * Convierte una respuesta del asistente en TEXTO plano y corto para el
+     * historial.
+     *
+     * Por qué existe (bug crítico de la evaluación del 2026-09-04): el historial
+     * guardaba el JSON crudo de cada respuesta, y `prepare_history()` corta a
+     * MAX_HISTORY_CONTENT_LENGTH, así que cualquier respuesta larga (un ranking,
+     * los alumnos en riesgo) quedaba en el payload como un objeto JSON **sin
+     * cerrar**. Con el prompt exigiendo "tu respuesta COMPLETA debe ser solo el
+     * objeto JSON", el modelo veía un turno de asistente con un JSON a medias del
+     * mismo esquema y, en vez de responder a la pregunta nueva, lo continuaba:
+     * reemitía la respuesta anterior entera. Con la conversación limpia no pasaba,
+     * de ahí que se arreglase recargando.
+     *
+     * Guardando texto, no queda JSON que continuar (y se gastan menos tokens).
+     *
+     * @param string $answer Respuesta tal cual se envió al cliente (JSON o texto)
+     * @return string
+     */
+    public static function history_digest(string $answer): string {
+        $answer = trim($answer);
+        if ($answer === '') {
+            return '';
+        }
+
+        $json = self::extract_json_object($answer);
+        if ($json === null) {
+            // Ya es texto: solo se limpian fences de markdown.
+            $plain = trim(preg_replace('/^```[a-z]*|```$/mu', '', $answer));
+            return self::shorten_for_history($plain);
+        }
+
+        $data = json_decode($json, true);
+        if (!is_array($data)) {
+            // JSON invalido (el modelo emite alguno malformado de vez en cuando):
+            // se guarda como texto legible, nunca como JSON roto.
+            return self::shorten_for_history(self::strip_json_noise($answer));
+        }
+
+        $parts = [];
+        foreach (['title', 'summary', 'content'] as $key) {
+            if (!empty($data[$key]) && is_string($data[$key])) {
+                $parts[] = trim($data[$key]);
+            }
+        }
+
+        // 'data' puede ser tabla, lista o párrafos: se aplanan unas pocas filas
+        // para que el modelo recuerde de qué se habló, no para reproducirlo.
+        if (!empty($data['data']) && is_array($data['data'])) {
+            $rows = [];
+            foreach (array_slice($data['data'], 0, 5) as $row) {
+                if (is_string($row)) {
+                    $rows[] = trim($row);
+                    continue;
+                }
+                if (!is_array($row)) {
+                    continue;
+                }
+                $values = [];
+                foreach ($row as $value) {
+                    if (is_scalar($value) && trim((string)$value) !== '') {
+                        $values[] = trim((string)$value);
+                    }
+                }
+                if (!empty($values)) {
+                    $rows[] = implode(' · ', $values);
+                }
+            }
+            if (!empty($rows)) {
+                $parts[] = implode('; ', $rows);
+            }
+        }
+
+        if (empty($parts)) {
+            return self::shorten_for_history(self::strip_json_noise($answer));
+        }
+
+        // Se unen con salto de línea, NO con punto: el history-hint localiza el
+        // recurso del turno anterior con anclas de línea ("Recurso: X",
+        // "Seccion: N"), y aplastar los saltos lo dejaría ciego.
+        return self::shorten_for_history(implode("\n", $parts));
+    }
+
+    /**
+     * Deja legible un JSON que no se pudo decodificar: fuera llaves, corchetes,
+     * comillas y separadores. Sirve para que un JSON roto del modelo nunca acabe
+     * en el historial invitando al modelo a continuarlo.
+     *
+     * @param string $text
+     * @return string
+     */
+    private static function strip_json_noise(string $text): string {
+        $text = strip_tags($text);
+        $text = preg_replace('/^```[a-z]*|```$/mu', '', $text);
+        $text = str_replace(['{', '}', '[', ']', '"'], ' ', $text);
+        $text = preg_replace('/\s*,\s*/u', ', ', $text);
+        $text = preg_replace('/\s*:\s*/u', ': ', $text);
+        return trim($text);
+    }
+
+    /**
+     * Normaliza espacios y recorta al tope del historial. Conserva los saltos de
+     * línea (ver history_digest()). mb_* obligatorio (invariante de CLAUDE.md).
+     *
+     * @param string $text
+     * @return string
+     */
+    private static function shorten_for_history(string $text): string {
+        $text = preg_replace('/[^\S\n]+/u', ' ', $text);
+        $text = preg_replace('/\n{2,}/u', "\n", $text);
+        $text = trim($text);
+        if (mb_strlen($text, 'UTF-8') > self::MAX_HISTORY_CONTENT_LENGTH) {
+            $text = mb_substr($text, 0, self::MAX_HISTORY_CONTENT_LENGTH, 'UTF-8') . '...';
+        }
+        return $text;
     }
 
     /**
@@ -1018,9 +1153,17 @@ class chat_pipeline {
         if (preg_match('/^Seccion:\s*(.+)$/mi', $searchText, $msec)) {
             $sectionName = trim((string)$msec[1]);
         }
-        // Fallback: extraer del título JSON.
-        if ($resourceName === '' && is_array($decoded) && isset($decoded['title'])) {
+        // Fallback: extraer del título. Con el historial en texto (ver
+        // history_digest()) el título es la PRIMERA LÍNEA del mensaje, así que se
+        // acepta cualquiera de las dos fuentes.
+        $title = '';
+        if (is_array($decoded) && isset($decoded['title'])) {
             $title = (string)$decoded['title'];
+        } else {
+            $firstline = strtok($searchText, "\n");
+            $title = $firstline === false ? '' : trim($firstline);
+        }
+        if ($resourceName === '' && $title !== '') {
             if (preg_match('/^Cuestionario:\s*(.+)$/i', $title, $mqt)) {
                 $resourceName = trim($mqt[1]);
                 $type = 'quiz';

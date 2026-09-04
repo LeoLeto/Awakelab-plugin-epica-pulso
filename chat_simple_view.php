@@ -3066,6 +3066,44 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             return formData;
         }
 
+        // El historial guarda TEXTO, nunca el JSON de la respuesta: un JSON
+        // recortado en un turno de asistente hacía que el modelo continuase la
+        // respuesta anterior en vez de contestar la pregunta nueva. El servidor
+        // vuelve a limpiarlo igualmente (chat_pipeline::history_digest()), esto
+        // evita generar historiales sucios nuevos.
+        function pulsoHistoryDigest(answer) {
+            const raw = String(answer || '').trim();
+            if (!raw) return '';
+            if (raw[0] !== '{' && raw[0] !== '[') {
+                return raw.slice(0, 500);
+            }
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch (e) {
+                // JSON inválido o cortado: quedarse con el texto plano que se vea.
+                return raw.replace(/[{}\[\]"]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+            }
+            const parts = [];
+            ['title', 'summary', 'content'].forEach(function(key) {
+                if (typeof data[key] === 'string' && data[key].trim()) {
+                    parts.push(data[key].trim());
+                }
+            });
+            if (Array.isArray(data.data)) {
+                const rows = data.data.slice(0, 5).map(function(row) {
+                    if (typeof row === 'string') return row;
+                    if (!row || typeof row !== 'object') return '';
+                    return Object.keys(row)
+                        .map(function(k) { return row[k]; })
+                        .filter(function(v) { return v !== null && v !== undefined && typeof v !== 'object' && String(v).trim(); })
+                        .join(' · ');
+                }).filter(Boolean);
+                if (rows.length) parts.push(rows.join('; '));
+            }
+            return parts.join('. ').replace(/\s+/g, ' ').trim().slice(0, 500);
+        }
+
         // Procesamiento compartido de la respuesta completa (stream final / XHR).
         function handleChatResponse(message, response) {
             if (response.success && response.answer) {
@@ -3084,7 +3122,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                     window.conversationHistory = [];
                 }
                 window.conversationHistory.push({role: 'user', content: message});
-                window.conversationHistory.push({role: 'assistant', content: response.answer});
+                window.conversationHistory.push({role: 'assistant', content: pulsoHistoryDigest(response.answer)});
                 if (window.conversationHistory.length > 20) {
                     window.conversationHistory = window.conversationHistory.slice(-20);
                 }

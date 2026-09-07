@@ -799,7 +799,13 @@ class chat_pipeline {
         }
 
         $parts = [];
-        foreach (['title', 'summary', 'content'] as $key) {
+        // 'next_step' va AL FINAL y tiene que estar (v1.15.2): la regla de INICIATIVA
+        // prohíbe repetir el ofrecimiento dos turnos seguidos, y para eso el modelo
+        // necesita VER el del turno anterior. Como el esquema del LLM no tiene
+        // 'content', sin esta clave el digest de una respuesta del modelo sería solo
+        // título + resumen y la regla de no repetir no tendría con qué cumplirse.
+        // Es una frase en prosa, así que no reabre la trampa de las filas de 'data'.
+        foreach (['title', 'summary', 'content', 'next_step'] as $key) {
             if (!empty($data[$key]) && is_string($data[$key])) {
                 $parts[] = trim($data[$key]);
             }

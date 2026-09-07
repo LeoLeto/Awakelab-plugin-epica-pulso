@@ -922,6 +922,18 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             margin-top: 4px;
         }
 
+        /* Ofrecimiento del siguiente paso (campo 'next_step'). Cierra la respuesta,
+           así que se distingue del cuerpo con el acento cian a la izquierda pero sin
+           tarjeta: no es una sección más, es la última frase. */
+        .pulso-next-step {
+            margin-top: 10px;
+            padding: 8px 0 8px 12px;
+            border-left: 2px solid var(--pulso-cyan);
+            color: var(--pulso-cyan-soft);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
         .pulso-insights ul,
         .pulso-recos ul {
             margin: 0;
@@ -1776,6 +1788,22 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                         html += `<li>${escapeHtml(String(rec))}</li>`;
                     });
                     html += '</ul></div>';
+                }
+
+                // Ofrecimiento del siguiente paso (campo 'next_step', v1.15.2). Se pinta
+                // como bloque APARTE y SIEMPRE que venga, sin depender de data.type ni de
+                // showAnalysisSections: en v1.15.0 la regla pedía la frase dentro de
+                // 'content', que solo se pinta si type === 'text', así que en las
+                // respuestas de analítica (type table/list) era invisible por diseño; y
+                // 'recommendations' se oculta entero cuando la pregunta no parece de
+                // analítica. Con campo propio no hay layout en el que se pierda.
+                // Se escapa aquí y no pasa por formatRichTextResponse() (que escapa el
+                // bloque entero una sola vez), igual que el enlace de abajo.
+                const nextStep = (data.next_step !== undefined && data.next_step !== null)
+                    ? String(data.next_step).trim()
+                    : '';
+                if (nextStep !== '') {
+                    html += `<div class="pulso-next-step">${escapeHtml(nextStep)}</div>`;
                 }
 
                 // Enlace directo a la actividad/recurso. La URL la construye SIEMPRE el
@@ -3097,7 +3125,11 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                 return pulsoTrimDigest(raw.replace(/[{}\[\]"]/g, ' '));
             }
             const parts = [];
-            ['title', 'summary', 'content'].forEach(function(key) {
+            // 'next_step' al FINAL y en la misma posición que en el digest de PHP
+            // (chat_pipeline::history_digest): los dos tienen que producir exactamente
+            // lo mismo. Va incluido porque la regla de INICIATIVA prohíbe repetir el
+            // ofrecimiento dos turnos seguidos, y el modelo necesita ver el anterior.
+            ['title', 'summary', 'content', 'next_step'].forEach(function(key) {
                 if (typeof data[key] === 'string' && data[key].trim()) {
                     parts.push(data[key].trim());
                 }

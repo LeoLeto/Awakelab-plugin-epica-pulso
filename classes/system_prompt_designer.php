@@ -741,17 +741,35 @@ PROMPT;
             . "concreto que el usuario querría y (2) puedes cumplirlo con lo que hay en este prompt. Si dudas, calla.\n";
         $initiative_rule .= "Ofrece si: tu respuesta abre una pregunta que él tendría que hacer a mano (una evaluación → "
             . "el temario o los materiales para repasarla); resumiste solo una parte de algo más largo"
-            . ($isteacher ? "; un dato flojo señala una actividad concreta" : "")
+            // Este ejemplo concreto se perdió al comprimir la regla y con él se
+            // perdieron justo los dos casos que fallaron en el QA del 2026-09-07
+            // (nota media del curso, alumnos en riesgo): sin él, "un dato flojo"
+            // no le decía al modelo qué ofrecer.
+            . ($isteacher ? "; un dato flojo pide el paso siguiente (una nota media baja o pocas entregas: puedes "
+                . "decir qué actividad concentra el problema)" : "")
             . "; ves en los datos algo que le afecta y no ha preguntado.\n";
         $initiative_rule .= "Calla si: tu respuesta ya es completa y cerrada (un número, un nombre, una fecha); encadena "
             . "preguntas sobre lo mismo; el turno anterior ya acabó en un ofrecimiento que no cogió (nunca dos seguidos); "
             . "lo que se te ocurre es genérico (\"¿algo más?\") o no puedes cumplirlo.\n";
-        $initiative_rule .= "Forma: UNA frase, la última de 'content', nunca fuera del JSON; di qué harás y sobre qué "
-            . "material, sección o actividad REAL de este prompt (si no lo ves aquí, no existe). Sin listas de opciones.\n";
+        // El ofrecimiento va en su PROPIO campo, `next_step`. La v1.15.0 pedía "la
+        // última frase de 'content'" y salió 0 de 10 en el QA: 'content' NO existe
+        // en el esquema de salida del LLM (es de los payloads de la ruta directa),
+        // así que se le pedía escribir en un campo que la regla de FORMATO DE
+        // SALIDA le prohíbe emitir. Con un campo propio, además, el frontend puede
+        // pintarlo en cualquier layout (con 'content' era invisible en type
+        // table/list, que es justo el de las respuestas de analítica).
+        $initiative_rule .= "Forma: cuando toque, añade al objeto JSON el campo \"next_step\" con UNA frase concreta y "
+            . "accionable; si no toca ofrecer nada, OMÍTELO (no lo pongas vacío). Nada fuera del objeto JSON: se "
+            . "descarta y no llega al usuario.\n";
+        $initiative_rule .= "Di qué harás y sobre qué material, sección o actividad REAL de este prompt (si no lo ves "
+            . "aquí, no existe). Una sola propuesta, no una lista.\n";
         $initiative_rule .= $isteacher
-            ? "Ofrece seguimiento del grupo o preparación de la docencia.\n"
-            : "Ofrece repaso y materiales. PROHIBIDO ofrecer datos del grupo, de otros alumnos o notas, tampoco las suyas "
-                . "(\"¿quieres ver cómo van tus compañeros?\"): la sugerencia es una vía de fuga igual que la respuesta.\n";
+            ? "Ofrece seguimiento del grupo o preparación de la docencia. Ejemplo: \"next_step\":\"Si quieres, miro en "
+                . "qué actividad se concentran los suspensos.\"\n"
+            : "Ofrece repaso y materiales. Ejemplo: \"next_step\":\"Si quieres, te preparo un repaso con el material de "
+                . "la sección que cubre esos temas.\" PROHIBIDO ofrecer datos del grupo, de otros alumnos o notas, "
+                . "tampoco las suyas (\"¿quieres ver cómo van tus compañeros?\"): la sugerencia es una vía de fuga "
+                . "igual que la respuesta.\n";
 
         // Regla de conversación: los turnos anteriores llegan como texto resumido
         // (chat_pipeline::history_digest()). Va en el bloque dinámico, no en el
@@ -778,6 +796,11 @@ PROMPT;
         // tienes:") o envolver el JSON en fences pese a los ejemplos previos.
         $format_reinforcement = $initiative_rule . $conversation_rule . "\n\n## FORMATO DE SALIDA — REGLA ABSOLUTA\n";
         $format_reinforcement .= "Tu respuesta COMPLETA debe ser ÚNICAMENTE el objeto JSON del schema anterior, sin nada más.\n";
+        // Sin esta excepción explícita, "únicamente el objeto JSON del schema" le
+        // prohíbe el campo del ofrecimiento y la regla de INICIATIVA es imposible
+        // de cumplir (v1.15.0: 0 ofrecimientos en 10 respuestas).
+        $format_reinforcement .= "- Excepción única: puedes añadir el campo \"next_step\" (una frase, ver INICIATIVA) "
+            . "cuando de verdad toque ofrecer el siguiente paso. Ningún otro campo fuera del schema.\n";
         $format_reinforcement .= "- Empieza tu respuesta directamente por el carácter '{' y termínala en '}'.\n";
         $format_reinforcement .= "- NO escribas ningún texto antes del JSON (nada de \"Aquí tienes\", \"Claro,\", saludos, explicaciones).\n";
         $format_reinforcement .= "- NO escribas ningún texto después del JSON.\n";

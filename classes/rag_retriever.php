@@ -751,7 +751,12 @@ class rag_retriever {
                     continue;
                 }
                 $significantTokens++;
-                if (strpos($query, $token) !== false) {
+                // Palabra COMPLETA, no subcadena (v1.14.0): con strpos, un nombre
+                // de actividad enganchaba por la mitad de otra palabra de la
+                // pregunta ("dudas" dentro de "adudas", "ia" dentro de
+                // "materia"...). El match exacto de nombre completo sigue
+                // resolviendo aparte los nombres cortos y las siglas.
+                if (preg_match('/(?<![\pL\pN])' . preg_quote($token, '/') . '(?![\pL\pN])/ui', $query)) {
                     $hits++;
                 }
             }
@@ -782,6 +787,19 @@ class rag_retriever {
                 $bestScore = $score;
                 $bestRecord = $record;
             }
+        }
+
+        // Traza para auditar por qué se elige (o no) una actividad. Solo con el
+        // modo depuración de Moodle activo; es la forma de comprobar en el sitio
+        // real si un "no hay match" se está colando como match.
+        if (function_exists('debugging')) {
+            debugging(
+                'block_pulso match_activity_by_name_fuzzy: ' .
+                ($bestRecord === null
+                    ? 'sin match para "' . $query . '"'
+                    : 'elegido "' . $bestRecord->name . '" (score ' . $bestScore . ') para "' . $query . '"'),
+                DEBUG_DEVELOPER
+            );
         }
 
         return $bestRecord;
@@ -2429,6 +2447,17 @@ class rag_retriever {
             $diagnostics['direct_structure_context'] = true;
         }
 
+        // La pregunta nombra una actividad que NO existe en el curso: hay que
+        // decirlo. Sin este aviso, la recuperación semántica devolvía los
+        // fragmentos "menos malos" (el foro del curso, por ejemplo) y el modelo
+        // los presentaba como si fueran la respuesta — inventando incluso sus
+        // cifras. Con el aviso, responde que no existe y ofrece las reales.
+        $missingActivityNotice = self::build_missing_activity_notice($courseid, $query);
+        if ($missingActivityNotice !== '') {
+            $diagnostics['missing_activity_notice'] = true;
+            $directStructureContext = $missingActivityNotice . $directStructureContext;
+        }
+
         // Guard: RAG must be explicitly enabled in admin settings.
         if (!$diagnostics['rag_enabled']) {
             $diagnostics['status'] = 'disabled';
@@ -2547,6 +2576,47 @@ class rag_retriever {
             'context' => implode("\n", $lines),
             'diagnostics' => $diagnostics
         ];
+    }
+
+    /**
+     * Si la pregunta nombra explícitamente una actividad/recurso ("la actividad
+     * IA", "el foro X", "la tarea T1") y en el curso NO existe nada con ese
+     * nombre, devuelve un aviso para el prompt. Cadena vacía en cualquier otro
+     * caso.
+     *
+     * @param int $courseid
+     * @param string $query
+     * @return string
+     */
+    private static function build_missing_activity_notice(int $courseid, string $query): string {
+        $q = mb_strtolower(trim($query), 'UTF-8');
+
+        // Solo cuando la pregunta pone una etiqueta de tipo delante de un nombre:
+        // "la actividad X", "el recurso X", "el foro X"... Si el usuario no nombra
+        // nada concreto, no hay nada que avisar.
+        $named = (bool)preg_match(
+            '/\b(actividad|recurso|documento|archivo|pdf|foro|tarea|cuestionario|examen|p[aá]gina|libro|glosario|wiki|lecci[oó]n|carpeta)\s+' .
+            // Se admite "foro DE novedades" (nombres que empiezan por "de"), pero
+            // no "recurso de la sección 2" ni las anáforas ("ese", "el anterior").
+            '(?:de\s+(?!la\b|el\b|los\b|las\b|este\b|esta\b|ese\b|esa\b|un\b|una\b|qu[eé]\b))?' .
+            '(?!que\b|de\b|del\b|la\b|el\b|los\b|las\b|un\b|una\b|este\b|esta\b|ese\b|esa\b|anterior\b|previo\b|mismo\b|hay\b|tiene\b|con\b|para\b|sobre\b)' .
+            '[\p{L}\p{N}][\p{L}\p{N}_\-]*/u',
+            $q
+        );
+        if (!$named) {
+            return '';
+        }
+
+        if (self::query_mentions_any_activity_name($courseid, $q)) {
+            return '';
+        }
+
+        return "## AVISO: LA ACTIVIDAD MENCIONADA NO EXISTE EN ESTE CURSO\n"
+            . "La pregunta nombra una actividad o recurso que NO está en este curso.\n"
+            . "- Dilo con claridad: no existe ninguna actividad con ese nombre.\n"
+            . "- NO respondas sobre otra actividad distinta ni des cifras de otra actividad.\n"
+            . "- Ofrece las actividades y secciones REALES del curso que tengas en este contexto, por si el "
+            . "usuario buscaba una de ellas con otro nombre.\n\n";
     }
 
     /**

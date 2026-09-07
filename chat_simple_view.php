@@ -3155,6 +3155,31 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                 .slice(0, 500);
         }
 
+        // Mensaje al usuario cuando una respuesta no se puede usar. Lo comparten el
+        // evento 'error' del SSE y la rama de fallo de handleChatResponse, que es la
+        // que en el QA de 1.15.2 mostró "Error: No success flag" — un literal de
+        // desarrollador que no le dice nada a nadie.
+        //
+        // El detalle del servidor solo se añade cuando es un error de verdad. Con
+        // success:true (respuesta vacía) el 'message' del payload es "Query procesado
+        // exitosamente", que como texto de error no tiene sentido; y el prefijo
+        // "Error:" que ya pone el servidor se quita para no pintar "Error: Error: ...".
+        function pulsoFailureMessage(payload) {
+            const lang = navigator.language.startsWith('en') ? 'en' : 'es';
+            const raw = (payload && typeof payload.message === 'string') ? payload.message : '';
+            const detail = raw.replace(/^(?:\s*error\s*:\s*)+/i, '').trim();
+            const useDetail = detail !== '' && !(payload && payload.success === true);
+            let text = lang === 'en'
+                ? '⚠️ I could not complete the answer. Try again in a few seconds; if it happens again, '
+                    + 'press "Nueva conversación" and ask once more.'
+                : '⚠️ No he podido completar la respuesta. Inténtalo de nuevo en unos segundos; si vuelve a '
+                    + 'pasar, pulsa «Nueva conversación» y repite la pregunta.';
+            if (useDetail) {
+                text += (lang === 'en' ? ' Detail: ' : ' Detalle: ') + detail;
+            }
+            return text;
+        }
+
         // Procesamiento compartido de la respuesta completa (stream final / XHR).
         function handleChatResponse(message, response) {
             if (response.success && response.answer) {
@@ -3199,9 +3224,25 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                     console.warn('⚠️ No se pudo guardar historial en sessionStorage');
                 }
             } else {
-                const errorMsg = response.message || 'No success flag';
-                console.error('❌ Response not successful:', response);
-                addMessage('⚠️ Error: ' + errorMsg, 'ai');
+                // Este else colapsa TRES situaciones distintas y las tres acababan
+                // mostrando texto de desarrollador al usuario (visto en el QA de
+                // 1.15.2: "Error: No success flag", que no dice nada):
+                //  - success:false con 'message' = "Error: <texto crudo de la
+                //    excepción>" (api_chat.php / api_chat_stream.php) → se pintaba
+                //    doblemente prefijado, "Error: Error: ...".
+                //  - success:true pero 'answer' vacío → el 'message' del payload es
+                //    "Query procesado exitosamente", que como error no tiene sentido.
+                //  - una respuesta sin 'success' ni 'message' → el literal
+                //    "No success flag".
+                // Ahora al usuario se le dice qué hacer y el detalle técnico se queda
+                // en la consola. El detalle del servidor solo se añade cuando es un
+                // error de verdad (success:false con mensaje), nunca el "procesado
+                // exitosamente" de una respuesta vacía.
+                // Este turno NO entra en el historial, y así debe seguir: un turno
+                // fallido en el historial se le reenvía al modelo en la pregunta
+                // siguiente.
+                console.error('❌ Respuesta no utilizable:', response);
+                addMessage(pulsoFailureMessage(response), 'ai');
             }
         }
 
@@ -3317,7 +3358,8 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                     gotFinal = true;
                     showLoading(false);
                     removeStreamBubble();
-                    addMessage('⚠️ Error: ' + (data.message || 'desconocido'), 'ai');
+                    console.error('❌ Evento error del stream:', data);
+                    addMessage(pulsoFailureMessage(data), 'ai');
                 }
             }
 

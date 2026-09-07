@@ -1,5 +1,50 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-07 — El ofrecimiento no salía nunca: campo propio `next_step` (v1.15.2)
+
+QA de v1.15.0 en el curso 92: los 4 casos de control pasan, ninguna regresión, las
+sugerencias de las rutas directas funcionan de punta a punta (el caso cuestionario →
+temario incluido)… y **0 ofrecimientos en 10 respuestas** por el camino del LLM, incluidas
+4 donde la regla aplicaba. La mitad de "cállate" funcionaba perfecta. Diagnóstico entero
+desde el código, sin necesitar el log:
+
+- **Le estaba pidiendo al modelo un campo que el propio prompt le prohíbe.** La regla decía
+  "la última frase de `content`", y `content` **no existe en el esquema de salida del
+  LLM** — es un campo de los payloads de la ruta directa. Con `FORMATO DE SALIDA`
+  exigiendo "únicamente el objeto JSON del schema", el modelo no tenía dónde ponerlo.
+  Explica el 0/10 y explica por qué la mitad de "cállate" sí funcionaba: esa no necesita
+  ningún campo.
+- **Y lo introduje al comprimir la regla.** La versión de 750 tokens decía "última frase de
+  `content` *(o del último párrafo de `data` si el cuerpo va ahí)*". Al bajar a 282 quité
+  el paréntesis, que era la única referencia a un campo que sí existe. Lección: al
+  comprimir un prompt, lo que parece redundancia puede ser la única vía viable — comprobar
+  contra el esquema, no contra la lectura.
+- **Segundo fallo apilado, independiente del prompt:** aunque el modelo lo hubiera
+  emitido, `formatAIResponse()` solo pinta `content` si `type === 'text'`, e
+  `insights`/`recommendations` solo si `isAnalyticsQuestion(message)`. En las dos
+  respuestas de analítica del QA (`type: table`) `content` era invisible por diseño; en
+  las dos de contenido lo eran las recomendaciones. **No había ningún campo del esquema
+  que se pintara en los cuatro layouts.** Por eso el arreglo no es renombrar un campo: es
+  darle uno propio y pintarlo al margen de `type` y de `isAnalyticsQuestion`.
+- **Consecuencia que había que arreglar de paso:** `next_step` entra en el digest del
+  historial (PHP **y** JS, misma posición) porque la regla de "no repitas el ofrecimiento
+  dos turnos seguidos" necesita ver el del turno anterior — y como el esquema no tiene
+  `content`, el digest de una respuesta del modelo era solo título + resumen. Sin esto, el
+  primer efecto visible del arreglo habrían sido ofrecimientos repetidos.
+- **Coste:** la regla pasa de ~282 a ~420 tokens (~$0,84 por mil mensajes). Los ~140 de
+  más son el nombre del campo, la instrucción de omitirlo cuando no toca, el "nada fuera
+  del objeto JSON", un ejemplo concreto de `next_step` y la autorización en
+  `FORMATO DE SALIDA`. Se recortó la redundancia dos veces antes de cerrar (de 407 a 374
+  en la sección).
+- **La instrumentación se queda en el código, apagada**: `$CFG->block_pulso_log_raw_answer`
+  (servidor, respuesta cruda antes de `clean_answer()` — `error_log` y no `debugging()`,
+  que en el endpoint SSE rompería el stream) y `window.pulsoDebug` (cliente, JSON final +
+  qué secciones se van a pintar). Sirven para la próxima.
+- **Verificado**: 215 comprobaciones, 0 fallos, incluida la **paridad del digest de PHP con
+  el del cliente ejecutando el JS real con node** (invariante de v1.14.0) y que el texto de
+  los dos prompts base sigue intacto contra `git HEAD`. v1.15.1 nunca llegó al servidor:
+  hay que desplegar **1.15.2**, que lo contiene todo.
+
 ## 2026-09-07 — Conversación proactiva (v1.15.0)
 
 Implementada la idea que quedaba pendiente de la ronda 5. Las reglas que deben persistir

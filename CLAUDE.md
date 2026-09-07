@@ -318,12 +318,36 @@ secciones") **no puede salir**.
 La regla se implementa en DOS sitios porque el chat tiene dos caminos, y una regla en el
 prompt no cubre el otro:
 
+- **El ofrecimiento viaja en su PROPIO campo, `next_step`** (v1.15.2), y esto es un
+  invariante, no un detalle de estilo. La v1.15.0 pedía la frase "como última frase de
+  `content`" y salió **0 ofrecimientos en 10 respuestas** en el QA. Dos causas apiladas,
+  las dos estructurales: (a) **`content` NO existe en el esquema de salida del LLM**
+  (`{type,title,summary,data,insights,recommendations,language,confidence}`) — es un campo
+  de los payloads de la *ruta directa*, y la regla de `FORMATO DE SALIDA` prohíbe
+  cualquier campo fuera del esquema, así que se le estaba pidiendo algo imposible; (b)
+  aunque lo hubiera emitido, `formatAIResponse()` solo pinta `content` si
+  `type === 'text'`, y `insights`/`recommendations` solo si `isAnalyticsQuestion(message)`
+  — o sea que **ningún campo del esquema se pinta en los cuatro layouts**: en una
+  respuesta de analítica (`type: table`) `content` es invisible por diseño, y en una de
+  contenido lo son las recomendaciones. Reglas que se derivan: `next_step` se declara en
+  el bloque **dinámico** (no en el base: no toca el prefijo cacheado), se autoriza
+  **explícitamente** en `FORMATO DE SALIDA` (sin esa excepción la regla es incumplible),
+  se pinta como bloque aparte **sin depender de `type` ni de `isAnalyticsQuestion`**, y
+  entra en el digest del historial (`history_digest()` y `pulsoHistoryDigest()`, las dos)
+  porque la regla de "no repitas el ofrecimiento dos turnos seguidos" necesita ver el del
+  turno anterior — y sin `content` en el esquema, el digest de una respuesta del modelo
+  sería solo título + resumen. **Si algún día se añade otro campo a la respuesta, la
+  pregunta que hay que hacerse es la misma: ¿está en el esquema, lo autoriza el formato,
+  y lo pinta el frontend en TODOS los layouts?**
 - **Respuestas del LLM** → sección `## INICIATIVA` en `build_dynamic_prompt_section()`.
   Va en el bloque **dinámico**, nunca en el base: depende del rol, y una sección
   condicional dentro del bloque cacheado crearía una entrada de caché por combinación.
-  Está redactada al mínimo (~280 tokens, ~$0,56 por mil mensajes en `claude-sonnet-5` a
-  $2/MTok de input) porque **se paga sin cachear en cada respuesta que pasa por el LLM**:
-  antes de añadirle una línea, quita otra. Diferencia por rol: al docente, seguimiento
+  Está redactada al mínimo (~420 tokens con la autorización de `next_step` incluida, unos
+  $0,84 por mil mensajes en `claude-sonnet-5` a $2/MTok de input) porque **se paga sin
+  cachear en cada respuesta que pasa por el LLM**: antes de añadirle una línea, quita
+  otra. Solo la pagan las dos llamadas de respuesta principal —
+  `answer_document_question()` y `summarize_document_text()` llevan su propio system
+  prompt corto, y los follow-ups de Haiku también. Diferencia por rol: al docente, seguimiento
   del grupo; al alumno, repaso y materiales, con la prohibición de datos del grupo
   aplicada también al ofrecimiento (una sugerencia es una vía de fuga igual que una
   respuesta). El ofrecimiento va DENTRO del JSON, como última frase de `content`.

@@ -724,6 +724,35 @@ PROMPT;
             $base_prompt .= $rag_context;
         }
 
+        // Iniciativa (v1.15.0): el chat puede ofrecer el siguiente paso útil, pero
+        // el caso POR DEFECTO es callarse. Va en el bloque DINÁMICO, no en el base:
+        // depende del rol, y una sección condicional dentro del bloque cacheado
+        // crearía una entrada de caché por combinación (invariante de CLAUDE.md).
+        //
+        // Redactada al mínimo a propósito: se paga SIN CACHEAR en cada respuesta
+        // que pasa por el LLM. Si se alarga, se paga en todas; antes de añadirle
+        // una línea, quita otra.
+        //
+        // OJO — esta regla solo gobierna las respuestas que pasan por el LLM. Las
+        // respuestas de una actividad concreta se construyen desde la BD sin
+        // modelo, y ahí la proactividad vive en chat_pipeline::build_direct_followups().
+        $initiative_rule = "\n\n## INICIATIVA\n";
+        $initiative_rule .= "Por defecto NO ofrezcas nada. Cierra con UN ofrecimiento solo si (1) hay un siguiente paso "
+            . "concreto que el usuario querría y (2) puedes cumplirlo con lo que hay en este prompt. Si dudas, calla.\n";
+        $initiative_rule .= "Ofrece si: tu respuesta abre una pregunta que él tendría que hacer a mano (una evaluación → "
+            . "el temario o los materiales para repasarla); resumiste solo una parte de algo más largo"
+            . ($isteacher ? "; un dato flojo señala una actividad concreta" : "")
+            . "; ves en los datos algo que le afecta y no ha preguntado.\n";
+        $initiative_rule .= "Calla si: tu respuesta ya es completa y cerrada (un número, un nombre, una fecha); encadena "
+            . "preguntas sobre lo mismo; el turno anterior ya acabó en un ofrecimiento que no cogió (nunca dos seguidos); "
+            . "lo que se te ocurre es genérico (\"¿algo más?\") o no puedes cumplirlo.\n";
+        $initiative_rule .= "Forma: UNA frase, la última de 'content', nunca fuera del JSON; di qué harás y sobre qué "
+            . "material, sección o actividad REAL de este prompt (si no lo ves aquí, no existe). Sin listas de opciones.\n";
+        $initiative_rule .= $isteacher
+            ? "Ofrece seguimiento del grupo o preparación de la docencia.\n"
+            : "Ofrece repaso y materiales. PROHIBIDO ofrecer datos del grupo, de otros alumnos o notas, tampoco las suyas "
+                . "(\"¿quieres ver cómo van tus compañeros?\"): la sugerencia es una vía de fuga igual que la respuesta.\n";
+
         // Regla de conversación: los turnos anteriores llegan como texto resumido
         // (chat_pipeline::history_digest()). Va en el bloque dinámico, no en el
         // base, para no tocar el prefijo cacheado.
@@ -747,7 +776,7 @@ PROMPT;
         // que lee el modelo) para maximizar que la respete. Necesaria porque
         // Claude, a diferencia de GPT-4o, tiende a añadir preámbulos ("Aquí
         // tienes:") o envolver el JSON en fences pese a los ejemplos previos.
-        $format_reinforcement = $conversation_rule . "\n\n## FORMATO DE SALIDA — REGLA ABSOLUTA\n";
+        $format_reinforcement = $initiative_rule . $conversation_rule . "\n\n## FORMATO DE SALIDA — REGLA ABSOLUTA\n";
         $format_reinforcement .= "Tu respuesta COMPLETA debe ser ÚNICAMENTE el objeto JSON del schema anterior, sin nada más.\n";
         $format_reinforcement .= "- Empieza tu respuesta directamente por el carácter '{' y termínala en '}'.\n";
         $format_reinforcement .= "- NO escribas ningún texto antes del JSON (nada de \"Aquí tienes\", \"Claro,\", saludos, explicaciones).\n";

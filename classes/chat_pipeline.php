@@ -1331,6 +1331,23 @@ class chat_pipeline {
     /**
      * Preguntas de seguimiento deterministas para respuestas directas.
      *
+     * Las rutas directas NO pasan por el LLM, así que estas sugerencias son su
+     * ÚNICA forma de ofrecer un siguiente paso útil (v1.15.0). Por eso proponen
+     * ayuda real —de qué van las preguntas de un cuestionario y con qué material
+     * se repasa, qué pide una tarea y cómo prepararla, profundizar en un recurso
+     * o relacionarlo con el resto del curso— en vez de trivia sobre la misma
+     * actividad ("¿cuántas preguntas tiene?", "¿un resumen más corto?").
+     *
+     * Dos reglas al redactarlas, las dos con su motivo:
+     *  - Incluir el NOMBRE de la actividad siempre que se tenga: al pulsar la
+     *    sugerencia, su texto vuelve a entrar por el pipeline y el matcher
+     *    necesita el nombre para acertar (mismo motivo que las tarjetas del home).
+     *  - Cada rama debe dejar al menos DOS sugerencias de contenido que sobrevivan
+     *    a filter_student_followups(). Si se cayeran todas, el alumno recibiría el
+     *    catálogo genérico de student_content_followups() y perdería el seguimiento
+     *    contextual. La tercera de las ramas de actividad es deliberadamente de
+     *    seguimiento del grupo: útil al docente, filtrada al alumno.
+     *
      * @param array $direct_course_answer
      * @param string $qnorm
      * @param bool $isContentSpecificQuery
@@ -1343,76 +1360,138 @@ class chat_pipeline {
         $isAssignAnswer = (bool)preg_match('/^Tarea:/i', $answerTitle);
         $isForumAnswer = (bool)preg_match('/^Foro:/i', $answerTitle);
         $isGenericActivity = (bool)preg_match('/^(Página|URL|Libro|Carpeta|Glosario|Wiki|Encuesta|Feedback|Lección):/i', $answerTitle);
+        $name = self::direct_answer_activity_name($answerTitle, $isDocumentAnswer);
 
-        if ($isDocumentAnswer && $isContentSpecificQuery) {
-            return [
-                '¿Puedes mostrarme el siguiente apartado?',
-                '¿Qué otros contenidos tiene este archivo?',
-                '¿Puedes hacer un resumen del archivo completo?'
-            ];
-        }
+        // Las ramas de actividad van ANTES que la de documento: si la respuesta es
+        // el contenido de un cuestionario o de una tarea, el siguiente paso útil
+        // sigue siendo el de su tipo (temario y material de repaso), no el
+        // "siguiente apartado" de un documento.
         if ($isQuizAnswer) {
+            $ref = $name !== '' ? 'el cuestionario "' . $name . '"' : 'este cuestionario';
+            $refde = $name !== '' ? 'del cuestionario "' . $name . '"' : 'de este cuestionario';
             return [
-                '¿Cuántas preguntas tiene este cuestionario?',
-                '¿Puedes mostrarme la primera pregunta?',
-                '¿Cuántos alumnos han completado este cuestionario?'
+                '¿De qué temas van las preguntas ' . $refde . '?',
+                '¿Qué materiales del curso me sirven para repasar ' . $ref . '?',
+                '¿Cuántos alumnos han intentado ' . $ref . '?'
             ];
         }
         if ($isAssignAnswer) {
+            $ref = $name !== '' ? 'la tarea "' . $name . '"' : 'esta tarea';
             return [
-                '¿Cuántos alumnos han entregado esta tarea?',
-                '¿Cuál es la calificación media de esta tarea?',
-                '¿Qué otras tareas hay en el curso?'
+                '¿Qué me piden exactamente en ' . $ref . '?',
+                '¿Con qué material del curso puedo preparar ' . $ref . '?',
+                '¿Cuántos alumnos han entregado ' . $ref . '?'
             ];
         }
         if ($isForumAnswer) {
+            $ref = $name !== '' ? 'el foro "' . $name . '"' : 'este foro';
             return [
-                '¿Cuántas discusiones tiene este foro?',
-                '¿Qué otros foros hay en el curso?',
-                '¿Qué contenidos hay en este curso?'
+                '¿De qué se está hablando en ' . $ref . '?',
+                '¿Qué materiales del curso se relacionan con ' . $ref . '?',
+                '¿Cuántos alumnos han participado en ' . $ref . '?'
             ];
         }
         if ($isGenericActivity) {
+            $ref = $name !== '' ? '"' . $name . '"' : 'esta actividad';
             return [
-                '¿Cuántos alumnos han completado esta actividad?',
-                '¿Qué otros contenidos hay en esta sección?',
-                '¿Qué contenidos hay en este curso?'
+                '¿Qué tengo que hacer exactamente en ' . $ref . '?',
+                '¿Qué materiales del curso me preparan para ' . $ref . '?',
+                '¿Cuántos alumnos han completado ' . $ref . '?'
             ];
         }
-        if ($isDocumentAnswer || preg_match('/pdf|recurso|archivo|resource/u', $qnorm)) {
-            // Extraer nombre del recurso para preguntas contextualizadas.
-            $resName = '';
-            if (preg_match('/^Resumen del recurso\s+(.+)$/i', $answerTitle, $_rn)) {
-                $resName = trim($_rn[1]);
-            } else if (preg_match('/^Recurso\s+(.+)$/i', $answerTitle, $_rn)) {
-                $resName = trim($_rn[1]);
-            }
-            $refLabel = $resName !== '' ? '"' . $resName . '"' : 'este archivo';
+        // Un listado NO es un material, y se resuelve ANTES que la rama de
+        // documento: el nombre de la sección ("RECURSOS") mete "recurso" en qnorm,
+        // así que un listado de sección caía en la rama de documento y ofrecía
+        // "este material" sobre algo que no es un material.
+        $sectionName = '';
+        if (preg_match('/^Contenido de la sección\s+(.+)$/ui', $answerTitle, $_sn)) {
+            $sectionName = self::sanitize_history_name($_sn[1]);
+        }
+        $isCourseListing = (bool)preg_match('/^(Secciones del curso|Contenido del curso)/ui', $answerTitle);
+
+        if ($sectionName === '' && !$isCourseListing
+                && ($isDocumentAnswer || preg_match('/pdf|recurso|archivo|resource/u', $qnorm))) {
+            $ref = $name !== '' ? '"' . $name . '"' : 'este material';
+            // Si acabamos de responder una pregunta concreta sobre el texto, lo
+            // natural es seguir leyendo; si fue un resumen, profundizar.
+            $first = $isContentSpecificQuery
+                ? '¿Puedes mostrarme el siguiente apartado de ' . $ref . '?'
+                : '¿Puedes explicarme con más detalle el contenido de ' . $ref . '?';
             return [
-                '¿Qué temas principales trata ' . $refLabel . '?',
-                '¿Puedes explicarme con más detalle el contenido de ' . $refLabel . '?',
-                '¿Quieres un resumen más corto en 2 líneas?'
+                $first,
+                '¿Qué otros materiales del curso tratan lo mismo que ' . $ref . '?',
+                '¿En qué sección está ' . $ref . ' y qué más hay en esa sección?'
             ];
         }
-        if (strpos($qnorm, 'seccion') !== false || strpos($qnorm, 'sección') !== false) {
+        // "¿Cuántas secciones tiene el curso?" habla de secciones pero no de UNA
+        // sección: su respuesta es el listado del curso, y ahí lo útil es el curso.
+        if ($sectionName !== ''
+                || (!$isCourseListing
+                    && (strpos($qnorm, 'seccion') !== false || strpos($qnorm, 'sección') !== false))) {
+            $ref = $sectionName !== '' ? 'la sección "' . $sectionName . '"' : 'esta sección';
             return [
-                '¿Cuántas secciones tiene este curso?',
-                '¿Cómo se llama este curso?',
-                '¿Qué actividades hay en otra sección?'
+                '¿Puedes resumirme los materiales de ' . $ref . '?',
+                '¿Qué tengo que estudiar de ' . $ref . '?',
+                '¿Qué actividades de ' . $ref . ' tienen fecha de entrega?'
             ];
         }
-        if (preg_match('/contenidos?.*curso|qu[eé]\s+hay\s+en\s+(este|el)\s+curso/u', $qnorm)) {
+        if ($isCourseListing || preg_match('/contenidos?.*curso|qu[eé]\s+hay\s+en\s+(este|el)\s+curso/u', $qnorm)) {
             return [
-                '¿Qué contenidos hay en una sección concreta?',
-                '¿Puedes darme un resumen de algún PDF del curso?',
-                '¿Cuántas secciones tiene este curso?'
+                '¿De qué trata este curso y qué temas cubre?',
+                '¿Puedes resumirme los materiales de una sección concreta?',
+                '¿Qué actividades del curso tienen fecha de entrega?'
             ];
         }
         return [
-            '¿Cuántas secciones tiene este curso?',
-            '¿Qué contenidos hay dentro de una sección concreta?',
-            '¿Cómo se llama este curso?'
+            '¿De qué trata este curso y qué temas cubre?',
+            '¿Qué materiales hay para estudiar en el curso?',
+            '¿Qué contenidos hay dentro de una sección concreta?'
         ];
+    }
+
+    /**
+     * Nombre de la actividad o recurso al que responde un payload directo,
+     * sacado de su título ('Cuestionario: X', 'Resumen del recurso X'...).
+     *
+     * Devuelve '' cuando el título NO identifica uno concreto (listado de
+     * sección, secciones del curso, datos del curso): en ese caso la sugerencia
+     * usa un referente genérico, en vez de colar un título de listado como si
+     * fuera el nombre de un material — que es justo lo que dejaría la pregunta
+     * irreconocible para el matcher al volver a entrar por el pipeline.
+     *
+     * @param string $title            Campo 'title' del payload directo
+     * @param bool   $isDocumentAnswer content_mode/summary_mode: ahí el título
+     *                                 puede ser el nombre del recurso a secas
+     * @return string Nombre limpio, o '' si el título no es un nombre
+     */
+    private static function direct_answer_activity_name(string $title, bool $isDocumentAnswer): string {
+        $title = trim($title);
+        if ($title === '') {
+            return '';
+        }
+
+        $patterns = [
+            '/^(?:Cuestionario|Tarea|Foro|Página|URL|Libro|Carpeta|Glosario|Wiki|Encuesta|Feedback|Lección)\s*:\s*(.+)$/ui',
+            '/^Resumen del recurso\s+(.+)$/ui',
+            '/^Recurso\s+(.+)$/ui',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $title, $m)) {
+                return self::sanitize_history_name($m[1]);
+            }
+        }
+
+        // Respuesta de contenido de un recurso: el título ES el nombre del
+        // recurso, sin prefijo (ver rag_retriever::resolve_direct_resource_query).
+        // Los títulos de listado o de curso no son el nombre de nada.
+        $notaname = '/^(?:Contenido|Resumen)\s+(?:del|de\s+la)\s+(?:curso|secci[oó]n)'
+            . '|^PDF\/recurso|^Resumen del PDF|^Secciones del curso|^Datos del curso'
+            . '|^Etiqueta en secci[oó]n/ui';
+        if ($isDocumentAnswer && !preg_match($notaname, $title)) {
+            return self::sanitize_history_name($title);
+        }
+
+        return '';
     }
 
     /**

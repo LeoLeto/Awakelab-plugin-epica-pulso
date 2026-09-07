@@ -1,5 +1,44 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-07 — Ronda 4: contaminación residual y "no hay match" (v1.14.0 → v1.14.1)
+
+Evaluación de 34 preguntas (41 Bien / 2 Regular / 4 Mal) en `PROMPTS_ARREGLO_v1.14.md`,
+sin versionar. Dos raíces, un commit cada una. Reglas persistentes en `CLAUDE.md`; aquí
+lo que costó encontrar:
+
+- **Una parte del bug crítico la introduje yo en v1.12.0.** El digest del historial en
+  el JS (`pulsoHistoryDigest`) unía las partes con punto y aplastaba los saltos de
+  línea, mientras el del servidor los conservaba. Como el historial que se envía es el
+  del cliente (el de `$SESSION` no persiste tras `write_close()`), las anclas
+  `^Recurso:` / `^Seccion:` desaparecían y `^Cuestionario:\s*(.+)$` capturaba la frase
+  entera como nombre del recurso: el history-hint la pegaba a la pregunta y la ruta
+  directa dejaba de reconocerla. Verificado ejecutando la función con node antes de
+  tocar nada. Lección: si una función existe duplicada en PHP y en JS, hay que
+  probar **las dos**; probé solo la de PHP en su día.
+- **La asimetría "solo falla después de analítica" tenía una explicación concreta**: el
+  digest incluía filas de `data`, y en una respuesta de analítica esas filas son una
+  tabla de métricas con el mismo aspecto que el formato de salida que exige el prompt.
+  El modelo la leía como plantilla a continuar. Tras una respuesta de contenido no
+  pasaba porque su digest es prosa. Fuera las filas → digest de analítica de 81
+  caracteres en vez de ~350.
+- **El "Foro de dudas" como respuesta a "la actividad IA" no lo pude reproducir en
+  código**: ni el matcher exacto ni el difuso lo eligen (comprobado con los nombres
+  reales del curso). La hipótesis que queda es que la ruta directa devolvía `null` y
+  la recuperación semántica traía el fragmento "menos malo", que el modelo presentó
+  como respuesta inventándole las cifras. Por eso el arreglo no es solo endurecer el
+  matcher: hay un aviso explícito de "esa actividad no existe" en el contexto, y queda
+  un `debugging()` con la actividad elegida y su puntuación para confirmarlo en el
+  sitio real.
+- **Verificado**: 26 comprobaciones nuevas de historial/ordinales/matcher, 13 del aviso
+  de actividad inexistente (con `get_fast_modinfo` simulado), 7 del digest del cliente
+  en node, más las suites anteriores (16 + 12 + 17 + 16 + 6 + modo alumno 17/17 y
+  19/19). El md5 del prompt base del profesorado sigue intacto.
+- **Sin verificar en Moodle**: los 5 pasos de la comprobación obligatoria del prompt 1
+  en una misma conversación, y las dos del prompt 2. Y hay una decisión de producto que
+  conviene mirar en la demo: el aviso de "no existe" salta también cuando el usuario
+  abrevia el nombre de una actividad que sí existe (dirá que no existe y ofrecerá las
+  reales, en vez de adivinar).
+
 ## 2026-09-04 — Los 6 arreglos de la evaluación del curso SANS0001 (v1.11.1 → v1.13.3)
 
 Evaluación de 34 preguntas sobre el curso id 92 (`PROMPTS_ARREGLO_v1.11.1.md`, sin

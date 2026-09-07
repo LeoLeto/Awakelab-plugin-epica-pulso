@@ -167,6 +167,21 @@ que los evitan son poco intuitivas, así que quedan escritas aquí:
   cual. La regla "responde solo a la última pregunta" vive en el bloque **dinámico**
   del prompt (`build_dynamic_prompt_section`), no en el base, para no invalidar el
   prefijo cacheado.
+- **El digest del historial NO lleva filas de `data`, y el del cliente tiene que
+  respetar los saltos de línea** (v1.14.0). Dos trampas del digest, las dos vistas en
+  producción: (a) las filas de `data` de una respuesta de analítica son una tabla de
+  métricas con el MISMO aspecto que el formato de salida exigido en el prompt, y el
+  modelo la trataba como plantilla a continuar — tras una respuesta de analítica, la
+  pregunta siguiente se contestaba repitiendo la tabla anterior; ahora el digest es
+  solo `title` + `summary` + `content`. (b) El digest del JS (`pulsoHistoryDigest`)
+  unía las partes con punto y aplastaba los `\n`, así que las anclas `^Recurso:` /
+  `^Seccion:` desaparecían y `^Cuestionario:\s*(.+)$` capturaba la FRASE ENTERA como
+  nombre del recurso: el history-hint pegaba esa frase a la pregunta y la ruta directa
+  dejaba de reconocerla. El digest del cliente y el del servidor deben producir
+  exactamente lo mismo, con saltos de línea. Como el `sessionStorage` de los usuarios
+  ya contiene digests sucios, `sanitize_history_name()` corta el nombre en el primer
+  punto/salto y descarta lo que no parece un nombre (>120 caracteres, otro campo
+  detrás): esa red no se puede quitar.
 - **Los tres endpoints exigen `require_sesskey()`** (`api_chat.php`,
   `api_chat_stream.php`, `toggle_course.php`) y el orden de validación es
   autenticar → sesskey → permisos → `check_enabled()`. `check_enabled()` no puede
@@ -259,7 +274,19 @@ recurso por nombre y nº de preguntas de un cuestionario.
 - Las **stopwords del matcher difuso** incluyen ya las genéricas de nombre de
   recurso (`material`, `recurso`, `documento`, `archivo`, `contenido`, `unidad`…):
   un PDF llamado "MATERIAL 1" no puede engancharse por la palabra "material" de la
-  pregunta.
+  pregunta. Y desde v1.14.1 el difuso empareja por **palabra completa**, no por
+  subcadena (`preg_match` con límites, no `strpos`): las siglas y los nombres de 1-3
+  caracteres ("IA", "T1") solo pueden ganar por match exacto de nombre completo.
+- **"No hay match" es una respuesta válida.** Si la pregunta nombra una actividad con
+  etiqueta de tipo delante ("la actividad IA", "el foro de novedades") y ninguna
+  actividad del curso se llama así (`query_mentions_any_activity_name()` con
+  `get_fast_modinfo`), `build_missing_activity_notice()` mete en el contexto un aviso
+  que obliga al modelo a decir que no existe y a ofrecer las reales. Sin él, la
+  recuperación semántica devolvía los fragmentos "menos malos" (el foro del curso) y
+  el modelo los presentaba como respuesta, inventándose sus cifras. Y una referencia
+  ordinal que el historial no puede satisfacer ("dame el enunciado del primero" sin
+  recursos previos) se responde con `ordinal_unresolved_answer()` — nunca se deja
+  seguir a la ruta directa, que acababa emparejando por palabra clave.
 - **"Resúmeme el curso" es contenido, no analítica.** La ruta directa ya devolvía
   `null` (`is_course_about_query()`), pero el prompt base es de analítica educativa
   y el modelo contestaba con secciones, matriculados y tasa de aprobación. Ahora

@@ -1,5 +1,47 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-07 — Camino A verificado, y el fallo se cuenta al usuario (v1.15.3)
+
+QA de v1.15.2 en el curso 92: **el camino A funciona**. Ofrece en las dos respuestas
+`table` (el layout donde era imposible), se calla en los tres datos puntuales, no repite
+dos turnos seguidos, los cuatro casos de control pasan y los ofrecimientos son concretos y
+anclados en datos reales, sin inventar materiales. La conversación proactiva queda cerrada
+en sus dos caminos.
+
+**Pendiente NO perseguido (decisión de Marcos): "Error: No success flag" en una tanda**, en
+la pregunta del cuestionario como tercera tras dos de analítica. No reproducible ni con la
+misma secuencia ni con contexto limpio → apunta a algo transitorio (fallo de API o carrera
+al enviar muy seguido). La causa raíz queda sin investigar **a propósito**. Si reaparece,
+lo primero es activar `$CFG->block_pulso_log_raw_answer` y `window.pulsoDebug`, que ya
+están en el código apagados.
+
+Lo que sí se arregló es la **degradación**, que era mala con independencia de la causa. La
+rama de fallo del cliente colapsaba TRES situaciones y las tres acababan mostrando texto de
+desarrollador:
+
+- `success:false` con `message` = `'Error: ' . $e->getMessage()` (los dos endpoints) → se
+  pintaba doblemente prefijado: "Error: Error: …", con el texto crudo de la excepción.
+- `success:true` con `answer` vacío → el `message` del payload es "Query procesado
+  exitosamente", que como texto de error no tiene ningún sentido.
+- Una respuesta sin `success` ni `message` → el literal **"No success flag"**, que es lo
+  que vio Marcos.
+
+Ahora las tres pasan por `pulsoFailureMessage()`, compartido con el evento `error` del SSE
+(que tenía el mismo doble prefijo y un "desconocido" igual de inútil): mensaje en es/en con
+qué hacer —reintentar y, si se repite, «Nueva conversación»—, el detalle del servidor solo
+cuando es un error de verdad (con `success:true` se suprime el boilerplate) y sin el
+prefijo "Error:" duplicado. El detalle técnico se queda en `console.error`.
+
+Dos cosas que hay que mantener si se toca: el turno fallido **no entra en el historial**
+(si entrara, se le reenviaría al modelo en la pregunta siguiente), y el mensaje cita el
+label real del botón, «Nueva conversación», también en la versión inglesa — la UI es
+español-first y decirle "New conversation" mandaría a buscar un botón que no existe.
+
+Verificado con los seis payloads que los endpoints pueden emitir de verdad, ejecutando el
+helper real extraído del fichero con node, y en los dos idiomas (`navigator.language` hay
+que inyectarlo con `Object.defineProperty` y en procesos separados: Node no deja
+reasignar `navigator` dos veces en el mismo proceso).
+
 ## 2026-09-07 — El ofrecimiento no salía nunca: campo propio `next_step` (v1.15.2)
 
 QA de v1.15.0 en el curso 92: los 4 casos de control pasan, ninguna regresión, las

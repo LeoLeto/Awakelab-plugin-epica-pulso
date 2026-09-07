@@ -805,32 +805,14 @@ class chat_pipeline {
             }
         }
 
-        // 'data' puede ser tabla, lista o párrafos: se aplanan unas pocas filas
-        // para que el modelo recuerde de qué se habló, no para reproducirlo.
-        if (!empty($data['data']) && is_array($data['data'])) {
-            $rows = [];
-            foreach (array_slice($data['data'], 0, 5) as $row) {
-                if (is_string($row)) {
-                    $rows[] = trim($row);
-                    continue;
-                }
-                if (!is_array($row)) {
-                    continue;
-                }
-                $values = [];
-                foreach ($row as $value) {
-                    if (is_scalar($value) && trim((string)$value) !== '') {
-                        $values[] = trim((string)$value);
-                    }
-                }
-                if (!empty($values)) {
-                    $rows[] = implode(' · ', $values);
-                }
-            }
-            if (!empty($rows)) {
-                $parts[] = implode('; ', $rows);
-            }
-        }
+        // Las filas de 'data' NO entran en el digest (v1.14.0). En una respuesta
+        // de analítica son una tabla de métricas con el MISMO aspecto que el
+        // formato de salida exigido en el prompt, y el modelo la leía como una
+        // plantilla a continuar: tras una respuesta de analítica, la pregunta
+        // siguiente se contestaba repitiendo la tabla anterior. El digest solo
+        // existe para resolver referencias posteriores ("ese pdf", "el primero"),
+        // y para eso bastan el título, el resumen y las anclas de línea de
+        // 'content' ("Recurso: X", "Seccion: N") — las filas no aportan nada.
 
         if (empty($parts)) {
             return self::shorten_for_history(self::strip_json_noise($answer));
@@ -840,6 +822,38 @@ class chat_pipeline {
         // recurso del turno anterior con anclas de línea ("Recurso: X",
         // "Seccion: N"), y aplastar los saltos lo dejaría ciego.
         return self::shorten_for_history(implode("\n", $parts));
+    }
+
+    /**
+     * Limpia un nombre de recurso/sección extraído del historial.
+     *
+     * Defensa contra historiales sucios: el digest del cliente de v1.12/v1.13
+     * aplastaba los saltos de línea, así que un patrón como `^Cuestionario:
+     * (.+)$` capturaba la FRASE ENTERA como si fuera el nombre del recurso, y el
+     * history-hint la pegaba a la pregunta — dejando la consulta irreconocible
+     * para la ruta directa. Esos historiales siguen vivos en el sessionStorage de
+     * los usuarios, así que el saneado tiene que estar aquí, en el servidor: se
+     * corta en el primer punto o salto de línea y se rechaza lo que no parece un
+     * nombre.
+     *
+     * @param string $name
+     * @return string Nombre limpio, o '' si no parece un nombre
+     */
+    private static function sanitize_history_name(string $name): string {
+        $name = trim($name);
+        // Cortar en el primer salto de línea o final de frase.
+        $name = preg_split('/[\n\r]|\.\s|\.$/u', $name)[0] ?? '';
+        $name = trim(preg_replace('/[^\S\n]+/u', ' ', $name));
+        // Un nombre de actividad de Moodle no es una frase larga.
+        if ($name === '' || mb_strlen($name, 'UTF-8') > 120) {
+            return '';
+        }
+        // Si trae dos puntos, es que el digest venía aplastado y arrastra otro
+        // campo detrás ("MATERIAL 1 Seccion: RECURSOS Archivo: ..."): se corta.
+        if (preg_match('/^(.*?)\s+\p{Lu}[\p{L}]*:\s/u', $name . ' ', $mcut)) {
+            $name = trim($mcut[1]);
+        }
+        return $name;
     }
 
     /**
@@ -950,8 +964,17 @@ class chat_pipeline {
             && ($hasAnaphoricReference || $asksAboutPrevious || $hasOrdinalReference)
             && ($isContentSpecificQuery || $isSummaryOfPrevious || $refersToKnownResource || $asksAboutPrevious || $bareSummaryRequest || $refersToActivity || $asksAboutActivity || $hasOrdinalReference);
 
+        // Referencia ordinal que NO se puede satisfacer con el historial: se dice,
+        // en vez de dejar que la pregunta siga camino y acabe emparejando por
+        // palabra clave cualquier actividad ("dame el enunciado del primero"
+        // devolvía un foro sin relación).
+        $ordinalUnresolved = false;
+
         if ($needsHistoryHint) {
             $foundResource = self::find_resource_in_history($history, $qnorm);
+            if ($foundResource === null && $hasOrdinalReference) {
+                $ordinalUnresolved = true;
+            }
             if ($foundResource !== null) {
                 $resourceName = $foundResource['name'];
                 $sectionName = $foundResource['section'];
@@ -974,7 +997,33 @@ class chat_pipeline {
         return [
             'direct_query' => $direct_query,
             'qnorm' => $qnorm,
-            'is_content_specific' => $isContentSpecificQuery
+            'is_content_specific' => $isContentSpecificQuery,
+            'ordinal_unresolved' => $ordinalUnresolved
+        ];
+    }
+
+    /**
+     * Respuesta determinista para una referencia por posición que el historial no
+     * puede resolver ("dame el enunciado del primero" sin recursos previos).
+     *
+     * @return array ['answer' => string(JSON), 'schema_data' => array, 'followup_questions' => array]
+     */
+    public static function ordinal_unresolved_answer(): array {
+        $payload = [
+            'type' => 'text',
+            'title' => 'No sé a qué documento te refieres',
+            'content' => 'No encuentro suficientes documentos en esta conversación para saber cuál es "el '
+                . 'primero". Dime el nombre del material o pregúntame primero qué recursos hay en una sección.',
+        ];
+
+        return [
+            'answer' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'schema_data' => $payload,
+            'followup_questions' => [
+                '¿Qué materiales hay en el curso?',
+                '¿Qué actividades hay en una sección concreta?',
+                '¿De qué trata este curso?',
+            ],
         ];
     }
 
@@ -1147,11 +1196,11 @@ class chat_pipeline {
         $type = 'resource'; // por defecto es pdf/recurso
 
         if (preg_match('/^Recurso:\s*(.+)$/mi', $searchText, $mres)) {
-            $resourceName = trim((string)$mres[1]);
+            $resourceName = self::sanitize_history_name((string)$mres[1]);
             $type = 'resource';
         }
         if (preg_match('/^Seccion:\s*(.+)$/mi', $searchText, $msec)) {
-            $sectionName = trim((string)$msec[1]);
+            $sectionName = self::sanitize_history_name((string)$msec[1]);
         }
         // Fallback: extraer del título. Con el historial en texto (ver
         // history_digest()) el título es la PRIMERA LÍNEA del mensaje, así que se
@@ -1165,31 +1214,31 @@ class chat_pipeline {
         }
         if ($resourceName === '' && $title !== '') {
             if (preg_match('/^Cuestionario:\s*(.+)$/i', $title, $mqt)) {
-                $resourceName = trim($mqt[1]);
+                $resourceName = self::sanitize_history_name($mqt[1]);
                 $type = 'quiz';
             } else if (preg_match('/^Tarea:\s*(.+)$/i', $title, $mqt)) {
-                $resourceName = trim($mqt[1]);
+                $resourceName = self::sanitize_history_name($mqt[1]);
                 $type = 'assign';
             } else if (preg_match('/^Foro:\s*(.+)$/i', $title, $mqt)) {
-                $resourceName = trim($mqt[1]);
+                $resourceName = self::sanitize_history_name($mqt[1]);
                 $type = 'forum';
             } else if (preg_match('/^P[aá]gina:\s*(.+)$/i', $title, $mqt)) {
-                $resourceName = trim($mqt[1]);
+                $resourceName = self::sanitize_history_name($mqt[1]);
                 $type = 'page';
             } else if (preg_match('/^URL:\s*(.+)$/i', $title, $mqt)) {
-                $resourceName = trim($mqt[1]);
+                $resourceName = self::sanitize_history_name($mqt[1]);
                 $type = 'url';
             } else if (preg_match('/^Libro:\s*(.+)$/i', $title, $mqt)) {
-                $resourceName = trim($mqt[1]);
+                $resourceName = self::sanitize_history_name($mqt[1]);
                 $type = 'book';
             } else if (preg_match('/^Carpeta:\s*(.+)$/i', $title, $mqt)) {
-                $resourceName = trim($mqt[1]);
+                $resourceName = self::sanitize_history_name($mqt[1]);
                 $type = 'folder';
             } else if (preg_match('/^Recurso\s+(.+)$/i', $title, $mtitle)) {
-                $resourceName = trim($mtitle[1]);
+                $resourceName = self::sanitize_history_name($mtitle[1]);
                 $type = 'resource';
             } else if (preg_match('/^Resumen del recurso\s+(.+)$/i', $title, $mtitle)) {
-                $resourceName = trim($mtitle[1]);
+                $resourceName = self::sanitize_history_name($mtitle[1]);
                 $type = 'resource';
             }
         }
@@ -1211,6 +1260,12 @@ class chat_pipeline {
      * @return array|null ['answer' => string(json), 'schema_data' => array, 'followup_questions' => array]
      */
     public static function resolve_direct_answer(int $courseid, string $user_query, array $qinfo, ?callable $ondelta = null): ?array {
+        // Ordinal sin resolver: no se busca actividad ninguna (acabaría
+        // emparejando por palabra clave), se dice que no se sabe a qué se refiere.
+        if (!empty($qinfo['ordinal_unresolved'])) {
+            return self::ordinal_unresolved_answer();
+        }
+
         $direct_course_answer = rag_retriever::resolve_direct_course_query($courseid, $qinfo['direct_query']);
         if ($direct_course_answer === null) {
             return null;

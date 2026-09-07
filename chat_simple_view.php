@@ -3087,14 +3087,14 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             const raw = String(answer || '').trim();
             if (!raw) return '';
             if (raw[0] !== '{' && raw[0] !== '[') {
-                return raw.slice(0, 500);
+                return pulsoTrimDigest(raw);
             }
             let data;
             try {
                 data = JSON.parse(raw);
             } catch (e) {
                 // JSON inválido o cortado: quedarse con el texto plano que se vea.
-                return raw.replace(/[{}\[\]"]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 500);
+                return pulsoTrimDigest(raw.replace(/[{}\[\]"]/g, ' '));
             }
             const parts = [];
             ['title', 'summary', 'content'].forEach(function(key) {
@@ -3102,18 +3102,25 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                     parts.push(data[key].trim());
                 }
             });
-            if (Array.isArray(data.data)) {
-                const rows = data.data.slice(0, 5).map(function(row) {
-                    if (typeof row === 'string') return row;
-                    if (!row || typeof row !== 'object') return '';
-                    return Object.keys(row)
-                        .map(function(k) { return row[k]; })
-                        .filter(function(v) { return v !== null && v !== undefined && typeof v !== 'object' && String(v).trim(); })
-                        .join(' · ');
-                }).filter(Boolean);
-                if (rows.length) parts.push(rows.join('; '));
-            }
-            return parts.join('. ').replace(/\s+/g, ' ').trim().slice(0, 500);
+            // Las filas de 'data' NO entran en el digest: en una respuesta de
+            // analítica son una tabla de métricas con el mismo aspecto que el
+            // formato de salida que se le pide al modelo, y el modelo la
+            // continuaba en vez de responder a la pregunta nueva. Para resolver
+            // referencias posteriores ("ese pdf") solo hacen falta título,
+            // resumen y las anclas de línea que van en 'content'.
+            return pulsoTrimDigest(parts.join('\n'));
+        }
+
+        // Recorta conservando los SALTOS DE LÍNEA: las anclas "Recurso:" /
+        // "Seccion:" del historial se localizan con anclas de línea, así que
+        // aplastarlos deja al history-hint ciego (y hace que el "título" pase a
+        // ser toda la frase).
+        function pulsoTrimDigest(text) {
+            return String(text || '')
+                .replace(/[^\S\n]+/g, ' ')
+                .replace(/\n{2,}/g, '\n')
+                .trim()
+                .slice(0, 500);
         }
 
         // Procesamiento compartido de la respuesta completa (stream final / XHR).

@@ -732,6 +732,16 @@ PROMPT;
         $conversation_rule .= "- Responde ÚNICAMENTE a la última pregunta del usuario.\n";
         $conversation_rule .= "- NUNCA repitas, continúes ni completes una respuesta anterior, aunque parezca cortada.\n";
         $conversation_rule .= "- Si la pregunta nueva es de otro tema que la anterior, ignora por completo el tema anterior.\n";
+        // Refuerzo añadido en v1.14.0: tras una respuesta de analítica (tabla de
+        // métricas + insights), la pregunta siguiente se contestaba repitiendo esa
+        // tabla. El resumen del turno anterior se parece al formato de salida que
+        // se pide, y el modelo lo trataba como una plantilla a continuar.
+        $conversation_rule .= "- El resumen de un turno anterior NO es una plantilla ni un borrador de tu respuesta: "
+            . "aunque contenga cifras, métricas o listas, no las reutilices salvo que la última pregunta las pida.\n";
+        $conversation_rule .= "- Antes de responder, comprueba que tu respuesta contesta LA ÚLTIMA pregunta. "
+            . "Si el tema de tu borrador es el del turno anterior y no el de la última pregunta, descártalo y empieza de nuevo.\n";
+        $conversation_rule .= "- Los turnos anteriores solo sirven para resolver referencias del tipo \"ese pdf\", "
+            . "\"ese cuestionario\" o \"el primero\".\n";
 
         // Regla de formato de salida: va SIEMPRE al final del prompt (lo último
         // que lee el modelo) para maximizar que la respete. Necesaria porque

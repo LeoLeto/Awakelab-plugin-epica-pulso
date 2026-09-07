@@ -1,5 +1,112 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-07 — Conversación proactiva (v1.15.0)
+
+Implementada la idea que quedaba pendiente de la ronda 5. Las reglas que deben persistir
+están en `CLAUDE.md` ("Conversación proactiva — dos caminos, y el defecto es callarse");
+aquí, las decisiones y lo que costó encontrar:
+
+- **Se ataca por los dos caminos porque el prompt no cubre el chat entero.** La regla
+  `## INICIATIVA` gobierna solo las respuestas del LLM; las de una actividad concreta se
+  construyen desde la BD sin modelo (verificado en el QA: el nº de preguntas de un
+  cuestionario acertaba incluso con la conversación contaminada). El propio ejemplo que
+  motivó la idea —el cuestionario— se resuelve por ruta directa, así que sin tocar
+  `build_direct_followups()` la funcionalidad no habría existido donde se pidió.
+- **El texto de la regla se comprimió de ~750 a ~280 tokens** tras preguntar el coste. Se
+  paga SIN CACHEAR en cada respuesta del LLM: ~$0,56 por mil mensajes en `claude-sonnet-5`
+  ($2/MTok de input; ojo, $3 es Sonnet **4.6**, otro modelo). Se recortaron ejemplos
+  duplicados y explicaciones, no criterio: los cuatro casos de "cállate" siguen enteros.
+  Solo la pagan las dos llamadas de respuesta principal — `answer_document_question()` y
+  `summarize_document_text()` llevan su propio system prompt corto, y los follow-ups de
+  Haiku también.
+- **`sed -i` aplanó los CRLF de `system_prompt_designer.php` y eso solo habría invalidado
+  el prefijo cacheado**, sin cambiar una palabra del prompt. El fichero es CRLF en el
+  árbol de trabajo y LF en el índice (`core.autocrlf=true`, sin `.gitattributes`), y el
+  prompt base es un nowdoc: sus finales de línea son bytes del prompt. El parche se aplicó
+  con un script que preserva el EOL de cada fichero. Detalle a recordar: un md5 medido en
+  Windows NO sirve para verificar el del servidor, que tiene LF.
+- **Verificado con pruebas de lógica** (PHP 8.3 portátil del scratchpad, script en
+  `test_proactividad.php` del scratchpad de la sesión): 181 comprobaciones, 0 fallos —
+  texto de los dos prompts base intacto contra `git HEAD`, la regla fuera del bloque
+  cacheado y `FORMATO DE SALIDA` todavía al final, ausencia de datos de grupo en la
+  variante de alumno, las 12 ramas de sugerencias con su nombre dentro, ≥2 sugerencias
+  contextuales para el alumno en cuestionario/tarea/recurso (y la tercera filtrada), y los
+  13 casos de `is_teacher_only_query()` de las tres capas.
+- **Sin verificar en Moodle**: que el ofrecimiento sale cuando aporta y NO en respuestas
+  de dato puntual, que no se repite en turnos seguidos, y que a un alumno no se le ofrece
+  nada del grupo. Y sigue pendiente comprobar `cache_read_input_tokens > 0` desde el
+  segundo mensaje después de este cambio.
+
+**Pendiente decidido, no hecho — mover la mitad invariable de la regla a los prompts
+base.** El criterio y la forma (~200 tokens, idénticos para todos) podrían ir dentro de
+`generate_system_prompt()` / `generate_student_system_prompt()`, dejando en el bloque
+dinámico solo la línea de rol: la regla pasaría a costar 0,1x en lugar de precio completo.
+Condición de entrada, en este orden:
+
+1. Que el texto esté calibrado contra el Moodle real (mientras se itere, tenerlo en el
+   bloque dinámico es gratis; dentro del base, cada retoque invalida el prefijo).
+2. **Medir el prompt base del ALUMNO con `count_tokens`** — esto es lo que puede estar
+   costando dinero ya. Estimado por caracteres en ~950 tokens, justo por debajo del mínimo
+   cacheable de 1.024 de `claude-sonnet-5`, así que probablemente **no se cachea desde
+   v1.10.0, en silencio y sin ningún error** (`CLAUDE.md` lo daba por sabido con ~860
+   tokens, pero nunca se midió). Si está por debajo, meterle esos ~200 tokens lo cruza el
+   umbral y el prompt de alumno empezaría a cachearse por primera vez: ahorra más que la
+   propia regla. No se pudo medir en la sesión — no hay credenciales de la API en el
+   entorno de desarrollo (la clave vive en la config de Moodle del servidor).
+
+Alternativas evaluadas y descartadas para lo mismo: un **segundo breakpoint** de caché
+(permitido, hasta 4, y el mínimo se mide sobre el prefijo acumulado — pero obliga a subir
+iniciativa y conversación por delante del RAG, mismo ahorro sin el bonus del alumno);
+**condicionar** la inyección de la regla (es el patrón que la propia doc de Anthropic marca
+como invalidador silencioso, y una regla intermitente da comportamiento inconsistente); y
+el **`{"role":"system"}` a mitad de conversación**, que sería el sitio ideal pero **no
+está soportado en `claude-sonnet-5`** (400) — solo en Opus 5/4.8 y la familia Fable/Mythos.
+Si algún día cambia el modelo por defecto del plugin, esa pasa a ser la mejor opción.
+
+## 2026-09-07 — Ronda 5: QA verificado en Moodle (56/56) + idea de conversación proactiva
+
+Ejecutadas las 56 preguntas de la matriz en el curso SANS0001 (id 92) contra v1.14.1, en
+el Moodle real. Matriz cerrada: **41 Bien / 3 Regular / 1 Mal / 11 No aplica** (la
+evaluación empezó en 17/5/26/7). No queda ninguna pregunta sin reprobar. Lo que la
+verificación real desmintió del "hecho en código":
+
+- **#3 contaminación: NO cerrado.** La pregunta que va justo DESPUÉS de una respuesta de
+  analítica sigue devolviendo la tabla anterior (P38 tras "¿cuántos accesos?", P44 tras
+  "How many students passed?"). Quitar las filas de `data` del digest no bastó. Dato
+  nuevo que acota el sitio: en la MISMA conversación contaminada, "¿cuántas preguntas
+  tiene el CUESTIONARIO TIPO TEST?" acertó — y esa va por ruta directa sin LLM. Luego lo
+  que se contamina es la **ruta del LLM**, no el historial en sí.
+- **#5 ordinales: NO cerrado.** "Dame el enunciado del primero", tras consultar MATERIAL 1
+  y MIC Tema 2, devuelve el enunciado de la primera pregunta del cuestionario. Y da
+  **exactamente la misma respuesta sin ningún documento previo en el historial**: prueba
+  de que `ordinal_unresolved_answer()` no se alcanza y el ordinal se resuelve contra el
+  quiz antes de mirar el historial.
+- **#1, #2 y #4: cerrados y verificados en Moodle.** Analítica por su ruta (nota media
+  9.18/10, % aprobados, matriculados, nota de un alumno), listado completo de sección,
+  "tema N" como sección, contenido real de los PDF y enunciados literales. Los cuatro
+  casos de control del `CLAUDE.md` pasan **seguidos en una misma conversación**.
+- **P46 mejoró a medias**: ya no presenta el "Foro de dudas" como si fuera la respuesta,
+  pero tampoco avisa de que la actividad no existe. Con "la tarea T1" (P48) sí lo hace y
+  encima enumera las reales, así que `build_missing_activity_notice()` no cubre el fraseo
+  "¿de qué trata la actividad X?".
+- **P55/P56 → No aplica**: SANS0001 no tiene ningún SCORM (0 enlaces a `/mod/scorm/`).
+  Hace falta otro curso para poder evaluarlas.
+
+**Idea pendiente — conversación proactiva** (sin implementar; el prompt de arreglo está en
+`PROMPTS_PROACTIVIDAD.md`). Marcos quiere que el chat tenga iniciativa en general, no solo
+en un caso: "como si hablaras con una persona de verdad". Su ejemplo era el cuestionario
+(leer los enunciados y ofrecer el temario para repasar), pero el objetivo es que ofrezca
+ayuda siempre que pueda. Restricción de diseño que hay que tener presente: la regla del
+prompt solo gobierna las respuestas del LLM, y el propio ejemplo del cuestionario se
+responde por **ruta directa desde la BD sin pasar por el modelo** (se vio en el QA:
+"¿cuántas preguntas tiene el CUESTIONARIO TIPO TEST?" acertaba incluso con la
+conversación contaminada). Así que hay que tocar dos sitios: la regla en el bloque
+dinámico y las sugerencias de `build_direct_followups()`. **Decisión de producto tomada:
+el ofrecimiento NO debe salir en todas las respuestas** — por defecto no se ofrece nada, y
+solo aparece si hay un siguiente paso concreto que el usuario querría y Pulso puede
+cumplirlo. En respuestas de dato puntual ("tiene 15 preguntas") debe callarse: si sale
+siempre es ruido y alarga todas las respuestas.
+
 ## 2026-09-07 — Ronda 4: contaminación residual y "no hay match" (v1.14.0 → v1.14.1)
 
 Evaluación de 34 preguntas (41 Bien / 2 Regular / 4 Mal) en `PROMPTS_ARREGLO_v1.14.md`,

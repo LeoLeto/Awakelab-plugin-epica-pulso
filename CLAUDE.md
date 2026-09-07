@@ -151,6 +151,17 @@ que los evitan son poco intuitivas, así que quedan escritas aquí:
   `input + output + cache_creation + cache_read` — no volver a sumar solo input+output.
   Para comprobar que funciona: `cache_read_input_tokens` en la respuesta debe ser > 0 a
   partir del segundo mensaje; si es 0 siempre, algo está rompiendo el prefijo estable.
+  Y una tercera trampa, esta descubierta el 2026-09-07 al editar el fichero: **el
+  prefijo cacheado depende de los FINALES DE LÍNEA del checkout**. El prompt base es un
+  nowdoc, así que sus `\r\n` o `\n` son bytes del prompt; el repo tiene
+  `core.autocrlf=true` y ningún `.gitattributes`, de modo que
+  `system_prompt_designer.php` está en el índice con LF y en el árbol de Windows con
+  CRLF. Consecuencias: (a) **nunca editar ese fichero con `sed -i`** ni con nada que
+  reescriba el fichero entero — aplana los CRLF y eso solo, sin tocar una palabra,
+  invalida el prefijo de ese entorno; (b) el md5 del prompt base solo es comparable
+  dentro de un mismo estilo de checkout, así que un md5 medido en Windows no sirve para
+  verificar el del servidor (que tiene LF); (c) dev y producción usan, por diseño, dos
+  entradas de caché distintas — cada una estable en su entorno, que es lo que importa.
 - **El historial NUNCA contiene JSON** (v1.12.0). Antes se guardaba la respuesta
   cruda (el JSON del esquema) y `prepare_history()` la cortaba a 500 caracteres: el
   payload acababa con turnos de asistente que eran objetos JSON **sin cerrar**, y con
@@ -293,6 +304,44 @@ recurso por nombre y nº de preguntas de un cuestionario.
   `generate_system_blocks()` recibe el `$user_query` y añade al bloque **dinámico**
   una sección que obliga a responder con el temario (y permite al profesorado UNA
   sola línea de contexto analítico; al alumno, ninguna).
+
+## Conversación proactiva — dos caminos, y el defecto es callarse (v1.15.0)
+
+El chat ofrece el siguiente paso útil cuando aporta. La decisión de producto, que es lo
+que hay que respetar antes que cualquier detalle: **por defecto NO se ofrece nada**. El
+ofrecimiento solo aparece si hay un siguiente paso concreto que el usuario querría Y se
+puede cumplir con el contexto que ya está delante; si no, se responde y se calla. Un
+ofrecimiento en cada respuesta es ruido, alarga todas las respuestas y la gente deja de
+leer la última línea. En una respuesta de dato puntual ("tiene 15 preguntas", "hay 4
+secciones") **no puede salir**.
+
+La regla se implementa en DOS sitios porque el chat tiene dos caminos, y una regla en el
+prompt no cubre el otro:
+
+- **Respuestas del LLM** → sección `## INICIATIVA` en `build_dynamic_prompt_section()`.
+  Va en el bloque **dinámico**, nunca en el base: depende del rol, y una sección
+  condicional dentro del bloque cacheado crearía una entrada de caché por combinación.
+  Está redactada al mínimo (~280 tokens, ~$0,56 por mil mensajes en `claude-sonnet-5` a
+  $2/MTok de input) porque **se paga sin cachear en cada respuesta que pasa por el LLM**:
+  antes de añadirle una línea, quita otra. Diferencia por rol: al docente, seguimiento
+  del grupo; al alumno, repaso y materiales, con la prohibición de datos del grupo
+  aplicada también al ofrecimiento (una sugerencia es una vía de fuga igual que una
+  respuesta). El ofrecimiento va DENTRO del JSON, como última frase de `content`.
+- **Rutas directas** → `chat_pipeline::build_direct_followups()`. No pasan por el LLM, así
+  que sus sugerencias son su única forma de ofrecer un siguiente paso. Dos reglas al
+  redactarlas: (a) meter el NOMBRE de la actividad, porque al pulsarlas el texto vuelve a
+  entrar por el pipeline y el matcher lo necesita; (b) cada rama debe dejar al menos DOS
+  sugerencias que sobrevivan a `filter_student_followups()` — si se cayeran todas, el
+  alumno recibiría el catálogo genérico y perdería el seguimiento contextual. La tercera
+  sugerencia de las ramas de actividad es de seguimiento del grupo a propósito: útil al
+  docente, filtrada al alumno. El nombre se saca del título del payload con
+  `direct_answer_activity_name()`, que devuelve '' para los títulos de listado (un
+  "Contenido de la sección X" metido en una sugerencia la deja irreconocible para el
+  matcher).
+
+Y un desempate de la misma tanda: **un listado no es un material**. El nombre de una
+sección ("RECURSOS") mete "recurso" en `qnorm`, así que los listados (`Contenido de la
+sección X`, `Secciones del curso`) se resuelven ANTES de la rama de documento.
 
 ## Bug backlog — evaluación jul-2026 (arreglar en este orden)
 

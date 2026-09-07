@@ -3127,6 +3127,22 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         function handleChatResponse(message, response) {
             if (response.success && response.answer) {
                 const showAnalysisSections = isAnalyticsQuestion(message);
+                // Diagnóstico opcional (window.pulsoDebug = true en la consola): el JSON
+                // ya limpio y QUÉ secciones se van a pintar. Sirve para localizar en qué
+                // campo viene una frase que no aparece en pantalla: 'content' solo se
+                // pinta si type === 'text', e 'insights'/'recommendations' solo si la
+                // pregunta parece de analítica (isAnalyticsQuestion), así que un texto
+                // en el campo equivocado se descarta en silencio.
+                if (window.pulsoDebug) {
+                    let parsed = null;
+                    try { parsed = JSON.parse(response.answer); } catch (e) { parsed = null; }
+                    console.log('[pulso] JSON final:', response.answer);
+                    console.log('[pulso] campos:', parsed ? Object.keys(parsed) : '(no es JSON)',
+                        '| type:', parsed && parsed.type,
+                        '| showAnalysisSections:', showAnalysisSections,
+                        '| se pinta content:', !!(parsed && parsed.content && parsed.type === 'text'),
+                        '| se pintan insights/recomendaciones:', showAnalysisSections);
+                }
                 const formattedAnswer = formatAIResponse(response.answer, showAnalysisSections);
                 addMessage(formattedAnswer, 'ai', true);
 

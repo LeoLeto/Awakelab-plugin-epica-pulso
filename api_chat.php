@@ -181,6 +181,17 @@ try {
     // 4. PARSEAR Y VALIDAR RESPUESTA JSON
     // ============================================================
 
+    // Diagnóstico opcional: volcar la respuesta CRUDA del modelo antes de limpiarla.
+    // clean_answer() extrae el objeto JSON balanceado, así que cualquier frase que el
+    // modelo escriba FUERA del objeto desaparece aquí sin dejar rastro — es la única
+    // forma de distinguir "el modelo no ofreció nada" de "ofreció algo y el pipeline
+    // se lo comió". Se activa con `$CFG->block_pulso_log_raw_answer = true;` en
+    // config.php. Va a error_log y NO a debugging(): en api_chat_stream.php cualquier
+    // salida en el cuerpo rompería el SSE, y este log tiene que ser simétrico.
+    if (!empty($CFG->block_pulso_log_raw_answer)) {
+        error_log('[pulso raw][xhr] ' . $ai_response['answer']);
+    }
+
     $answer = chat_pipeline::clean_answer($ai_response['answer']);
     $schema_data = system_prompt_designer::validate_response($answer);
 

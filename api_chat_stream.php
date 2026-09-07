@@ -208,6 +208,12 @@ try {
         $ondelta
     );
 
+    // Respuesta CRUDA del modelo antes de limpiarla (ver la nota en api_chat.php).
+    // error_log obligatorio aquí: cualquier salida en el cuerpo rompería el SSE.
+    if (!empty($CFG->block_pulso_log_raw_answer)) {
+        error_log('[pulso raw][sse] ' . $ai_response['answer']);
+    }
+
     $answer = chat_pipeline::clean_answer($ai_response['answer']);
     $schema_data = system_prompt_designer::validate_response($answer);
 

@@ -73,25 +73,26 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
         /* ==================================================================
-           PULSO AI — Identidad Awakelab 2026, tema OSCURO
-           Fondo casi negro con base azul profundo de marca; cian vivo como
-           acento sobre oscuro (uso canónico de la paleta). Poppins.
+           PULSO AI — Identidad Awakelab 2026, tema CLARO (variante B)
+           Cuerpo claro con cabecera azul profunda de marca como ancla oscura;
+           cian como acento funcional (iconos, bordes, foco), nunca como color
+           de texto sobre superficie clara. Poppins.
            ================================================================== */
         .pulso-chat-bubble,
         .pulso-chat-container {
-            --pulso-ink: #EDF1FA;                      /* texto principal (claro) */
-            --pulso-deep: #012142;                     /* azul profundo de marca */
+            --pulso-ink: #27334F;                      /* texto principal */
+            --pulso-deep: #003670;                     /* azul profundo de marca (cabecera) */
             --pulso-navy: #003670;                     /* azul profundo secundario */
-            --pulso-slate: #A9B6D3;                    /* texto secundario */
-            --pulso-muted: #72A3C4;                    /* texto terciario / hints */
-            --pulso-cyan: #11EAEA;                     /* acento vivo */
-            --pulso-cyan-soft: #D9FBFF;                /* cian pálido (texto) */
-            --pulso-teal: #0ABCC9;                     /* acento funcional (focus) */
-            --pulso-teal-ink: #19F7F1;                 /* marcadores sobre oscuro */
-            --pulso-bg: #0B111C;                       /* fondo base casi negro */
-            --pulso-surface: #151D2C;                  /* tarjetas / superficies */
-            --pulso-surface-2: #1C2739;                /* hover / anidado */
-            --pulso-line: rgba(226, 230, 242, 0.12);   /* bordes y divisores */
+            --pulso-slate: #34547A;                     /* texto secundario */
+            --pulso-muted: #3B6996;                     /* texto terciario / hints */
+            --pulso-cyan: #0B93AA;                      /* acento (iconos/bordes/foco, no texto) */
+            --pulso-cyan-soft: #D9FBFF;                 /* fondo del bloque de siguiente paso */
+            --pulso-teal: #0B93AA;                      /* acento funcional (focus) */
+            --pulso-teal-ink: #0B93AA;                  /* marcadores */
+            --pulso-bg: #FFFFFF;                        /* fondo del panel */
+            --pulso-surface: #F7F9FD;                   /* tarjetas / superficies */
+            --pulso-surface-2: #EDF1FA;                 /* cabecera de tabla / anidado */
+            --pulso-line: #DCE3F2;                      /* bordes y divisores */
             --pulso-font: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
@@ -163,7 +164,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             border-radius: 16px;
             overflow: hidden;
             flex-direction: column;
-            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+            box-shadow: 0 24px 64px rgba(1, 25, 50, 0.18);
             font-family: var(--pulso-font);
             font-size: 0.92rem;
             color: var(--pulso-ink);
@@ -319,12 +320,12 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-chat-messages::-webkit-scrollbar-thumb {
-            background: rgba(226, 230, 242, 0.18);
+            background: rgba(39, 51, 79, 0.18);
             border-radius: 8px;
         }
 
         .pulso-chat-messages::-webkit-scrollbar-thumb:hover {
-            background: rgba(226, 230, 242, 0.32);
+            background: rgba(39, 51, 79, 0.32);
         }
 
         /* ========== PANTALLA DE INICIO (acciones predefinidas) ========== */
@@ -345,8 +346,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             height: 44px;
             border-radius: 50%;
             background: var(--pulso-deep) url('https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png') center / 24px 24px no-repeat;
-            border: 1px solid rgba(17, 234, 234, 0.4);
-            box-shadow: 0 0 18px rgba(17, 234, 234, 0.18);
+            border: 1px solid rgba(11, 147, 170, 0.4);
         }
 
         .pulso-home-hello h5 {
@@ -368,8 +368,8 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             margin: 0 0 18px;
             padding: 12px 14px;
             border-radius: 12px;
-            border: 1px solid rgba(17, 234, 234, 0.35);
-            background: linear-gradient(135deg, rgba(17, 234, 234, 0.14), rgba(17, 234, 234, 0.04));
+            border: 1px solid rgba(11, 147, 170, 0.4);
+            background: linear-gradient(135deg, rgba(11, 147, 170, 0.12), rgba(11, 147, 170, 0.03));
             color: var(--pulso-ink);
             font-family: var(--pulso-font);
             font-size: 0.9rem;
@@ -380,8 +380,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-home-help-btn:hover {
-            border-color: rgba(17, 234, 234, 0.7);
-            box-shadow: 0 0 16px rgba(17, 234, 234, 0.22);
+            border-color: rgba(11, 147, 170, 0.7);
         }
 
         .pulso-home-help-btn:active {
@@ -410,7 +409,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         .pulso-suggest-title {
             font-weight: 600;
-            color: var(--pulso-cyan-soft);
+            color: var(--pulso-navy);
             font-size: 0.88rem;
             margin-bottom: 6px;
             display: flex;
@@ -455,7 +454,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             font-weight: 500;
             padding: 3px 10px;
             border-radius: 999px;
-            background: rgba(226, 230, 242, 0.08);
+            background: rgba(39, 51, 79, 0.06);
             border: 1px solid var(--pulso-line);
             color: var(--pulso-slate);
             max-width: 100%;
@@ -488,7 +487,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-action-card:hover {
-            border-color: rgba(17, 234, 234, 0.55);
+            border-color: rgba(11, 147, 170, 0.55);
             background: var(--pulso-surface-2);
             transform: translateY(-1px);
         }
@@ -499,13 +498,13 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         /* Sección de contenido del curso: tarjetas con tinte azul de marca. */
         .pulso-home-section.course .pulso-action-card {
-            background: #14213A;
+            background: #F0F3FC;
             border-color: rgba(78, 126, 165, 0.35);
         }
 
         .pulso-home-section.course .pulso-action-card:hover {
-            border-color: rgba(17, 234, 234, 0.55);
-            background: #182A4A;
+            border-color: rgba(11, 147, 170, 0.55);
+            background: #E2E6F2;
         }
 
         .pulso-action-icon {
@@ -528,7 +527,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             width: 26px;
             height: 26px;
             border-radius: 50%;
-            background: rgba(226, 230, 242, 0.08);
+            background: rgba(39, 51, 79, 0.06);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -593,7 +592,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             color: #ffffff;
             border-bottom-right-radius: 4px;
             max-width: 85%;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 8px rgba(1, 25, 50, 0.2);
         }
 
         .pulso-message.ai .pulso-message-content {
@@ -601,7 +600,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             color: var(--pulso-ink);
             border: 1px solid var(--pulso-line);
             border-top-left-radius: 4px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 2px 10px rgba(1, 25, 50, 0.1);
             flex: 1 1 auto;
             min-width: 0;
         }
@@ -633,7 +632,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         .pulso-rich-title {
             font-size: 1rem;
             font-weight: 600;
-            color: var(--pulso-cyan-soft);
+            color: var(--pulso-navy);
             margin-bottom: 2px;
             line-height: 1.35;
         }
@@ -659,22 +658,22 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             gap: 8px;
             padding: 9px 14px;
             border-radius: 10px;
-            background: var(--pulso-cyan);
-            color: var(--pulso-deep) !important;
+            background: var(--pulso-navy);
+            color: #ffffff !important;
             font-weight: 600;
             font-size: 0.9rem;
             line-height: 1.2;
             text-decoration: none !important;
-            border: 1px solid var(--pulso-cyan);
+            border: 1px solid var(--pulso-navy);
             transition: filter 0.15s ease, transform 0.15s ease;
         }
 
         .pulso-goto-link:hover,
         .pulso-goto-link:focus {
-            filter: brightness(1.08);
+            filter: brightness(1.15);
             transform: translateY(-1px);
             text-decoration: none !important;
-            color: var(--pulso-deep) !important;
+            color: #ffffff !important;
         }
 
         .pulso-goto-icon {
@@ -763,7 +762,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         .pulso-meta-key {
             font-weight: 600;
-            color: var(--pulso-cyan-soft);
+            color: var(--pulso-navy);
             font-size: 0.85em;
             display: flex;
             align-items: center;
@@ -792,7 +791,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         .pulso-card-item-title {
             font-weight: 600;
-            color: var(--pulso-cyan-soft);
+            color: var(--pulso-navy);
             font-size: 0.95rem;
             margin-bottom: 4px;
             display: flex;
@@ -835,29 +834,29 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            background: rgba(17, 234, 234, 0.1);
-            color: var(--pulso-cyan-soft);
-            border: 1px solid rgba(17, 234, 234, 0.25);
+            background: rgba(11, 147, 170, 0.12);
+            color: var(--pulso-navy);
+            border: 1px solid rgba(11, 147, 170, 0.3);
         }
 
         .pulso-activity-badge.resource {
-            background: rgba(52, 211, 153, 0.12);
-            color: #7EE2B8;
-            border-color: rgba(52, 211, 153, 0.3);
+            background: rgba(15, 122, 87, 0.12);
+            color: #0F7A57;
+            border-color: rgba(15, 122, 87, 0.3);
         }
 
         .pulso-activity-badge.label {
-            background: rgba(245, 212, 143, 0.12);
-            color: #F5D48F;
-            border-color: rgba(245, 212, 143, 0.3);
+            background: rgba(138, 97, 0, 0.12);
+            color: #8A6100;
+            border-color: rgba(138, 97, 0, 0.3);
         }
 
         .pulso-activity-badge.page,
         .pulso-activity-badge.book,
         .pulso-activity-badge.wiki {
-            background: rgba(196, 167, 255, 0.12);
-            color: #C4A7FF;
-            border-color: rgba(196, 167, 255, 0.3);
+            background: rgba(52, 84, 122, 0.12);
+            color: #34547A;
+            border-color: rgba(52, 84, 122, 0.3);
         }
 
         .pulso-activity-name {
@@ -867,12 +866,12 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-formula {
-            background: #0A1526;
+            background: #E2E6F2;
             border: 1px solid var(--pulso-line);
             border-left: 3px solid var(--pulso-cyan);
             border-radius: 8px;
             padding: 10px 12px;
-            color: var(--pulso-cyan-soft);
+            color: var(--pulso-ink);
             font-family: Consolas, Monaco, "Courier New", monospace;
             font-size: 0.88em;
             line-height: 1.45;
@@ -882,10 +881,10 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-result-box {
-            background: rgba(52, 211, 153, 0.1);
-            border: 1px solid rgba(52, 211, 153, 0.25);
-            border-left: 3px solid #34D399;
-            color: #A7EFCE;
+            background: rgba(15, 122, 87, 0.1);
+            border: 1px solid rgba(15, 122, 87, 0.25);
+            border-left: 3px solid #0F7A57;
+            color: #0F7A57;
             border-radius: 10px;
             padding: 10px 12px;
             font-weight: 500;
@@ -929,7 +928,8 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             margin-top: 10px;
             padding: 8px 0 8px 12px;
             border-left: 2px solid var(--pulso-cyan);
-            color: var(--pulso-cyan-soft);
+            background: var(--pulso-cyan-soft);
+            color: var(--pulso-navy);
             font-size: 13px;
             line-height: 1.5;
         }
@@ -971,10 +971,10 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             border-radius: 10px;
         }
 
-        .pulso-list-card.success { border-left-color: #34D399; }
+        .pulso-list-card.success { border-left-color: #0F7A57; }
         .pulso-list-card.info    { border-left-color: var(--pulso-cyan); }
-        .pulso-list-card.warn    { border-left-color: #F5D48F; }
-        .pulso-list-card.danger  { border-left-color: #F28B82; }
+        .pulso-list-card.warn    { border-left-color: #8A6100; }
+        .pulso-list-card.danger  { border-left-color: #B3261E; }
 
         .pulso-list-card-title {
             font-weight: 600;
@@ -1031,7 +1031,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             padding: 12px 14px;
             background: var(--pulso-surface-2);
             border-radius: 10px;
-            border: 1px dashed rgba(226, 230, 242, 0.25);
+            border: 1px dashed rgba(59, 105, 150, 0.35);
             margin: 4px 0;
         }
         
@@ -1046,7 +1046,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         .pulso-table-toolbar {
             padding: 10px 12px;
-            background: rgba(226, 230, 242, 0.04);
+            background: var(--pulso-surface-2);
             border-bottom: 1px solid var(--pulso-line);
         }
 
@@ -1066,7 +1066,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         .pulso-table-search:focus {
             outline: none;
             border-color: var(--pulso-teal);
-            box-shadow: 0 0 0 3px rgba(17, 234, 234, 0.15);
+            box-shadow: 0 0 0 3px rgba(11, 147, 170, 0.25);
         }
 
         .pulso-table-search::placeholder {
@@ -1128,7 +1128,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-table tbody tr:nth-child(even) {
-            background: rgba(226, 230, 242, 0.03);
+            background: rgba(3, 54, 112, 0.03);
         }
 
         .pulso-table tbody tr {
@@ -1136,7 +1136,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-table tbody tr:hover {
-            background: rgba(17, 234, 234, 0.07);
+            background: rgba(11, 147, 170, 0.1);
         }
 
         .pulso-no-results td {
@@ -1147,7 +1147,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         .pulso-table-footer {
             padding: 10px 12px;
-            background: rgba(226, 230, 242, 0.04);
+            background: var(--pulso-surface-2);
             border-top: 1px solid var(--pulso-line);
             display: flex;
             justify-content: space-between;
@@ -1170,7 +1170,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         .pulso-export-btn {
             padding: 6px 14px;
             background: transparent;
-            color: var(--pulso-cyan-soft);
+            color: var(--pulso-navy);
             border: 1px solid var(--pulso-line);
             border-radius: 8px;
             cursor: pointer;
@@ -1181,8 +1181,8 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-export-btn:hover {
-            border-color: rgba(17, 234, 234, 0.55);
-            background: rgba(17, 234, 234, 0.08);
+            border-color: rgba(11, 147, 170, 0.55);
+            background: rgba(11, 147, 170, 0.1);
         }
 
         /* Píldoras de estado en celdas */
@@ -1195,10 +1195,10 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             white-space: nowrap;
         }
 
-        .pulso-status-pill.success { background: rgba(52, 211, 153, 0.14); color: #7EE2B8; }
-        .pulso-status-pill.danger  { background: rgba(242, 139, 130, 0.14); color: #F5A9A2; }
-        .pulso-status-pill.warning { background: rgba(245, 212, 143, 0.14); color: #F5D48F; }
-        .pulso-status-pill.neutral { background: rgba(226, 230, 242, 0.1); color: var(--pulso-slate); }
+        .pulso-status-pill.success { background: rgba(15, 122, 87, 0.14); color: #0F7A57; }
+        .pulso-status-pill.danger  { background: rgba(179, 38, 30, 0.14); color: #B3261E; }
+        .pulso-status-pill.warning { background: rgba(138, 97, 0, 0.14); color: #8A6100; }
+        .pulso-status-pill.neutral { background: rgba(52, 84, 122, 0.1); color: var(--pulso-slate); }
 
         .pulso-message-content ul,
         .pulso-message-content ol {
@@ -1236,7 +1236,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             font-family: var(--pulso-font);
             cursor: pointer;
             transition: border-color 0.2s, background 0.2s, transform 0.15s;
-            color: var(--pulso-cyan-soft);
+            color: var(--pulso-navy);
             font-weight: 500;
             white-space: normal;
             text-align: left;
@@ -1245,7 +1245,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         .pulso-followup-chip:hover {
-            border-color: rgba(17, 234, 234, 0.55);
+            border-color: rgba(11, 147, 170, 0.55);
             background: var(--pulso-surface-2);
             transform: translateY(-1px);
         }
@@ -1283,7 +1283,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             35% {
                 transform: translateY(-7px) scale(1.18);
                 opacity: 1;
-                box-shadow: 0 0 8px rgba(17, 234, 234, 0.6);
+                box-shadow: 0 0 8px rgba(11, 147, 170, 0.55);
             }
         }
 
@@ -1346,9 +1346,9 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         .pulso-input-group input:focus {
             outline: none;
-            border-color: rgba(17, 234, 234, 0.6);
+            border-color: rgba(11, 147, 170, 0.6);
             background: var(--pulso-surface-2);
-            box-shadow: 0 0 0 3px rgba(17, 234, 234, 0.14);
+            box-shadow: 0 0 0 3px rgba(11, 147, 170, 0.22);
         }
 
         .pulso-send-btn {
@@ -1375,7 +1375,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         .pulso-send-btn:hover {
             background: #19F7F1;
-            box-shadow: 0 0 16px rgba(17, 234, 234, 0.4);
+            box-shadow: 0 0 16px rgba(11, 147, 170, 0.35);
         }
 
         .pulso-send-btn:active {
@@ -1405,7 +1405,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
 
         .pulso-mic-btn:hover {
             background: var(--pulso-surface-2);
-            border-color: rgba(17, 234, 234, 0.5);
+            border-color: rgba(11, 147, 170, 0.5);
         }
 
         .pulso-mic-btn:active {
@@ -1421,9 +1421,9 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         }
 
         @keyframes pulso-mic-pulse {
-            0%   { box-shadow: 0 0 0 0 rgba(17, 234, 234, 0.5); }
-            70%  { box-shadow: 0 0 0 10px rgba(17, 234, 234, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(17, 234, 234, 0); }
+            0%   { box-shadow: 0 0 0 0 rgba(11, 147, 170, 0.5); }
+            70%  { box-shadow: 0 0 0 10px rgba(11, 147, 170, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(11, 147, 170, 0); }
         }
 
         .pulso-char-count {

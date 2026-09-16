@@ -457,6 +457,51 @@ pinta como botón "Ir a…" (`.pulso-goto-link`) al final de la respuesta. Regla
   `formatRichTextResponse()` (que escapa el bloque entero una sola vez y
   convertiría el `<a>` en texto literal).
 
+## Tema claro (variante B) — paleta del chat (v1.16.0)
+
+Desde v1.16.0 el chat es de tema CLARO: cuerpo claro, cabecera azul profunda
+(`#003670`) que se mantiene oscura como ancla de marca. Todo vive en las variables
+`--pulso-*` definidas en `.pulso-chat-bubble, .pulso-chat-container` dentro de
+`chat_simple_view.php`, más una pasada de `rgba()` y hex sueltos que NO pasaban por
+esas variables (ver abajo). Paleta activa:
+
+| Variable | Valor | Papel |
+|---|---|---|
+| `--pulso-bg` | `#FFFFFF` | fondo del panel |
+| `--pulso-surface` | `#F7F9FD` | tarjetas, sugerencias |
+| `--pulso-surface-2` | `#EDF1FA` | cabecera de tabla, chips |
+| `--pulso-deep` / `--pulso-navy` | `#003670` | cabecera del chat, botones de acción |
+| `--pulso-ink` | `#27334F` | texto principal |
+| `--pulso-slate` | `#34547A` | texto secundario |
+| `--pulso-muted` | `#3B6996` | etiquetas pequeñas |
+| `--pulso-line` | `#DCE3F2` | separadores y bordes |
+| `--pulso-cyan` / `--pulso-teal` / `--pulso-teal-ink` | `#0B93AA` | acento (iconos, bordes, foco — nunca texto) |
+| `--pulso-cyan-soft` | `#D9FBFF` | cian claro de marca (fondo del bloque de siguiente paso) |
+
+Estados (sustituyen a los pasteles del tema oscuro, ilegibles sobre blanco):
+success `#0F7A57` (5,33), warning `#8A6100` (5,54), danger `#B3261E` (6,54). Para
+fondos tenues de píldoras, sube la alfa del `rgba()` lo justo para que se note sobre
+blanco; el color del texto es siempre el de esta tabla, nunca el pastel antiguo.
+
+**El cian deja de ser color de texto en claro — invariante, no detalle de estilo.**
+Sobre fondo blanco: `#11EAEA`→1,50, `#19F7F1`→1,34, `#0ABCC9`→2,32 (inservibles),
+`#0B93AA`→3,64 (solo iconos/bordes/foco/fondos de botón, mínimo AA no-texto),
+`#4E7EA5`→4,33 (insuficiente para texto), `#3B6996`→5,76, `#34547A`→7,79,
+`#003670`→11,92, `#27334F`→12,55 (correctos para texto). Si necesitas un color
+"de marca pero no cian" para texto sobre fondo claro (p.ej. un badge que no encaja
+en success/warning/danger), usa `#34547A` — está en la paleta oficial y da 7,79;
+NO inventes un tono fuera de paleta (pasó una vez con un morado para badges
+`page/book/wiki` en el propio recolor a v1.16.0 — se corrigió antes de mergear).
+
+**Sobre fondo cian NO hay ningún texto que cumpla AA — ni blanco ni un azul
+oscuro.** Medido para el botón "Ir a…" (`.pulso-goto-link`, antes fondo
+`var(--pulso-cyan)` + texto `var(--pulso-deep)`): blanco sobre `#0B93AA` da 3,64;
+`#01264C` (el azul casi-negro de la paleta) sobre `#0B93AA` da 4,17 — los dos por
+debajo del 4,5 que exige texto normal. Por eso un botón de ACCIÓN con texto (no un
+icono suelto, que solo necesita 3:1) va siempre en `#003670` con texto blanco
+(11,92 de contraste), nunca en fondo cian. El cian como fondo solo es seguro para
+iconos/SVG sin texto encima (ahí aplica el umbral no-texto de 3:1, que si cumple).
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

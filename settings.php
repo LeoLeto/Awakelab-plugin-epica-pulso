@@ -199,4 +199,61 @@ if ($ADMIN->fulltree) {
         get_string('rag_enabled_desc', 'block_pulso'),
         0   // Disabled by default until the admin runs the first index.
     ));
+
+    // ============================================================
+    // Encargos de creacion (Epica): cupos anti-abuso (v1.18.0)
+    // ============================================================
+    $settings->add(new admin_setting_heading(
+        'block_pulso/creationquota_heading',
+        get_string('creationquota_heading', 'block_pulso'),
+        get_string('creationquota_heading_desc', 'block_pulso')
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/quota_user_section_day',
+        get_string('quota_user_section_day', 'block_pulso'),
+        get_string('quota_user_section_day_desc', 'block_pulso'),
+        2,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/quota_user_course_day',
+        get_string('quota_user_course_day', 'block_pulso'),
+        get_string('quota_user_course_day_desc', 'block_pulso'),
+        5,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/quota_course_hour',
+        get_string('quota_course_hour', 'block_pulso'),
+        get_string('quota_course_hour_desc', 'block_pulso'),
+        15,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/quota_course_day_floor',
+        get_string('quota_course_day_floor', 'block_pulso'),
+        get_string('quota_course_day_floor_desc', 'block_pulso'),
+        40,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/quota_course_day_multiplier',
+        get_string('quota_course_day_multiplier', 'block_pulso'),
+        get_string('quota_course_day_multiplier_desc', 'block_pulso'),
+        '1.5',
+        PARAM_RAW
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/quota_teacher_day',
+        get_string('quota_teacher_day', 'block_pulso'),
+        get_string('quota_teacher_day_desc', 'block_pulso'),
+        10,
+        PARAM_INT
+    ));
 }

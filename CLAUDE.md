@@ -525,6 +525,71 @@ Y el cierre de cada paso es siempre el mismo: enseñar el diff antes de aplicar,
 `version.php`, y documentar en este fichero lo que sea regla permanente y en
 `memory/session-history.md` lo que costó encontrar.
 
+## Integración con Épica — paso 1: bloque «Crear» (v1.18.0)
+
+Épica genera infografías a partir del texto de un recurso del curso (guardado desde
+v1.17.0 en `block_pulso_full_text`). Este paso construye solo la parte de Pulse: pantalla
+de encargo + cupos + tabla. **Todavía no se manda nada a Épica** — eso es el paso 4, y el
+punto de entrada ya queda marcado (`creation_quota::dispatch_to_epica()`, no-op a
+propósito).
+
+- **Alumnado y profesorado, los dos.** Decisión de producto: la puerta de Épica acepta
+  encargos de alumno. Por eso el bloque «Crear» vive FUERA de los marcadores
+  `<!--PULSO_TEACHER_ONLY_*-->`/`<!--PULSO_STUDENT_ONLY_*-->`, en sus propios
+  `<!--PULSO_CREATE_ONLY_START/END-->`, con la capability nueva
+  `block/pulso:createactivity` (contexto de curso, `CAP_ALLOW` para
+  student/teacher/editingteacher/manager — hace lo mismo que hoy haría no tener
+  capability, y existe solo para que un centro se la pueda quitar al alumnado desde la
+  interfaz de Moodle sin tocar código). Se comprueba en `block_pulso.php` igual que
+  `viewanalytics`, y los dos endpoints nuevos (`api_create_form.php`,
+  `api_create_submit.php`) la vuelven a exigir con `require_capability()`: la UI no es
+  control de acceso, igual que en modo alumno.
+- **v1 tiene UN botón** (infografías). Retos/presentaciones son v2+; no se ha dejado hueco
+  de "tres botones" en el HTML ni en la capability — añadirlos es repetir este mismo
+  patrón, no descomentar algo ya puesto.
+- **Es una pantalla, no un mensaje de chat.** `#pulso-create-panel` es hermano de
+  `#pulso-home` dentro de `#pulso-messages` y se alterna con una clase
+  (`pulso-showing-create` en `#pulso-messages`) que oculta todo lo demás — si el
+  formulario se colara como mensaje, entraría en el historial que viaja a Anthropic en
+  cada petición siguiente.
+- **El desplegable tiene DOS filtros obligatorios**, los dos en
+  `creation_quota::get_resources_context()`/`filter_visible()`: `usable=1` de
+  `full_text_store::get_available_resources()` (un recurso sin texto da un encargo vacío)
+  y `get_fast_modinfo()->uservisible` (mismo criterio que
+  `rag_retriever::build_activity_link()` — sin esto, un alumno vería en el desplegable el
+  nombre de un recurso oculto o restringido, y el nombre ya es información). Lista vacía
+  → mensaje explícito con motivo real (`full_text_store::has_any_indexed()` distingue
+  "el curso aún no se indexó" de "no hay texto aprovechable"; un tercer motivo,
+  `no_visible`, cubre el caso — no contemplado en el encargo original pero real — de que
+  todo lo indexado esté oculto/restringido para ESE usuario).
+- **Los topes cuentan ENCARGOS, no infografías** (`block_pulso_encargos`, sin filtrar por
+  `tool` al contar): cuando llegue la v2 con retos, el mismo contador protege a los dos,
+  porque Épica avisó de que la cola es compartida entre herramientas. Son 5, todos
+  ajustes de plugin (`settings.php`, pendientes de aprobación de negocio, no
+  constantes): usuario+sección+día, usuario+curso+día, curso+hora (ventana móvil, no reloj
+  de pared), curso+día (`max(suelo, matriculados × multiplicador)`, los dos también
+  configurables) y docente+día — esta última es la única que NO filtra por curso: cuenta
+  los encargos del docente en TODOS sus cursos, porque la de usuario+curso ya lo protege
+  dentro de uno solo.
+- **El cupo de sección se avisa ANTES de escribir, sin una petición aparte.** El GET que
+  arma el desplegable (`api_create_form.php`) ya devuelve, por cada recurso, su consumo de
+  hoy de esa sección (`sectionused`/`sectionlimit`); el JS lo usa al `change` del
+  desplegable para avisar o bloquear el envío en cuanto se elige el recurso, no al
+  enviarlo — un tope que se descubre después de teclear se lee como una avería. El resto
+  de cupos (los que no dependen del recurso) se comprueban al pulsar el botón, antes de
+  mostrar el formulario. Los dos se REVALIDAN en servidor al enviar
+  (`api_create_submit.php`): nunca confiar en el cupo ya mostrado, que puede haberse
+  quedado desfasado, ni en el `cmid` tal cual llega del cliente (se recalcula contra
+  `get_resources_context()` de nuevo).
+- **`block_pulso_encargos` está diseñada para el paso 4, no solo para contar**: además de
+  `courseid`/`cmid`/`sectionnum`/`userid`/`tool`/`timecreated`/`status`, guarda `prompt` y
+  `format` (lo que el paso 4 tendrá que enviar) y una columna `epica_job_id` ya reservada
+  (nula hasta entonces) para el identificador de trabajo que devuelva Épica.
+- **El cian sigue sin ser color de texto.** El CTA «Crear infografía» usa fondo
+  `--pulso-navy` sólido con texto blanco (regla del tema claro); el cian solo aparece en
+  el icono, para diferenciarlo visualmente de las tarjetas-pregunta de los otros dos
+  bloques sin romper la regla de contraste.
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

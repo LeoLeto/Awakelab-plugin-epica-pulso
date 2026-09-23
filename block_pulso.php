@@ -51,9 +51,14 @@ class block_pulso extends block_base {
         // (el bloqueo real de datos está en servidor, no en la UI).
         $isteacher = has_capability('block/pulso:viewanalytics', $context);
 
+        // Bloque "Crear" (encargos a Epica): alumnado y profesorado, los dos.
+        // Existe como capability propia solo para que un centro se la pueda
+        // quitar al alumnado desde la interfaz de Moodle sin tocar código.
+        $cancreate = has_capability('block/pulso:createactivity', $context);
+
         // Cargar chat simple
         require_once(__DIR__ . '/chat_simple_view.php');
-        $this->content->text = render_chat_simple($COURSE->id, $context, $isteacher);
+        $this->content->text = render_chat_simple($COURSE->id, $context, $isteacher, $cancreate);
 
         return $this->content;
     }

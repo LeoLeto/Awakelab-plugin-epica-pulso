@@ -1,5 +1,45 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-23 — Bloque «Crear infografía» (Épica paso 1): pantalla + cupos (v1.18.0)
+
+Segundo paso de la integración con Épica (el primero fue guardar el texto completo,
+v1.17.0). Este construye solo el lado de Pulse: pantalla de encargo, capability nueva,
+cupos anti-abuso y la tabla `block_pulso_encargos`. Todavía no manda nada a Épica —eso es
+el paso 4, con el punto de entrada ya marcado y sin cuerpo
+(`creation_quota::dispatch_to_epica()`)—. Las reglas que deben persistir están en
+`CLAUDE.md` → "Integración con Épica — paso 1"; aquí lo que se decidió sobre la marcha:
+
+- **El cupo de sección se resuelve sin una petición extra.** La instrucción original solo
+  decía "cupo antes de escribir", pero el cupo por sección solo se puede evaluar una vez
+  elegido el recurso —dentro del formulario—, y validarlo recién al ENVIAR habría sido
+  exactamente el "se descubre después de teclear" que se quería evitar. Solución: el GET
+  que arma el desplegable ya calcula, por cada recurso, el consumo de hoy de su sección
+  (`creation_quota::attach_section_usage()`), y el JS avisa/bloquea al `change` del
+  desplegable —antes de que el usuario escriba una sola palabra—, sin ningún viaje de red
+  adicional. Se revalida igualmente en servidor al enviar (nunca confiar en un cupo ya
+  mostrado ni en el `cmid` del cliente).
+- **Tercer motivo de "lista vacía" no contemplado en el encargo**: además de "no indexado"
+  y "sin texto aprovechable", puede pasar que TODO lo indexado esté oculto/restringido
+  para ese usuario en concreto (`no_visible`). Con un solo recurso indexado y una
+  restricción de acceso puesta a un alumno, los otros dos motivos habrían dado un mensaje
+  engañoso ("aún no se indexó" cuando sí se indexó). Se añadió sin que lo pidiera el
+  encargo porque era un caso real y barato de cubrir.
+- **La tabla de encargos lleva `prompt` y `format` desde ya**, no solo lo mínimo para
+  contar (`courseid`/`cmid`/`sectionnum`/`userid`/`tool`/`timecreated`/`status`): son
+  literalmente el contenido del encargo, y sin ellos el paso 4 no tendría qué enviarle a
+  Épica. `epica_job_id` queda reservado (NULL) para entonces.
+- **La capability es de escritura (`captype: write`)**, distinta de `usechat`/
+  `viewanalytics` (ambas `read`): crea una fila nueva, no solo consulta.
+- **No verificado en Moodle todavía** (sin acceso a una instancia en esta sesión): que el
+  alumno vea el bloque «Crear» sin ver «Analítica»; que un recurso con restricción de
+  acceso puesta a propósito no aparezca en el desplegable de un alumno; que la
+  actualización de Moodle cree `block_pulso_encargos` sin errores; y los 5 cupos con
+  datos reales (en especial el de curso+hora con ventana móvil, y el de curso+día con el
+  cálculo de matriculados). Revisar también, con Moodle real, si `require_sesskey()`
+  acepta el sesskey pasado por querystring en el GET de `api_create_form.php` igual que
+  lo hace por POST en los demás endpoints (la lectura interna de Moodle no distingue
+  GET/POST, pero no se ha podido probar en vivo).
+
 ## 2026-09-23 — Texto completo por módulo para Épica: tabla nueva (v1.17.0)
 
 Primer paso de la integración con Épica, y no depende de ella: guardar el texto

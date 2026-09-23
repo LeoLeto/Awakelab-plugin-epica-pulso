@@ -141,6 +141,26 @@ class full_text_store {
     }
 
     /**
+     * ¿Tiene este curso AL MENOS una fila indexada, aprovechable o no?
+     *
+     * Distingue, para el desplegable de "enviar a Epica", entre un curso que
+     * aun no ha pasado por el cron nocturno de indexacion (sin filas) y uno
+     * que ya se indexo pero ninguno de sus recursos tiene texto aprovechable
+     * (filas con usable=0). Los dos dan una lista vacia en
+     * get_available_resources(), pero el mensaje al usuario debe ser distinto.
+     *
+     * @param int $courseid
+     * @return bool
+     */
+    public static function has_any_indexed(int $courseid): bool {
+        global $DB;
+        if (!self::table_exists()) {
+            return false;
+        }
+        return $DB->record_exists('block_pulso_full_text', ['courseid' => $courseid]);
+    }
+
+    /**
      * Borra el texto completo de un curso (p. ej. al desactivar Pulso en el curso).
      *
      * @param int $courseid

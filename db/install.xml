@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="blocks/pulso/db" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    VERSION="20260923"
+    VERSION="20260924"
     COMMENT="XMLDB file for Moodle block Pulso"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
   <TABLES>
@@ -53,6 +53,32 @@
         <INDEX NAME="idx_courseid" UNIQUE="false" FIELDS="courseid"/>
         <INDEX NAME="idx_cmid" UNIQUE="false" FIELDS="cmid"/>
         <INDEX NAME="idx_courseid_cmid" UNIQUE="false" FIELDS="courseid, cmid"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="block_pulso_encargos" COMMENT="Encargos de creacion para Epica (infografias; retos en v2). Cuenta contra los cupos anti-abuso y guarda el job id real del paso 4.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="course_modules.id del recurso origen"/>
+        <FIELD NAME="sectionnum" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Seccion del recurso, para el cupo por usuario+seccion+dia"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="tool" TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="infografia" SEQUENCE="false" COMMENT="infografia hoy; reto/presentacion en versiones futuras"/>
+        <FIELD NAME="format" TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="poster_2_3 / square / landscape_3_2"/>
+        <FIELD NAME="prompt" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="Que quiere el usuario, tal cual lo escribio (maximo 4000 caracteres)"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="pendiente" SEQUENCE="false"/>
+        <FIELD NAME="epica_job_id" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Identificador de trabajo devuelto por Epica; lo rellena el paso 4"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_courseid" UNIQUE="false" FIELDS="courseid"/>
+        <INDEX NAME="idx_userid" UNIQUE="false" FIELDS="userid"/>
+        <INDEX NAME="idx_timecreated" UNIQUE="false" FIELDS="timecreated"/>
+        <INDEX NAME="idx_courseid_timecreated" UNIQUE="false" FIELDS="courseid, timecreated"/>
+        <INDEX NAME="idx_userid_timecreated" UNIQUE="false" FIELDS="userid, timecreated"/>
       </INDEXES>
     </TABLE>
   </TABLES>

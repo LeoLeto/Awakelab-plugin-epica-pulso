@@ -82,3 +82,20 @@ $string['task_index_course_adhoc'] = 'Index a single course on demand for RAG (P
 
 // === CACHES ===
 $string['cachedef_coursecontext'] = 'Unified course analytics context used by the Pulse chat';
+
+// === Creation requests to Epica (infographics; v1.18.0) ===
+$string['pulso:createactivity'] = 'Request a creation (infographic) from Pulse';
+$string['creationquota_heading'] = 'Creation requests (Epica) — quotas';
+$string['creationquota_heading_desc'] = 'Anti-abuse limits for creation requests sent through Pulse (infographics today; challenges and presentations in future versions). These count REQUESTS, not finished creations — Epica shares its queue across tools.';
+$string['quota_user_section_day'] = 'Per user, section and day';
+$string['quota_user_section_day_desc'] = 'Maximum creation requests a single user can submit for resources in the same course section, per day.';
+$string['quota_user_course_day'] = 'Per user and day, in a course';
+$string['quota_user_course_day_desc'] = 'Maximum creation requests a single user can submit within one course, per day.';
+$string['quota_course_hour'] = 'Per course and hour';
+$string['quota_course_hour_desc'] = 'Maximum creation requests a single course can generate in a rolling hour.';
+$string['quota_course_day_floor'] = 'Per course and day — minimum';
+$string['quota_course_day_floor_desc'] = 'Minimum daily requests allowed per course, regardless of enrolment size (see the multiplier setting below for the actual formula: the higher of this floor and enrolled users × multiplier).';
+$string['quota_course_day_multiplier'] = 'Per course and day — multiplier per enrolled user';
+$string['quota_course_day_multiplier_desc'] = 'Multiplied by the course\'s enrolled users to get the daily cap (e.g. 1.5 means 150 enrolled users allow up to 225 requests/day). The effective limit is the higher of this and the floor above.';
+$string['quota_teacher_day'] = 'Per teacher and day (all courses)';
+$string['quota_teacher_day_desc'] = 'Maximum creation requests a single teaching-staff member can submit per day, across ALL their courses.';

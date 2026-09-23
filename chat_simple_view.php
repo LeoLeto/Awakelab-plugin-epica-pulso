@@ -24,14 +24,22 @@ defined('MOODLE_INTERNAL') || die();
  *                        analítica, saludo y capacidades de contenido. Es solo
  *                        presentación — el bloqueo de datos está en servidor
  *                        (chat_pipeline / data_retriever / rag_retriever).
+ * @param bool $cancreate ¿Tiene 'block/pulso:createactivity'? Con false se
+ *                        elimina del HTML el bloque "Crear" (encargos a
+ *                        Epica). Por defecto lo tienen alumnado y
+ *                        profesorado: existe para que un centro se lo pueda
+ *                        quitar sin tocar código. Es solo presentación — el
+ *                        bloqueo real está en los endpoints api_create_*.php.
  * @return string
  */
-function render_chat_simple($courseid, $context, $isteacher = true) {
+function render_chat_simple($courseid, $context, $isteacher = true, $cancreate = true) {
     global $OUTPUT, $USER, $CFG;
-    
+
     // Construir URL base correcta para AJAX
     $api_url = $CFG->wwwroot . '/blocks/pulso/api_chat.php';
     $stream_url = $CFG->wwwroot . '/blocks/pulso/api_chat_stream.php';
+    $create_form_url = $CFG->wwwroot . '/blocks/pulso/api_create_form.php';
+    $create_submit_url = $CFG->wwwroot . '/blocks/pulso/api_create_submit.php';
 
     // Leer la versión directamente de version.php (no de la BD) para que el
     // badge del header refleje siempre el código desplegado, incluso antes
@@ -53,6 +61,8 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         window.courseid = {$courseid};
         window.apiUrl = '{$api_url}';
         window.streamApiUrl = '{$stream_url}';
+        window.apiCreateFormUrl = '{$create_form_url}';
+        window.apiCreateSubmitUrl = '{$create_submit_url}';
         window.pulsoSesskey = '{$pulso_sesskey}';
         // Solo para adaptar la UI: el servidor decide qué datos se devuelven.
         window.pulsoIsTeacher = {$pulso_isteacher};
@@ -537,6 +547,204 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
         .pulso-action-chevron svg {
             width: 12px;
             height: 12px;
+        }
+
+        /* ========== BLOQUE "CREAR" (encargos a Epica) ==========
+           Distinto a propósito de los otros dos bloques: aquellos son
+           preguntas, este es una acción que cuesta dinero y genera algo.
+           Fondo navy sólido + texto blanco (nunca cian como color de texto,
+           regla del tema claro), acento cian solo en el icono. */
+        .pulso-create-cta {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 14px 16px;
+            border: none;
+            border-radius: 14px;
+            background: var(--pulso-navy);
+            color: #ffffff;
+            font-family: var(--pulso-font);
+            cursor: pointer;
+            text-align: left;
+            box-shadow: 0 2px 10px rgba(1, 25, 50, 0.18);
+            transition: transform 0.15s, box-shadow 0.2s;
+        }
+
+        .pulso-create-cta:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(1, 25, 50, 0.26);
+        }
+
+        .pulso-create-cta:active {
+            transform: translateY(0);
+        }
+
+        .pulso-create-cta-icon {
+            flex-shrink: 0;
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: rgba(11, 147, 170, 0.28);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pulso-create-cta-icon svg {
+            width: 20px;
+            height: 20px;
+            color: var(--pulso-cyan-soft);
+        }
+
+        .pulso-create-cta-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .pulso-create-cta-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .pulso-create-cta-sub {
+            font-size: 0.74rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.78);
+        }
+
+        /* Pantalla de "Crear infografía": NO es un mensaje de chat, es una
+           pantalla propia que sustituye a la home/mensajes mientras está
+           abierta (misma capa, se alternan con una clase en #pulso-messages
+           para no duplicar el scroll). */
+        .pulso-create-panel {
+            display: none;
+        }
+
+        #pulso-messages.pulso-showing-create > *:not(.pulso-create-panel) {
+            display: none;
+        }
+
+        #pulso-messages.pulso-showing-create .pulso-create-panel {
+            display: block;
+        }
+
+        .pulso-create-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .pulso-create-back {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 1px solid var(--pulso-line);
+            background: var(--pulso-surface);
+            color: var(--pulso-ink);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .pulso-create-head svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .pulso-create-head h4 {
+            margin: 0;
+            font-size: 0.98rem;
+            font-weight: 600;
+            color: var(--pulso-ink);
+            font-family: var(--pulso-font);
+        }
+
+        .pulso-create-body {
+            font-family: var(--pulso-font);
+            color: var(--pulso-ink);
+            font-size: 0.88rem;
+        }
+
+        .pulso-create-field {
+            margin-bottom: 14px;
+        }
+
+        .pulso-create-field label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--pulso-slate);
+            margin-bottom: 6px;
+        }
+
+        .pulso-create-field select,
+        .pulso-create-field textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border: 1px solid var(--pulso-line);
+            border-radius: 10px;
+            font-family: var(--pulso-font);
+            font-size: 0.86rem;
+            color: var(--pulso-ink);
+            background: var(--pulso-surface);
+        }
+
+        .pulso-create-field select:focus,
+        .pulso-create-field textarea:focus {
+            outline: none;
+            border-color: var(--pulso-cyan);
+            box-shadow: 0 0 0 2px rgba(11, 147, 170, 0.2);
+        }
+
+        .pulso-create-field textarea {
+            resize: vertical;
+            min-height: 76px;
+        }
+
+        .pulso-create-hint {
+            font-size: 0.72rem;
+            color: var(--pulso-muted);
+            margin-top: 4px;
+            min-height: 1em;
+        }
+
+        .pulso-create-hint.warn {
+            color: #8A6100;
+        }
+
+        .pulso-create-submit {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 999px;
+            background: var(--pulso-navy);
+            color: #ffffff;
+            font-family: var(--pulso-font);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        .pulso-create-submit:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .pulso-create-notice {
+            padding: 14px;
+            border-radius: 12px;
+            background: var(--pulso-surface);
+            border-left: 3px solid var(--pulso-cyan);
+            font-size: 0.86rem;
+            line-height: 1.5;
         }
 
         .pulso-message {
@@ -1604,7 +1812,38 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                         <!--PULSO_STUDENT_ONLY_END-->
                     </div>
                 </div>
+
+                <!--PULSO_CREATE_ONLY_START-->
+                <div class="pulso-home-section create">
+                    <div class="pulso-home-section-head">
+                        <span class="pulso-home-section-title">Crear</span>
+                    </div>
+                    <button type="button" class="pulso-create-cta" onclick="openCreatePanel()">
+                        <span class="pulso-create-cta-icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                        </span>
+                        <span class="pulso-create-cta-text">
+                            <span class="pulso-create-cta-title">Crear infografía</span>
+                            <span class="pulso-create-cta-sub">Genera una infografía a partir de un recurso del curso</span>
+                        </span>
+                    </button>
+                </div>
+                <!--PULSO_CREATE_ONLY_END-->
             </div>
+
+            <!--PULSO_CREATE_ONLY_START-->
+            <div class="pulso-create-panel" id="pulso-create-panel">
+                <div class="pulso-create-head">
+                    <button type="button" class="pulso-create-back" onclick="closeCreatePanel()" aria-label="Volver a la pantalla de inicio">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <h4>Crear infografía</h4>
+                </div>
+                <div class="pulso-create-body" id="pulso-create-body">
+                    <p class="pulso-create-hint">Cargando…</p>
+                </div>
+            </div>
+            <!--PULSO_CREATE_ONLY_END-->
         </div>
 
         <div class="pulso-chat-input-area">
@@ -2925,6 +3164,190 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
                 home.style.display = visible ? '' : 'none';
             }
         }
+
+        // ========== CREAR INFOGRAFÍA (encargo a Epica) ==========
+        // Es una PANTALLA propia, no un mensaje del chat: si se colara como
+        // mensaje acabaría en el historial que viaja a Anthropic en cada
+        // petición. #pulso-create-panel sustituye a la home/mensajes
+        // alternando la clase 'pulso-showing-create' en #pulso-messages.
+        // De momento no manda nada a Epica (eso es el paso 4): solo valida,
+        // comprueba cupo y guarda el encargo como "pendiente".
+        let pulsoCreateResources = [];
+
+        function openCreatePanel() {
+            const messagesDiv = document.getElementById('pulso-messages');
+            const body = document.getElementById('pulso-create-body');
+            if (!messagesDiv || !body) return;
+
+            messagesDiv.classList.add('pulso-showing-create');
+            body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
+
+            const params = new URLSearchParams();
+            params.set('courseid', window.courseid);
+            params.set('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+
+            fetch(window.apiCreateFormUrl + '?' + params.toString(), { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        renderCreateNotice(data.message || 'No se ha podido comprobar el cupo. Inténtalo de nuevo.');
+                        return;
+                    }
+                    if (!data.quota_ok) {
+                        renderCreateNotice(data.quota_message || 'Has alcanzado el límite de encargos.');
+                        return;
+                    }
+                    if (!data.resources || data.resources.length === 0) {
+                        renderCreateNoResources(data.noresourcesreason);
+                        return;
+                    }
+                    pulsoCreateResources = data.resources;
+                    renderCreateForm(data.resources);
+                })
+                .catch(function() {
+                    renderCreateNotice('No se ha podido conectar para comprobar el cupo. Inténtalo de nuevo.');
+                });
+        }
+
+        function closeCreatePanel() {
+            const messagesDiv = document.getElementById('pulso-messages');
+            if (messagesDiv) {
+                messagesDiv.classList.remove('pulso-showing-create');
+            }
+        }
+
+        function renderCreateNotice(text) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+            body.innerHTML = '<div class="pulso-create-notice"></div>';
+            body.querySelector('.pulso-create-notice').textContent = text;
+        }
+
+        function renderCreateNoResources(reason) {
+            const messages = {
+                'not_indexed': 'Este curso todavía no se ha indexado. La indexación es nocturna: si el curso es nuevo, vuelve a intentarlo mañana.',
+                'no_usable': 'Ninguno de los recursos de este curso tiene texto que se pueda aprovechar para generar una infografía.',
+                'no_visible': 'No tienes acceso a ningún recurso indexado de este curso.'
+            };
+            renderCreateNotice(messages[reason] || 'No hay recursos disponibles para crear una infografía en este curso.');
+        }
+
+        function renderCreateForm(resources) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+
+            let optionsHtml = '';
+            resources.forEach(function(r) {
+                const flag = r.lowtext ? ' — texto escaso, resultado limitado' : '';
+                optionsHtml += '<option value="' + r.cmid + '">'
+                    + escapeHtmlText(r.moduletypelabel) + ': ' + escapeHtmlText(r.name) + escapeHtmlText(flag)
+                    + '</option>';
+            });
+
+            body.innerHTML = ''
+                + '<div class="pulso-create-field">'
+                + '<label for="pulso-create-resource">Recurso</label>'
+                + '<select id="pulso-create-resource">' + optionsHtml + '</select>'
+                + '<div class="pulso-create-hint" id="pulso-create-section-hint"></div>'
+                + '</div>'
+                + '<div class="pulso-create-field">'
+                + '<label for="pulso-create-prompt">Qué quieres</label>'
+                + '<textarea id="pulso-create-prompt" maxlength="4000" placeholder="Ej: Una infografía que resuma las fases del proceso para repasarlas de un vistazo."></textarea>'
+                + '</div>'
+                + '<div class="pulso-create-field">'
+                + '<label for="pulso-create-format">Formato</label>'
+                + '<select id="pulso-create-format">'
+                + '<option value="poster_2_3">Póster (2:3)</option>'
+                + '<option value="square">Cuadrado</option>'
+                + '<option value="landscape_3_2">Horizontal (3:2)</option>'
+                + '</select>'
+                + '</div>'
+                + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" onclick="submitCreateInfografia()">Crear infografía</button>';
+
+            const select = document.getElementById('pulso-create-resource');
+            if (select) {
+                select.addEventListener('change', updateCreateSectionHint);
+                updateCreateSectionHint();
+            }
+        }
+
+        // Avisa del cupo por sección ANTES de que el usuario escriba su
+        // petición (con los datos que ya trajo el GET, sin otra petición):
+        // un tope que se descubre después de teclear se lee como una avería.
+        function updateCreateSectionHint() {
+            const select = document.getElementById('pulso-create-resource');
+            const hint = document.getElementById('pulso-create-section-hint');
+            const btn = document.getElementById('pulso-create-submit-btn');
+            if (!select || !hint) return;
+
+            const cmid = parseInt(select.value, 10);
+            const resource = pulsoCreateResources.find(function(r) { return r.cmid === cmid; });
+            if (!resource) return;
+
+            if (resource.sectionused >= resource.sectionlimit) {
+                hint.textContent = 'Ya has llegado al límite de encargos de hoy para la sección de este recurso ('
+                    + resource.sectionlimit + '). Elige otro recurso.';
+                hint.classList.add('warn');
+                if (btn) btn.disabled = true;
+            } else {
+                hint.textContent = '';
+                hint.classList.remove('warn');
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        function submitCreateInfografia() {
+            const select = document.getElementById('pulso-create-resource');
+            const promptEl = document.getElementById('pulso-create-prompt');
+            const formatEl = document.getElementById('pulso-create-format');
+            const btn = document.getElementById('pulso-create-submit-btn');
+            if (!select || !promptEl || !formatEl) return;
+
+            const prompt = promptEl.value.trim();
+            if (!prompt) {
+                promptEl.focus();
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Guardando…';
+            }
+
+            const formData = new FormData();
+            formData.append('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+            formData.append('courseid', window.courseid);
+            formData.append('cmid', select.value);
+            formData.append('prompt', prompt);
+            formData.append('format', formatEl.value);
+
+            fetch(window.apiCreateSubmitUrl, { method: 'POST', credentials: 'same-origin', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.success) {
+                        renderCreateNotice(data.message || 'Encargo guardado. En cuanto esté lista, te avisaremos.');
+                    } else {
+                        renderCreateNotice(data.message || 'No se ha podido guardar el encargo. Inténtalo de nuevo.');
+                        if (btn) {
+                            btn.disabled = false;
+                            btn.textContent = 'Crear infografía';
+                        }
+                    }
+                })
+                .catch(function() {
+                    renderCreateNotice('No se ha podido conectar para guardar el encargo. Inténtalo de nuevo.');
+                    if (btn) {
+                        btn.disabled = false;
+                        btn.textContent = 'Crear infografía';
+                    }
+                });
+        }
+
+        function escapeHtmlText(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
         
         function updateCharCount() {
             const input = document.getElementById('pulso-input');
@@ -3842,6 +4265,14 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
     );
     // Quitar los marcadores del rol que sí se renderiza.
     $html = preg_replace('/<!--PULSO_(TEACHER|STUDENT)_ONLY_(START|END)-->/', '', $html);
+
+    // Bloque "Crear" (encargos a Epica): capability independiente de
+    // teacher/student, se elimina del HTML igual que los otros bloques
+    // cuando el centro se la ha quitado a este usuario.
+    if (!$cancreate) {
+        $html = preg_replace('/<!--PULSO_CREATE_ONLY_START-->.*?<!--PULSO_CREATE_ONLY_END-->/s', '', $html);
+    }
+    $html = preg_replace('/<!--PULSO_CREATE_ONLY_(START|END)-->/', '', $html);
 
     // Inyectar versión, nombre y curso (el bloque HTML es un nowdoc sin interpolación).
     $html = str_replace('%%PULSO_VERSION%%', s($pulso_release), $html);

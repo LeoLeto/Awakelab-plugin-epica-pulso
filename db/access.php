@@ -27,6 +27,22 @@ $capabilities = [
         ],
     ],
 
+    // Encargar una creacion (infografia, y en el futuro retos/presentaciones)
+    // a Epica. Por defecto la tiene todo el que ya puede usar el chat -hace lo
+    // mismo que hoy haria no tener capability, todos pueden-: existe como
+    // capability propia solo para que un centro se la pueda quitar al
+    // alumnado desde la interfaz de Moodle sin tocar codigo.
+    'block/pulso:createactivity' => [
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes' => [
+            'student' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+            'teacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
+        ],
+    ],
+
     // T2.6.2: Capability to view analytics data via Pulso chat
     'block/pulso:viewanalytics' => [
         'captype' => 'read',

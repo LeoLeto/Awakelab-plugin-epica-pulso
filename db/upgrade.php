@@ -96,5 +96,40 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092302, 'pulso');
     }
 
+    if ($oldversion < 2026092303) {
+        // Encargos de creacion para Epica (paso 1: infografias; el mismo
+        // contador servira para retos en v2 -Epica avisa de que la cola de
+        // encargos es compartida entre herramientas). Cada fila cuenta contra
+        // los cupos anti-abuso y es la que el paso 4 completara con el job id
+        // real que devuelva Epica.
+        $table = new xmldb_table('block_pulso_encargos');
+
+        $table->add_field('id',           XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
+        $table->add_field('courseid',     XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('cmid',         XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('sectionnum',   XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('userid',       XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('tool',         XMLDB_TYPE_CHAR,    '30', null, XMLDB_NOTNULL, null, 'infografia');
+        $table->add_field('format',       XMLDB_TYPE_CHAR,    '30', null, XMLDB_NOTNULL, null, '');
+        $table->add_field('prompt',       XMLDB_TYPE_TEXT,    null, null, XMLDB_NOTNULL);
+        $table->add_field('status',       XMLDB_TYPE_CHAR,    '20', null, XMLDB_NOTNULL, null, 'pendiente');
+        $table->add_field('epica_job_id', XMLDB_TYPE_CHAR,   '255', null, null, null);
+        $table->add_field('timecreated',  XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_index('idx_courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']);
+        $table->add_index('idx_userid', XMLDB_INDEX_NOTUNIQUE, ['userid']);
+        $table->add_index('idx_timecreated', XMLDB_INDEX_NOTUNIQUE, ['timecreated']);
+        $table->add_index('idx_courseid_timecreated', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'timecreated']);
+        $table->add_index('idx_userid_timecreated', XMLDB_INDEX_NOTUNIQUE, ['userid', 'timecreated']);
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_block_savepoint(true, 2026092303, 'pulso');
+    }
+
     return true;
 }

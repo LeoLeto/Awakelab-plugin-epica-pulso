@@ -141,6 +141,40 @@ class full_text_store {
     }
 
     /**
+     * Texto completo aprovechable de UN recurso, para construir el envío a
+     * Epica (paso 3). Devuelve null si no hay fila, si no es aprovechable
+     * (usable=0, p.ej. un PDF escaneado) o si la tabla no existe todavía —
+     * quien llama debe tratarlo como "ya no se puede generar nada de esto",
+     * porque entre el encargo y la ejecución de la tarea puede haber pasado
+     * una reindexación nocturna.
+     *
+     * @param int $courseid
+     * @param int $cmid
+     * @return array{module_type: string, module_name: string, texto: string,
+     *               caracteres: int, extraido_por: string}|null
+     */
+    public static function get_resource_text(int $courseid, int $cmid): ?array {
+        global $DB;
+
+        if (!self::table_exists()) {
+            return null;
+        }
+
+        $row = $DB->get_record('block_pulso_full_text', ['courseid' => $courseid, 'cmid' => $cmid]);
+        if (!$row || empty($row->usable)) {
+            return null;
+        }
+
+        return [
+            'module_type'  => $row->module_type,
+            'module_name'  => $row->module_name,
+            'texto'        => (string)$row->texto,
+            'caracteres'   => (int)$row->caracteres,
+            'extraido_por' => $row->extraido_por,
+        ];
+    }
+
+    /**
      * ¿Tiene este curso AL MENOS una fila indexada, aprovechable o no?
      *
      * Distingue, para el desplegable de "enviar a Epica", entre un curso que

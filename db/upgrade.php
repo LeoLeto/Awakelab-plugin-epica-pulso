@@ -131,5 +131,41 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092303, 'pulso');
     }
 
+    if ($oldversion < 2026092304) {
+        // Ciclo con Epica (paso 3): columnas para firmar/encargar/sondear/recoger
+        // sin salirse de la fila que ya existe. "status" reutiliza el campo del
+        // paso 1 con los estados nuevos (encolado/trabajando/listo/fallado/
+        // desconocido/ensayo); lo demas es lo que hace falta para no repetir un
+        // encargo terminal ni perder la cadencia de sondeo entre ejecuciones de
+        // la tarea adhoc (que NUNCA duerme: un paso por ejecucion, ver CLAUDE.md).
+        $table = new xmldb_table('block_pulso_encargos');
+
+        $fields = [
+            new xmldb_field('epica_plataforma', XMLDB_TYPE_CHAR, '100', null, null, null, null, 'epica_job_id'),
+            new xmldb_field('epica_posicion', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'epica_plataforma'),
+            new xmldb_field('epica_traza', XMLDB_TYPE_CHAR, '32', null, null, null, null, 'epica_posicion'),
+            new xmldb_field('last_posicion', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'epica_traza'),
+            new xmldb_field('stall_count', XMLDB_TYPE_INTEGER, '5', null, XMLDB_NOTNULL, null, '0', 'last_posicion'),
+            new xmldb_field('pollcount', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'stall_count'),
+            new xmldb_field('timequeued', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'pollcount'),
+            new xmldb_field('mock', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'timequeued'),
+            new xmldb_field('verificado', XMLDB_TYPE_INTEGER, '1', null, null, null, null, 'mock'),
+            new xmldb_field('avisos', XMLDB_TYPE_TEXT, null, null, null, null, null, 'verificado'),
+            new xmldb_field('titulo', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'avisos'),
+            new xmldb_field('tema', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'titulo'),
+            new xmldb_field('arquetipo', XMLDB_TYPE_CHAR, '100', null, null, null, null, 'tema'),
+            new xmldb_field('filename', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'arquetipo'),
+            new xmldb_field('motivo', XMLDB_TYPE_TEXT, null, null, null, null, null, 'filename'),
+            new xmldb_field('sobre_json', XMLDB_TYPE_TEXT, null, null, null, null, null, 'motivo'),
+        ];
+        foreach ($fields as $field) {
+            if (!$dbman->field_exists($table, $field)) {
+                $dbman->add_field($table, $field);
+            }
+        }
+
+        upgrade_block_savepoint(true, 2026092304, 'pulso');
+    }
+
     return true;
 }

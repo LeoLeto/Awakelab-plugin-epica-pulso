@@ -590,6 +590,72 @@ propósito).
   el icono, para diferenciarlo visualmente de las tarjetas-pregunta de los otros dos
   bloques sin romper la regla de contraste.
 
+## Integración con Épica — paso 3: firmar, encargar, sondear, recoger (v1.19.0)
+
+El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + reglas) y
+`classes/task/epica_ciclo_adhoc.php` (la tarea que lo orquesta), encolado desde
+`creation_quota::dispatch_to_epica()`. Ninguno de los dos lo llama nunca una petición web
+— lo dice el propio nombre del paso: firmar, encargar y sondear son trabajo de cron.
+
+- **Un paso por ejecución, nunca `sleep()`.** Una lámina tarda minutos y la concurrencia
+  de Épica es 2, compartida con otras herramientas: si la tarea durmiera hasta el
+  siguiente sondeo, una clase entera encargando a la vez deja el cron bloqueado casi una
+  hora por encargo. Cada ejecución de `epica_ciclo_adhoc` hace UN paso
+  (`epica_client::procesar_paso()`) y, si toca seguir, se reencola a sí misma con
+  `set_next_run_time()` para la cadencia que corresponda. `status` (columna ya existente
+  desde el paso 1) es la máquina de estados: `pendiente` → firma y llama a `encargar`,
+  pasa a `encolado`; `encolado`/`trabajando` → sondea una vez; `listo`/`fallado`/
+  `desconocido`/`ensayo` son terminales y **no se vuelven a tocar jamás** (`fallado` y
+  `desconocido` no se reintentan: si el problema fuera transitorio, Épica los habría
+  respondido como `en-cola`).
+- **Cadencia guiada por `posicion`, no por reloj**, y con cortesía de 30 minutos: en-cola
+  espera `max(10s, posicion×20s)` con tope 60s; trabajando cada 15s; pasados 30 minutos sin
+  resolverse, la tarea deja de sondear en primer plano y pasa a un sondeo de fondo cada 5
+  minutos (el trabajo sigue vivo y recogible 7 días — dejar de sondear rápido no lo pierde).
+  Si la posición no baja en 3 sondeos seguidos, se deja constancia en el log; no cambia el
+  comportamiento, es solo para poder ver que hay cola real si alguien pregunta.
+- **Token nuevo en CADA llamada, incluidos todos los sondeos** (`local_awkepica`, nunca
+  firma manual). El `jti` se gasta al recibirlo — reenviar el mismo cuerpo da 401
+  `reusado` —, así que cada paso de la tarea firma su propio token justo antes de usarlo,
+  nunca reutiliza uno de un paso anterior. Y `epica::ESPERA_LARGA_S` (180s) en TODAS las
+  llamadas del ciclo, no solo en el sondeo que se espera que sea el último: el `listo` cae
+  en el que cae y trae el PNG de ~1,7 MB dentro; con una espera corta ahí se ve un error de
+  cURL donde había una lámina terminada.
+- **El rol se firma con la capability en contexto de CURSO**
+  (`block/pulso:createactivity` vía `epica::rol_de()`/`firmar_por()`), nunca con
+  `is_siteadmin()` ni un rol de sitio — un profesor de un curso no debe firmar como
+  docente en otro, y el alumnado sí puede encargar.
+- **`caracteres` y `extraido_por` del material salen TAL CUAL de
+  `block_pulso_full_text`** (el tamaño ORIGINAL, no el recortado): es la referencia que
+  hace honesto el flag `truncado`. Solo `texto` se recorta, con `mb_substr` (nunca
+  `substr`) y por frontera de párrafo o, en su defecto, de palabra — jamás a mitad de una:
+  Épica compara el material contra el original para verificar fidelidad, y una frase
+  cortada envenena esa comparación. Objetivo de recorte 100.000 caracteres aunque el
+  contrato admita hasta 300.000 (no mejora el PNG y encarece la generación).
+- **El `contexto` de sección (nombre, resumen, vecinas) se manda SIEMPRE**, haya material
+  aprovechable o no: es lo que sostiene el tema si el material falla o si el recurso ya no
+  es válido para generar nada.
+- **El PNG jamás entra en el historial del chat ni en un log.** Se decodifica de base64 y
+  se guarda con la File API de Moodle (`component=block_pulso`, `filearea=encargo`,
+  `itemid=` id de la fila del encargo, en el contexto de CURSO — un encargo no está atado
+  a una instancia de bloque concreta) y se sirve por `pluginfile.php` vía
+  `block_pulso_pluginfile()` en `lib.php`, con acceso solo para quien hizo el encargo o
+  quien tiene `viewanalytics` en ese curso. `mock` se mira siempre: si llega `true` el PNG
+  es de relleno pero válido, se guarda y se enseña igual (queda marcado para decirlo en la
+  interfaz cuando el paso 4 la construya).
+- **Modo de ensayo (`block_pulso/epica_dry_run`, apagado por defecto).** Con el ajuste
+  activo, el paso `pendiente` construye el sobre completo y lo registra en
+  `sobre_json`, pero nunca firma ni llama a Épica — el encargo pasa directo a un estado
+  terminal propio (`ensayo`). Sirve para verificar el payload exacto contra el contrato
+  antes de tener el secreto de producción configurado en `local_awkepica`, sin gastar
+  cuota. El sobre en ensayo no lleva `token` (firmar de verdad requiere el secreto, que en
+  ensayo puede no estar configurado).
+- **`epica::pedir()` no está documentado en este repo** (`local_awkepica` es una
+  dependencia externa cuyo código no vive aquí): `epica_client::normalize_response()`
+  acepta de forma defensiva tanto un array como un `stdClass`, y un cuerpo ya decodificado
+  o en bruto. Si el shape real difiere al probar contra el secreto de producción, el sitio
+  a ajustar es solo ese método — el resto del ciclo no depende de la forma exacta.
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

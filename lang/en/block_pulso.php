@@ -99,3 +99,12 @@ $string['quota_course_day_multiplier'] = 'Per course and day — multiplier per 
 $string['quota_course_day_multiplier_desc'] = 'Multiplied by the course\'s enrolled users to get the daily cap (e.g. 1.5 means 150 enrolled users allow up to 225 requests/day). The effective limit is the higher of this and the floor above.';
 $string['quota_teacher_day'] = 'Per teacher and day (all courses)';
 $string['quota_teacher_day_desc'] = 'Maximum creation requests a single teaching-staff member can submit per day, across ALL their courses.';
+
+// === Epica cycle: sign, order, poll, collect (v1.19.0) ===
+$string['task_epica_ciclo_adhoc'] = 'One step of the Epica creation cycle (Pulse AI)';
+$string['epica_heading'] = 'Epica integration — creation cycle';
+$string['epica_heading_desc'] = 'Where Pulse sends creation requests (infographics) and how the background task talks to Epica. The whole cycle (sign, order, poll, collect) runs in an adhoc task — it never happens inside a web request.';
+$string['epica_base_url'] = 'Epica base URL';
+$string['epica_base_url_desc'] = 'Base URL of the Epica environment to send creation requests to (e.g. the QA environment while piloting, production once cleared). The task appends the fixed API paths to this.';
+$string['epica_dry_run'] = 'Dry-run mode (build the envelope, never send it)';
+$string['epica_dry_run_desc'] = 'When enabled, the task builds the full request envelope for each pending creation request and stores it, but never signs a token or calls Epica — the request is left in its own terminal state ("ensayo"). Use this to verify the payload shape before local_awkepica has a production secret configured, or to test the cycle without spending Epica quota. Off by default.';

@@ -256,4 +256,28 @@ if ($ADMIN->fulltree) {
         10,
         PARAM_INT
     ));
+
+    // ============================================================
+    // Ciclo con Epica: dónde apuntar y modo de ensayo (v1.19.0)
+    // ============================================================
+    $settings->add(new admin_setting_heading(
+        'block_pulso/epica_heading',
+        get_string('epica_heading', 'block_pulso'),
+        get_string('epica_heading_desc', 'block_pulso')
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/epica_base_url',
+        get_string('epica_base_url', 'block_pulso'),
+        get_string('epica_base_url_desc', 'block_pulso'),
+        'https://entorno-qa-2.awakelab.world',
+        PARAM_URL
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'block_pulso/epica_dry_run',
+        get_string('epica_dry_run', 'block_pulso'),
+        get_string('epica_dry_run_desc', 'block_pulso'),
+        0
+    ));
 }

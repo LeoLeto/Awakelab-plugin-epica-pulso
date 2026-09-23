@@ -319,15 +319,21 @@ class creation_quota {
     }
 
     /**
-     * PUNTO DE ENTRADA DEL PASO 4: aquí se llamará a la API de Epica para
-     * encolar el trabajo real (enviando el texto completo del recurso vía
-     * full_text_store) y se guardará el job id que devuelva en
-     * `epica_job_id`. De momento no hace nada -a propósito, este paso solo
-     * construye la parte de nuestro lado-: enchufarlo es cambiar el cuerpo de
-     * esta función, no el sitio desde el que se llama.
+     * Encola el ciclo completo con Epica (firmar, encargar, sondear, recoger)
+     * como una tarea adhoc: nunca se llama a Epica dentro de esta petición
+     * web. Ver classes/task/epica_ciclo_adhoc.php y classes/epica_client.php
+     * (paso 3 de la integración).
      */
     private static function dispatch_to_epica(\stdClass $encargo): void {
-        // No-op a propósito (paso 1 de la integración con Epica).
+        try {
+            $task = new \block_pulso\task\epica_ciclo_adhoc();
+            $task->set_component('block_pulso');
+            $task->set_custom_data(['encargoid' => $encargo->id]);
+            \core\task\manager::queue_adhoc_task($task);
+        } catch (\Throwable $e) {
+            error_log('Pulso: no se pudo encolar el ciclo de Epica para el encargo '
+                . $encargo->id . ': ' . $e->getMessage());
+        }
     }
 
     private static function table_exists(): bool {

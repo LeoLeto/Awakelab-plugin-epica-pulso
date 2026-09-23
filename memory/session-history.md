@@ -1,5 +1,65 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-23 — Ciclo con Épica: firmar, encargar, sondear, recoger (v1.19.0)
+
+Tercer paso de la integración (los dos primeros: texto completo v1.17.0, bloque «Crear» +
+cupos v1.18.0). Construye el ciclo entero server-side: `classes/epica_client.php` (sobre +
+HTTP + reglas de cadencia/errores) y `classes/task/epica_ciclo_adhoc.php` (la tarea, un
+paso por ejecución), enchufado en `creation_quota::dispatch_to_epica()` que hasta ahora era
+un no-op a propósito. Las reglas que deben persistir están en `CLAUDE.md` → "Integración
+con Épica — paso 3"; aquí lo que es propio de esta sesión y lo que queda sin verificar.
+
+**No se ha podido probar contra Épica de verdad — no hay secreto de producción ni acceso a
+`local_awkepica` en este entorno.** Todo lo de abajo se verificó con pruebas de lógica pura
+(PHP 8.3 portátil del scratchpad, `mbstring` activado a mano — mismo patrón que sesiones
+anteriores): 21 comprobaciones sobre los métodos privados de `epica_client` vía
+`ReflectionClass` (truncado de material por frontera de párrafo/palabra y nunca a mitad de
+una, cadencia de sondeo con los topes de 10s/60s y el paso a cadencia de fondo tras 30
+minutos, `retry_after` con y sin valor explícito, `normalize_response` con array y
+`stdClass` de entrada). Sintaxis de los 10 ficheros tocados verificada con `php -l`.
+
+**Decisiones tomadas sin que el encargo las precisara, y por qué:**
+
+- **`epica::pedir()` no está documentado en este repo.** `local_awkepica` es una
+  dependencia externa (no vendorizada aquí) y no había ni `docs/bruno/` ni
+  `resultados.md` disponibles en el entorno de esta sesión para confirmar el shape exacto
+  de su valor de retorno. `normalize_response()` se escribió defensivamente (acepta array
+  o `stdClass`, body ya decodificado o en bruto) precisamente para no depender de acertar
+  ese detalle a la primera. **Cuando llegue el secreto de producción, lo primero que hay
+  que verificar en real es esta función.**
+- **El cuerpo de `/api/moodle/laminas/encargo` (sondeo) se asume `{token, trabajo}`.** El
+  contrato que se nos dio detalla el cuerpo de `/encargar` con precisión pero no el de
+  `/encargo`; `trabajo` es el único identificador que devuelve `/encargar`, así que es la
+  suposición más razonable, pero **sin verificar**.
+- **`alumno.intento`** se interpretó como "cuántas veces ha pedido ya este mismo usuario
+  una infografía de este mismo recurso, +1" (cuenta encargos previos por
+  `userid`+`cmid`), no como intento de cuestionario — el contrato no lo define y esta
+  lectura es la única que tiene sentido con los demás campos de `alumno`.
+- **`alumno.grupo`** sale de `groups_get_user_groups()` (grupos de Moodle, primero que
+  encuentre); si el alumno no pertenece a ninguno, va vacío. El `contexto` de sección se
+  manda siempre precisamente para que un `grupo` vacío no deje a Épica sin nada de dónde
+  tirar.
+- **Manejo de errores no cubierto explícitamente por la tabla del contrato:** un 401
+  `reusado` o un fallo de red se tratan como transitorios (reencolar con backoff, nunca
+  más de una vez por los mismos datos gracias a que cada paso firma un token nuevo); 400
+  `material-ilegible`/`material-excesivo`/`origen-contradictorio`, 403 y 409 se tratan
+  como fallo terminal inmediato (`fallado`, sin reintento) porque no son transitorios ni
+  se arreglan solos.
+- **El artefacto se guarda en contexto de CURSO**, no de bloque: un encargo no está atado
+  a una instancia de bloque concreta (puede haber varias instancias de Pulso en un curso,
+  o ninguna visible ya para cuando se recoge la lámina), así que el contexto de curso es
+  el único que sobrevive de forma estable. `lib.php`/`block_pulso_pluginfile()` es
+  fichero nuevo — el plugin no tenía ninguno hasta ahora.
+- **`$plugin->dependencies` con `local_awkepica => 2026090902`** (1.1.0), el número que
+  Épica confirmó en `RESPUESTA_A_EPICA_4.md`.
+
+**Pendiente real, todo bloqueado por lo mismo (sin secreto ni entorno de Épica):**
+probar el ciclo completo con `epica_dry_run` activado contra un encargo real y comprobar
+a mano que el `sobre_json` registrado coincide con el contrato; luego, con el secreto,
+repetir sin ensayo y verificar los cuatro estados (`encolado`→`trabajando`→`listo`, y un
+`fallado` provocado a propósito) y que el PNG se sirve por `pluginfile.php` con los
+permisos correctos (dueño del encargo sí, otro alumno no, profesor del curso sí).
+
 ## 2026-09-23 — Bloque «Crear infografía» (Épica paso 1): pantalla + cupos (v1.18.0)
 
 Segundo paso de la integración con Épica (el primero fue guardar el texto completo,

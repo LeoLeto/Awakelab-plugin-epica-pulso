@@ -167,5 +167,20 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092304, 'pulso');
     }
 
+    if ($oldversion < 2026092305) {
+        // Paso 4: panel de estado + galeria + aviso de mensajeria. "notified"
+        // asegura que ese aviso se manda UNA sola vez por encargo: aunque un
+        // encargo terminal (listo/fallado/desconocido) nunca se reprocesa
+        // (ver epica_client::procesar_paso()), esta columna deja la garantia
+        // explicita en la fila en vez de depender solo de esa invariante.
+        $table = new xmldb_table('block_pulso_encargos');
+        $field = new xmldb_field('notified', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'sobre_json');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_block_savepoint(true, 2026092305, 'pulso');
+    }
+
     return true;
 }

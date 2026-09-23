@@ -66,7 +66,28 @@
         <FIELD NAME="format" TYPE="char" LENGTH="30" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="poster_2_3 / square / landscape_3_2"/>
         <FIELD NAME="prompt" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="Que quiere el usuario, tal cual lo escribio (maximo 4000 caracteres)"/>
         <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="pendiente" SEQUENCE="false"/>
-        <FIELD NAME="epica_job_id" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Identificador de trabajo devuelto por Epica; lo rellena el paso 4"/>
+        <FIELD NAME="epica_job_id" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Identificador de trabajo devuelto por Epica"/>
+        <!-- Columnas del paso 3 (firmar, encargar, sondear, recoger) y del
+             paso 4 (notificar). Añadidas aqui para que una instalacion NUEVA
+             tenga el esquema completo -upgrade.php las anade via ALTER TABLE
+             a las instalaciones que ya existian antes de esos pasos. -->
+        <FIELD NAME="epica_plataforma" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="epica_posicion" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="epica_traza" TYPE="char" LENGTH="32" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="last_posicion" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="stall_count" TYPE="int" LENGTH="5" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="pollcount" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timequeued" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="mock" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 si la lamina es de relleno (Epica en modo de prueba)"/>
+        <FIELD NAME="verificado" TYPE="int" LENGTH="1" NOTNULL="false" SEQUENCE="false" COMMENT="Señal de calidad que da Epica sobre la lamina concreta"/>
+        <FIELD NAME="avisos" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="JSON de avisos de calidad de Epica sobre esta lamina"/>
+        <FIELD NAME="titulo" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="tema" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="arquetipo" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="filename" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Nombre del PNG guardado con la File API; NULL si aun no esta listo"/>
+        <FIELD NAME="motivo" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Motivo del fallo, tal cual lo dio Epica o la causa local"/>
+        <FIELD NAME="sobre_json" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Sobre completo construido; solo se rellena en modo de ensayo"/>
+        <FIELD NAME="notified" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 si ya se mando el aviso de mensajeria de este encargo terminal"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>

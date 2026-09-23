@@ -502,6 +502,91 @@ icono suelto, que solo necesita 3:1) va siempre en `#003670` con texto blanco
 (11,92 de contraste), nunca en fondo cian. El cian como fondo solo es seguro para
 iconos/SVG sin texto encima (ahí aplica el umbral no-texto de 3:1, que si cumple).
 
+## Integración con Épica — paso 4: panel de estado, galería y aviso (v1.20.0)
+
+Última pieza del ciclo: que el usuario vea el progreso de su encargo y reciba la
+infografía, en vez del «Encargo guardado» estático del paso 1. Vive en
+`api_create_status.php` (endpoint nuevo) + las funciones `renderCreateStatus`/
+`loadCreateGallery`/`pollCreateStatusOnce` de `chat_simple_view.php` + un
+`notify_completion()` nuevo en `classes/epica_client.php`.
+
+- **El navegador NUNCA habla con Épica.** `api_create_status.php` solo lee la
+  fila de `block_pulso_encargos` — quien sondea a Épica de verdad sigue siendo
+  solo la tarea adhoc. El panel sondea NUESTRO endpoint cada 7 s y deja de
+  hacerlo a los 30 minutos (`PULSO_CREATE_POLL_WINDOW_MS`), la misma cortesía
+  que ya aplica `epica_client::FOREGROUND_WINDOW_S` en el servidor: pasada esa
+  ventana, el aviso pasa a depender solo de la notificación de mensajería.
+- **Nunca se devuelve el base64 de la imagen.** El endpoint solo da la URL de
+  `pluginfile.php` (vista y descarga, generadas con
+  `moodle_url::make_pluginfile_url(..., $forcedownload)`), que revalida el
+  acceso ella misma en `block_pulso_pluginfile()` (lib.php). Mismo criterio de
+  acceso en el endpoint: dueño del encargo o quien tenga `viewanalytics` en el
+  curso — un alumno que no hizo el encargo no puede consultar su estado ni ver
+  su PNG.
+- **El `sobre` (envelope JSON del modo de ensayo) solo viaja a quien tiene
+  `viewanalytics`**, nunca al alumno aunque sea el dueño del encargo: es la
+  señal de verificación contra el contrato de Épica, no algo que un alumno
+  necesite ver. Se pinta en el panel dentro de un `<details>` plegable.
+- **Un aviso por encargo, mandado desde `epica_client::notify_completion()`**,
+  llamado desde `recoger()` (listo/fallado sin imagen) y `marcar_fallo()`
+  (fallado/desconocido) — nunca desde el paso que deja un encargo en
+  `ensayo` (termina en el mismo tick en que se crea; el usuario sigue delante
+  de la pantalla, y no es una generación real). La columna `notified` en
+  `block_pulso_encargos` es la garantía explícita de que se manda una sola
+  vez: aunque un encargo terminal nunca se reprocesa (invariante ya
+  documentada arriba), depender solo de eso habría dejado el "una vez" sin
+  red de seguridad si esa invariante cambiara algún día. Usa el proveedor de
+  mensajes `epica_encargo` (`db/messages.php`, nuevo — recuerda pasar por
+  Notificaciones al desplegar).
+  **Simplificación consciente**: no hay forma barata de saber desde una tarea
+  de cron sin estado si el usuario "sigue mirando" el panel, así que el aviso
+  se manda siempre al llegar a un estado terminal real, tenga o no el panel
+  abierto. Si lo tiene abierto, es una notificación de más en la campana, no
+  un aviso emergente — coste aceptado.
+- **Los cuatro mensajes de error de la sección "Cuidado con" del encargo
+  original son responsabilidad del CLIENTE** (`pulsoCreateFailureMessage()`),
+  no del servidor: inspecciona el texto de `motivo` (que sí viaja tal cual)
+  y distingue `cuota-agotada` (cupo propio, "vuelve a intentarlo en unos
+  minutos") de `cuota-del-centro` (cupo del centro entero, "no es nada que
+  hayas hecho tú" — la persona no ha gastado nada) de `material-ilegible`
+  (fallo nuestro, nunca del usuario) del genérico (motivo de Épica sin
+  adornos + botón para crear un encargo nuevo, nunca reintentar el mismo).
+  **Gap conocido, apuntado como SIGUIENTE PASO — no arreglar sin que lo pida
+  otro encargo**: hoy `cuota-agotada`/`cuota-del-centro` nunca llegan a
+  aparecer en un `fallado` real, porque `epica_client::
+  procesar_error_encargar()` trata CUALQUIER 429 como transitorio y lo
+  reencola indefinidamente con el `retry_after` que dé Épica, sin límite de
+  reintentos ni de tiempo total (el corte a los 30 min es solo de PRIMER
+  PLANO del navegador; la tarea sigue sondeando en segundo plano). Revisado
+  con Marcos: con `cuota-agotada` no urge (es el cupo del propio usuario, y
+  reintentar solo hasta que le toque no es grave); con `cuota-del-centro` SÍ
+  importa, porque el límite es de TODO el centro y puede tardar hasta el día
+  siguiente en liberarse — mientras tanto el usuario ve su encargo en
+  `pendiente` sin ninguna explicación, y el mensaje correcto
+  (`pulsoCreateFailureMessage()`) ya está escrito pero nunca llega a
+  mostrarse porque el encargo jamás pasa a `fallado`. Cuando se aborde: dar
+  por terminado un `cuota-del-centro` tras un tope de reintentos o de tiempo
+  (no necesariamente `cuota-agotada`, que puede seguir reintentando sin
+  problema), y entonces sí que el mapeo de mensajes del cliente ya funciona
+  sin tocarlo.
+- **La galería ("últimas infografías") es SOLO de los encargos propios del
+  usuario en el curso** (`api_create_status.php` sin `encargoid`) — no un
+  listado de todo el curso para el profesorado; eso seguiría exigiendo
+  comprobar `viewanalytics` por fila, no por vista completa, y no lo pidió el
+  encargo. Se enseña siempre debajo del formulario, del aviso de cupo/sin
+  recursos y de la vista de progreso: una lámina de ayer no deja de existir
+  porque hoy no queden encargos o cupo.
+- **`db/install.xml` estaba desincronizado con `db/upgrade.php` desde
+  v1.19.0**: las columnas del paso 3 (`epica_plataforma`, `mock`,
+  `verificado`, `avisos`, `titulo`, `tema`, `arquetipo`, `filename`,
+  `motivo`, `sobre_json`…) se añadieron con `ALTER TABLE` en `upgrade.php`
+  pero nunca se reflejaron en `install.xml` — una instalación NUEVA se habría
+  quedado sin ellas. Corregido en este paso de paso: `install.xml` ahora
+  describe el esquema completo de una instalación fresca (paso 3 + `notified`
+  de este paso), y `upgrade.php` sigue siendo el único camino para las
+  instalaciones que ya existían. Si se toca esta tabla otra vez, comprobar
+  SIEMPRE los dos ficheros a la vez — ese es el bug a no repetir.
+
 ## Cómo se trabaja este repo con prompts
 
 El trabajo entra por prompts escritos para Claude Code, uno por paso, y **cada paso en una

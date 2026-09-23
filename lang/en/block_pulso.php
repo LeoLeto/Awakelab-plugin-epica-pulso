@@ -108,3 +108,6 @@ $string['epica_base_url'] = 'Epica base URL';
 $string['epica_base_url_desc'] = 'Base URL of the Epica environment to send creation requests to (e.g. the QA environment while piloting, production once cleared). The task appends the fixed API paths to this.';
 $string['epica_dry_run'] = 'Dry-run mode (build the envelope, never send it)';
 $string['epica_dry_run_desc'] = 'When enabled, the task builds the full request envelope for each pending creation request and stores it, but never signs a token or calls Epica — the request is left in its own terminal state ("ensayo"). Use this to verify the payload shape before local_awkepica has a production secret configured, or to test the cycle without spending Epica quota. Off by default.';
+
+// === Epica cycle: status panel + notification (v1.20.0) ===
+$string['messageprovider:epica_encargo'] = 'A creation request (infographic) is ready or failed';

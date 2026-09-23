@@ -336,6 +336,8 @@ class epica_client {
         } else {
             mtrace("Pulso Epica: encargo {$encargo->id} → listo sin imagen válida, se marca como fallado.");
         }
+
+        self::notify_completion((int)$encargo->id, $filename ? 'listo' : 'fallado');
     }
 
     private static function guardar_artefacto(\stdClass $encargo, string $base64png): ?string {
@@ -374,6 +376,80 @@ class epica_client {
             'timemodified' => time(),
         ]);
         mtrace("Pulso Epica: encargo {$encargo->id} → {$status} ({$motivo}).");
+
+        self::notify_completion((int)$encargo->id, $status);
+    }
+
+    /**
+     * Un aviso por encargo, solo al llegar a un estado TERMINAL real
+     * (listo/fallado/desconocido) — nunca en 'ensayo' (no es una generación
+     * real, y el modo de ensayo termina en el mismo paso en que se crea, así
+     * que el usuario sigue delante de la pantalla) ni en cada sondeo. La
+     * columna "notified" es defensiva: un encargo terminal no se vuelve a
+     * tocar nunca (ver procesar_paso()), pero así esta función es segura
+     * aunque algún día se llamase dos veces sobre la misma fila.
+     *
+     * El navegador sondea api_create_status.php mientras el panel está
+     * abierto; este aviso es el canal para cuando ya no lo está. Se manda
+     * igualmente aunque el panel siga abierto -no hay forma barata de saber
+     * "sigue mirando" desde una tarea de cron sin estado-, pero eso solo
+     * añade una notificación de más en la campana, nunca un aviso emergente.
+     */
+    private static function notify_completion(int $encargoid, string $status): void {
+        global $DB;
+
+        if ($status === 'ensayo') {
+            return;
+        }
+        if (!$DB->record_exists('block_pulso_encargos', ['id' => $encargoid, 'notified' => 0])) {
+            return;
+        }
+
+        $encargo = $DB->get_record('block_pulso_encargos', ['id' => $encargoid]);
+        if (!$encargo) {
+            return;
+        }
+
+        $recipient = \core_user::get_user((int)$encargo->userid, '*', IGNORE_MISSING);
+        if (!$recipient || !empty($recipient->deleted)) {
+            return;
+        }
+
+        $course = get_course((int)$encargo->courseid);
+        $courseurl = new \moodle_url('/course/view.php', ['id' => $course->id]);
+
+        if ($status === 'listo') {
+            $subject = 'Tu infografía está lista';
+            $body = 'La infografía que pediste en "' . format_string($course->fullname) . '" ya está lista'
+                . (!empty($encargo->titulo) ? ' ("' . $encargo->titulo . '")' : '') . '. Ábrela desde el curso: '
+                . $courseurl->out(false);
+        } else {
+            $motivo = ($encargo->motivo !== null && $encargo->motivo !== '') ? $encargo->motivo : 'sin motivo especificado';
+            $subject = 'Tu infografía no se ha podido generar';
+            $body = 'La infografía que pediste en "' . format_string($course->fullname) . '" no se ha podido generar ('
+                . $motivo . '). Puedes intentarlo de nuevo desde el curso: ' . $courseurl->out(false);
+        }
+
+        try {
+            $message = new \core\message\message();
+            $message->component = 'block_pulso';
+            $message->name = 'epica_encargo';
+            $message->userfrom = \core_user::get_noreply_user();
+            $message->userto = $recipient;
+            $message->subject = $subject;
+            $message->fullmessage = $body;
+            $message->fullmessageformat = FORMAT_PLAIN;
+            $message->fullmessagehtml = '<p>' . s($body) . '</p>';
+            $message->smallmessage = $subject;
+            $message->notification = 1;
+            $message->contexturl = $courseurl->out(false);
+            $message->contexturlname = format_string($course->fullname);
+            message_send($message);
+        } catch (\Throwable $e) {
+            error_log('Pulso Epica: fallo al enviar la notificación del encargo ' . $encargoid . ': ' . $e->getMessage());
+        }
+
+        $DB->set_field('block_pulso_encargos', 'notified', 1, ['id' => $encargoid]);
     }
 
     // ----------------------------------------------------------------

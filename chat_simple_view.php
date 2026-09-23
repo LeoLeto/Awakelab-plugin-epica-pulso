@@ -40,6 +40,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $stream_url = $CFG->wwwroot . '/blocks/pulso/api_chat_stream.php';
     $create_form_url = $CFG->wwwroot . '/blocks/pulso/api_create_form.php';
     $create_submit_url = $CFG->wwwroot . '/blocks/pulso/api_create_submit.php';
+    $create_status_url = $CFG->wwwroot . '/blocks/pulso/api_create_status.php';
 
     // Leer la versión directamente de version.php (no de la BD) para que el
     // badge del header refleje siempre el código desplegado, incluso antes
@@ -63,6 +64,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         window.streamApiUrl = '{$stream_url}';
         window.apiCreateFormUrl = '{$create_form_url}';
         window.apiCreateSubmitUrl = '{$create_submit_url}';
+        window.apiCreateStatusUrl = '{$create_status_url}';
         window.pulsoSesskey = '{$pulso_sesskey}';
         // Solo para adaptar la UI: el servidor decide qué datos se devuelven.
         window.pulsoIsTeacher = {$pulso_isteacher};
@@ -745,6 +747,157 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             border-left: 3px solid var(--pulso-cyan);
             font-size: 0.86rem;
             line-height: 1.5;
+        }
+
+        /* ========== ESTADO DEL ENCARGO (paso 4) ==========
+           Progreso del encargo recien creado, o de uno abierto desde la
+           galeria. Mismos colores de estado que el resto del plugin (nunca
+           cian como texto): exito #0F7A57, aviso #8A6100, error #B3261E. */
+        .pulso-create-status {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pulso-create-status-head {
+            display: flex;
+            align-items: center;
+        }
+
+        .pulso-create-notice-inline {
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: var(--pulso-surface);
+            font-size: 0.82rem;
+            line-height: 1.5;
+            border-left: 3px solid var(--pulso-line);
+        }
+
+        .pulso-create-notice-inline.warn {
+            border-left-color: #8A6100;
+            color: #8A6100;
+        }
+
+        .pulso-create-notice-inline.danger {
+            border-left-color: #B3261E;
+            color: #B3261E;
+        }
+
+        .pulso-create-image {
+            width: 100%;
+            border-radius: 12px;
+            border: 1px solid var(--pulso-line);
+            display: block;
+        }
+
+        .pulso-create-image-title {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--pulso-ink);
+        }
+
+        .pulso-create-image-tema {
+            font-size: 0.8rem;
+            color: var(--pulso-slate);
+            margin-top: -6px;
+        }
+
+        .pulso-create-image-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .pulso-create-image-actions a {
+            flex: 1;
+            text-align: center;
+            padding: 9px 12px;
+            border-radius: 10px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            text-decoration: none;
+            background: var(--pulso-navy);
+            color: #ffffff !important;
+        }
+
+        .pulso-create-back-link {
+            align-self: flex-start;
+            border: none;
+            background: transparent;
+            color: var(--pulso-slate);
+            font-family: var(--pulso-font);
+            font-size: 0.8rem;
+            cursor: pointer;
+            padding: 4px 0;
+            text-decoration: underline;
+        }
+
+        .pulso-create-sobre summary {
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--pulso-slate);
+        }
+
+        .pulso-create-sobre pre {
+            margin-top: 8px;
+            padding: 10px;
+            border-radius: 10px;
+            background: var(--pulso-surface-2);
+            font-size: 0.72rem;
+            line-height: 1.4;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* Galeria de encargos anteriores del usuario en el curso. */
+        .pulso-create-gallery-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--pulso-slate);
+            margin: 18px 0 8px;
+        }
+
+        .pulso-create-gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .pulso-create-gallery-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 0;
+            border: 1px solid var(--pulso-line);
+            border-radius: 10px;
+            background: var(--pulso-surface);
+            cursor: pointer;
+            overflow: hidden;
+            font-family: var(--pulso-font);
+        }
+
+        .pulso-create-gallery-item img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .pulso-create-gallery-placeholder {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px;
+            text-align: center;
+        }
+
+        .pulso-create-gallery-date {
+            font-size: 0.65rem;
+            color: var(--pulso-muted);
+            padding: 0 4px 4px;
         }
 
         .pulso-message {
@@ -3179,6 +3332,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const body = document.getElementById('pulso-create-body');
             if (!messagesDiv || !body) return;
 
+            stopCreatePolling();
             messagesDiv.classList.add('pulso-showing-create');
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
 
@@ -3210,17 +3364,22 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         function closeCreatePanel() {
+            stopCreatePolling();
             const messagesDiv = document.getElementById('pulso-messages');
             if (messagesDiv) {
                 messagesDiv.classList.remove('pulso-showing-create');
             }
         }
 
+        // La galería de "últimas infografías" se enseña siempre debajo,
+        // tenga o no cupo el usuario ahora mismo: una lámina de ayer no deja
+        // de existir porque hoy no queden encargos.
         function renderCreateNotice(text) {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
-            body.innerHTML = '<div class="pulso-create-notice"></div>';
+            body.innerHTML = '<div class="pulso-create-notice"></div><div id="pulso-create-gallery"></div>';
             body.querySelector('.pulso-create-notice').textContent = text;
+            loadCreateGallery();
         }
 
         function renderCreateNoResources(reason) {
@@ -3262,13 +3421,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '<option value="landscape_3_2">Horizontal (3:2)</option>'
                 + '</select>'
                 + '</div>'
-                + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" onclick="submitCreateInfografia()">Crear infografía</button>';
+                + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" onclick="submitCreateInfografia()">Crear infografía</button>'
+                + '<div id="pulso-create-gallery"></div>';
 
             const select = document.getElementById('pulso-create-resource');
             if (select) {
                 select.addEventListener('change', updateCreateSectionHint);
                 updateCreateSectionHint();
             }
+            loadCreateGallery();
         }
 
         // Avisa del cupo por sección ANTES de que el usuario escriba su
@@ -3325,7 +3486,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
-                        renderCreateNotice(data.message || 'Encargo guardado. En cuanto esté lista, te avisaremos.');
+                        const body = document.getElementById('pulso-create-body');
+                        if (body) body.innerHTML = '<p class="pulso-create-hint">Encargo guardado. Comprobando estado…</p>';
+                        startCreatePolling(data.encargoid);
                     } else {
                         renderCreateNotice(data.message || 'No se ha podido guardar el encargo. Inténtalo de nuevo.');
                         if (btn) {
@@ -3341,6 +3504,237 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         btn.textContent = 'Crear infografía';
                     }
                 });
+        }
+
+        // ---- Estado del encargo (paso 4): sondeo del panel, nunca de Epica ----
+        // El navegador solo habla con api_create_status.php; quien sondea a
+        // Epica de verdad es la tarea adhoc (classes/epica_client.php). Una
+        // lámina tarda ~150s con concurrencia 2 en Epica, así que con una
+        // clase entera encargando a la vez el último puede esperar casi una
+        // hora: nada de spinner bloqueante, solo sondeo de fondo con la misma
+        // cortesía de 30 minutos que aplica la tarea (CLAUDE.md).
+        let pulsoCreatePollTimer = null;
+        let pulsoCreatePollStart = 0;
+        const PULSO_CREATE_POLL_MS = 7000;
+        const PULSO_CREATE_POLL_WINDOW_MS = 30 * 60 * 1000;
+
+        function stopCreatePolling() {
+            if (pulsoCreatePollTimer) {
+                clearTimeout(pulsoCreatePollTimer);
+                pulsoCreatePollTimer = null;
+            }
+        }
+
+        function startCreatePolling(encargoid) {
+            stopCreatePolling();
+            pulsoCreatePollStart = Date.now();
+            pollCreateStatusOnce(encargoid);
+        }
+
+        function pollCreateStatusOnce(encargoid) {
+            const params = new URLSearchParams();
+            params.set('courseid', window.courseid);
+            params.set('encargoid', encargoid);
+            params.set('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+
+            fetch(window.apiCreateStatusUrl + '?' + params.toString(), { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) {
+                        stopCreatePolling();
+                        renderCreateNotice(data.message || 'No se ha podido comprobar el estado del encargo.');
+                        return;
+                    }
+                    renderCreateStatus(data.encargo);
+                    if (!data.encargo.terminal) {
+                        scheduleNextCreatePoll(encargoid);
+                    } else {
+                        loadCreateGallery();
+                    }
+                })
+                .catch(function() {
+                    // Fallo de red puntual: no dar el encargo por perdido,
+                    // seguir intentando mientras quede ventana.
+                    scheduleNextCreatePoll(encargoid);
+                });
+        }
+
+        function scheduleNextCreatePoll(encargoid) {
+            if (Date.now() - pulsoCreatePollStart >= PULSO_CREATE_POLL_WINDOW_MS) {
+                appendCreateStatusNotice(
+                    'Esto está tardando más de lo normal. Hemos dejado de comprobarlo aquí automáticamente: '
+                    + 'te avisaremos en cuanto esté lista.', 'warn'
+                );
+                return;
+            }
+            pulsoCreatePollTimer = setTimeout(function() { pollCreateStatusOnce(encargoid); }, PULSO_CREATE_POLL_MS);
+        }
+
+        function appendCreateStatusNotice(text, kind) {
+            const container = document.querySelector('.pulso-create-status');
+            if (!container) return;
+            const div = document.createElement('div');
+            div.className = 'pulso-create-notice-inline' + (kind ? ' ' + kind : '');
+            div.textContent = text;
+            container.appendChild(div);
+        }
+
+        function pulsoCreateStatusLabel(status) {
+            const labels = {
+                pendiente: 'En preparación',
+                encolado: 'En cola',
+                trabajando: 'Generando',
+                listo: 'Lista',
+                fallado: 'No se pudo generar',
+                desconocido: 'No se pudo generar',
+                ensayo: 'Modo de ensayo'
+            };
+            return labels[status] || status;
+        }
+
+        function pulsoCreateStatusPillClass(status) {
+            if (status === 'listo') return 'success';
+            if (status === 'fallado' || status === 'desconocido') return 'danger';
+            if (status === 'ensayo') return 'warning';
+            return 'neutral';
+        }
+
+        // Dos motivos que NO pueden dar el mismo mensaje: "cuota-agotada" es
+        // el cupo propio del usuario ("vuelve a intentarlo en un rato");
+        // "cuota-del-centro" es el cupo diario de TODO el centro, y esta
+        // persona no ha gastado nada — decirle "has pedido varias seguidas"
+        // la manda a buscar un error suyo que no existe. "material-ilegible"
+        // es fallo nuestro, nunca del usuario.
+        function pulsoCreateFailureMessage(encargo) {
+            const motivo = String(encargo.motivo || '');
+            if (/cuota-agotada/i.test(motivo)) {
+                return 'Has pedido varias infografías seguidas y se ha agotado tu cupo de generación. '
+                    + 'Vuelve a intentarlo en unos minutos.';
+            }
+            if (/cuota-del-centro/i.test(motivo)) {
+                return 'El centro ha alcanzado su límite de generaciones de hoy. No es nada que hayas hecho tú: '
+                    + 'vuelve a intentarlo más tarde.';
+            }
+            if (/material-ilegible/i.test(motivo)) {
+                return 'Hubo un problema para leer el material de este recurso. No es culpa tuya: lo estamos revisando.';
+            }
+            return motivo ? ('No se ha podido generar la infografía: ' + motivo) : 'No se ha podido generar la infografía.';
+        }
+
+        function renderCreateStatus(encargo) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+
+            const pillClass = pulsoCreateStatusPillClass(encargo.status);
+            const pillLabel = pulsoCreateStatusLabel(encargo.status);
+
+            let progressLine = '';
+            if (encargo.status === 'encolado') {
+                progressLine = encargo.posicion
+                    ? ('Posición en cola: ' + encargo.posicion)
+                    : 'Esperando turno en la cola de Épica.';
+            } else if (encargo.status === 'trabajando') {
+                progressLine = 'Generando la lámina… puede tardar un par de minutos.';
+            } else if (encargo.status === 'pendiente') {
+                progressLine = 'Preparando el encargo…';
+            }
+
+            let html = '<div class="pulso-create-status">'
+                + '<div class="pulso-create-status-head">'
+                + '<span class="pulso-status-pill ' + pillClass + '">' + escapeHtmlText(pillLabel) + '</span>'
+                + '</div>';
+
+            if (progressLine) {
+                html += '<p class="pulso-create-hint">' + escapeHtmlText(progressLine) + '</p>';
+            }
+
+            if (encargo.status === 'listo' && encargo.imageurl) {
+                if (encargo.mock) {
+                    html += '<div class="pulso-create-notice-inline warn">Esta lámina es de prueba, no una generación real.</div>';
+                }
+                if (encargo.verificado === false || (encargo.avisos && encargo.avisos.length)) {
+                    html += '<div class="pulso-create-notice-inline warn">Épica marcó esta lámina para revisar'
+                        + (encargo.avisos && encargo.avisos.length
+                            ? ': ' + encargo.avisos.map(function(a) { return escapeHtmlText(String(a)); }).join('; ')
+                            : '')
+                        + '.</div>';
+                }
+                html += '<img class="pulso-create-image" src="' + escapeHtmlText(encargo.imageurl) + '" alt="'
+                    + escapeHtmlText(encargo.titulo || 'Infografía generada') + '">';
+                if (encargo.titulo) html += '<div class="pulso-create-image-title">' + escapeHtmlText(encargo.titulo) + '</div>';
+                if (encargo.tema) html += '<div class="pulso-create-image-tema">' + escapeHtmlText(encargo.tema) + '</div>';
+                html += '<div class="pulso-create-image-actions">'
+                    + '<a href="' + escapeHtmlText(encargo.imageurl) + '" target="_blank" rel="noopener">Abrir a tamaño completo</a>'
+                    + '<a href="' + escapeHtmlText(encargo.downloadurl) + '">Descargar</a>'
+                    + '</div>';
+            } else if (encargo.status === 'fallado' || encargo.status === 'desconocido') {
+                html += '<div class="pulso-create-notice-inline danger">' + escapeHtmlText(pulsoCreateFailureMessage(encargo)) + '</div>'
+                    + '<button type="button" class="pulso-create-submit" onclick="openCreatePanel()">Crear un encargo nuevo</button>';
+            } else if (encargo.status === 'ensayo') {
+                html += '<div class="pulso-create-notice-inline warn">Modo de ensayo activo: el sobre se construyó pero no se envió a Épica.</div>';
+                if (encargo.sobre) {
+                    html += '<details class="pulso-create-sobre"><summary>Ver sobre construido</summary>'
+                        + '<pre>' + escapeHtmlText(JSON.stringify(encargo.sobre, null, 2)) + '</pre></details>';
+                }
+            }
+
+            html += '<button type="button" class="pulso-create-back-link" onclick="openCreatePanel()">← Volver al formulario</button>'
+                + '</div><div id="pulso-create-gallery"></div>';
+
+            body.innerHTML = html;
+            loadCreateGallery();
+        }
+
+        // La galería es un extra: si falla, no debe romper el resto del panel.
+        function loadCreateGallery() {
+            const params = new URLSearchParams();
+            params.set('courseid', window.courseid);
+            params.set('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+
+            fetch(window.apiCreateStatusUrl + '?' + params.toString(), { credentials: 'same-origin' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success) return;
+                    renderCreateGallery(data.encargos || []);
+                })
+                .catch(function() { /* la galería es un extra, no bloquea el panel */ });
+        }
+
+        function renderCreateGallery(encargos) {
+            const container = document.getElementById('pulso-create-gallery');
+            if (!container) return;
+            if (!encargos.length) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = '<div class="pulso-create-gallery-title">Tus últimas infografías</div><div class="pulso-create-gallery-grid">';
+            encargos.forEach(function(e) {
+                const pillClass = pulsoCreateStatusPillClass(e.status);
+                const pillLabel = pulsoCreateStatusLabel(e.status);
+                const dateLabel = new Date(e.timecreated * 1000).toLocaleDateString();
+                const thumb = e.imageurl
+                    ? '<img src="' + escapeHtmlText(e.imageurl) + '" alt="">'
+                    : '<div class="pulso-create-gallery-placeholder"><span class="pulso-status-pill ' + pillClass + '">'
+                        + escapeHtmlText(pillLabel) + '</span></div>';
+
+                html += '<button type="button" class="pulso-create-gallery-item" onclick="openCreateGalleryItem(' + e.id + ')">'
+                    + thumb
+                    + '<span class="pulso-create-gallery-date">' + escapeHtmlText(dateLabel) + '</span>'
+                    + '</button>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function openCreateGalleryItem(encargoid) {
+            const messagesDiv = document.getElementById('pulso-messages');
+            const body = document.getElementById('pulso-create-body');
+            if (!messagesDiv || !body) return;
+            messagesDiv.classList.add('pulso-showing-create');
+            body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
+            // Si sigue en curso, se sondea igual que un encargo recién creado.
+            startCreatePolling(encargoid);
         }
 
         function escapeHtmlText(text) {

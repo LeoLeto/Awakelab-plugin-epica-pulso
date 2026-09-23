@@ -1,5 +1,74 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-23 — Épica paso 4: panel de estado, galería, aviso (v1.20.0)
+
+Última pieza de la integración con Épica. Antes de esto el usuario encargaba y
+solo veía «Encargo guardado»; ahora el panel sondea el estado, muestra la
+lámina cuando llega (o el motivo si falla), enseña las últimas infografías del
+usuario en el curso, y se manda un aviso de mensajería de Moodle al terminar.
+Las reglas que deben persistir están en `CLAUDE.md` → "Integración con Épica —
+paso 4"; aquí lo que se decidió sobre la marcha y lo que queda sin verificar.
+
+- **Bug real encontrado al revisar el esquema antes de tocarlo**:
+  `db/install.xml` llevaba desde v1.19.0 sin las columnas que
+  `db/upgrade.php` añadía por `ALTER TABLE` (`epica_plataforma`, `mock`,
+  `verificado`, `avisos`, `titulo`, `tema`, `arquetipo`, `filename`,
+  `motivo`, `sobre_json`…) — una instalación NUEVA de Moodle se habría
+  quedado con la tabla del paso 1, sin nada del paso 3. Corregido de paso:
+  `install.xml` ahora describe el esquema completo (incluida `notified`, la
+  columna de este paso), en el mismo orden en que `upgrade.php` las inserta
+  (todas antes de `timecreated`/`timemodified`, por los `AFTER` encadenados
+  de los `ALTER TABLE`).
+- **"Aviso cuando el usuario ya no está mirando" se simplificó a propósito**:
+  no hay forma barata de saber desde una tarea de cron sin estado si el panel
+  sigue abierto en el navegador de alguien. Se manda el aviso de mensajería
+  SIEMPRE al llegar a un estado terminal real (listo/fallado/desconocido,
+  nunca ensayo), tenga o no el panel abierto — si lo tiene, es una
+  notificación de más en la campana, nunca un aviso emergente que interrumpa.
+  Documentado como decisión consciente, no como algo pendiente de arreglar.
+- **Gap heredado del paso 3, apuntado como SIGUIENTE PASO por decisión de
+  Marcos, no arreglado en este commit**: los mensajes de error diferenciados
+  que pedía el encargo (`cuota-agotada` vs `cuota-del-centro` vs
+  `material-ilegible` vs genérico) están listos en el cliente
+  (`pulsoCreateFailureMessage()`), pero hoy los dos motivos de cuota nunca
+  llegan a aparecer en un encargo `fallado` real: `epica_client::
+  procesar_error_encargar()` trata cualquier 429 como transitorio y lo
+  reencola sin límite de reintentos ni de tiempo total (el corte de 30
+  minutos es solo de sondeo en PRIMER PLANO del navegador; la tarea sigue
+  sondeando en segundo plano indefinidamente). **Prioridad distinta entre los
+  dos, según Marcos**: `cuota-agotada` no urge (cupo propio, reintentar hasta
+  que le toque no es grave); `cuota-del-centro` sí, porque el límite es de
+  TODO el centro y puede tardar hasta el día siguiente en liberarse — el
+  usuario ve su encargo en `pendiente` sin explicación durante horas, con el
+  mensaje correcto ya escrito y sin poder llegar a mostrarse. Próxima vez
+  que se toque esto: dar por terminado (`fallado`) un `cuota-del-centro` tras
+  un tope de reintentos/tiempo, sin tocar el trato que recibe
+  `cuota-agotada`.
+- **La galería es solo de los encargos DEL PROPIO usuario en el curso**, no
+  un listado de todo el curso para el profesorado (el encargo pedía "sus
+  últimas infografías", no una vista de clase) — se sirve del mismo
+  `api_create_status.php` sin `encargoid`, limitado a 8 filas.
+- **El `sobre` del modo de ensayo solo viaja en el JSON a quien tiene
+  `viewanalytics`**, aunque el encargo lo haya hecho un alumno: es la señal
+  de verificación contra el contrato de Épica pensada para el profesorado
+  técnico, no algo que un alumno necesite ver. Ahora mismo hay un encargo
+  real en estado `ensayo` (de la sesión anterior) que debería verse en el
+  panel en cuanto esto se despliegue — sirve de primera prueba de humo.
+- **Verificado**: sintaxis PHP de los 9 ficheros tocados (PHP 8.3 portátil del
+  scratchpad), `install.xml` como XML bien formado, sintaxis del bloque JS
+  completo de `chat_simple_view.php` con `node --check`, y pruebas de lógica
+  aisladas (node) de los helpers puros nuevos (`pulsoCreateStatusLabel`,
+  `pulsoCreateStatusPillClass`, `pulsoCreateFailureMessage` — en particular,
+  que el mensaje de `cuota-agotada` y el de `cuota-del-centro` no se
+  confunden entre sí).
+- **Sin verificar, todo bloqueado por lo mismo de siempre (sin Moodle real ni
+  secreto de Épica en este entorno)**: la actualización de Moodle crea
+  `notified` sin errores; el sondeo real del panel contra un encargo que pasa
+  por encolado→trabajando→listo; que la notificación de mensajería llega y
+  con el enlace correcto; que un alumno no puede leer el estado ni el PNG de
+  un encargo ajeno (403 real, no solo la lógica); y que el sobre de ensayo
+  que ya existe en la BD se ve bien formateado en el panel.
+
 ## 2026-09-23 — Ciclo con Épica: firmar, encargar, sondear, recoger (v1.19.0)
 
 Tercer paso de la integración (los dos primeros: texto completo v1.17.0, bloque «Crear» +

@@ -182,5 +182,61 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092305, 'pulso');
     }
 
+    if ($oldversion < 2026092306) {
+        // Limpieza de encargos huerfanos: los creados antes de v1.19.0 (cuando
+        // creation_quota::dispatch_to_epica() todavia era un no-op) se quedaron
+        // en "pendiente" para siempre — nunca se encolo la tarea adhoc que los
+        // habria movido de estado, asi que epica_ciclo_adhoc jamas los toca (se
+        // encola solo al crear el encargo o desde un paso anterior de la propia
+        // tarea, nunca por un barrido periodico). Sin esto seguian saliendo como
+        // "pendientes" en la galeria del usuario.
+        //
+        // Un umbral de antiguedad NO sirve para distinguir un huerfano de uno
+        // vivo: un "pendiente" reintentando un 429 tambien puede llevar horas
+        // ahi. El criterio real es si existe una tarea adhoc de
+        // epica_ciclo_adhoc apuntando a ese encargo. dispatch_to_epica() y el
+        // propio epica_ciclo_adhoc::execute() la encolan siempre con
+        // set_custom_data(['encargoid' => $id]) (mismo shape en los dos
+        // sitios), asi que se decodifica el JSON de task_adhoc.customdata en
+        // vez de comparar con LIKE sobre el texto. Se marcan como fallo
+        // terminal en vez de borrarse, para no perder el registro.
+        $pendientes = $DB->get_records('block_pulso_encargos', ['status' => 'pendiente'], '', 'id');
+
+        if (!empty($pendientes)) {
+            $select = $DB->sql_like('classname', ':classname') . ' AND component = :component';
+            $tasks = $DB->get_records_select(
+                'task_adhoc',
+                $select,
+                ['classname' => '%epica_ciclo_adhoc', 'component' => 'block_pulso'],
+                '',
+                'id, customdata'
+            );
+
+            $encolados = [];
+            foreach ($tasks as $task) {
+                $data = json_decode((string)$task->customdata, true);
+                if (is_array($data) && isset($data['encargoid'])) {
+                    $encolados[(int)$data['encargoid']] = true;
+                }
+            }
+
+            foreach ($pendientes as $row) {
+                if (isset($encolados[(int)$row->id])) {
+                    continue; // Tiene tarea adhoc viva: pendiente real, no huerfano.
+                }
+                $DB->update_record('block_pulso_encargos', (object)[
+                    'id' => $row->id,
+                    'status' => 'fallado',
+                    'motivo' => 'Encargo huérfano de antes de la integración con Épica (v1.19.0): nunca llegó a encolarse.',
+                    'notified' => 1,
+                    'timemodified' => time(),
+                ]);
+                mtrace("block_pulso: encargo {$row->id} huérfano (sin tarea adhoc), marcado como fallado.");
+            }
+        }
+
+        upgrade_block_savepoint(true, 2026092306, 'pulso');
+    }
+
     return true;
 }

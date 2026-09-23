@@ -1,0 +1,8 @@
+smalot/pdfparser (vendorizada 2026-07-14)
+
+Este directorio se copio sin composer.json ni CHANGELOG, asi que la libreria no
+expone su version en tiempo de ejecucion y no quedo registrada la version exacta
+de origen. La fecha de arriba es la del commit que la vendorizo (b7b08c4, "Fix:
+vendoriza smalot/pdfparser + valida texto extraido de PDF") y es verificable con
+`git log -- lib/pdfparser`. Pendiente de confirmar la version exacta si algun dia
+hace falta (ver memory/session-history.md).

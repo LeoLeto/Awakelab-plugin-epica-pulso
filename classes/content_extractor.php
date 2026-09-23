@@ -31,6 +31,15 @@ class content_extractor {
     const SCORM_MAX_CHARS = 80000;
 
     /**
+     * smalot/pdfparser no trae composer.json vendorizado (lib/pdfparser/) y no
+     * expone su version en tiempo de ejecucion. La version exacta que se copio
+     * no quedo registrada en su momento; en vez de inventarla, se documenta con
+     * la fecha del commit que la vendorizo (b7b08c4, verificable en git log) —
+     * ver lib/pdfparser/VERSION y memory/session-history.md.
+     */
+    const PDFPARSER_VENDORED_VERSION = 'smalot/pdfparser (vendorizada 2026-07-14)';
+
+    /**
      * Espacio reservado por curso para los cmid SINTETICOS de los chunks que no
      * pertenecen a ningun modulo real (metadatos del curso y secciones). Los cmid
      * reales son positivos, asi que estos van en negativo:
@@ -311,8 +320,9 @@ class content_extractor {
         if (!$record) {
             return [];
         }
-        $text = $record->name . "\n\n" . $this->html_to_text($record->content);
-        return $this->chunk_text($text, $cmid, 'page', $record->name);
+        $literal = trim($this->html_to_text($record->content));
+        $text = $record->name . "\n\n" . $literal;
+        return $this->chunk_text($text, $cmid, 'page', $record->name, '', null, $literal);
     }
 
     private function extract_assign(int $cmid, int $instance): array {
@@ -321,8 +331,9 @@ class content_extractor {
         if (!$record) {
             return [];
         }
-        $text = $record->name . "\n\n" . $this->html_to_text($record->intro);
-        return $this->chunk_text($text, $cmid, 'assign', $record->name);
+        $literal = trim($this->html_to_text($record->intro));
+        $text = $record->name . "\n\n" . $literal;
+        return $this->chunk_text($text, $cmid, 'assign', $record->name, '', null, $literal);
     }
 
     private function extract_quiz(int $cmid, int $instance): array {
@@ -348,16 +359,28 @@ class content_extractor {
             ['quizid' => $instance]
         );
 
-        $full_text = $quiz->name . "\n\n" . $this->html_to_text($quiz->intro) . "\n\n";
+        $intro = trim($this->html_to_text($quiz->intro));
+
+        $full_text = $quiz->name . "\n\n" . $intro . "\n\n";
+        $literalparts = $intro !== '' ? [$intro] : [];
         foreach ($questions as $q) {
-            $full_text .= "Pregunta: " . $this->html_to_text($q->questiontext) . "\n";
+            $qtext = trim($this->html_to_text($q->questiontext));
+            $full_text .= "Pregunta: " . $qtext . "\n";
+            if ($qtext !== '') {
+                $literalparts[] = $qtext;
+            }
             if (!empty($q->generalfeedback)) {
-                $full_text .= "Feedback: " . $this->html_to_text($q->generalfeedback) . "\n";
+                $ftext = trim($this->html_to_text($q->generalfeedback));
+                $full_text .= "Feedback: " . $ftext . "\n";
+                if ($ftext !== '') {
+                    $literalparts[] = $ftext;
+                }
             }
             $full_text .= "\n";
         }
 
-        return $this->chunk_text(trim($full_text), $cmid, 'quiz', $quiz->name);
+        $literal = trim(implode("\n\n", $literalparts));
+        return $this->chunk_text(trim($full_text), $cmid, 'quiz', $quiz->name, '', null, $literal);
     }
 
     private function extract_label(int $cmid, int $instance): array {
@@ -381,10 +404,16 @@ class content_extractor {
         }
         $chapters = $DB->get_records('book_chapters', ['bookid' => $instance], 'pagenum ASC', 'title, content');
         $full_text = $book->name . "\n\n";
+        $literalparts = [];
         foreach ($chapters as $ch) {
             $full_text .= "## " . $ch->title . "\n" . $this->html_to_text($ch->content) . "\n\n";
+            $chaptertext = trim($ch->title . "\n" . $this->html_to_text($ch->content));
+            if ($chaptertext !== '') {
+                $literalparts[] = $chaptertext;
+            }
         }
-        return $this->chunk_text(trim($full_text), $cmid, 'book', $book->name);
+        $literal = trim(implode("\n\n", $literalparts));
+        return $this->chunk_text(trim($full_text), $cmid, 'book', $book->name, '', null, $literal);
     }
 
     private function extract_wiki(int $cmid, int $instance): array {
@@ -395,13 +424,19 @@ class content_extractor {
         }
         $subwikis = $DB->get_records('wiki_subwikis', ['wikiid' => $instance], '', 'id');
         $full_text = $wiki->name . "\n\n";
+        $literalparts = [];
         foreach ($subwikis as $sw) {
             $pages = $DB->get_records('wiki_pages', ['subwikiid' => $sw->id], 'title ASC', 'title, cachedcontent');
             foreach ($pages as $page) {
                 $full_text .= "## " . $page->title . "\n" . $this->html_to_text($page->cachedcontent) . "\n\n";
+                $pagetext = trim($page->title . "\n" . $this->html_to_text($page->cachedcontent));
+                if ($pagetext !== '') {
+                    $literalparts[] = $pagetext;
+                }
             }
         }
-        return $this->chunk_text(trim($full_text), $cmid, 'wiki', $wiki->name);
+        $literal = trim(implode("\n\n", $literalparts));
+        return $this->chunk_text(trim($full_text), $cmid, 'wiki', $wiki->name, '', null, $literal);
     }
 
     private function extract_resource(int $cmid, int $instance): array {
@@ -424,6 +459,11 @@ class content_extractor {
         // "se intento y fallo" (p.ej. PDF escaneado: usable = false aunque el
         // texto final tenga el aviso de fallo, que por si solo pasaria la
         // heuristica de is_extracted_text_useful al ser prosa normal).
+        // Texto LITERAL (para block_pulso_full_text / Epica): solo el contenido
+        // real de los ficheros, sin "Archivo: X (mimetype)" ni las etiquetas
+        // "Contenido ... extraido:" de abajo, que son encuadre para el RAG.
+        $literalparts = [];
+
         $extractmethods = [];
         $anyfileattempted = false;
         $anyfileusable = false;
@@ -443,6 +483,7 @@ class content_extractor {
                     $plain = trim((string)$file->get_content());
                     if (!empty($plain)) {
                         $parts[] = $plain;
+                        $literalparts[] = $plain;
                         $anyfileattempted = true;
                         if ($this->is_extracted_text_useful($plain)) {
                             $extractmethods[] = 'moodle:text_file';
@@ -478,6 +519,7 @@ class content_extractor {
                             if (!empty($cellParts)) {
                                 $celltext = implode("\n\n", $cellParts);
                                 $parts[] = $celltext;
+                                $literalparts[] = $celltext;
                                 $anyfileattempted = true;
                                 if ($this->is_extracted_text_useful($celltext)) {
                                     $extractmethods[] = 'moodle:ipynb';
@@ -500,6 +542,7 @@ class content_extractor {
                     if ($this->is_extracted_text_useful($officetext)) {
                         $parts[] = 'Contenido del documento extraido:';
                         $parts[] = $officetext;
+                        $literalparts[] = $officetext;
                         $extractmethods[] = $isDocx ? 'docx:ziparchive' : 'pptx:ziparchive';
                         $anyfileusable = true;
                     } else {
@@ -515,6 +558,7 @@ class content_extractor {
                     if (!empty($pdfresult['text'])) {
                         $parts[] = 'Contenido PDF extraido:';
                         $parts[] = $pdfresult['text'];
+                        $literalparts[] = $pdfresult['text'];
                         $extractmethods[] = $pdfresult['method'];
                         $anyfileusable = true;
                     } else {
@@ -537,11 +581,19 @@ class content_extractor {
         // Si no se intento extraer ningun archivo (recurso sin ficheros, solo
         // nombre/intro), no hay heuristica de fallo que aplicar: se deja que
         // chunk_text() decida usable con is_extracted_text_useful() sobre el
-        // texto final, igual que para el resto de tipos de modulo.
+        // texto literal, igual que para el resto de tipos de modulo.
         $extractedby = !empty($extractmethods) ? implode('; ', array_values(array_unique($extractmethods))) : 'moodle:resource';
         $usable = $anyfileattempted ? $anyfileusable : null;
 
-        return $this->chunk_text($full, $cmid, 'resource', $resource->name, $extractedby, $usable);
+        // Sin ficheros (o ninguno con texto aprovechable), el intro es lo unico
+        // "documento" real que queda: sin este fallback, un recurso sin PDF
+        // adjunto se quedaria con material.texto vacio aunque tenga descripcion.
+        $literal = trim(implode("\n\n", array_filter($literalparts)));
+        if ($literal === '' && !empty($resource->intro)) {
+            $literal = trim($this->html_to_text($resource->intro));
+        }
+
+        return $this->chunk_text($full, $cmid, 'resource', $resource->name, $extractedby, $usable, $literal);
     }
 
     private function extract_scorm(int $cmid, int $instance): array {
@@ -559,6 +611,10 @@ class content_extractor {
         // pasaria la heuristica de is_extracted_text_useful).
         $extractedby = 'moodle:scorm';
         $usable = false;
+        // Literal (Epica): solo el texto real del paquete, sin el nombre del
+        // modulo ni el aviso de fallo (que por si solo pasaria la heuristica
+        // de is_extracted_text_useful al ser prosa normal).
+        $literal = '';
 
         try {
             $context = \context_module::instance($cmid);
@@ -567,6 +623,7 @@ class content_extractor {
                 $parts[] = $scormtext;
                 $extractedby = 'moodle:scorm_html';
                 $usable = true;
+                $literal = $scormtext;
             } else {
                 $parts[] = 'No se pudo extraer el contenido de texto de este SCORM (puede usar un ' .
                     'formato interactivo, p. ej. Articulate/Storyline, que no expone texto en el HTML, ' .
@@ -581,7 +638,7 @@ class content_extractor {
             return [];
         }
 
-        return $this->chunk_text($full, $cmid, 'scorm', $scorm->name, $extractedby, $usable);
+        return $this->chunk_text($full, $cmid, 'scorm', $scorm->name, $extractedby, $usable, $literal);
     }
 
     /**
@@ -740,18 +797,24 @@ class content_extractor {
      * @param string $module_name Human-readable module name.
      * @param string $extracted_by Herramienta que produjo $text ('' = deducir de module_type).
      * @param bool|null $usable   Si el texto es aprovechable (Epica); null = decidirlo aqui con
-     *                            is_extracted_text_useful() sobre $text.
+     *                            is_extracted_text_useful() sobre el texto guardado (ver $literal_text).
+     * @param string|null $literal_text Texto para block_pulso_full_text (material.texto de Epica),
+     *                            SIN el encuadre que $text lleva para el RAG (nombre del modulo,
+     *                            "Archivo: X (mimetype)", "Contenido PDF extraido:"...). null = usar
+     *                            $text tal cual (mismo comportamiento que antes de este parametro,
+     *                            para los tipos de modulo que aun no distinguen las dos cosas).
      * @return array
      */
     public function chunk_text(string $text, int $cmid, string $module_type, string $module_name,
-            string $extracted_by = '', ?bool $usable = null): array {
+            string $extracted_by = '', ?bool $usable = null, ?string $literal_text = null): array {
         $text = $this->sanitize_utf8($text);
         $text = trim($text);
         if (empty($text)) {
             return [];
         }
 
-        $this->record_full_text($cmid, $module_type, mb_substr($module_name, 0, 255), $text, $extracted_by, $usable);
+        $storedtext = $literal_text !== null ? trim($this->sanitize_utf8($literal_text)) : $text;
+        $this->record_full_text($cmid, $module_type, mb_substr($module_name, 0, 255), $storedtext, $extracted_by, $usable);
 
         $chunks   = [];
         $length   = mb_strlen($text);
@@ -891,7 +954,7 @@ class content_extractor {
             // (a) Libreria PHP pura (sin dependencia de shell).
             $librarytext = $this->try_parse_pdf_with_php_library($tmpin);
             if ($this->is_extracted_text_useful($librarytext)) {
-                return ['text' => trim($librarytext), 'method' => 'smalot/pdfparser'];
+                return ['text' => trim($librarytext), 'method' => self::PDFPARSER_VENDORED_VERSION];
             }
 
             // (b) Fallback a pdftotext si el servidor lo tiene instalado.

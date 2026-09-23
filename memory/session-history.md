@@ -1,5 +1,75 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-23 — Revisión del sobre real de Épica: 4 arreglos + limpieza (v1.20.1)
+
+Marcos activó el modo de ensayo y leyó el sobre real de un encargo (id 3): la
+estructura cumple el contrato, pero encontró 2 fallos importantes y 2 menores.
+Diff mostrado antes de aplicar, como pidió.
+
+- **material.texto no era literal (el más importante).** `chunk_text()` guardaba
+  en `block_pulso_full_text` el mismo texto que se pasa al chunking del RAG —
+  que lleva encuadre añadido (nombre del módulo, "Archivo: X (mimetype)",
+  "Contenido PDF extraído:", "Pregunta:"/"Feedback:" en quiz, "## Título" en
+  book/wiki). Épica compara el material contra lo generado para verificar
+  fidelidad, así que ese encuadre synthetic contaminaba la comparación.
+  **Decisión de alcance, no pedida explícitamente así**: el encargo solo citaba
+  el caso resource/PDF (líneas ~439/~516), pero el defecto es el mismo patrón en
+  los 8 tipos de módulo — se arregló en los 8, no solo en resource, porque
+  dejarlo a medias habría sido inconsistente (unos módulos literales, otros no)
+  y porque el propio encargo decía "arréglalo en origen". `chunk_text()` ahora
+  acepta un `$literal_text` opcional (null = comportamiento anterior, para no
+  romper nada si algún día se llama desde otro sitio) que es lo que se guarda;
+  `$text` (con encuadre) se sigue usando igual para el RAG, sin tocarlo. Casos
+  no triviales: quiz conserva el texto de preguntas/feedback pero sin las
+  etiquetas "Pregunta:"/"Feedback:" (solo servían de separador visual para el
+  RAG); book/wiki conservan el título del capítulo/página (es contenido real
+  del documento, no encuadre nuestro) pero sin el nombre del libro/wiki ni el
+  "## "; resource cae a texto del intro cuando no hay ningún fichero con texto
+  aprovechable (antes se habría quedado vacío). **Como el hash cambia para
+  todos los recursos, hace falta reindexar** (cron nocturno, no urge).
+- **Sección 0 quedaba fuera de `resolve_contexto_seccion()`.** Un recurso que
+  vive en la sección general del curso salía con "Sección 0", resumen vacío y
+  sin vecinas. Se quitó el `continue` que la saltaba; el nombre de cualquier
+  sección (actual o vecina) usa ahora SIEMPRE `get_section_name()` en vez del
+  marcador fijo "Sección N" — con nombre propio lo respeta, sin él da el
+  nombre por defecto del formato del curso (p. ej. "Tema 2"), y la sección 0
+  ya tiene vecina siguiente.
+- **`extraido_por` de PDF sin versión.** `lib/pdfparser/` se vendorizó sin
+  `composer.json` ni ningún fichero de versión — la librería no expone su
+  versión en tiempo de ejecución y no quedó registrada la exacta. Decisión de
+  Marcos: usar `'smalot/pdfparser (vendorizada 2026-07-14)'` (la fecha del
+  commit `b7b08c4`, verificable con `git log`) en vez de inventar un número de
+  versión. Nuevo fichero `lib/pdfparser/VERSION` con la misma nota. **Pendiente
+  de confirmar la versión exacta** si algún día hace falta (no bloqueante:
+  Épica solo necesita saber que la extracción es mecánica y con qué
+  herramienta, y eso ya lo dice el string).
+- **Opcionales vacíos (`alumno.grupo`, `contexto.resumen`) se omiten** en vez
+  de mandarse como `""`, en `build_envelope()`/`resolve_contexto_seccion()`.
+- **Limpieza de los encargos 1 y 2**, huérfanos en "pendiente" desde antes de
+  v1.19.0 (cuando `dispatch_to_epica()` era un no-op): confirmado en
+  `epica_ciclo_adhoc.php` que no hay ningún barrido periódico que los recoja —
+  solo se encola la tarea al crear el encargo o desde un paso anterior de la
+  propia tarea — así que estaban huérfanos para siempre, no solo lentos. Paso
+  de upgrade (`db/upgrade.php`, versión 2026092306) que marca como `fallado`
+  (no borra, para no perder el registro). **Primer criterio propuesto (umbral
+  de antigüedad) rechazado por Marcos antes de aplicar**: los dos huérfanos se
+  crearon el mismo día que se despliega el upgrade, así que un umbral tipo
+  "más de 1 día" no los habría tocado nunca; y bajarlo habría confundido un
+  `pendiente` legítimo reintentando un 429 (puede llevar horas ahí) con uno
+  huérfano. El criterio real que se aplicó: `pendiente` en
+  `block_pulso_encargos` SIN ninguna fila en `task_adhoc` (`classname LIKE
+  '%epica_ciclo_adhoc'`, `component = 'block_pulso'`) cuyo `customdata`
+  decodificado (JSON, no `LIKE` sobre el texto) tenga ese `encargoid` — el
+  mismo shape que usan `dispatch_to_epica()` y el propio
+  `epica_ciclo_adhoc::execute()` al reencolarse
+  (`set_custom_data(['encargoid' => $id])`).
+- **No se pudo ejecutar `php -l`**: sin PHP ni red en este entorno (el intento
+  de descargar el zip portátil de windows.php.net dio 0 bytes — sin acceso a
+  internet). Verificado a mano releyendo cada bloque tocado y con un conteo de
+  llaves/paréntesis en `node` contra el `git diff` (balance idéntico al de
+  antes de los cambios). **Sin verificar de verdad hasta que alguien con PHP
+  local o Moodle real lo confirme.**
+
 ## 2026-09-23 — Épica paso 4: panel de estado, galería, aviso (v1.20.0)
 
 Última pieza de la integración con Épica. Antes de esto el usuario encargaba y

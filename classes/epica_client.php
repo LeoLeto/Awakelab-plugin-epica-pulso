@@ -463,6 +463,15 @@ class epica_client {
      * configurado todavía).
      */
     private static function build_envelope(\stdClass $encargo, \stdClass $course, array $textrow, \stdClass $user): array {
+        $alumno = [
+            'idioma' => 'es',
+            'intento' => self::resolve_intento((int)$encargo->userid, (int)$encargo->cmid, (int)$encargo->id),
+        ];
+        $grupo = self::resolve_grupo((int)$encargo->courseid, (int)$user->id);
+        if ($grupo !== '') {
+            $alumno['grupo'] = $grupo;
+        }
+
         return [
             'herramienta' => self::HERRAMIENTA,
             'peticion' => $encargo->prompt,
@@ -473,11 +482,7 @@ class epica_client {
                 'nombre_corto' => trim((string)$course->shortname),
                 'idioma' => 'es',
             ],
-            'alumno' => [
-                'grupo' => self::resolve_grupo((int)$encargo->courseid, (int)$user->id),
-                'idioma' => 'es',
-                'intento' => self::resolve_intento((int)$encargo->userid, (int)$encargo->cmid, (int)$encargo->id),
-            ],
+            'alumno' => $alumno,
             'material' => self::resolve_material($textrow),
         ];
     }
@@ -485,31 +490,37 @@ class epica_client {
     /**
      * El contexto de sección se manda SIEMPRE, haya material o no: nombre,
      * resumen (texto plano, recortado) y las secciones vecinas visibles.
+     *
+     * Incluye la sección 0 en la búsqueda: un recurso puede vivir ahí (la
+     * sección general del curso), y antes se descartaba explícitamente, así
+     * que salía con "Sección 0", resumen vacío y sin vecinas aunque tuviera
+     * nombre/resumen propios y una sección 1 justo detrás. El nombre usa
+     * SIEMPRE get_section_name() (nunca el marcador "Sección N"): con nombre
+     * propio lo respeta, y sin él da el nombre por defecto del formato del
+     * curso (p. ej. "Tema 2"), que es lo que ve el profesorado en la UI.
      */
     private static function resolve_contexto_seccion(int $courseid, int $sectionnum): array {
         global $DB;
 
+        $course = get_course($courseid);
         $sections = $DB->get_records('course_sections', ['course' => $courseid], 'section ASC',
             'id, section, name, summary, visible');
 
-        $ordered = [];
+        $ordered = array_values($sections);
         $currentkey = null;
-        foreach ($sections as $sec) {
-            if ((int)$sec->section === 0) {
-                continue; // Seccion general del curso, no es un "tema".
-            }
-            $ordered[] = $sec;
+        foreach ($ordered as $key => $sec) {
             if ((int)$sec->section === $sectionnum) {
-                $currentkey = count($ordered) - 1;
+                $currentkey = $key;
+                break;
             }
         }
 
         $current = $currentkey !== null ? $ordered[$currentkey] : null;
         $extractor = new content_extractor();
 
-        $nombre = $current && trim((string)$current->name) !== ''
-            ? trim((string)$current->name)
-            : ('Sección ' . $sectionnum);
+        $nombre = $current !== null
+            ? self::section_display_name($course, $current)
+            : get_section_name($course, $sectionnum);
 
         $resumen = $current ? trim($extractor->html_to_text((string)$current->summary)) : '';
         $resumen = mb_substr($resumen, 0, 600, 'UTF-8');
@@ -517,16 +528,31 @@ class epica_client {
         $vecinas = [];
         if ($currentkey !== null) {
             if ($currentkey > 0 && !empty($ordered[$currentkey - 1]->visible)) {
-                $prev = trim((string)$ordered[$currentkey - 1]->name);
-                $vecinas[] = $prev !== '' ? $prev : ('Sección ' . $ordered[$currentkey - 1]->section);
+                $vecinas[] = self::section_display_name($course, $ordered[$currentkey - 1]);
             }
             if (isset($ordered[$currentkey + 1]) && !empty($ordered[$currentkey + 1]->visible)) {
-                $next = trim((string)$ordered[$currentkey + 1]->name);
-                $vecinas[] = $next !== '' ? $next : ('Sección ' . $ordered[$currentkey + 1]->section);
+                $vecinas[] = self::section_display_name($course, $ordered[$currentkey + 1]);
             }
         }
 
-        return ['seccion' => $nombre, 'resumen' => $resumen, 'vecinas' => $vecinas];
+        $contexto = ['seccion' => $nombre, 'vecinas' => $vecinas];
+        if ($resumen !== '') {
+            $contexto['resumen'] = $resumen;
+        }
+        return $contexto;
+    }
+
+    /**
+     * Nombre a mostrar de una sección: el propio si lo tiene, si no el que le
+     * da el formato del curso (get_section_name resuelve el "Tema N"/"Sección
+     * N" que corresponda, nunca un marcador fijo en castellano).
+     */
+    private static function section_display_name(\stdClass $course, \stdClass $section): string {
+        $name = trim((string)$section->name);
+        if ($name !== '') {
+            return $name;
+        }
+        return get_section_name($course, (int)$section->section);
     }
 
     /**

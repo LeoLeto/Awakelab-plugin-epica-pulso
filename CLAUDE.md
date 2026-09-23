@@ -717,9 +717,34 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
   Épica compara el material contra el original para verificar fidelidad, y una frase
   cortada envenena esa comparación. Objetivo de recorte 100.000 caracteres aunque el
   contrato admita hasta 300.000 (no mejora el PNG y encarece la generación).
+- **`block_pulso_full_text.texto` (y por tanto `material.texto`) es SOLO el texto
+  literal del documento — nunca el encuadre que se añade para el RAG** (nombre del
+  módulo, "Archivo: X (mimetype)", "Contenido PDF extraído:"...). `content_extractor
+  ::chunk_text()` recibe DOS textos: `$text` (con encuadre, para trocear y embeber —
+  no tocar) y un `$literal_text` opcional que es lo que se guarda de verdad en
+  `block_pulso_full_text`; si se omite, se guarda `$text` tal cual (ver `extract_label`,
+  que ya era literal de origen). Si se añade un tipo de módulo nuevo o se toca uno
+  existente, hay que construir su `$literal_text` sin ningún prefijo/etiqueta que no
+  esté en el documento original — Épica compara el material contra lo generado, y ese
+  encuadre synthetic (detectado en la revisión del sobre real, 2026-09-23) contaminaba
+  la comparación. Extraído de un fichero real (docx/pptx/pdf/texto plano/notebook):
+  literal = el contenido devuelto por el extractor, sin envolver. Cambiar esto cambia el
+  `content_hash` de cada fila — hace falta reindexar.
+- **`extraido_por` de PDF usa `content_extractor::PDFPARSER_VENDORED_VERSION`**
+  (`'smalot/pdfparser (vendorizada 2026-07-14)'`), no un string suelto: `lib/pdfparser/`
+  se vendorizó sin `composer.json` ni fichero de versión, así que la librería no expone
+  su versión en tiempo de ejecución. Se usa la fecha del commit que la vendorizó
+  (`b7b08c4`, verificable con `git log`) en vez de inventar un número — ver
+  `lib/pdfparser/VERSION`. Si algún día se sabe la versión real de origen, actualizar
+  la constante Y el fichero VERSION a la vez.
 - **El `contexto` de sección (nombre, resumen, vecinas) se manda SIEMPRE**, haya material
   aprovechable o no: es lo que sostiene el tema si el material falla o si el recurso ya no
-  es válido para generar nada.
+  es válido para generar nada. Incluye la sección 0 (antes se saltaba explícitamente, y
+  un recurso que vive ahí salía con "Sección 0" y sin vecinas) y el nombre de cualquier
+  sección (actual o vecina) usa SIEMPRE `get_section_name()`, nunca un marcador fijo en
+  castellano — con nombre propio lo respeta, sin él da el nombre por defecto del formato
+  del curso. `resumen`/`grupo` (en `alumno`) se OMITEN del JSON cuando están vacíos, en
+  vez de mandarse como `""`.
 - **El PNG jamás entra en el historial del chat ni en un log.** Se decodifica de base64 y
   se guarda con la File API de Moodle (`component=block_pulso`, `filearea=encargo`,
   `itemid=` id de la fila del encargo, en el contexto de CURSO — un encargo no está atado

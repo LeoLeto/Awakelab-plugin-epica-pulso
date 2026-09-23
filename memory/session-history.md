@@ -1,5 +1,19 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-23 — Rebranding visible: Pulso AI → Pulse AI (v1.16.1)
+
+Renombre de marca SOLO en lo que lee el usuario: `pluginname` y demás valores de
+`lang/en/block_pulso.php` (las claves `pulso:*` NO se tocan — son el nombre real de
+las capabilities), los textos de cabecera/burbuja/capacidades de
+`chat_simple_view.php`, y la línea de auto-identificación del prompt de alumno en
+`classes/system_prompt_designer.php` ("Eres Pulso AI" → "Eres Pulse AI" — no estaba
+en el encargo original pero es lo que el modelo le dice al alumno que es, así que
+cuenta como texto visible). El componente `block_pulso`, las capabilities
+`block/pulso:*`, la tabla `block_pulso_content_chunks`, el namespace, los
+`error_log('Pulso: …')` de servidor y todo el CSS/JS `pulso-*`/`Pulso*` quedan
+igual a propósito: cambiarlos rompería ajustes/capabilities/tabla existentes en
+Moodle o sería una regresión visual gratuita sin ningún beneficio (nadie los lee).
+
 ## 2026-09-07 — Camino A verificado, y el fallo se cuenta al usuario (v1.15.3)
 
 QA de v1.15.2 en el curso 92: **el camino A funciona**. Ofrece en las dos respuestas

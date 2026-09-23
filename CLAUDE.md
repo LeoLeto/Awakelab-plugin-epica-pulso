@@ -502,6 +502,29 @@ icono suelto, que solo necesita 3:1) va siempre en `#003670` con texto blanco
 (11,92 de contraste), nunca en fondo cian. El cian como fondo solo es seguro para
 iconos/SVG sin texto encima (ahí aplica el umbral no-texto de 3:1, que si cumple).
 
+## Cómo se trabaja este repo con prompts
+
+El trabajo entra por prompts escritos para Claude Code, uno por paso, y **cada paso en una
+sesión nueva**. Funciona porque la fuente de verdad es el código más este fichero y
+`memory/session-history.md`, no la conversación: una sesión limpia lee los dos y arranca
+sabiendo lo mismo que la anterior. Con ficheros de 6.000 líneas, una sesión larga acumula
+contexto que ya no aplica y compite por atención con lo que importa.
+
+Dos reglas que se derivan:
+
+- **Todo prompt empieza pidiendo leer `CLAUDE.md` y `memory/session-history.md`**, y
+  cualquier otro fichero que ese cambio concreto necesite (el contrato con Épica, la matriz
+  de QA, el documento de una fase). Sin eso, una sesión nueva reinventa decisiones que ya
+  están tomadas y vuelve a pisar trampas documentadas: los `substr` por bytes, la
+  indexación dentro de la petición, el `courseid` en el upsert, el cian como color de texto.
+- **Un paso no se parte en dos sesiones.** Mientras se itera sobre el mismo cambio —diff,
+  ajuste, reaplicar— se sigue en la misma; lo que se separa son los pasos, no las vueltas
+  dentro de un paso.
+
+Y el cierre de cada paso es siempre el mismo: enseñar el diff antes de aplicar, bump de
+`version.php`, y documentar en este fichero lo que sea regla permanente y en
+`memory/session-history.md` lo que costó encontrar.
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

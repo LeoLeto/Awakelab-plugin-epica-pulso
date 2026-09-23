@@ -1463,16 +1463,16 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
     </style>
     
     <!-- Botón circular flotante -->
-    <button class="pulso-chat-bubble" id="pulso-chat-bubble" onclick="toggleChat()" title="Pulso AI — Asistente del curso" aria-label="Abrir el asistente Pulso AI">
+    <button class="pulso-chat-bubble" id="pulso-chat-bubble" onclick="toggleChat()" title="Pulse AI — Asistente del curso" aria-label="Abrir el asistente Pulse AI">
         <img src="https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png" alt="" aria-hidden="true">
     </button>
 
-    <div class="pulso-chat-container" id="pulso-chat-container" role="dialog" aria-label="Pulso AI, asistente del curso">
+    <div class="pulso-chat-container" id="pulso-chat-container" role="dialog" aria-label="Pulse AI, asistente del curso">
         <div class="pulso-chat-header" id="pulso-chat-header">
             <div class="pulso-header-brand">
                 <img class="pulso-header-logo" src="https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png" alt="" aria-hidden="true">
                 <div>
-                    <h4>Pulso AI <span class="pulso-version-badge">%%PULSO_VERSION%%</span></h4>
+                    <h4>Pulse AI <span class="pulso-version-badge">%%PULSO_VERSION%%</span></h4>
                     <span class="pulso-header-sub"><span class="pulso-status-dot" aria-hidden="true"></span>Asistente del curso</span>
                 </div>
             </div>
@@ -1486,16 +1486,16 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             </div>
         </div>
 
-        <div class="pulso-chat-messages" id="pulso-messages" role="log" aria-live="polite" aria-label="Conversación con Pulso AI">
+        <div class="pulso-chat-messages" id="pulso-messages" role="log" aria-live="polite" aria-label="Conversación con Pulse AI">
             <div class="pulso-home" id="pulso-home">
                 <div class="pulso-home-hello">
                     <div class="pulso-home-avatar" aria-hidden="true"></div>
                     <h5>%%PULSO_GREETING%%</h5>
                 </div>
 
-                <button type="button" class="pulso-home-help-btn" onclick="showCapabilities()" aria-label="Descubre qué puede hacer Pulso">
+                <button type="button" class="pulso-home-help-btn" onclick="showCapabilities()" aria-label="Descubre qué puede hacer Pulse">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    <span>¿Qué puede hacer Pulso?<span class="pulso-home-help-sub">Descúbrelo en 10 segundos</span></span>
+                    <span>¿Qué puede hacer Pulse?<span class="pulso-home-help-sub">Descúbrelo en 10 segundos</span></span>
                 </button>
 
                 <!--PULSO_TEACHER_ONLY_START-->
@@ -2877,7 +2877,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             if (isTeacher) {
                 html = ''
                     + '<div class="pulso-rich-answer">'
-                    + '<p>Soy <strong>Pulso AI</strong>, tu asistente del curso. Esto es lo que puedo hacer por ti:</p>'
+                    + '<p>Soy <strong>Pulse AI</strong>, tu asistente del curso. Esto es lo que puedo hacer por ti:</p>'
                     + '<ul class="pulso-rich-bullets">'
                     + '<li>📊 <strong>Analítica del curso:</strong> tasa de completitud, notas medias, ranking de mejores alumnos y nivel de participación.</li>'
                     + '<li>⚠️ <strong>Alerta temprana:</strong> detecto alumnos en riesgo o que llevan días sin acceder.</li>'
@@ -2895,7 +2895,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             } else {
                 html = ''
                     + '<div class="pulso-rich-answer">'
-                    + '<p>Soy <strong>Pulso AI</strong>, tu asistente de estudio. Esto es lo que puedo hacer por ti:</p>'
+                    + '<p>Soy <strong>Pulse AI</strong>, tu asistente de estudio. Esto es lo que puedo hacer por ti:</p>'
                     + '<ul class="pulso-rich-bullets">'
                     + '<li>📚 <strong>Contenido del curso:</strong> te cuento de qué trata, qué secciones tiene y qué materiales hay en cada una.</li>'
                     + '<li>📄 <strong>Resúmenes y explicaciones:</strong> leo los PDFs y materiales del curso y te los resumo o te los explico paso a paso.</li>'
@@ -3477,7 +3477,7 @@ function render_chat_simple($courseid, $context, $isteacher = true) {
             const messageEl = document.createElement('div');
             messageEl.className = 'pulso-message ai pulso-typing';
             messageEl.setAttribute('role', 'status');
-            messageEl.setAttribute('aria-label', 'Pulso está escribiendo');
+            messageEl.setAttribute('aria-label', 'Pulse está escribiendo');
             const contentEl = document.createElement('div');
             contentEl.className = 'pulso-message-content';
             const dots = document.createElement('span');

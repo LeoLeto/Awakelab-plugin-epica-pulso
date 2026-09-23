@@ -1,5 +1,39 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-23 — Texto completo por módulo para Épica: tabla nueva (v1.17.0)
+
+Primer paso de la integración con Épica, y no depende de ella: guardar el texto
+ENTERO extraído de cada módulo (para el campo `material.texto` del futuro envío),
+además de los fragmentos que ya se guardan para RAG.
+
+**Por qué no se reconstruye concatenando `chunk_text`**: los fragmentos de
+`block_pulso_content_chunks` SE SOLAPAN (`CHUNK_OVERLAP=200`), así que unirlos
+duplicaría ~200 caracteres en cada unión — inaceptable porque Épica compara el
+material contra el original para verificar fidelidad literal. Se captura en su
+lugar en `content_extractor::chunk_text()`, que ya recibe el texto completo justo
+antes de trocearlo: cero coste de extracción extra.
+
+**`usable` se calcula en el momento de extraer, no al leer.** Un PDF escaneado
+deja como texto final el aviso "No se pudo leer el texto de este PDF…", que por sí
+solo pasaría la heurística de `is_extracted_text_useful()` (es prosa española
+normal). Por eso `extract_resource()`/`extract_scorm()` calculan `usable` sobre el
+texto REAL extraído (antes de anteponer el aviso de fallo) y se lo pasan ya
+resuelto a `chunk_text()`; el resto de tipos de módulo dejan que `chunk_text()`
+aplique la heurística sobre el texto final (no hay riesgo de aviso-como-contenido
+fuera de PDF/SCORM).
+
+**`extraido_por`** junta los métodos reales que dieron texto en un recurso con
+varios ficheros (`smalot/pdfparser`, `pdftotext X.Y -layout` — versión detectada
+con `pdftotext -v`, cacheada por proceso —, `docx:ziparchive`…), no un valor fijo.
+
+Tabla `block_pulso_full_text` (upsert por `courseid`+`cmid` con `content_hash`
+para no reescribir sin cambios, mismo patrón que `embedding_manager`) en clase
+nueva `classes/full_text_store.php`, enganchada en
+`rag_retriever::index_course()`/`delete_course_index()` — corre solo desde las
+tareas de cron, nunca en una petición de chat. `full_text_store::get_available_resources($courseid)`
+da los cmid con texto aprovechable (`usable=1`, `cmid>0`) para el futuro
+desplegable de "enviar a Épica".
+
 ## 2026-09-23 — Rebranding visible: Pulso AI → Pulse AI (v1.16.1)
 
 Renombre de marca SOLO en lo que lee el usuario: `pluginname` y demás valores de

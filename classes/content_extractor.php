@@ -46,6 +46,19 @@ class content_extractor {
     const SYNTHETIC_CMID_STRIDE = 1000;
 
     /**
+     * Texto completo por modulo, capturado en chunk_text() ANTES de trocear
+     * (para Epica: material.texto). No se reconstruye concatenando chunk_text
+     * de block_pulso_content_chunks porque los fragmentos SE SOLAPAN
+     * (CHUNK_OVERLAP) y esa concatenacion duplicaria texto.
+     *
+     * @var array
+     */
+    private array $fulltexts = [];
+
+    /** Cache de proceso para no invocar `pdftotext -v` en cada PDF de un curso. */
+    private static ?string $pdftotextversion = null;
+
+    /**
      * Extract all content from a course and return as an array of chunks.
      *
      * Each chunk is an associative array:
@@ -57,6 +70,7 @@ class content_extractor {
     public function extract_course_content(int $courseid): array {
         global $DB;
 
+        $this->fulltexts = [];
         $chunks = [];
 
         // Include course-level metadata and section structure so RAG can answer
@@ -88,6 +102,16 @@ class content_extractor {
         }
 
         return $chunks;
+    }
+
+    /**
+     * Texto completo por modulo recogido durante la ultima extract_course_content().
+     * Cada entrada: cmid, module_type, module_name, texto, extraido_por, usable.
+     *
+     * @return array
+     */
+    public function get_extracted_full_texts(): array {
+        return $this->fulltexts;
     }
 
     /**
@@ -394,6 +418,16 @@ class content_extractor {
             $parts[] = $this->html_to_text($resource->intro);
         }
 
+        // Que tipo de extraccion produjo texto REAL (para extraido_por/usable en
+        // block_pulso_full_text). $anyfileattempted distingue "no habia nada que
+        // extraer" (usable se decide por heuristica sobre el texto final) de
+        // "se intento y fallo" (p.ej. PDF escaneado: usable = false aunque el
+        // texto final tenga el aviso de fallo, que por si solo pasaria la
+        // heuristica de is_extracted_text_useful al ser prosa normal).
+        $extractmethods = [];
+        $anyfileattempted = false;
+        $anyfileusable = false;
+
         try {
             $context = \context_module::instance($cmid);
             $fs = get_file_storage();
@@ -409,6 +443,11 @@ class content_extractor {
                     $plain = trim((string)$file->get_content());
                     if (!empty($plain)) {
                         $parts[] = $plain;
+                        $anyfileattempted = true;
+                        if ($this->is_extracted_text_useful($plain)) {
+                            $extractmethods[] = 'moodle:text_file';
+                            $anyfileusable = true;
+                        }
                     }
                     continue;
                 }
@@ -437,7 +476,13 @@ class content_extractor {
                                 }
                             }
                             if (!empty($cellParts)) {
-                                $parts[] = implode("\n\n", $cellParts);
+                                $celltext = implode("\n\n", $cellParts);
+                                $parts[] = $celltext;
+                                $anyfileattempted = true;
+                                if ($this->is_extracted_text_useful($celltext)) {
+                                    $extractmethods[] = 'moodle:ipynb';
+                                    $anyfileusable = true;
+                                }
                             }
                         }
                     }
@@ -451,9 +496,12 @@ class content_extractor {
                     || preg_match('/\.pptx$/i', $filename);
                 if ($isDocx || $isPptx) {
                     $officetext = $isDocx ? $this->extract_docx_text($file) : $this->extract_pptx_text($file);
+                    $anyfileattempted = true;
                     if ($this->is_extracted_text_useful($officetext)) {
                         $parts[] = 'Contenido del documento extraido:';
                         $parts[] = $officetext;
+                        $extractmethods[] = $isDocx ? 'docx:ziparchive' : 'pptx:ziparchive';
+                        $anyfileusable = true;
                     } else {
                         $parts[] = 'No se pudo leer el contenido de este documento.';
                     }
@@ -462,10 +510,13 @@ class content_extractor {
 
                 // PDFs require extraction step.
                 if ($mimetype === 'application/pdf' || preg_match('/\.pdf$/i', $filename)) {
-                    $pdftext = $this->extract_pdf_text($file);
-                    if (!empty($pdftext)) {
+                    $pdfresult = $this->extract_pdf_text($file);
+                    $anyfileattempted = true;
+                    if (!empty($pdfresult['text'])) {
                         $parts[] = 'Contenido PDF extraido:';
-                        $parts[] = $pdftext;
+                        $parts[] = $pdfresult['text'];
+                        $extractmethods[] = $pdfresult['method'];
+                        $anyfileusable = true;
                     } else {
                         // Ninguna estrategia de extraccion dio texto legible — mensaje
                         // claro en vez de dejar el recurso vacio o basura sin avisar.
@@ -483,7 +534,14 @@ class content_extractor {
             return [];
         }
 
-        return $this->chunk_text($full, $cmid, 'resource', $resource->name);
+        // Si no se intento extraer ningun archivo (recurso sin ficheros, solo
+        // nombre/intro), no hay heuristica de fallo que aplicar: se deja que
+        // chunk_text() decida usable con is_extracted_text_useful() sobre el
+        // texto final, igual que para el resto de tipos de modulo.
+        $extractedby = !empty($extractmethods) ? implode('; ', array_values(array_unique($extractmethods))) : 'moodle:resource';
+        $usable = $anyfileattempted ? $anyfileusable : null;
+
+        return $this->chunk_text($full, $cmid, 'resource', $resource->name, $extractedby, $usable);
     }
 
     private function extract_scorm(int $cmid, int $instance): array {
@@ -496,11 +554,19 @@ class content_extractor {
 
         $parts = [$scorm->name];
 
+        // Igual que en extract_resource(): usable se decide sobre el texto REAL
+        // extraido del paquete, no sobre el aviso de fallo (que por si solo
+        // pasaria la heuristica de is_extracted_text_useful).
+        $extractedby = 'moodle:scorm';
+        $usable = false;
+
         try {
             $context = \context_module::instance($cmid);
             $scormtext = $this->extract_scorm_content_text($context);
             if ($scormtext !== '') {
                 $parts[] = $scormtext;
+                $extractedby = 'moodle:scorm_html';
+                $usable = true;
             } else {
                 $parts[] = 'No se pudo extraer el contenido de texto de este SCORM (puede usar un ' .
                     'formato interactivo, p. ej. Articulate/Storyline, que no expone texto en el HTML, ' .
@@ -515,7 +581,7 @@ class content_extractor {
             return [];
         }
 
-        return $this->chunk_text($full, $cmid, 'scorm', $scorm->name);
+        return $this->chunk_text($full, $cmid, 'scorm', $scorm->name, $extractedby, $usable);
     }
 
     /**
@@ -672,14 +738,20 @@ class content_extractor {
      * @param int    $cmid        course_modules id.
      * @param string $module_type Module type name.
      * @param string $module_name Human-readable module name.
+     * @param string $extracted_by Herramienta que produjo $text ('' = deducir de module_type).
+     * @param bool|null $usable   Si el texto es aprovechable (Epica); null = decidirlo aqui con
+     *                            is_extracted_text_useful() sobre $text.
      * @return array
      */
-    public function chunk_text(string $text, int $cmid, string $module_type, string $module_name): array {
+    public function chunk_text(string $text, int $cmid, string $module_type, string $module_name,
+            string $extracted_by = '', ?bool $usable = null): array {
         $text = $this->sanitize_utf8($text);
         $text = trim($text);
         if (empty($text)) {
             return [];
         }
+
+        $this->record_full_text($cmid, $module_type, mb_substr($module_name, 0, 255), $text, $extracted_by, $usable);
 
         $chunks   = [];
         $length   = mb_strlen($text);
@@ -730,6 +802,32 @@ class content_extractor {
         return $chunks;
     }
 
+    /**
+     * Acumula el texto completo (pre-troceo) de un modulo para Epica
+     * (block_pulso_full_text). Se llama UNA vez por modulo, desde chunk_text(),
+     * que es el unico punto donde ya existe el texto entero en memoria antes de
+     * partirlo — asi no hace falta reconstruirlo despues a partir de chunks
+     * solapados ni volver a extraer nada.
+     *
+     * @param int $cmid
+     * @param string $module_type
+     * @param string $module_name
+     * @param string $text
+     * @param string $extracted_by '' = usar 'moodle:' . $module_type
+     * @param bool|null $usable null = decidir con is_extracted_text_useful()
+     */
+    private function record_full_text(int $cmid, string $module_type, string $module_name,
+            string $text, string $extracted_by, ?bool $usable): void {
+        $this->fulltexts[] = [
+            'cmid'         => $cmid,
+            'module_type'  => $module_type,
+            'module_name'  => $module_name,
+            'texto'        => $text,
+            'extraido_por' => $extracted_by !== '' ? $extracted_by : ('moodle:' . $module_type),
+            'usable'       => $usable ?? $this->is_extracted_text_useful($text),
+        ];
+    }
+
     // ----------------------------------------------------------------
     // Utility helpers
     // ----------------------------------------------------------------
@@ -775,13 +873,13 @@ class content_extractor {
      *  (c) Parser naive de streams PDF (ultimo recurso).
      *
      * @param \stored_file $file
-     * @return string
+     * @return array ['text' => string, 'method' => string] method='' si ninguna estrategia sirvio.
      */
-    private function extract_pdf_text(\stored_file $file): string {
+    private function extract_pdf_text(\stored_file $file): array {
         $tmpin = tempnam(sys_get_temp_dir(), 'pulso_pdf_in_');
         $tmpout = tempnam(sys_get_temp_dir(), 'pulso_pdf_out_');
         if (!$tmpin || !$tmpout) {
-            return '';
+            return ['text' => '', 'method' => ''];
         }
 
         // tempnam creates the file; for pdftotext we want a .txt output path.
@@ -793,22 +891,24 @@ class content_extractor {
             // (a) Libreria PHP pura (sin dependencia de shell).
             $librarytext = $this->try_parse_pdf_with_php_library($tmpin);
             if ($this->is_extracted_text_useful($librarytext)) {
-                return trim($librarytext);
+                return ['text' => trim($librarytext), 'method' => 'smalot/pdfparser'];
             }
 
             // (b) Fallback a pdftotext si el servidor lo tiene instalado.
             if (function_exists('shell_exec')) {
                 $commands = [
-                    'pdftotext -layout ' . escapeshellarg($tmpin) . ' ' . escapeshellarg($txtout),
-                    'pdftotext ' . escapeshellarg($tmpin) . ' ' . escapeshellarg($txtout),
+                    ['cmd' => 'pdftotext -layout ' . escapeshellarg($tmpin) . ' ' . escapeshellarg($txtout),
+                     'method' => $this->get_pdftotext_version() . ' -layout'],
+                    ['cmd' => 'pdftotext ' . escapeshellarg($tmpin) . ' ' . escapeshellarg($txtout),
+                     'method' => $this->get_pdftotext_version()],
                 ];
 
-                foreach ($commands as $cmd) {
-                    @shell_exec($cmd . ' 2>&1');
+                foreach ($commands as $c) {
+                    @shell_exec($c['cmd'] . ' 2>&1');
                     if (is_file($txtout) && filesize($txtout) > 0) {
                         $content = trim((string)file_get_contents($txtout));
                         if ($this->is_extracted_text_useful($content)) {
-                            return $content;
+                            return ['text' => $content, 'method' => $c['method']];
                         }
                     }
                 }
@@ -817,17 +917,41 @@ class content_extractor {
             // (c) Parser naive de streams PDF, ultimo recurso.
             $naivetext = $this->try_parse_pdf_naive($tmpin);
             if ($this->is_extracted_text_useful($naivetext)) {
-                return $naivetext;
+                return ['text' => $naivetext, 'method' => 'pulso:pdf_naive_parser'];
             }
         } catch (\Throwable $e) {
-            return '';
+            return ['text' => '', 'method' => ''];
         } finally {
             @unlink($tmpin);
             @unlink($tmpout);
             @unlink($txtout);
         }
 
-        return '';
+        return ['text' => '', 'method' => ''];
+    }
+
+    /**
+     * Version real de pdftotext instalada en el servidor, para extraido_por.
+     * Memorizada por proceso: un curso con muchos PDFs no debe lanzar
+     * `pdftotext -v` (shell_exec) una vez por archivo.
+     *
+     * @return string 'pdftotext X.Y' o 'pdftotext' si no se pudo determinar la version.
+     */
+    private function get_pdftotext_version(): string {
+        if (self::$pdftotextversion !== null) {
+            return self::$pdftotextversion;
+        }
+
+        $version = 'pdftotext';
+        if (function_exists('shell_exec')) {
+            $out = @shell_exec('pdftotext -v 2>&1');
+            if (is_string($out) && preg_match('/pdftotext version\s+([0-9.]+)/i', $out, $m)) {
+                $version = 'pdftotext ' . $m[1];
+            }
+        }
+
+        self::$pdftotextversion = $version;
+        return $version;
     }
 
     /**

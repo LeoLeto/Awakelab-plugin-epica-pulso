@@ -22,6 +22,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/content_extractor.php');
 require_once(__DIR__ . '/embedding_manager.php');
+require_once(__DIR__ . '/full_text_store.php');
 
 class rag_retriever {
 
@@ -3146,7 +3147,16 @@ class rag_retriever {
         $chunks    = $extractor->extract_course_content($courseid);
 
         $manager = new embedding_manager();
-        return $manager->index_course_chunks($courseid, $chunks);
+        $stats = $manager->index_course_chunks($courseid, $chunks);
+
+        // Texto completo (Epica), capturado por el extractor durante la misma
+        // pasada — no hace falta releer ni reextraer nada.
+        $fulltextstats = full_text_store::store_course_texts($courseid, $extractor->get_extracted_full_texts());
+        $stats['fulltext_stored']  = $fulltextstats['stored'];
+        $stats['fulltext_skipped'] = $fulltextstats['skipped'];
+        $stats['fulltext_deleted'] = $fulltextstats['deleted'];
+
+        return $stats;
     }
 
     /**
@@ -3174,6 +3184,7 @@ class rag_retriever {
         // proposito, la siguiente consulta debe poder reencolar la indexacion
         // sin esperar la ventana de INDEX_REQUEST_THROTTLE.
         unset_config('lastindexqueue_' . $courseid, 'block_pulso');
+        full_text_store::delete_course_texts($courseid);
         if (!self::rag_table_exists()) {
             return;
         }

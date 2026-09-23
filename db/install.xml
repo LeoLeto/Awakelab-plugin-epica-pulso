@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="blocks/pulso/db" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    VERSION="20260306"
+    VERSION="20260923"
     COMMENT="XMLDB file for Moodle block Pulso"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
   <TABLES>
@@ -29,6 +29,30 @@
         <INDEX NAME="idx_courseid" UNIQUE="false" FIELDS="courseid"/>
         <INDEX NAME="idx_cmid" UNIQUE="false" FIELDS="cmid"/>
         <INDEX NAME="idx_hash" UNIQUE="false" FIELDS="content_hash"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="block_pulso_full_text" COMMENT="Texto completo (sin trocear) por modulo, para Epica (material.texto)">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="course_modules.id; negativo = chunk sintetico (course_meta/course_section)"/>
+        <FIELD NAME="module_type" TYPE="char" LENGTH="50" NOTNULL="true" DEFAULT="" SEQUENCE="false"/>
+        <FIELD NAME="module_name" TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT="" SEQUENCE="false"/>
+        <FIELD NAME="texto" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="Texto completo, literal, sin trocear"/>
+        <FIELD NAME="caracteres" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="mb_strlen(texto), caracteres Unicode no bytes"/>
+        <FIELD NAME="extraido_por" TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="Herramienta/version real que extrajo el texto"/>
+        <FIELD NAME="usable" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 si is_extracted_text_useful() acepto el texto REAL extraido (no el aviso de fallo)"/>
+        <FIELD NAME="content_hash" TYPE="char" LENGTH="64" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="SHA256 de texto, para no reescribir si no ha cambiado"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_courseid" UNIQUE="false" FIELDS="courseid"/>
+        <INDEX NAME="idx_cmid" UNIQUE="false" FIELDS="cmid"/>
+        <INDEX NAME="idx_courseid_cmid" UNIQUE="false" FIELDS="courseid, cmid"/>
       </INDEXES>
     </TABLE>
   </TABLES>

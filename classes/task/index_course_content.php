@@ -51,6 +51,7 @@ class index_course_content extends \core\task\scheduled_task {
         $total_indexed  = 0;
         $total_skipped  = 0;
         $total_deleted  = 0;
+        $total_fulltext_stored = 0;
         $courses_done   = 0;
         $courses_skipped = 0;
 
@@ -78,8 +79,11 @@ class index_course_content extends \core\task\scheduled_task {
                 $total_indexed += $stats['indexed'];
                 $total_skipped += $stats['skipped'];
                 $total_deleted += $stats['deleted'];
+                $total_fulltext_stored += $stats['fulltext_stored'] ?? 0;
                 $courses_done++;
-                mtrace("    indexed={$stats['indexed']} skipped={$stats['skipped']} deleted={$stats['deleted']}");
+                mtrace("    indexed={$stats['indexed']} skipped={$stats['skipped']} deleted={$stats['deleted']} " .
+                    "| texto completo: nuevo/actualizado={$stats['fulltext_stored']} " .
+                    "sin cambios={$stats['fulltext_skipped']} borrados={$stats['fulltext_deleted']}");
             } catch (\Throwable $e) {
                 // Log error but do not halt other courses.
                 mtrace("    ERROR: " . $e->getMessage());
@@ -88,9 +92,11 @@ class index_course_content extends \core\task\scheduled_task {
 
         mtrace(sprintf(
             'Pulso RAG indexing complete: %d courses processed, %d skipped. ' .
-            'Chunks — indexed: %d, skipped (unchanged): %d, deleted: %d.',
+            'Chunks — indexed: %d, skipped (unchanged): %d, deleted: %d. ' .
+            'Texto completo — nuevo/actualizado: %d.',
             $courses_done, $courses_skipped,
-            $total_indexed, $total_skipped, $total_deleted
+            $total_indexed, $total_skipped, $total_deleted,
+            $total_fulltext_stored
         ));
     }
 }

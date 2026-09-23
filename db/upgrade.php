@@ -63,5 +63,38 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026080417, 'pulso');
     }
 
+    if ($oldversion < 2026092302) {
+        // Texto completo (sin trocear) por modulo, para Epica (material.texto).
+        // NO se reconstruye concatenando chunk_text de block_pulso_content_chunks:
+        // los fragmentos SE SOLAPAN (CHUNK_OVERLAP) y esa concatenacion
+        // duplicaria texto. Se captura aparte, en content_extractor::chunk_text(),
+        // que ya recibe el texto entero antes de partirlo.
+        $table = new xmldb_table('block_pulso_full_text');
+
+        $table->add_field('id',           XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE);
+        $table->add_field('courseid',     XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('cmid',         XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('module_type',  XMLDB_TYPE_CHAR,    '50', null, XMLDB_NOTNULL, null, '');
+        $table->add_field('module_name',  XMLDB_TYPE_CHAR,   '255', null, XMLDB_NOTNULL, null, '');
+        $table->add_field('texto',        XMLDB_TYPE_TEXT,    null, null, XMLDB_NOTNULL);
+        $table->add_field('caracteres',   XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('extraido_por', XMLDB_TYPE_CHAR,   '255', null, XMLDB_NOTNULL, null, '');
+        $table->add_field('usable',       XMLDB_TYPE_INTEGER,  '1', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('content_hash', XMLDB_TYPE_CHAR,    '64', null, XMLDB_NOTNULL, null, '');
+        $table->add_field('timecreated',  XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_index('idx_courseid', XMLDB_INDEX_NOTUNIQUE, ['courseid']);
+        $table->add_index('idx_cmid',     XMLDB_INDEX_NOTUNIQUE, ['cmid']);
+        $table->add_index('idx_courseid_cmid', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'cmid']);
+
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        upgrade_block_savepoint(true, 2026092302, 'pulso');
+    }
+
     return true;
 }

@@ -53,12 +53,16 @@ class index_course_adhoc extends \core\task\adhoc_task {
         mtrace("Pulso RAG (adhoc): indexing course {$courseid}…");
         $stats = \block_pulso\rag_retriever::index_course($courseid);
         mtrace(sprintf(
-            '  indexed=%d skipped=%d deleted=%d embedded=%d embed_errors=%d',
+            '  indexed=%d skipped=%d deleted=%d embedded=%d embed_errors=%d ' .
+            '| texto completo: nuevo/actualizado=%d sin_cambios=%d borrados=%d',
             $stats['indexed'] ?? 0,
             $stats['skipped'] ?? 0,
             $stats['deleted'] ?? 0,
             $stats['embedded'] ?? 0,
-            $stats['embed_errors'] ?? 0
+            $stats['embed_errors'] ?? 0,
+            $stats['fulltext_stored'] ?? 0,
+            $stats['fulltext_skipped'] ?? 0,
+            $stats['fulltext_deleted'] ?? 0
         ));
     }
 }

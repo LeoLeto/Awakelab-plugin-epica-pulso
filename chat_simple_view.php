@@ -3648,6 +3648,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 html += '<p class="pulso-create-hint">' + escapeHtmlText(progressLine) + '</p>';
             }
 
+            // "motivo" en un estado NO terminal es el último error de red del
+            // reintento (el servidor ya lo filtra a solo viewanalytics — ver
+            // api_create_status.php). Es un aviso técnico de que se está
+            // reintentando, no un fallo: el encargo sigue vivo.
+            if (!encargo.terminal && encargo.motivo) {
+                html += '<div class="pulso-create-notice-inline warn">Reintentando tras un error: '
+                    + escapeHtmlText(encargo.motivo) + '</div>';
+            }
+
             if (encargo.status === 'listo' && encargo.imageurl) {
                 if (encargo.mock) {
                     html += '<div class="pulso-create-notice-inline warn">Esta lámina es de prueba, no una generación real.</div>';

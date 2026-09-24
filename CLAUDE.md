@@ -765,6 +765,27 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
   acepta de forma defensiva tanto un array como un `stdClass`, y un cuerpo ya decodificado
   o en bruto. Si el shape real difiere al probar contra el secreto de producción, el sitio
   a ajustar es solo ese método — el resto del ciclo no depende de la forma exacta.
+- **Un fallo de transporte tiene tope** (v1.20.2, tras el primer encargo real
+  reintentando sin fin — ver `memory/session-history.md`). Los dos
+  `catch(\Throwable)` de `paso_pendiente()`/`paso_sondeo()` pasan por
+  `manejar_excepcion_transporte()` → `reintentar_o_fallar_transitorio()`, que
+  cuenta excepciones **SEGUIDAS** en la columna `error_count` (no
+  respuestas 4xx/5xx normales de Épica, que ya tenían su propio trato) y da
+  el encargo por `fallado` al llegar a `CONSECUTIVE_ERROR_THRESHOLD` (10,
+  ~10 minutos a 60s por intento). Cualquier 202/200 lo pone a 0, y también un
+  429 (esa respuesta demuestra que la red funciona, solo es cupo). Como
+  `epica::pedir()` no está documentado, `extraer_http_de_excepcion()` intenta
+  sacar un código HTTP de la excepción por si alguna librería lanza en vez de
+  devolver en un 4xx/5xx: un **4xx** extraído se enruta por
+  `procesar_error_encargar()`/`procesar_error_sondeo()` normales (terminal,
+  como un 401/400 real); un **5xx**, en cambio, se trata como transitorio
+  igual que un timeout — es un problema DE ÉPICA, no algo que un "no mejora
+  solo" represente bien. `motivo` se reutiliza para guardar el último error
+  transitorio (sin columna nueva para esto) **mientras el encargo no es
+  terminal**, y `api_create_status.php` lo expone solo a quien tiene
+  `viewanalytics` en ese caso — un alumno dueño del encargo no necesita ver
+  la clase y el mensaje de una excepción PHP. Una vez terminal, `motivo` es
+  la razón real del fallo y se enseña como siempre (dueño o `viewanalytics`).
 
 ## Dev notes
 

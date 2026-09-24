@@ -63,6 +63,17 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         $sobre = is_array($decoded) ? $decoded : null;
     }
 
+    // Mientras el encargo NO es terminal, "motivo" puede llevar el último
+    // error de red del reintento (epica_client::manejar_excepcion_transporte()),
+    // un detalle técnico que solo interesa a quien tiene viewanalytics — no
+    // al alumno dueño del encargo, que vería un mensaje de excepción sin
+    // sentido para él. Una vez terminal, motivo es la razón real del fallo y
+    // se enseña igual que siempre (a dueño o viewanalytics).
+    $motivo = null;
+    if ($encargo->motivo !== null && $encargo->motivo !== '') {
+        $motivo = ($terminal || $canviewanalytics) ? $encargo->motivo : null;
+    }
+
     return [
         'id' => (int)$encargo->id,
         'status' => $encargo->status,
@@ -74,7 +85,7 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         'mock' => !empty($encargo->mock),
         'verificado' => isset($encargo->verificado) && $encargo->verificado !== null ? (bool)$encargo->verificado : null,
         'avisos' => $avisos,
-        'motivo' => $encargo->motivo !== null && $encargo->motivo !== '' ? $encargo->motivo : null,
+        'motivo' => $motivo,
         'imageurl' => $imageurl,
         'downloadurl' => $downloadurl,
         'sobre' => $sobre,

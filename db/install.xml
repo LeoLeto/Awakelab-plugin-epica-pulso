@@ -88,6 +88,7 @@
         <FIELD NAME="motivo" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Motivo del fallo, tal cual lo dio Epica o la causa local"/>
         <FIELD NAME="sobre_json" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Sobre completo construido; solo se rellena en modo de ensayo"/>
         <FIELD NAME="notified" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 si ya se mando el aviso de mensajeria de este encargo terminal"/>
+        <FIELD NAME="error_count" TYPE="int" LENGTH="5" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Excepciones de red SEGUIDAS al encargar/sondear; un 202/200 lo pone a 0, y al llegar a CONSECUTIVE_ERROR_THRESHOLD el encargo pasa a fallado"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>

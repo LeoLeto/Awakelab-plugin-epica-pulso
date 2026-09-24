@@ -1,5 +1,35 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-24 — Tope a los reintentos de red del ciclo con Épica (v1.20.2)
+
+Primer encargo real (id 6, `sanase-test` → `entorno-qa-2`) se quedó en `pendiente`
+reintentando cada 60s sin motivo visible: los `catch(\Throwable)` de
+`paso_pendiente()`/`paso_sondeo()` solo hacían `error_log()` y reencolaban sin
+tope ni rastro en `mtrace()` (invisible en la salida del cron). Encontrado y
+arreglado en la misma sesión, con diff mostrado antes de aplicar, como pidió
+Marcos.
+
+- **Tope real**: contador `error_count` (columna nueva) de excepciones
+  SEGUIDAS; a las `CONSECUTIVE_ERROR_THRESHOLD` (10, ~10 min) el encargo pasa
+  a `fallado`. Cualquier 202/200/429 lo pone a 0 — un 429 ya demuestra que la
+  red funciona. Reglas completas en `CLAUDE.md` → paso 3.
+- **Ajuste pedido tras ver el primer diff**: un 5xx de Épica extraído de la
+  excepción (por si `epica::pedir()` lanza en un HTTP de error en vez de
+  devolverlo, cosa que no se puede confirmar sin el código de
+  `local_awkepica`) se trata como TRANSITORIO, igual que un timeout — no como
+  un 4xx, que sí es terminal por `procesar_error_encargar()`/
+  `procesar_error_sondeo()`. Un 5xx es un problema de ellos, no algo que
+  "no mejora solo" represente bien.
+- **`motivo` se reutilizó** para el último error transitorio en vez de crear
+  una columna `last_error` — es seguro porque `api_create_status.php` ya lo
+  expone en el payload y basta con gatearlo: mientras el encargo no es
+  terminal, solo lo ve quien tiene `viewanalytics` (un alumno dueño no
+  necesita la clase+mensaje de una excepción PHP).
+- **Sin verificar contra Moodle/Épica real** (mismo bloqueo de siempre: sin
+  PHP ni Moodle local en este entorno). Verificado balance de llaves/paréntesis
+  con `node` en los ficheros PHP tocados y `install.xml` parseado como XML
+  válido con PowerShell.
+
 ## 2026-09-23 — Revisión del sobre real de Épica: 4 arreglos + limpieza (v1.20.1)
 
 Marcos activó el modo de ensayo y leyó el sobre real de un encargo (id 3): la

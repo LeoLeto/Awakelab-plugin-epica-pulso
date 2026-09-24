@@ -62,6 +62,14 @@ class epica_client {
     const STALL_NOTICE_THRESHOLD = 3;
 
     /**
+     * Excepciones de RED seguidas (catch(\Throwable), no respuestas 4xx/5xx
+     * normales de Epica) antes de dar el encargo por fallado. A 60s de
+     * reintento cada una, son ~10 minutos. Un 202/200 correcto pone el
+     * contador a 0 (columna "error_count").
+     */
+    const CONSECUTIVE_ERROR_THRESHOLD = 10;
+
+    /**
      * Punto de entrada de la tarea adhoc: hace UN paso segun el estado actual
      * del encargo y dice si hay que reencolar (y con que retraso). Nunca
      * duerme ni hace más de un paso por llamada.
@@ -131,13 +139,7 @@ class epica_client {
                 \local_awkepica\epica::ESPERA_LARGA_S
             );
         } catch (\Throwable $e) {
-            error_log('Pulso Epica: fallo de red al encargar #' . $encargo->id . ': ' . $e->getMessage());
-            $DB->update_record('block_pulso_encargos', (object)[
-                'id' => $encargo->id,
-                'pollcount' => (int)$encargo->pollcount + 1,
-                'timemodified' => time(),
-            ]);
-            return ['requeue' => true, 'delay' => 60];
+            return self::manejar_excepcion_transporte($encargo, $e, 'encargar', [self::class, 'procesar_error_encargar']);
         }
 
         [$httpcode, $data] = self::normalize_response($respuesta);
@@ -152,6 +154,7 @@ class epica_client {
                 'epica_posicion' => $posicion,
                 'last_posicion' => $posicion,
                 'timequeued' => time(),
+                'error_count' => 0,
                 'pollcount' => (int)$encargo->pollcount + 1,
                 'timemodified' => time(),
             ]);
@@ -178,6 +181,7 @@ class epica_client {
             $espera = self::retry_after($data);
             $DB->update_record('block_pulso_encargos', (object)[
                 'id' => $encargo->id,
+                'error_count' => 0, // Respuesta real de Épica: la red funciona, solo es cupo.
                 'pollcount' => (int)$encargo->pollcount + 1,
                 'timemodified' => time(),
             ]);
@@ -225,13 +229,7 @@ class epica_client {
                 \local_awkepica\epica::ESPERA_LARGA_S
             );
         } catch (\Throwable $e) {
-            error_log('Pulso Epica: fallo de red al sondear #' . $encargo->id . ': ' . $e->getMessage());
-            $DB->update_record('block_pulso_encargos', (object)[
-                'id' => $encargo->id,
-                'pollcount' => (int)$encargo->pollcount + 1,
-                'timemodified' => time(),
-            ]);
-            return ['requeue' => true, 'delay' => 60];
+            return self::manejar_excepcion_transporte($encargo, $e, 'sondear', [self::class, 'procesar_error_sondeo']);
         }
 
         [$httpcode, $data] = self::normalize_response($respuesta);
@@ -262,6 +260,7 @@ class epica_client {
                     'epica_posicion' => $posicion,
                     'last_posicion' => $posicion,
                     'stall_count' => $stallcount,
+                    'error_count' => 0,
                     'epica_traza' => $traza ? mb_substr((string)$traza, 0, 32, 'UTF-8') : $encargo->epica_traza,
                     'pollcount' => (int)$encargo->pollcount + 1,
                     'timemodified' => time(),
@@ -293,6 +292,7 @@ class epica_client {
             $espera = self::retry_after($data);
             $DB->update_record('block_pulso_encargos', (object)[
                 'id' => $encargo->id,
+                'error_count' => 0,
                 'pollcount' => (int)$encargo->pollcount + 1,
                 'timemodified' => time(),
             ]);
@@ -301,6 +301,142 @@ class epica_client {
 
         self::marcar_fallo($encargo, $motivo !== '' ? $motivo : "Épica devolvió {$httpcode} al sondear.", $data['traza'] ?? null);
         return ['requeue' => false, 'delay' => 0];
+    }
+
+    /**
+     * Comun a los catch(\Throwable) de paso_pendiente()/paso_sondeo(). Dos
+     * casos, los dos tratados como TRANSITORIOS (reintento a 60s con tope,
+     * ver reintentar_o_fallar_transitorio()):
+     *  - Fallo de RED puro (timeout, DNS, conexión rechazada): sin código
+     *    HTTP que extraer.
+     *  - La excepción SÍ trae un 5xx (algunas librerías HTTP lanzan en vez
+     *    de devolver — epica::pedir() no está documentado en este repo, así
+     *    que no se puede descartar): un 5xx es un problema DE ÉPICA, no un
+     *    "no mejora solo" como el resto de motivos que procesar_error_encargar()/
+     *    procesar_error_sondeo() tratan como terminales — se reintenta igual
+     *    que un timeout, no se da el encargo por fallado a la primera.
+     * Solo un 4xx extraído se enruta por $procesarerror: eso sí es terminal
+     * (401/400 no mejora con el tiempo).
+     *
+     * @param callable $procesarerror Mismo shape que procesar_error_encargar()/
+     *   procesar_error_sondeo(): (\stdClass $encargo, int $httpcode, array $data): array.
+     */
+    private static function manejar_excepcion_transporte(
+        \stdClass $encargo, \Throwable $e, string $accion, callable $procesarerror
+    ): array {
+        $http = self::extraer_http_de_excepcion($e);
+        if ($http !== null) {
+            [$httpcode, $data] = $http;
+            if ($httpcode < 500) {
+                mtrace("Pulso Epica: excepción con HTTP {$httpcode} al {$accion} #{$encargo->id} ("
+                    . get_class($e) . '), enrutada como respuesta de Épica.');
+                return $procesarerror($encargo, $httpcode, $data);
+            }
+
+            $motivo = "HTTP {$httpcode}" . (!empty($data['motivo']) ? (': ' . $data['motivo']) : '');
+            return self::reintentar_o_fallar_transitorio($encargo, $accion, get_class($e), $motivo);
+        }
+
+        return self::reintentar_o_fallar_transitorio($encargo, $accion, get_class($e), $e->getMessage());
+    }
+
+    /**
+     * Log (mtrace() ADEMÁS de error_log() — antes solo iba al log de PHP,
+     * invisible en la salida del cron) + contador de excepciones SEGUIDAS
+     * ("error_count") + reintento a 60s, o fallo terminal al llegar a
+     * CONSECUTIVE_ERROR_THRESHOLD. Nunca se registra el token ni el cuerpo
+     * de la petición — solo clase y mensaje de la excepción (o "HTTP 5xx",
+     * sin cuerpo, para ese caso); en este punto no hay base64 todavía.
+     *
+     * "motivo" es seguro de rellenar aquí aunque el estado NO sea terminal:
+     * api_create_status.php solo lo enseña a quien tiene viewanalytics
+     * mientras el encargo sigue en curso (ver pulso_status_encargo_payload()).
+     */
+    private static function reintentar_o_fallar_transitorio(
+        \stdClass $encargo, string $accion, string $clase, string $mensaje
+    ): array {
+        global $DB;
+
+        error_log("Pulso Epica: fallo transitorio al {$accion} #{$encargo->id}: {$mensaje}");
+        mtrace("Pulso Epica: fallo transitorio al {$accion} #{$encargo->id} ({$clase}): {$mensaje}");
+
+        $errorcount = (int)$encargo->error_count + 1;
+        if ($errorcount >= self::CONSECUTIVE_ERROR_THRESHOLD) {
+            self::marcar_fallo(
+                $encargo,
+                "Fallo transitorio repetido al {$accion} ({$errorcount} intentos seguidos): {$clase}: {$mensaje}"
+            );
+            return ['requeue' => false, 'delay' => 0];
+        }
+
+        $DB->update_record('block_pulso_encargos', (object)[
+            'id' => $encargo->id,
+            'error_count' => $errorcount,
+            'motivo' => mb_substr("{$clase}: {$mensaje}", 0, 2000, 'UTF-8'),
+            'pollcount' => (int)$encargo->pollcount + 1,
+            'timemodified' => time(),
+        ]);
+        return ['requeue' => true, 'delay' => 60];
+    }
+
+    /**
+     * Intenta sacar (httpcode, body-decodificado) de una excepción de
+     * transporte, para las pocas librerías HTTP que lanzan en vez de devolver
+     * en un 4xx/5xx. epica::pedir() no está documentado en este repo: se
+     * prueban las formas más habituales (PSR-7 vía getResponse(), getHttpCode()/
+     * getStatusCode() directos, propiedad ->httpcode, código de excepción en
+     * rango HTTP) y si ninguna encaja se devuelve null — el llamador lo trata
+     * como fallo de red normal.
+     *
+     * @return array{0: int, 1: array}|null
+     */
+    private static function extraer_http_de_excepcion(\Throwable $e): ?array {
+        $response = null;
+        if (method_exists($e, 'getResponse')) {
+            try {
+                $response = $e->getResponse();
+            } catch (\Throwable $ignored) {
+                $response = null;
+            }
+        }
+
+        // get_object_vars() desde fuera de la clase de $e solo devuelve sus
+        // propiedades PUBLICAS — a diferencia de "$e->httpcode" directo, que
+        // si la propiedad existe pero es private/protected lanza un Error
+        // fatal ("Cannot access private property") en vez de devolver null.
+        $publicvars = get_object_vars($e);
+
+        $httpcode = 0;
+        if ($response !== null && method_exists($response, 'getStatusCode')) {
+            $httpcode = (int)$response->getStatusCode();
+        } else if (method_exists($e, 'getHttpCode')) {
+            $httpcode = (int)$e->getHttpCode();
+        } else if (method_exists($e, 'getStatusCode')) {
+            $httpcode = (int)$e->getStatusCode();
+        } else if (isset($publicvars['httpcode']) && is_numeric($publicvars['httpcode'])) {
+            $httpcode = (int)$publicvars['httpcode'];
+        } else if ($e->getCode() >= 400 && $e->getCode() < 600) {
+            // Solo si getCode() cae en rango HTTP: el codigo de una excepcion
+            // PHP normal no significa nada, y los errores de curl usan su
+            // propia numeracion (que no se solapa con 4xx/5xx).
+            $httpcode = $e->getCode();
+        }
+
+        if ($httpcode < 400 || $httpcode >= 600) {
+            return null;
+        }
+
+        $body = null;
+        if ($response !== null && method_exists($response, 'getBody')) {
+            $body = (string)$response->getBody();
+        } else if (method_exists($e, 'getBody')) {
+            $body = $e->getBody();
+        } else if (isset($publicvars['body'])) {
+            $body = $publicvars['body'];
+        }
+
+        [, $data] = self::normalize_response(['httpcode' => $httpcode, 'body' => $body]);
+        return [$httpcode, $data];
     }
 
     /**

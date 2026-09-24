@@ -238,5 +238,21 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092306, 'pulso');
     }
 
+    if ($oldversion < 2026092307) {
+        // Tope a los reintentos de red del ciclo (visto en produccion: el
+        // encargo 6 se quedaba en "pendiente" reintentando cada 60s sin fin,
+        // porque el catch(\Throwable) de paso_pendiente()/paso_sondeo() no
+        // tenia limite). "error_count" cuenta SOLO excepciones de red
+        // seguidas (no respuestas 4xx/5xx normales de Epica); un 202/200
+        // correcto lo pone a 0.
+        $table = new xmldb_table('block_pulso_encargos');
+        $field = new xmldb_field('error_count', XMLDB_TYPE_INTEGER, '5', null, XMLDB_NOTNULL, null, '0', 'notified');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_block_savepoint(true, 2026092307, 'pulso');
+    }
+
     return true;
 }

@@ -745,6 +745,9 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
   castellano — con nombre propio lo respeta, sin él da el nombre por defecto del formato
   del curso. `resumen`/`grupo` (en `alumno`) se OMITEN del JSON cuando están vacíos, en
   vez de mandarse como `""`.
+- **Cuando "listo" no trae imagen válida, `recoger()` registra la FORMA de la
+  respuesta (claves de primer/segundo nivel, tipo del campo imagen), nunca su
+  contenido** — jamás el base64 ni el `crudo` completo.
 - **El PNG jamás entra en el historial del chat ni en un log.** Se decodifica de base64 y
   se guarda con la File API de Moodle (`component=block_pulso`, `filearea=encargo`,
   `itemid=` id de la fila del encargo, en el contexto de CURSO — un encargo no está atado

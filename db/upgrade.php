@@ -254,5 +254,50 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092307, 'pulso');
     }
 
+    if ($oldversion < 2026092501) {
+        // Encargo 7 (2026-09-25): Epica respondio "listo" pero recoger() no
+        // encontro una imagen valida en la forma esperada -> fallado sin
+        // imagen, con titulo/tema vacios. Epica guarda el trabajo aceptado 7
+        // dias, asi que volver a pedirlo no cuesta cupo. Se devuelven a
+        // "trabajando" los encargos con ESE motivo exacto, con job id (o no
+        // habria nada que sondear) y encargados hace menos de 6 dias (margen
+        // sobre los 7 reales), para que el siguiente sondeo pase por el
+        // diagnostico nuevo de recoger() en vez de quedarse fallados para
+        // siempre por una forma de respuesta que todavia no entendemos.
+        //
+        // "motivo" es XMLDB_TYPE_TEXT: la comparacion de igualdad va con
+        // sql_compare_text() en los dos lados (campo y parametro), no con un
+        // "=" a pelo, por portabilidad entre motores.
+        $motivo = 'La respuesta "listo" no traía una imagen válida.';
+        $cutoff = time() - 6 * DAYSECS;
+
+        $select = "status = :status AND " . $DB->sql_compare_text('motivo') . " = " . $DB->sql_compare_text(':motivo')
+            . " AND epica_job_id IS NOT NULL AND epica_job_id <> :vacio AND timequeued > :cutoff";
+        $params = ['status' => 'fallado', 'motivo' => $motivo, 'vacio' => '', 'cutoff' => $cutoff];
+        $encargos = $DB->get_records_select('block_pulso_encargos', $select, $params, '', 'id');
+
+        foreach ($encargos as $row) {
+            $DB->update_record('block_pulso_encargos', (object)[
+                'id' => $row->id,
+                'status' => 'trabajando',
+                'error_count' => 0,
+                'notified' => 0,
+                'timemodified' => time(),
+            ]);
+
+            try {
+                $task = new \block_pulso\task\epica_ciclo_adhoc();
+                $task->set_component('block_pulso');
+                $task->set_custom_data(['encargoid' => (int)$row->id]);
+                \core\task\manager::queue_adhoc_task($task);
+                mtrace("block_pulso: encargo {$row->id} devuelto a 'trabajando' y reencolado para recoger con diagnostico.");
+            } catch (\Throwable $e) {
+                mtrace("block_pulso: encargo {$row->id} devuelto a 'trabajando' pero NO se pudo reencolar: " . $e->getMessage());
+            }
+        }
+
+        upgrade_block_savepoint(true, 2026092501, 'pulso');
+    }
+
     return true;
 }

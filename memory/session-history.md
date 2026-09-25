@@ -1,5 +1,47 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-25 — Encargo 7: "listo" sin imagen reconocible + diagnóstico + recuperación (v1.20.4)
+
+Primer encargo real que llega a estado "listo" (id 7). Épica respondió `estado:
+"listo"`, pero `recoger()` no encontró ninguna imagen en `$data['imagen']` —
+`titulo`/`tema` también llegaron vacíos — así que el encargo quedó `fallado`
+con el motivo genérico "La respuesta \"listo\" no traía una imagen válida.".
+Dos hipótesis sin descartar: `$data` no tiene los campos en la raíz (van
+anidados bajo otra clave) o `datos` llegó `null` desde `pedir()`. Se preguntó
+a Épica la forma real; mientras tanto, diagnóstico sin exponer contenido
+sensible. Diff mostrado antes de aplicar, como pidió Marcos.
+
+- **`recoger()` ahora recibe la respuesta COMPLETA de `pedir()`**, no solo
+  `$data` — hacía falta para poder mirar `datos`/`crudo` originales (antes de
+  la coerción de `normalize_response()`, que convierte `null` en `[]` y por
+  tanto borra la señal de "vino null").
+- **`diagnosticar_listo_sin_imagen()`**: cuando no hay imagen válida, guarda en
+  `motivo` (y en `mtrace()`) las claves de primer nivel de `$data`, las de
+  segundo nivel de cualquier valor que sea array, el tipo de `$data['imagen']`
+  si existe + sus primeros 30 caracteres, si `datos` era `null`, y
+  `strlen($respuesta['crudo'])`. Nunca el base64 entero ni el crudo — la regla
+  de "nunca loguear el cuerpo" (ya en CLAUDE.md para el resto del ciclo) se
+  mantiene también aquí.
+- **Recuperación del encargo 7 vía `db/upgrade.php`** (versión 2026092501):
+  Épica guarda el trabajo aceptado 7 días, así que volver a pedirlo no cuesta
+  cupo. El paso devuelve a `trabajando` (con `error_count=0`, `notified=0`) los
+  encargos `fallado` con ESE motivo exacto, `epica_job_id` no vacío y
+  `timequeued` de menos de 6 días, y reencola `epica_ciclo_adhoc` para cada
+  uno — así el siguiente sondeo pasa por el diagnóstico nuevo.
+- **Ajuste pedido tras el primer diff**: `motivo` es `XMLDB_TYPE_TEXT`, así que
+  la comparación de igualdad en el upgrade va con `$DB->sql_compare_text()` en
+  los dos lados (campo y parámetro), no con un `=` a pelo — portabilidad entre
+  motores de BD.
+- **Este paso de recuperación es de un solo uso, no una regla general**: el
+  motivo exacto que filtra pertenece al código VIEJO (sin diagnóstico); en
+  cuanto se despliega v1.20.4, cualquier fallo nuevo de "listo sin imagen"
+  lleva el diagnóstico anexo y ya no coincide con ese string.
+- **Sigue sin saberse la forma real de la respuesta.** En cuanto vuelva a
+  fallar (o Épica conteste), el `motivo`/`mtrace()` del encargo 7 dirá dónde
+  está el campo real — actualizar `recoger()` con eso, no con otra suposición.
+- **Sin verificar contra Moodle/Épica real** (mismo bloqueo de siempre: sin PHP
+  ni Moodle local en este entorno).
+
 ## 2026-09-25 — epica_client ajustado al contrato real de local_awkepica (v1.20.3)
 
 Primer encargo real (id 6) falló al desplegar v1.20.2: `TypeError:

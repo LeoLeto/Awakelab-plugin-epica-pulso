@@ -313,7 +313,7 @@ class epica_client {
                 return ['requeue' => true, 'delay' => self::next_delay($estado, $posicion, (int)$encargo->timequeued)];
 
             case 'listo':
-                self::recoger($encargo, $data, $traza);
+                self::recoger($encargo, $data, $traza, $respuesta);
                 return ['requeue' => false, 'delay' => 0];
 
             case 'fallado':
@@ -418,11 +418,18 @@ class epica_client {
      * Mira siempre "mock": si llega true, el PNG es de relleno pero válido —
      * se guarda y se enseña igual, y queda marcado para decirlo en la interfaz.
      */
-    private static function recoger(\stdClass $encargo, array $data, $traza): void {
+    /**
+     * $respuesta es la respuesta COMPLETA de pedir() (no solo $data): hace
+     * falta para diagnosticar_listo_sin_imagen() cuando no hay imagen válida
+     * (encargo 7, 2026-09-25 — "listo" no traía los campos donde se
+     * esperaban y no sabíamos por qué sin volcar el cuerpo entero).
+     */
+    private static function recoger(\stdClass $encargo, array $data, $traza, array $respuesta): void {
         global $DB;
 
         $imagen = (string)($data['imagen'] ?? '');
         $filename = $imagen !== '' ? self::guardar_artefacto($encargo, $imagen) : null;
+        $motivo = $filename ? null : self::diagnosticar_listo_sin_imagen($data, $respuesta);
 
         $DB->update_record('block_pulso_encargos', (object)[
             'id' => $encargo->id,
@@ -435,7 +442,7 @@ class epica_client {
             'verificado' => isset($data['verificado']) ? (int)(bool)$data['verificado'] : null,
             'avisos' => isset($data['avisos']) ? json_encode($data['avisos'], JSON_UNESCAPED_UNICODE) : null,
             'epica_traza' => $traza ? mb_substr((string)$traza, 0, 32, 'UTF-8') : $encargo->epica_traza,
-            'motivo' => $filename ? null : 'La respuesta "listo" no traía una imagen válida.',
+            'motivo' => $motivo,
             'pollcount' => (int)$encargo->pollcount + 1,
             'timemodified' => time(),
         ]);
@@ -443,10 +450,48 @@ class epica_client {
         if ($filename) {
             mtrace("Pulso Epica: encargo {$encargo->id} → listo" . (!empty($data['mock']) ? ' (mock)' : '') . '.');
         } else {
-            mtrace("Pulso Epica: encargo {$encargo->id} → listo sin imagen válida, se marca como fallado.");
+            mtrace("Pulso Epica: encargo {$encargo->id} → listo sin imagen válida, se marca como fallado. {$motivo}");
         }
 
         self::notify_completion((int)$encargo->id, $filename ? 'listo' : 'fallado');
+    }
+
+    /**
+     * Diagnóstico MÍNIMO cuando "listo" no trae una imagen válida donde se
+     * espera (encargo 7: Épica respondió "listo" pero titulo/tema también
+     * llegaron vacíos — $data no tiene los campos en la raíz, o "datos"
+     * llegó null). Registra la FORMA de la respuesta, nunca su contenido:
+     * jamás el base64 entero de una posible imagen ni el "crudo" completo —
+     * solo claves, tipos y un prefijo corto.
+     */
+    private static function diagnosticar_listo_sin_imagen(array $data, array $respuesta): string {
+        $nivel1 = array_keys($data);
+        $nivel2 = [];
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $nivel2[$key] = array_keys($value);
+            }
+        }
+
+        $partes = [];
+        $partes[] = 'claves_nivel1=' . json_encode($nivel1, JSON_UNESCAPED_UNICODE);
+        if (!empty($nivel2)) {
+            $partes[] = 'claves_nivel2=' . json_encode($nivel2, JSON_UNESCAPED_UNICODE);
+        }
+
+        if (array_key_exists('imagen', $data)) {
+            $valor = $data['imagen'];
+            $preview = is_string($valor) ? $valor : json_encode($valor, JSON_UNESCAPED_UNICODE);
+            $partes[] = 'imagen_tipo=' . gettype($valor);
+            $partes[] = 'imagen_preview=' . mb_substr((string)$preview, 0, 30, 'UTF-8');
+        } else {
+            $partes[] = 'imagen_tipo=ausente';
+        }
+
+        $partes[] = 'datos_null=' . (($respuesta['datos'] ?? null) === null ? 'si' : 'no');
+        $partes[] = 'crudo_len=' . strlen((string)($respuesta['crudo'] ?? ''));
+
+        return mb_substr('La respuesta "listo" no traía una imagen válida. ' . implode(' ', $partes), 0, 2000, 'UTF-8');
     }
 
     private static function guardar_artefacto(\stdClass $encargo, string $base64png): ?string {

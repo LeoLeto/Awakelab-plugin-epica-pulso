@@ -745,9 +745,21 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
   castellano — con nombre propio lo respeta, sin él da el nombre por defecto del formato
   del curso. `resumen`/`grupo` (en `alumno`) se OMITEN del JSON cuando están vacíos, en
   vez de mandarse como `""`.
+- **La lámina va anidada bajo `data.lamina`, no en la raíz** (confirmado por
+  Épica contra su propio código: `backend/src/laminas.ts:469`,
+  `encargos.ts:191` y `:389`). La raíz de un "listo" solo lleva
+  `plataforma`/`estado`; `imagen`, `titulo`, `subtitulo`, `tema`,
+  `verificado` (true/false/null), `prompt`, `inventario`, `arquetipo`,
+  `formato`, `idioma`, `notas`, `avisos`, `mock` van dentro de `lamina`.
+  `recoger()` no guarda `prompt`/`inventario` (no hacen falta y pueden ser
+  largos), y `verificado` es tri-state: `null` significa "no se comprobó el
+  tema contra el material", no "false" — se guarda como `null`, nunca como 0.
 - **Cuando "listo" no trae imagen válida, `recoger()` registra la FORMA de la
   respuesta (claves de primer/segundo nivel, tipo del campo imagen), nunca su
-  contenido** — jamás el base64 ni el `crudo` completo.
+  contenido** — jamás el base64 ni el `crudo` completo. Épica confirma que un
+  "listo" sin imagen no debería darse nunca (si la imagen desaparece,
+  contestan "desconocido" en su lugar), así que si este diagnóstico vuelve a
+  saltar es señal de que algo ha cambiado, no un caso ya resuelto.
 - **El PNG jamás entra en el historial del chat ni en un log.** Se decodifica de base64 y
   se guarda con la File API de Moodle (`component=block_pulso`, `filearea=encargo`,
   `itemid=` id de la fila del encargo, en el contexto de CURSO — un encargo no está atado

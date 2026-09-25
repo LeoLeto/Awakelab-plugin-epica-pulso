@@ -1,5 +1,45 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-25 — Forma real de "listo" confirmada por Épica: `data.lamina` (v1.20.5)
+
+Épica contestó (comprobado en su propio código: `backend/src/laminas.ts:469`,
+`encargos.ts:191` y `:389`, y su prueba Bruno espera `res.body.lamina.imagen`):
+la raíz de un "listo" en `/api/moodle/laminas/encargo` solo lleva
+`plataforma`/`estado` — todo lo demás (imagen incluida) va anidado bajo
+`lamina`: `imagen`, `titulo`, `subtitulo`, `tema`, `verificado`
+(true/false/null), `prompt`, `inventario`, `arquetipo`, `formato`, `idioma`,
+`notas`, `avisos`, `mock`. La v1.20.4 (diagnóstico del encargo 7) leía estos
+campos en la raíz — no existían ahí, así que el diagnóstico nuevo confirmó el
+problema real en vez de solo describirlo. Diff mostrado antes de aplicar.
+
+- **`recoger()` ahora lee de `$data['lamina']`** (si no es array, se trata
+  como `[]` y salta el mismo diagnóstico de antes — `diagnosticar_listo_sin_imagen()`
+  no cambió: Épica confirma que un "listo" sin imagen no debería darse
+  nunca —si la imagen desaparece contestan "desconocido"—, así que si el
+  diagnóstico vuelve a saltar es señal de que algo ha cambiado, no el mismo
+  caso).
+- **`verificado` es tri-state** (true/false/null — null = no se comprobó el
+  tema contra el material) y se guarda como tal, nunca como `0` cuando en
+  realidad era `null`.
+- **`mock` se lee de `lamina.mock`**; `prompt`/`inventario` de la lámina NO se
+  guardan en la fila (no hacen falta y pueden ser largos).
+- **Segunda recuperación en `db/upgrade.php`** (2026092502): como la 1.20.4 ya
+  estaba en `origin/main`, el encargo 7 (devuelto a `trabajando` por el paso
+  2026092501) ya había vuelto a fallar, esta vez con el motivo del
+  diagnóstico anexo al string original — ya no exacto. El nuevo paso filtra
+  por **prefijo** (`sql_like` sobre `sql_compare_text('motivo')`) en vez de
+  igualdad, misma condición de `epica_job_id`/`timequeued` de menos de 6
+  días, mismo reencolado de `epica_ciclo_adhoc`.
+- **De paso se limpió un docblock duplicado** que había quedado sobre
+  `recoger()` tras el cambio anterior (dos bloques `/** */` seguidos, uno
+  viejo sin fusionar) — se unificó en uno solo con la forma de `lamina`
+  documentada ahí también.
+- Line también en `CLAUDE.md` (sección paso 3, junto a la línea de
+  `recoger()`): la forma completa de `data.lamina` y el porqué de
+  `verificado` tri-state.
+- **Sin verificar contra Moodle/Épica real** (mismo bloqueo de siempre: sin
+  PHP ni Moodle local en este entorno).
+
 ## 2026-09-25 — Encargo 7: "listo" sin imagen reconocible + diagnóstico + recuperación (v1.20.4)
 
 Primer encargo real que llega a estado "listo" (id 7). Épica respondió `estado:

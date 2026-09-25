@@ -417,30 +417,44 @@ class epica_client {
      * ni en un log: son ~1,7 MB en base64) y cierra el encargo como "listo".
      * Mira siempre "mock": si llega true, el PNG es de relleno pero válido —
      * se guarda y se enseña igual, y queda marcado para decirlo en la interfaz.
-     */
-    /**
+     *
+     * La lámina va anidada bajo $data['lamina'] — la raíz solo lleva
+     * "plataforma"/"estado" (forma confirmada por Épica contra su propio
+     * código: backend/src/laminas.ts:469, encargos.ts:191 y :389): imagen,
+     * titulo, subtitulo, tema, verificado (true/false/null — null = no se
+     * comprobó el tema contra el material), prompt, inventario, arquetipo,
+     * formato, idioma, notas, avisos, mock. No se guardan prompt/inventario
+     * (no hacen falta y pueden ser largos).
+     *
      * $respuesta es la respuesta COMPLETA de pedir() (no solo $data): hace
-     * falta para diagnosticar_listo_sin_imagen() cuando no hay imagen válida
-     * (encargo 7, 2026-09-25 — "listo" no traía los campos donde se
-     * esperaban y no sabíamos por qué sin volcar el cuerpo entero).
+     * falta para diagnosticar_listo_sin_imagen() cuando no hay imagen válida.
+     * Épica dice que un "listo" sin imagen no debería darse nunca (si la
+     * imagen desaparece, contestan "desconocido"), así que si el diagnóstico
+     * vuelve a saltar es señal de que algo ha cambiado, no un caso resuelto.
      */
     private static function recoger(\stdClass $encargo, array $data, $traza, array $respuesta): void {
         global $DB;
 
-        $imagen = (string)($data['imagen'] ?? '');
+        $lamina = isset($data['lamina']) && is_array($data['lamina']) ? $data['lamina'] : [];
+        $imagen = (string)($lamina['imagen'] ?? '');
         $filename = $imagen !== '' ? self::guardar_artefacto($encargo, $imagen) : null;
         $motivo = $filename ? null : self::diagnosticar_listo_sin_imagen($data, $respuesta);
+
+        $verificado = null;
+        if (array_key_exists('verificado', $lamina) && $lamina['verificado'] !== null) {
+            $verificado = (int)(bool)$lamina['verificado'];
+        }
 
         $DB->update_record('block_pulso_encargos', (object)[
             'id' => $encargo->id,
             'status' => $filename ? 'listo' : 'fallado',
             'filename' => $filename,
-            'titulo' => mb_substr((string)($data['titulo'] ?? ''), 0, 255, 'UTF-8'),
-            'tema' => mb_substr((string)($data['tema'] ?? ''), 0, 255, 'UTF-8'),
-            'arquetipo' => mb_substr((string)($data['arquetipo'] ?? ''), 0, 100, 'UTF-8'),
-            'mock' => !empty($data['mock']) ? 1 : 0,
-            'verificado' => isset($data['verificado']) ? (int)(bool)$data['verificado'] : null,
-            'avisos' => isset($data['avisos']) ? json_encode($data['avisos'], JSON_UNESCAPED_UNICODE) : null,
+            'titulo' => mb_substr((string)($lamina['titulo'] ?? ''), 0, 255, 'UTF-8'),
+            'tema' => mb_substr((string)($lamina['tema'] ?? ''), 0, 255, 'UTF-8'),
+            'arquetipo' => mb_substr((string)($lamina['arquetipo'] ?? ''), 0, 100, 'UTF-8'),
+            'mock' => !empty($lamina['mock']) ? 1 : 0,
+            'verificado' => $verificado,
+            'avisos' => isset($lamina['avisos']) ? json_encode($lamina['avisos'], JSON_UNESCAPED_UNICODE) : null,
             'epica_traza' => $traza ? mb_substr((string)$traza, 0, 32, 'UTF-8') : $encargo->epica_traza,
             'motivo' => $motivo,
             'pollcount' => (int)$encargo->pollcount + 1,
@@ -448,7 +462,7 @@ class epica_client {
         ]);
 
         if ($filename) {
-            mtrace("Pulso Epica: encargo {$encargo->id} → listo" . (!empty($data['mock']) ? ' (mock)' : '') . '.');
+            mtrace("Pulso Epica: encargo {$encargo->id} → listo" . (!empty($lamina['mock']) ? ' (mock)' : '') . '.');
         } else {
             mtrace("Pulso Epica: encargo {$encargo->id} → listo sin imagen válida, se marca como fallado. {$motivo}");
         }

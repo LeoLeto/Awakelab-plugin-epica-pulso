@@ -299,5 +299,44 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092501, 'pulso');
     }
 
+    if ($oldversion < 2026092502) {
+        // Epica confirmo la forma real de "listo" (backend/src/laminas.ts:469,
+        // encargos.ts:191,389): la raiz solo lleva "plataforma"/"estado", todo
+        // lo demas (imagen incluida) va anidado bajo "lamina". La v1.20.4 leia
+        // los campos en la raiz, asi que el encargo 7 (devuelto a "trabajando"
+        // por el paso 2026092501) volvio a fallar, esta vez con el motivo del
+        // diagnostico nuevo anexo al string original. Misma recuperacion, pero
+        // con LIKE sobre el PREFIJO del motivo (ya no es un string exacto).
+        $prefijo = $DB->sql_like_escape('La respuesta "listo" no traía una imagen válida.') . '%';
+        $cutoff = time() - 6 * DAYSECS;
+
+        $select = "status = :status AND " . $DB->sql_like($DB->sql_compare_text('motivo'), ':motivo')
+            . " AND epica_job_id IS NOT NULL AND epica_job_id <> :vacio AND timequeued > :cutoff";
+        $params = ['status' => 'fallado', 'motivo' => $prefijo, 'vacio' => '', 'cutoff' => $cutoff];
+        $encargos = $DB->get_records_select('block_pulso_encargos', $select, $params, '', 'id');
+
+        foreach ($encargos as $row) {
+            $DB->update_record('block_pulso_encargos', (object)[
+                'id' => $row->id,
+                'status' => 'trabajando',
+                'error_count' => 0,
+                'notified' => 0,
+                'timemodified' => time(),
+            ]);
+
+            try {
+                $task = new \block_pulso\task\epica_ciclo_adhoc();
+                $task->set_component('block_pulso');
+                $task->set_custom_data(['encargoid' => (int)$row->id]);
+                \core\task\manager::queue_adhoc_task($task);
+                mtrace("block_pulso: encargo {$row->id} devuelto a 'trabajando' y reencolado (2ª recuperación, lectura de lámina corregida).");
+            } catch (\Throwable $e) {
+                mtrace("block_pulso: encargo {$row->id} devuelto a 'trabajando' pero NO se pudo reencolar: " . $e->getMessage());
+            }
+        }
+
+        upgrade_block_savepoint(true, 2026092502, 'pulso');
+    }
+
     return true;
 }

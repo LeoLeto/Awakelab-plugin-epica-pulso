@@ -1,5 +1,47 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-25 — epica_client ajustado al contrato real de local_awkepica (v1.20.3)
+
+Primer encargo real (id 6) falló al desplegar v1.20.2: `TypeError:
+local_awkepica\epica::firmar_por(): Argument #4 ($curso) must be of type string,
+stdClass given` — `paso_pendiente()`/`paso_sondeo()` pasaban el objeto `$course`
+entero en vez de `(string) $course->id`. Épica mandó `docs/local_awkepica_api.md`
+(sacado de su propio código) con el contrato exacto, que hasta ahora se había
+adivinado a base de suposiciones defensivas. Diff mostrado antes de aplicar, como
+pidió Marcos.
+
+- **El bug real era solo el `TypeError` de `firmar_por()`.** El resto del ajuste es
+  reemplazar suposiciones defensivas por el contrato confirmado, no arreglos de
+  fallos ya vistos.
+- **`normalize_response()` habría leído `http=0` en un 202 real.** `pedir()`
+  devuelve siempre `{errno, error, http, datos, crudo}` — `http`, no `httpcode` ni
+  ninguna de las otras claves que probaba la versión defensiva. Con la forma
+  antigua, un 202 de verdad se habría leído como `httpcode=0` (ninguna de las
+  claves que buscaba existía) y el encargo se habría dado por fallado **con el
+  trabajo ya aceptado por Épica** — el bug que el propio encargo pedía evitar,
+  nunca reproducido porque ningún encargo real había llegado tan lejos todavía (el
+  `TypeError` cortaba antes).
+- **El criterio de "transitorio" se movió de dentro del `catch` a justo después de
+  CADA `pedir()`.** Antes solo una excepción de transporte podía disparar un
+  reintento; ahora un `pedir()` que vuelve con `errno`/`http=0`/`http>=500` (sin
+  lanzar nada, que es lo normal según el contrato) también lo hace, vía
+  `es_transitorio()`. Esto eliminó `manejar_excepcion_transporte()` y
+  `extraer_http_de_excepcion()` enteras: ya no hace falta adivinar si una
+  excepción "trae" un código HTTP dentro, porque `pedir()` no lanza para eso.
+- **202 sin `datos['trabajo']`** pasó a ser fallo terminal explícito
+  (`marcar_fallo()`), en vez de guardar `epica_job_id` como cadena vacía y dejar
+  que el encargo se quedara sondeando un trabajo que nunca existió.
+- **`retry_after()` leía claves que Épica nunca manda** (`retry_after`,
+  `reintentar_en`, `Retry-After` de cabecera). El contrato dice que `pedir()` no
+  expone cabeceras y que el 429 trae la espera en el cuerpo, en `esperaS`.
+- **Precondiciones nuevas antes de firmar** (`verificar_precondiciones()`,
+  compartida por los dos pasos): `!epica::configurado()` y usuario sin `email` —
+  ninguna de las dos las comprueba `firmar_por()` por sí solo («quien llame,
+  comprueba», dice el propio contrato).
+- **Sin verificar contra Moodle/Épica real** (mismo bloqueo de siempre: sin PHP ni
+  Moodle local en este entorno). Verificado balance de llaves/paréntesis con
+  `node` sobre el fichero completo tras el cambio.
+
 ## 2026-09-24 — Tope a los reintentos de red del ciclo con Épica (v1.20.2)
 
 Primer encargo real (id 6, `sanase-test` → `entorno-qa-2`) se quedó en `pendiente`

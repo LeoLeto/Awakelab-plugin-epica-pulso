@@ -62,10 +62,12 @@ class epica_client {
     const STALL_NOTICE_THRESHOLD = 3;
 
     /**
-     * Excepciones de RED seguidas (catch(\Throwable), no respuestas 4xx/5xx
-     * normales de Epica) antes de dar el encargo por fallado. A 60s de
-     * reintento cada una, son ~10 minutos. Un 202/200 correcto pone el
-     * contador a 0 (columna "error_count").
+     * Fallos TRANSITORIOS seguidos (excepcion real, o pedir() con errno
+     * distinto de 0 / http=0 / http>=500 — ver es_transitorio()) antes de
+     * dar el encargo por fallado. Un 4xx normal de Epica (rol-sin-permiso,
+     * material-ilegible…) no pasa por aqui: es terminal a la primera. A 60s
+     * de reintento cada uno, son ~10 minutos. Un 202/200/429 correcto pone
+     * el contador a 0 (columna "error_count").
      */
     const CONSECUTIVE_ERROR_THRESHOLD = 10;
 
@@ -129,9 +131,14 @@ class epica_client {
             return ['requeue' => false, 'delay' => 0];
         }
 
+        $fallo = self::verificar_precondiciones($encargo, $user);
+        if ($fallo !== null) {
+            return $fallo;
+        }
+
         try {
             $context = \context_course::instance((int)$encargo->courseid);
-            $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY, $course);
+            $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY, (string)$course->id);
             $body = array_merge(['token' => $token], $envelope);
             $respuesta = \local_awkepica\epica::pedir(
                 self::endpoint(self::RUTA_ENCARGAR),
@@ -139,17 +146,25 @@ class epica_client {
                 \local_awkepica\epica::ESPERA_LARGA_S
             );
         } catch (\Throwable $e) {
-            return self::manejar_excepcion_transporte($encargo, $e, 'encargar', [self::class, 'procesar_error_encargar']);
+            return self::reintentar_o_fallar_transitorio($encargo, 'encargar', get_class($e), $e->getMessage());
+        }
+
+        if (self::es_transitorio($respuesta)) {
+            return self::reintentar_o_fallar_transitorio($encargo, 'encargar', 'HTTP', self::describir_transitorio($respuesta));
         }
 
         [$httpcode, $data] = self::normalize_response($respuesta);
 
         if ($httpcode === 202) {
+            if (empty($data['trabajo'])) {
+                self::marcar_fallo($encargo, 'Épica respondió 202 al encargar sin identificador de trabajo.');
+                return ['requeue' => false, 'delay' => 0];
+            }
             $posicion = (int)($data['posicion'] ?? 0);
             $DB->update_record('block_pulso_encargos', (object)[
                 'id' => $encargo->id,
                 'status' => 'encolado',
-                'epica_job_id' => (string)($data['trabajo'] ?? ''),
+                'epica_job_id' => (string)$data['trabajo'],
                 'epica_plataforma' => (string)($data['plataforma'] ?? ''),
                 'epica_posicion' => $posicion,
                 'last_posicion' => $posicion,
@@ -162,6 +177,27 @@ class epica_client {
         }
 
         return self::procesar_error_encargar($encargo, $httpcode, $data);
+    }
+
+    /**
+     * Comprobaciones que firmar_por() no hace por sí solo («quien llame,
+     * comprueba», docs/local_awkepica_api.md § firmar_por). Sin secreto
+     * configurado firma igual pero con iss vacío/sin firma real, y sin
+     * correo el token sale sin claim "email" — los dos son fallo terminal,
+     * no algo que un reintento vaya a arreglar.
+     *
+     * @return array{requeue: bool, delay: int}|null null si se puede seguir.
+     */
+    private static function verificar_precondiciones(\stdClass $encargo, ?\stdClass $user): ?array {
+        if (!\local_awkepica\epica::configurado()) {
+            self::marcar_fallo($encargo, 'local_awkepica no tiene configurada la plataforma o el secreto en este sitio.');
+            return ['requeue' => false, 'delay' => 0];
+        }
+        if (empty($user) || empty($user->email)) {
+            self::marcar_fallo($encargo, 'El usuario que hizo el encargo no tiene correo electrónico configurado.');
+            return ['requeue' => false, 'delay' => 0];
+        }
+        return null;
     }
 
     /**
@@ -217,11 +253,16 @@ class epica_client {
             return ['requeue' => false, 'delay' => 0];
         }
 
+        $fallo = self::verificar_precondiciones($encargo, $user);
+        if ($fallo !== null) {
+            return $fallo;
+        }
+
         try {
             $context = \context_course::instance((int)$encargo->courseid);
             // Token NUEVO en cada sondeo: el jti se gasta al recibirlo, así
             // que reenviar el mismo token da 401 "reusado".
-            $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY, $course);
+            $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY, (string)$course->id);
             $body = ['token' => $token, 'trabajo' => $encargo->epica_job_id];
             $respuesta = \local_awkepica\epica::pedir(
                 self::endpoint(self::RUTA_ENCARGO),
@@ -229,7 +270,11 @@ class epica_client {
                 \local_awkepica\epica::ESPERA_LARGA_S
             );
         } catch (\Throwable $e) {
-            return self::manejar_excepcion_transporte($encargo, $e, 'sondear', [self::class, 'procesar_error_sondeo']);
+            return self::reintentar_o_fallar_transitorio($encargo, 'sondear', get_class($e), $e->getMessage());
+        }
+
+        if (self::es_transitorio($respuesta)) {
+            return self::reintentar_o_fallar_transitorio($encargo, 'sondear', 'HTTP', self::describir_transitorio($respuesta));
         }
 
         [$httpcode, $data] = self::normalize_response($respuesta);
@@ -304,40 +349,28 @@ class epica_client {
     }
 
     /**
-     * Comun a los catch(\Throwable) de paso_pendiente()/paso_sondeo(). Dos
-     * casos, los dos tratados como TRANSITORIOS (reintento a 60s con tope,
-     * ver reintentar_o_fallar_transitorio()):
-     *  - Fallo de RED puro (timeout, DNS, conexión rechazada): sin código
-     *    HTTP que extraer.
-     *  - La excepción SÍ trae un 5xx (algunas librerías HTTP lanzan en vez
-     *    de devolver — epica::pedir() no está documentado en este repo, así
-     *    que no se puede descartar): un 5xx es un problema DE ÉPICA, no un
-     *    "no mejora solo" como el resto de motivos que procesar_error_encargar()/
-     *    procesar_error_sondeo() tratan como terminales — se reintenta igual
-     *    que un timeout, no se da el encargo por fallado a la primera.
-     * Solo un 4xx extraído se enruta por $procesarerror: eso sí es terminal
-     * (401/400 no mejora con el tiempo).
-     *
-     * @param callable $procesarerror Mismo shape que procesar_error_encargar()/
-     *   procesar_error_sondeo(): (\stdClass $encargo, int $httpcode, array $data): array.
+     * Criterio de "transitorio" de docs/local_awkepica_api.md § pedir(), el
+     * mismo que usan los demás plugins de Épica: fallo de cURL (errno
+     * distinto de 0), sin respuesta (http=0, típico de un timeout) o un 5xx
+     * de Épica. Un 4xx NO es transitorio: eso es fallo terminal de verdad
+     * (material-ilegible, rol-sin-permiso…), salvo el 429, que
+     * procesar_error_encargar()/procesar_error_sondeo() tratan aparte porque
+     * trae su propio Retry-After en el cuerpo.
      */
-    private static function manejar_excepcion_transporte(
-        \stdClass $encargo, \Throwable $e, string $accion, callable $procesarerror
-    ): array {
-        $http = self::extraer_http_de_excepcion($e);
-        if ($http !== null) {
-            [$httpcode, $data] = $http;
-            if ($httpcode < 500) {
-                mtrace("Pulso Epica: excepción con HTTP {$httpcode} al {$accion} #{$encargo->id} ("
-                    . get_class($e) . '), enrutada como respuesta de Épica.');
-                return $procesarerror($encargo, $httpcode, $data);
-            }
+    private static function es_transitorio(array $respuesta): bool {
+        $errno = (int)($respuesta['errno'] ?? 0);
+        $http = (int)($respuesta['http'] ?? 0);
+        return $errno !== 0 || $http === 0 || $http >= 500;
+    }
 
-            $motivo = "HTTP {$httpcode}" . (!empty($data['motivo']) ? (': ' . $data['motivo']) : '');
-            return self::reintentar_o_fallar_transitorio($encargo, $accion, get_class($e), $motivo);
+    private static function describir_transitorio(array $respuesta): string {
+        $errno = (int)($respuesta['errno'] ?? 0);
+        if ($errno !== 0) {
+            $error = trim((string)($respuesta['error'] ?? ''));
+            return "errno {$errno}" . ($error !== '' ? ": {$error}" : '');
         }
-
-        return self::reintentar_o_fallar_transitorio($encargo, $accion, get_class($e), $e->getMessage());
+        $http = (int)($respuesta['http'] ?? 0);
+        return $http === 0 ? 'Sin respuesta (timeout o fallo de red)' : "HTTP {$http}";
     }
 
     /**
@@ -377,66 +410,6 @@ class epica_client {
             'timemodified' => time(),
         ]);
         return ['requeue' => true, 'delay' => 60];
-    }
-
-    /**
-     * Intenta sacar (httpcode, body-decodificado) de una excepción de
-     * transporte, para las pocas librerías HTTP que lanzan en vez de devolver
-     * en un 4xx/5xx. epica::pedir() no está documentado en este repo: se
-     * prueban las formas más habituales (PSR-7 vía getResponse(), getHttpCode()/
-     * getStatusCode() directos, propiedad ->httpcode, código de excepción en
-     * rango HTTP) y si ninguna encaja se devuelve null — el llamador lo trata
-     * como fallo de red normal.
-     *
-     * @return array{0: int, 1: array}|null
-     */
-    private static function extraer_http_de_excepcion(\Throwable $e): ?array {
-        $response = null;
-        if (method_exists($e, 'getResponse')) {
-            try {
-                $response = $e->getResponse();
-            } catch (\Throwable $ignored) {
-                $response = null;
-            }
-        }
-
-        // get_object_vars() desde fuera de la clase de $e solo devuelve sus
-        // propiedades PUBLICAS — a diferencia de "$e->httpcode" directo, que
-        // si la propiedad existe pero es private/protected lanza un Error
-        // fatal ("Cannot access private property") en vez de devolver null.
-        $publicvars = get_object_vars($e);
-
-        $httpcode = 0;
-        if ($response !== null && method_exists($response, 'getStatusCode')) {
-            $httpcode = (int)$response->getStatusCode();
-        } else if (method_exists($e, 'getHttpCode')) {
-            $httpcode = (int)$e->getHttpCode();
-        } else if (method_exists($e, 'getStatusCode')) {
-            $httpcode = (int)$e->getStatusCode();
-        } else if (isset($publicvars['httpcode']) && is_numeric($publicvars['httpcode'])) {
-            $httpcode = (int)$publicvars['httpcode'];
-        } else if ($e->getCode() >= 400 && $e->getCode() < 600) {
-            // Solo si getCode() cae en rango HTTP: el codigo de una excepcion
-            // PHP normal no significa nada, y los errores de curl usan su
-            // propia numeracion (que no se solapa con 4xx/5xx).
-            $httpcode = $e->getCode();
-        }
-
-        if ($httpcode < 400 || $httpcode >= 600) {
-            return null;
-        }
-
-        $body = null;
-        if ($response !== null && method_exists($response, 'getBody')) {
-            $body = (string)$response->getBody();
-        } else if (method_exists($e, 'getBody')) {
-            $body = $e->getBody();
-        } else if (isset($publicvars['body'])) {
-            $body = $publicvars['body'];
-        }
-
-        [, $data] = self::normalize_response(['httpcode' => $httpcode, 'body' => $body]);
-        return [$httpcode, $data];
     }
 
     /**
@@ -785,39 +758,27 @@ class epica_client {
     }
 
     /**
-     * epica::pedir() no está documentado en este repo (local_awkepica es una
-     * dependencia externa) — se normaliza de forma defensiva para aceptar
-     * tanto un array como un stdClass, y un cuerpo ya decodificado o en
-     * bruto. AJUSTAR cuando se verifique el shape real contra el secreto de
-     * producción (ver memory/session-history.md).
+     * epica::pedir() devuelve SIEMPRE un array con 5 claves fijas
+     * (docs/local_awkepica_api.md § pedir()): errno, error, http, datos
+     * (array|null, el cuerpo ya decodificado), crudo. No hace falta ninguna
+     * normalización defensiva de formas alternativas — ese shape es el
+     * contrato real, verificado contra el código de local_awkepica.
      *
      * @return array{0: int, 1: array}
      */
-    private static function normalize_response($respuesta): array {
-        if (is_object($respuesta)) {
-            $respuesta = (array)$respuesta;
-        }
-        if (!is_array($respuesta)) {
-            return [0, []];
-        }
-
-        $httpcode = (int)($respuesta['httpcode'] ?? $respuesta['http_code'] ?? $respuesta['status'] ?? $respuesta['code'] ?? 0);
-        $body = $respuesta['body'] ?? $respuesta['data'] ?? $respuesta['response'] ?? $respuesta;
-
-        if (is_string($body)) {
-            $decoded = json_decode($body, true);
-            $body = is_array($decoded) ? $decoded : [];
-        } elseif (is_object($body)) {
-            $body = (array)$body;
-        } elseif (!is_array($body)) {
-            $body = [];
-        }
-
-        return [$httpcode, $body];
+    private static function normalize_response(array $respuesta): array {
+        $httpcode = (int)($respuesta['http'] ?? 0);
+        $datos = $respuesta['datos'] ?? null;
+        return [$httpcode, is_array($datos) ? $datos : []];
     }
 
+    /**
+     * pedir() no expone cabeceras (docs/local_awkepica_api.md § pedir()):
+     * en el 429 de cuota, Épica manda el mismo valor en el cuerpo, en
+     * "esperaS" (backend/src/server.ts, según el propio documento).
+     */
     private static function retry_after(array $data): int {
-        $val = (int)($data['retry_after'] ?? $data['reintentar_en'] ?? $data['Retry-After'] ?? 0);
+        $val = (int)($data['esperaS'] ?? 0);
         return $val > 0 ? $val : 60;
     }
 

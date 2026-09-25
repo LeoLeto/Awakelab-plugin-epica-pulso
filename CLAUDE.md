@@ -760,32 +760,43 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
   antes de tener el secreto de producción configurado en `local_awkepica`, sin gastar
   cuota. El sobre en ensayo no lleva `token` (firmar de verdad requiere el secreto, que en
   ensayo puede no estar configurado).
-- **`epica::pedir()` no está documentado en este repo** (`local_awkepica` es una
-  dependencia externa cuyo código no vive aquí): `epica_client::normalize_response()`
-  acepta de forma defensiva tanto un array como un `stdClass`, y un cuerpo ya decodificado
-  o en bruto. Si el shape real difiere al probar contra el secreto de producción, el sitio
-  a ajustar es solo ese método — el resto del ciclo no depende de la forma exacta.
-- **Un fallo de transporte tiene tope** (v1.20.2, tras el primer encargo real
-  reintentando sin fin — ver `memory/session-history.md`). Los dos
-  `catch(\Throwable)` de `paso_pendiente()`/`paso_sondeo()` pasan por
-  `manejar_excepcion_transporte()` → `reintentar_o_fallar_transitorio()`, que
-  cuenta excepciones **SEGUIDAS** en la columna `error_count` (no
-  respuestas 4xx/5xx normales de Épica, que ya tenían su propio trato) y da
-  el encargo por `fallado` al llegar a `CONSECUTIVE_ERROR_THRESHOLD` (10,
-  ~10 minutos a 60s por intento). Cualquier 202/200 lo pone a 0, y también un
-  429 (esa respuesta demuestra que la red funciona, solo es cupo). Como
-  `epica::pedir()` no está documentado, `extraer_http_de_excepcion()` intenta
-  sacar un código HTTP de la excepción por si alguna librería lanza en vez de
-  devolver en un 4xx/5xx: un **4xx** extraído se enruta por
-  `procesar_error_encargar()`/`procesar_error_sondeo()` normales (terminal,
-  como un 401/400 real); un **5xx**, en cambio, se trata como transitorio
-  igual que un timeout — es un problema DE ÉPICA, no algo que un "no mejora
-  solo" represente bien. `motivo` se reutiliza para guardar el último error
+- **`epica::pedir()` SÍ está documentado — `docs/local_awkepica_api.md`**, sacado
+  del código de `local_awkepica` por el equipo de Épica (v1.20.3, tras un `TypeError`
+  real en el primer encargo: ver `memory/session-history.md`). Devuelve SIEMPRE un
+  array con 5 claves fijas — `errno`, `error`, `http`, `datos` (array\|null, el cuerpo
+  ya decodificado), `crudo` — así que `epica_client::normalize_response()` ya no
+  normaliza nada de forma defensiva: lee `http`/`datos` tal cual. Y `firmar_por()`
+  quiere el **`id` del curso como cadena** (`(string) $course->id`), nunca el objeto
+  `$course`/`$COURSE` — pasar el objeto es el `TypeError` de más arriba.
+- **Un fallo de transporte tiene tope, y el criterio de "transitorio" es el de
+  Épica, no uno inventado** (v1.20.2, ajustado en v1.20.3 al contrato real). El
+  criterio, igual que usan los demás plugins de `local_awkepica`:
+  `!empty(errno) || http === 0 || http >= 500`. Se comprueba con
+  `epica_client::es_transitorio()` justo después de CADA `pedir()` (no solo dentro de
+  un `catch`), y también dentro de los dos `catch(\Throwable)` de
+  `paso_pendiente()`/`paso_sondeo()` (`firmar_por()` puede lanzar `RuntimeException`
+  por UTF-8 inválido; `pedir()` en sí no lanza). Ambos caminos van a
+  `reintentar_o_fallar_transitorio()`, que cuenta fallos transitorios **SEGUIDOS** en
+  la columna `error_count` (un 4xx normal de Épica — `material-ilegible`,
+  `rol-sin-permiso`… — NO pasa por aquí: es terminal a la primera vía
+  `procesar_error_encargar()`/`procesar_error_sondeo()`) y da el encargo por `fallado`
+  al llegar a `CONSECUTIVE_ERROR_THRESHOLD` (10, ~10 minutos a 60s por intento).
+  Cualquier 202/200/429 correcto lo pone a 0 (un 429 ya demuestra que la red
+  funciona, solo es cupo). `retry_after()` lee `datos['esperaS']` (Épica no pasa
+  cabeceras por `pedir()`, `Retry-After` no llega). Un **202 sin `datos['trabajo']`**
+  es fallo terminal explícito, no un `epica_job_id` vacío colándose como si el
+  encargo se hubiera aceptado. `motivo` se reutiliza para guardar el último error
   transitorio (sin columna nueva para esto) **mientras el encargo no es
   terminal**, y `api_create_status.php` lo expone solo a quien tiene
   `viewanalytics` en ese caso — un alumno dueño del encargo no necesita ver
   la clase y el mensaje de una excepción PHP. Una vez terminal, `motivo` es
   la razón real del fallo y se enseña como siempre (dueño o `viewanalytics`).
+- **Antes de firmar, dos comprobaciones que `firmar_por()` no hace por sí solo**
+  (`epica_client::verificar_precondiciones()`, «quien llame, comprueba» según el
+  propio contrato): `!epica::configurado()` → fallado con motivo claro (sin eso,
+  firma igual con `iss` vacío o sin secreto, y Épica lo rechaza sin decir por qué);
+  usuario sin `email` → fallado con motivo claro (el token sale sin claim `email`,
+  y sin ella Épica tampoco tiene con quién contactar).
 
 ## Dev notes
 

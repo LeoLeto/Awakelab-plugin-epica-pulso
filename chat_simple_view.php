@@ -884,16 +884,6 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             display: block;
         }
 
-        .pulso-create-gallery-placeholder {
-            width: 100%;
-            aspect-ratio: 1 / 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 4px;
-            text-align: center;
-        }
-
         .pulso-create-gallery-date {
             font-size: 0.65rem;
             color: var(--pulso-muted);
@@ -3713,22 +3703,18 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const container = document.getElementById('pulso-create-gallery');
             if (!container) return;
             if (!encargos.length) {
-                container.innerHTML = '';
+                container.innerHTML = '<p class="pulso-create-hint">Aún no has creado ninguna infografía en este curso.</p>';
                 return;
             }
 
+            // El servidor ya filtra a status='listo' con imagen (ver
+            // api_create_status.php), así que aquí no hay placeholder de
+            // estado: todas las tarjetas tienen imagen real.
             let html = '<div class="pulso-create-gallery-title">Tus últimas infografías</div><div class="pulso-create-gallery-grid">';
             encargos.forEach(function(e) {
-                const pillClass = pulsoCreateStatusPillClass(e.status);
-                const pillLabel = pulsoCreateStatusLabel(e.status);
                 const dateLabel = new Date(e.timecreated * 1000).toLocaleDateString();
-                const thumb = e.imageurl
-                    ? '<img src="' + escapeHtmlText(e.imageurl) + '" alt="">'
-                    : '<div class="pulso-create-gallery-placeholder"><span class="pulso-status-pill ' + pillClass + '">'
-                        + escapeHtmlText(pillLabel) + '</span></div>';
-
                 html += '<button type="button" class="pulso-create-gallery-item" onclick="openCreateGalleryItem(' + e.id + ')">'
-                    + thumb
+                    + '<img src="' + escapeHtmlText(e.imageurl) + '" alt="">'
                     + '<span class="pulso-create-gallery-date">' + escapeHtmlText(dateLabel) + '</span>'
                     + '</button>';
             });

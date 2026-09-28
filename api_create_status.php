@@ -7,8 +7,9 @@
  *
  * GET params:
  *   courseid  (obligatorio)
- *   encargoid (opcional): con él, detalle de UN encargo; sin él, los últimos
- *             encargos de ESTE usuario en el curso.
+ *   encargoid (opcional): con él, detalle de UN encargo; sin él, la galería
+ *             con los últimos encargos 'listo' (con imagen) de ESTE usuario
+ *             en el curso — pendientes/fallidos/de ensayo no salen ahí.
  *
  * Nunca se devuelve el base64 de la imagen: solo la URL de pluginfile.php,
  * que ya valida el acceso ella misma (block_pulso_pluginfile() en lib.php).
@@ -125,13 +126,17 @@ try {
             'encargo' => pulso_status_encargo_payload($encargo, $context, $canviewanalytics),
         ], JSON_UNESCAPED_UNICODE);
     } else {
-        // Galería: solo LOS PROPIOS encargos del usuario en este curso, más
+        // Galería: solo LOS PROPIOS encargos del usuario en este curso que son
+        // infografías de verdad (status = 'listo' con fichero guardado), más
         // recientes primero. No es un listado de todo el curso (eso seguiría
-        // exigiendo viewanalytics por fila, no por vista completa).
+        // exigiendo viewanalytics por fila, no por vista completa), y no
+        // enseña encargos en curso/fallidos/de ensayo: esos los sigue el panel
+        // de progreso, no la galería.
         $rows = $DB->get_records_select(
             'block_pulso_encargos',
-            'courseid = :courseid AND userid = :userid',
-            ['courseid' => $courseid, 'userid' => $userid],
+            "courseid = :courseid AND userid = :userid AND status = :status
+                AND filename IS NOT NULL AND filename <> ''",
+            ['courseid' => $courseid, 'userid' => $userid, 'status' => 'listo'],
             'timecreated DESC',
             '*',
             0,

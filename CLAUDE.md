@@ -576,6 +576,18 @@ infografía, en vez del «Encargo guardado» estático del paso 1. Vive en
   encargo. Se enseña siempre debajo del formulario, del aviso de cupo/sin
   recursos y de la vista de progreso: una lámina de ayer no deja de existir
   porque hoy no queden encargos o cupo.
+- **La galería enseña SOLO infografías de verdad**: la consulta de
+  `api_create_status.php` (rama sin `encargoid`) filtra en el SERVIDOR por
+  `status = 'listo' AND filename IS NOT NULL AND filename <> ''`, además de
+  `courseid`+`userid`. Un encargo `pendiente`/`encolado`/`trabajando`/
+  `fallado`/`desconocido`/`ensayo` no sale ahí — ese seguimiento es cosa del
+  panel de progreso (`renderCreateStatus`), no de la galería. `filename` es
+  `char` en `install.xml`, así que la comparación es SQL directo, sin
+  `sql_isnotempty()`. Consecuencia en el frontend: como el servidor ya
+  garantiza imagen, `renderCreateGallery()` ya no pinta un placeholder con
+  píldora de estado (se quitó junto con el CSS `.pulso-create-gallery-placeholder`,
+  que se quedó sin uso) y una galería vacía muestra un texto explícito en vez
+  de no pintar nada.
 - **`db/install.xml` estaba desincronizado con `db/upgrade.php` desde
   v1.19.0**: las columnas del paso 3 (`epica_plataforma`, `mock`,
   `verificado`, `avisos`, `titulo`, `tema`, `arquetipo`, `filename`,

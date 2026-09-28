@@ -1,5 +1,22 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-28 — Galería solo enseña infografías reales (v1.20.6)
+
+La galería de "últimas infografías" enseñaba TODOS los encargos del usuario en
+el curso, también `pendiente`/`encolado`/`trabajando`/`fallado`/`desconocido`/
+`ensayo` (recuadro vacío con píldora de estado). Filtro movido al servidor:
+`api_create_status.php` (rama sin `encargoid`) añade `status = 'listo' AND
+filename IS NOT NULL AND filename <> ''` a la condición de `courseid`+`userid`
+(no filtrar solo en el JS). Consecuencia en el frontend: `renderCreateGallery()`
+ya no necesita el placeholder con píldora (se quitó junto con el CSS
+`.pulso-create-gallery-placeholder`, que quedó sin uso), y una galería vacía
+enseña un texto explícito en vez de no pintar nada. Regla completa en
+`CLAUDE.md`, sección paso 4. Diff mostrado antes de aplicar, como pidió Marcos.
+Se decidió no añadir cadena a `lang/en/block_pulso.php`: ningún texto de este
+bloque de chat (formulario, galería, panel de progreso) pasa por `get_string()`
+— todo va hardcodeado en español en el JS — así que una entrada ahí quedaría
+sin usar.
+
 ## 2026-09-25 — Forma real de "listo" confirmada por Épica: `data.lamina` (v1.20.5)
 
 Épica contestó (comprobado en su propio código: `backend/src/laminas.ts:469`,

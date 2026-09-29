@@ -1,5 +1,67 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-29 — Gamificación paso 2: jugar un juego de forma segura (v1.22.0)
+
+Segundo paso de Gamificación: `juego_html.php` (sirve el HTML modificado) y
+`juego.php` (la página con el iframe) — la forma segura de jugar lo que el
+paso 1 ya guardaba en la filearea `juego` bloqueada. Contexto releído:
+`docs/epica_gamificacion_carta6.md` (A3, A4, B2, B3) y
+`docs/epica_gamificacion_recorrido_v2.md` (§3 paso 9, §6.2, §13). Las reglas
+que deben persistir están en `CLAUDE.md` → "Gamificación — paso 2"; aquí lo
+que costó encontrar.
+
+- **No hay ningún string de Moodle core en el que confiar a ciegas para los
+  404/permisos.** La tentación era usar `print_error('invalidrecord', ...)`
+  para que `juego.php` (una página `$PAGE`/`$OUTPUT`) diera un error
+  "themed" en vez de un 404 plano. Sin Moodle real en este entorno no se
+  puede verificar que esa clave de idioma existe con ese significado exacto,
+  así que se descartó: los dos endpoints usan `send_file_not_found()` para
+  CUALQUIER fallo de acceso o de estado, exactamente igual que
+  `block_pulso_pluginfile()` — menos elegante en `juego.php`, pero cero
+  riesgo de citar una lang string que no es la que se cree.
+- **El orden pedido (`require_login` → acceso → `tool`/`status`) choca con
+  una realidad práctica**: `require_login()` necesita un `$course`, y el
+  único dato de entrada es `id` (el encargo). Se resuelve leyendo la fila
+  ANTES de `require_login()` solo para sacar `courseid` — un `SELECT` que no
+  imprime nada ni decide acceso por sí solo — y dejando el orden de negocio
+  real (acceso antes que `tool`/`status`) intacto después. Se documentó en
+  el propio código para que no parezca una desviación del encargo.
+- **La inyección de la CSP y del puente son funciones puras** (`pulso_juego_
+  inject_csp_meta()`, `pulso_juego_strip_existing_bridge()`, `pulso_juego_
+  inject_bridge()` en `juego_html.php`), verificadas aparte con 18 casos:
+  documento con `<head>`/`<body>` normales, sin `<head>` pero con `<html>`,
+  sin ninguno de los dos, etiquetas en MAYÚSCULAS (`mb_stripos` es case
+  insensitive, había que probarlo), un puente ya existente que hay que
+  quitar antes de meter el nuestro, sin `</body>` de cierre, y acentos UTF-8
+  justo en la zona donde se corta el string — para confirmar que `mb_substr`
+  no parte un carácter multibyte, la misma trampa que ya está documentada
+  para el material que se manda a Épica.
+- **Primer intento de test dio 3 "fallos" que eran del arnés, no del
+  código**: comparar contra `'<head>\n<meta'` con COMILLAS SIMPLES (donde
+  `\n` es litera, no salto de línea), buscar la posición de una subcadena en
+  vez de la del string completo, y un `substr($x, -8)` que no correspondía a
+  la longitud real del marcador de cierre. Los tres se confirmaron
+  imprimiendo la salida real antes de tocar la implementación — no se
+  cambió una línea de `juego_html.php` para "hacer pasar" el test.
+- **`api_create_status.php` verificado con stubs de `moodle_url`/
+  `context_course`**: una infografía sigue devolviendo exactamente el mismo
+  payload que antes (sin `playurl`/`tool`/`puntua`), un juego listo lleva
+  `playurl`/`tool`/`puntua` y NUNCA `imageurl`/`downloadurl`, `puntua = 0`
+  se traduce a `false` (no a `null`, que significa "sin dato"), y un juego
+  que no está `listo` no lleva `playurl`. `class_alias()` hizo falta porque
+  `eval()` no hereda el `use` del fichero que lo llama — sin él,
+  `creation_quota::` dentro de la función extraída resolvía a la clase
+  global (inexistente) en vez de `block_pulso\creation_quota`.
+- **Sin verificar contra Moodle real** (mismo bloqueo de siempre): que
+  `$PAGE`/`$OUTPUT` rendericen la página con el tema del sitio; que el
+  `sandbox` de la cabecera HTTP deje `window.origin === "null"` de verdad
+  en un navegador real al abrir `juego_html.php` en una pestaña suelta; que
+  la puntuación llegue de un juego real generado por Épica (con su propia
+  llamada a `reportAwakegameScore`); y los cinco casos de acceso del
+  apartado de verificación del encargo (dueño, profesor, alumno ajeno,
+  encargo de otra herramienta, encargo no terminal). Diff mostrado antes de
+  aplicar, como pidió Marcos.
+
 ## 2026-09-29 — Gamificación paso 1: ciclo con Épica reutilizado para juegos (v1.21.0)
 
 Primer paso de la segunda herramienta de Épica (juegos HTML). Contexto leído

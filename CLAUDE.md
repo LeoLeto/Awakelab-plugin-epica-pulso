@@ -680,6 +680,73 @@ es el paso 2— y sin página de juego, puente ni CSP —eso es el paso 3—.
   vacía, que la columna ya admite (`NOTNULL DEFAULT ''`), así que no hizo
   falta ningún cambio de esquema para ese campo.
 
+## Gamificación — paso 2: jugar un juego de forma segura (v1.22.0)
+
+El HTML de un juego lo escribió un modelo a partir de material del curso.
+`juego_html.php` es la **ÚNICA vía** para servirlo — `block_pulso_pluginfile()`
+sigue bloqueando la filearea `juego` **para siempre**, no como algo pendiente
+de un paso futuro (ver `lib.php`). Reglas que no se pueden romper:
+
+- **La CSP va en DOS sitios, con roles distintos.** El `<meta http-equiv=
+  "Content-Security-Policy">` que `juego_html.php` inyecta en el `<head>`
+  cierra la red del propio documento (sin `fetch`, sin fuentes externas,
+  nada que no sea `data:`/`blob:` inline); pero una etiqueta `<meta>` **no
+  puede** llevar la directiva `sandbox`. Por eso la cabecera HTTP real manda
+  `Content-Security-Policy: sandbox allow-scripts; …`: es lo único que
+  garantiza un origen opaco (`window.origin === "null"`, sin cookies, sin
+  storage) aunque alguien abra `juego_html.php?id=N` directamente en una
+  pestaña, **fuera** del iframe de `juego.php`. Sin la cabecera, abrir la URL
+  a pelo ejecutaría el HTML con el origen real de Moodle.
+- **La lista de permisos del `sandbox` del iframe es CERRADA:** solo
+  `allow-scripts`. Nunca `allow-same-origin` (rompe el aislamiento entero:
+  el juego podría leer `document.cookie`/`sesskey` de Moodle), nunca
+  `allow-forms`/`allow-popups`/`allow-modals`/`allow-top-navigation` (el
+  prompt de Gamificación ya prohíbe `alert`/`confirm`/`prompt`/`localStorage`
+  desde el 29-09 — carta 6 §A3 —, así que un juego bien generado no los
+  necesita; añadir el permiso "por si acaso" es la fuga que un juego mal
+  generado sí explotaría).
+- **La escucha de `postMessage` valida por `event.source === iframe.
+  contentWindow`, nunca por `event.origin`.** Dentro de un `sandbox` sin
+  `allow-same-origin` el origen del juego es la cadena `"null"` — comparar
+  contra eso no distingue nada real de un mensaje falsificado por otra
+  ventana. `event.source` sí identifica la ventana concreta del iframe.
+- **El puente (`window.reportAwakegameScore`) se inyecta en `juego_html.php`,
+  no se guarda en el fichero.** `guardar_juego()` (paso 1) sigue guardando el
+  HTML limpio tal cual llega de Épica; si el puente cambiara de forma
+  algún día, cambiaría en este endpoint sin tener que regenerar ningún
+  juego ya guardado. Si el HTML ya trajera un bloque
+  `PULSO_PLATFORM_BRIDGE_START…END` (no debería, Épica lo entrega limpio),
+  se quita antes de meter el nuestro — nunca se apila un segundo puente.
+- **Sin nota, en ningún sitio** (carta 6 §B1, decisión ya cerrada): la
+  puntuación se pinta en `juego.php` con JavaScript y no hay ninguna
+  petición al servidor con ese número. El marcador (y su `<script>` de
+  escucha) solo se pintan si `puntua = 1`; con `0` o `null`, ninguno de los
+  dos — no tiene sentido escuchar un mensaje que el juego no va a mandar.
+- **`verificado` sigue siendo tri-state en la interfaz, no solo en la
+  BD:** `false` es el único caso que se avisa («No hemos podido confirmar
+  que este juego trate de…», con esas palabras — carta 5 §3.4); `null`
+  (no se comprobó) no pinta nada, ni un aviso ni una nota — un aviso ahí
+  sería ruido sobre algo que nunca se intentó comprobar.
+- **`api_create_status.php` separa completamente los dos payloads**: una
+  infografía sigue con `imageurl`/`downloadurl` de `pluginfile.php`, sin
+  ningún campo nuevo; un juego lleva `playurl` (a `juego.php`) y **nunca**
+  `imageurl`/`downloadurl` — esa URL apuntaría a la filearea `juego`, que
+  `pluginfile.php` bloquea a propósito. `tool`/`puntua` solo se añaden al
+  payload de un juego, no al de una infografía.
+- **`juego.php`/`juego_html.php` comparten el mismo criterio de acceso que
+  `block_pulso_pluginfile()`** (dueño del encargo o `viewanalytics` en el
+  curso) y el mismo orden: existe → `require_login()` → acceso → `tool`/
+  `status`. Los dos últimos dan el MISMO 404 (`send_file_not_found()`) para
+  no distinguir "no es tuyo" de "no está listo" a quien no tiene acceso de
+  todas formas. `juego_html.php` no exige sesskey: es el `src` de un
+  `<iframe>`, una petición GET idempotente sin efectos.
+- **Ninguna operación de texto sobre el HTML corta por bytes.** La
+  inyección de la meta CSP y del puente usa `mb_stripos`/`mb_strripos`/
+  `mb_substr` (nunca `strpos`/`substr` a secas): el HTML puede traer
+  acentos y otro UTF-8 real, y cortar a mitad de un carácter multibyte
+  corrompería el documento entero (mismo motivo que la regla ya existente
+  para el material que se manda a Épica).
+
 ## Cómo se trabaja este repo con prompts
 
 El trabajo entra por prompts escritos para Claude Code, uno por paso, y **cada paso en una

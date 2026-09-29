@@ -21,12 +21,13 @@ defined('MOODLE_INTERNAL') || die();
  * resto del modo alumno del plugin.
  *
  * La filearea "juego" (el HTML de Gamificación, ver epica_client::guardar_juego())
- * vive en el MISMO contexto de curso pero NO se sirve por aquí todavía —
- * "$filearea !== 'encargo'" la excluye junto con cualquier otra. Es a
- * propósito: el HTML lo escribe un modelo, y servirlo tal cual (sin
- * sandbox/CSP) ejecutaría su JavaScript con el origen y la sesión de Moodle
- * de quien abra el enlace. Habilitarla es el paso 3 (puente + CSP + iframe
- * con sandbox="allow-scripts"), no un simple añadido a esta lista.
+ * vive en el MISMO contexto de curso pero NO se sirve NUNCA por aquí —
+ * "$filearea !== 'encargo'" la excluye junto con cualquier otra, y es
+ * PERMANENTE, no un pendiente: el HTML lo escribe un modelo, y servirlo tal
+ * cual (sin sandbox/CSP) ejecutaría su JavaScript con el origen y la sesión
+ * de Moodle de quien abra el enlace. La única vía para jugarlo es
+ * juego_html.php (paso 2), que sirve el fichero modificado -con el puente de
+ * puntuación y la CSP inyectados- y con cabeceras de aislamiento propias.
  */
 function block_pulso_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
     global $DB, $USER;

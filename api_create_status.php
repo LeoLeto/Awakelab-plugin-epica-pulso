@@ -39,19 +39,30 @@ header('Content-Type: application/json; charset=utf-8');
  * ensayo) solo viaja a quien tiene viewanalytics: es la señal de
  * verificación contra el contrato de Epica, no algo que un alumno necesite
  * ver. El resto de campos son seguros para cualquiera con acceso al encargo.
+ *
+ * Una infografía se ENSEÑA (imageurl/downloadurl a pluginfile.php); un
+ * juego se JUEGA (playurl a juego.php) — pluginfile.php sigue bloqueando la
+ * filearea "juego" a propósito (lib.php), así que un juego nunca lleva
+ * imageurl/downloadurl: esa URL apuntaría a un fichero que no se sirve.
  */
 function pulso_status_encargo_payload(stdClass $encargo, context_course $context, bool $canviewanalytics): array {
     $terminal = in_array($encargo->status, ['listo', 'fallado', 'desconocido', 'ensayo'], true);
+    $esjuego = $encargo->tool === creation_quota::TOOL_GAMIFICACION;
 
     $imageurl = null;
     $downloadurl = null;
+    $playurl = null;
     if ($encargo->status === 'listo' && !empty($encargo->filename)) {
-        $imageurl = (string)moodle_url::make_pluginfile_url(
-            $context->id, 'block_pulso', 'encargo', $encargo->id, '/', $encargo->filename, false
-        );
-        $downloadurl = (string)moodle_url::make_pluginfile_url(
-            $context->id, 'block_pulso', 'encargo', $encargo->id, '/', $encargo->filename, true
-        );
+        if ($esjuego) {
+            $playurl = (string)(new moodle_url('/blocks/pulso/juego.php', ['id' => $encargo->id]));
+        } else {
+            $imageurl = (string)moodle_url::make_pluginfile_url(
+                $context->id, 'block_pulso', 'encargo', $encargo->id, '/', $encargo->filename, false
+            );
+            $downloadurl = (string)moodle_url::make_pluginfile_url(
+                $context->id, 'block_pulso', 'encargo', $encargo->id, '/', $encargo->filename, true
+            );
+        }
     }
 
     $avisos = null;
@@ -77,7 +88,7 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         $motivo = ($terminal || $canviewanalytics) ? $encargo->motivo : null;
     }
 
-    return [
+    $payload = [
         'id' => (int)$encargo->id,
         'status' => $encargo->status,
         'terminal' => $terminal,
@@ -95,6 +106,16 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         'timecreated' => (int)$encargo->timecreated,
         'timemodified' => (int)$encargo->timemodified,
     ];
+
+    // Campos propios de gamificación: no se añaden a una infografía (payload
+    // sin cambios para esa herramienta).
+    if ($esjuego) {
+        $payload['tool'] = $encargo->tool;
+        $payload['puntua'] = isset($encargo->puntua) && $encargo->puntua !== null ? (bool)$encargo->puntua : null;
+        $payload['playurl'] = $playurl;
+    }
+
+    return $payload;
 }
 
 try {

@@ -1,5 +1,65 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-29 — Gamificación paso 1: ciclo con Épica reutilizado para juegos (v1.21.0)
+
+Primer paso de la segunda herramienta de Épica (juegos HTML). Contexto leído
+antes de tocar código: `docs/epica_gamificacion_carta5.md` (contrato
+completo), `docs/epica_gamificacion_carta6.md` (manda sobre la 5 donde
+discrepan — la entrega del juego va en la raíz, no en `lamina`, al revés de
+lo que decía una carta anterior de Épica sobre sí misma) y
+`docs/epica_gamificacion_recorrido_v2.md`. Las reglas que deben persistir
+están en `CLAUDE.md` → "Gamificación — paso 1"; aquí lo que costó encontrar
+y lo que queda sin verificar.
+
+- **El gallo en la manga era `api_create_status.php`, no el contrato con
+  Épica.** La consulta de la galería de infografías (`status = 'listo' AND
+  filename IS NOT NULL`) no filtraba por `tool` porque hasta ahora solo
+  existía una herramienta. En cuanto un juego llega a `listo` también tiene
+  `filename` relleno (el `.html`, en su propia filearea) — sin el filtro
+  `tool = 'infografia'` que se le añadió, el primer juego real se habría
+  colado en la galería de infografías del paso 4, con una URL de imagen que
+  apunta a un fichero que no existe en esa filearea. No estaba en el encargo
+  original explícitamente, pero es una consecuencia directa de darle
+  `filename` a los juegos y había que cerrarla en el mismo paso.
+- **`block_pulso_pluginfile()` ya bloqueaba la filearea `juego` sin tocar una
+  línea**: el filtro existente es una lista blanca (`$filearea !== 'encargo'`
+  → 404), no una lista negra que hubiera que ampliar. Se dejó así y solo se
+  documentó la intención (que nadie la añada a la lista sin el puente/CSP
+  del paso 3 detrás) — añadir código donde ya hay una guardia correcta habría
+  sido una complicación sin beneficio.
+- **`recoger()` se separó en `recoger_lamina()`/`recoger_juego()`** en vez de
+  intentar una función común con `if`s por todas partes: las dos formas de
+  entrega no comparten casi nada (anidada vs. raíz, imagen vs. html,
+  arquetipo/avisos vs. puntua), y una función común habría sido más difícil
+  de leer que dos separadas con un despachador de tres líneas.
+- **El diagnóstico de "listo sin html" NUNCA imprime ni un fragmento del
+  marcado**, a diferencia del de imagen (que sí guarda 30 bytes de base64 de
+  muestra): 30 bytes de base64 no dicen nada legible, pero 30 caracteres de
+  HTML real bastan para filtrar cómo escribe el modelo. Se registra tipo y
+  longitud, nunca contenido.
+- **`herramienta` se añadió al cuerpo del sondeo SOLO para gamificación**,
+  pese a que hubiera sido más simple mandarlo siempre: el contrato de
+  láminas no lo pide, ese sobre lleva meses en producción sin él, y tocarlo
+  sin necesidad es el tipo de cambio que un día invalida algo que no se
+  estaba probando.
+- **Verificado con un arnés de lógica aislado** (PHP 8.3 portátil del
+  scratchpad, mbstring activado a mano vía `php.ini` + `extension_dir`
+  explícito — el binario no traía uno activo): 29 comprobaciones vía
+  `ReflectionClass` sobre `build_envelope()` (las dos ramas: juego sin
+  formato/plantilla/juego_actual/nombre_corto/materia/origen/entrega, lámina
+  con `nombre_corto` fuera y el resto intacto), `resolve_intento()` (el
+  `WHERE` incluye `tool`), `ruta_encargar()`/`ruta_encargo()` por
+  herramienta, y `diagnosticar_listo_sin_html()` (nunca mete contenido).
+  Sintaxis de los 8 ficheros PHP tocados con `php -l`, `install.xml` releído
+  como XML bien formado con `DOMDocument`.
+- **Sin verificar contra Moodle/Épica real** (mismo bloqueo de siempre): que
+  la actualización crea la columna `puntua` sin errores; un ciclo completo
+  encolado→trabajando→listo de un juego real contra `entorno-qa-2` (carta 6
+  dice que no hace falta ventana de mock, gasto asumido); que `pluginfile.php`
+  devuelve 404 de verdad para la filearea `juego`; y que el sobre de ensayo
+  de un juego (con `epica_dry_run` activo) coincide campo a campo con lo que
+  pide la carta 5. Diff mostrado antes de aplicar, como pidió Marcos.
+
 ## 2026-09-28 — Galería solo enseña infografías reales (v1.20.6)
 
 La galería de "últimas infografías" enseñaba TODOS los encargos del usuario en

@@ -27,7 +27,13 @@ use block_pulso\creation_quota;
 
 $courseid = required_param('courseid', PARAM_INT);
 $cmid = required_param('cmid', PARAM_INT);
-$format = required_param('format', PARAM_ALPHANUMEXT);
+// creation_quota::TOOL_INFOGRAFIA por defecto (sin romper al cliente actual,
+// que no manda "tool" todavía -no hay botón de gamificación hasta el paso 2).
+// Con TOOL_GAMIFICACION, "format" no se pide ni se valida: esa herramienta no
+// tiene formato, se guarda vacío (columna ya lo admite).
+$tool = optional_param('tool', creation_quota::TOOL_INFOGRAFIA, PARAM_ALPHA);
+$isjuego = $tool === creation_quota::TOOL_GAMIFICACION;
+$format = $isjuego ? '' : required_param('format', PARAM_ALPHANUMEXT);
 // PARAM_RAW: el recorte a MAX_PROMPT_LENGTH se hace con mb_substr más abajo,
 // nunca con substr/strlen -el texto es UTF-8 en español (ver CLAUDE.md).
 $prompt = trim((string)required_param('prompt', PARAM_RAW));
@@ -43,7 +49,10 @@ try {
     require_capability('block/pulso:createactivity', $context);
     chat_pipeline::check_enabled($courseid);
 
-    if (!in_array($format, creation_quota::FORMATS, true)) {
+    if (!in_array($tool, [creation_quota::TOOL_INFOGRAFIA, creation_quota::TOOL_GAMIFICACION], true)) {
+        throw new \Exception('Herramienta de creación no reconocida.');
+    }
+    if (!$isjuego && !in_array($format, creation_quota::FORMATS, true)) {
         throw new \Exception('Formato de infografía no reconocido.');
     }
     if ($prompt === '') {
@@ -67,7 +76,7 @@ try {
         }
     }
     if ($resource === null) {
-        throw new \Exception('Ese recurso ya no está disponible para generar una infografía.');
+        throw new \Exception('Ese recurso ya no está disponible para generar contenido con Pulse.');
     }
 
     $quota = creation_quota::check_general_quota($courseid, $userid, $isteacher);
@@ -83,7 +92,7 @@ try {
         $cmid,
         (int)$resource['sectionnum'],
         $userid,
-        creation_quota::TOOL_INFOGRAFIA,
+        $tool,
         $prompt,
         $format
     );

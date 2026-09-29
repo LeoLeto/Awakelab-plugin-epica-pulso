@@ -2,8 +2,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026092503; // Galeria solo enseña encargos 'listo' con imagen
-$plugin->release   = '1.20.6';      // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026092900; // Gamificacion (paso 1): ciclo con Epica reutilizado para juegos HTML
+$plugin->release   = '1.21.0';      // Semver visible en el header del chat — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->dependencies = [

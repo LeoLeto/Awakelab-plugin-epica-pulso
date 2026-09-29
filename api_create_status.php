@@ -24,8 +24,10 @@ define('AJAX_SCRIPT', true);
 
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
+require_once(__DIR__ . '/classes/creation_quota.php');
 
 use block_pulso\chat_pipeline;
+use block_pulso\creation_quota;
 
 $courseid = required_param('courseid', PARAM_INT);
 $encargoid = optional_param('encargoid', 0, PARAM_INT);
@@ -132,11 +134,17 @@ try {
         // exigiendo viewanalytics por fila, no por vista completa), y no
         // enseña encargos en curso/fallidos/de ensayo: esos los sigue el panel
         // de progreso, no la galería.
+        //
+        // "tool = infografia" es deliberado (Gamificación paso 1): un juego
+        // 'listo' también tiene "filename" relleno (el .html, en su propia
+        // filearea), así que sin este filtro la galería de infografías
+        // empezaría a mezclar juegos en cuanto existiera el primero. La
+        // galería de juegos es del paso 2, con su propia UI.
         $rows = $DB->get_records_select(
             'block_pulso_encargos',
-            "courseid = :courseid AND userid = :userid AND status = :status
+            "courseid = :courseid AND userid = :userid AND status = :status AND tool = :tool
                 AND filename IS NOT NULL AND filename <> ''",
-            ['courseid' => $courseid, 'userid' => $userid, 'status' => 'listo'],
+            ['courseid' => $courseid, 'userid' => $userid, 'status' => 'listo', 'tool' => creation_quota::TOOL_INFOGRAFIA],
             'timecreated DESC',
             '*',
             0,

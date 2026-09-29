@@ -1,13 +1,21 @@
 <?php
 /**
- * Ciclo con Epica (paso 3): construir el sobre, encargar, sondear y recoger
- * la infografia. Todo esto lo llama SOLO la tarea adhoc
- * (classes/task/epica_ciclo_adhoc.php) — nunca una peticion web. Firmar,
- * encargar y sondear son trabajo de cron; el navegador nunca habla con Epica.
+ * Ciclo con Epica: construir el sobre, encargar, sondear y recoger la
+ * infografia o el juego (gamificacion). Todo esto lo llama SOLO la tarea
+ * adhoc (classes/task/epica_ciclo_adhoc.php) — nunca una peticion web.
+ * Firmar, encargar y sondear son trabajo de cron; el navegador nunca habla
+ * con Epica. Es UN solo ciclo para las dos herramientas (misma cadencia,
+ * mismo criterio de transitorio, mismo tope de errores seguidos); lo que
+ * cambia por herramienta -ruta, forma del sobre, forma de la entrega- se
+ * decide con encargo->tool (creation_quota::TOOL_*), nunca duplicando el
+ * ciclo entero.
  *
- * Contrato resumido (ver CLAUDE.md y PROMPT_EPICA_03_TAREA_Y_CICLO.md):
+ * Contrato resumido (ver CLAUDE.md, docs/epica_gamificacion_carta5.md y
+ * docs/epica_gamificacion_carta6.md):
  *   POST /api/moodle/laminas/encargar -> 202 {plataforma, trabajo, posicion, estado}
- *   POST /api/moodle/laminas/encargo  -> 200 siempre, {estado, posicion, traza, ...}
+ *   POST /api/moodle/laminas/encargo  -> 200 siempre, {estado, posicion, traza, lamina?, ...}
+ *   POST /api/moodle/juegos/encargar  -> 202 {plataforma, trabajo, posicion, estado}
+ *   POST /api/moodle/juegos/encargo   -> 200 siempre, {estado, posicion, traza, html?, ...} (EN LA RAIZ, sin envolver)
  * El cuerpo es PLANO (nada anidado bajo "encargo") y firmado con local_awkepica,
  * nunca a mano: epica::rol_de()/firmar_por()/pedir()/ESPERA_LARGA_S.
  *
@@ -25,14 +33,24 @@ require_once(__DIR__ . '/content_extractor.php');
 
 class epica_client {
 
-    /** @var string Unica herramienta que manda Pulso en v1 (infografias). */
-    const HERRAMIENTA = 'infografias';
+    /**
+     * Codigo de herramienta que espera Epica en el campo "herramienta" del
+     * sobre (docs/epica_gamificacion_carta5.md §1: el mismo valor de siempre,
+     * "gamificacion", pese al cambio de nombre visible de "Retos"). No
+     * confundir con creation_quota::TOOL_* (el "tool" que guardamos NOSOTROS
+     * en block_pulso_encargos) — coinciden por casualidad en gamificacion,
+     * pero infografias/infografia llevan una "s" de diferencia a proposito.
+     */
+    const HERRAMIENTA_INFOGRAFIA = 'infografias';
+    const HERRAMIENTA_GAMIFICACION = 'gamificacion';
 
-    /** @var string Capacidad usada para resolver el rol firmado (rol_de/firmar_por). */
+    /** @var string Capacidad usada para resolver el rol firmado (rol_de/firmar_por). Misma para las dos herramientas. */
     const CAPABILITY = 'block/pulso:createactivity';
 
-    const RUTA_ENCARGAR = '/api/moodle/laminas/encargar';
-    const RUTA_ENCARGO  = '/api/moodle/laminas/encargo';
+    const RUTA_ENCARGAR_LAMINA = '/api/moodle/laminas/encargar';
+    const RUTA_ENCARGO_LAMINA  = '/api/moodle/laminas/encargo';
+    const RUTA_ENCARGAR_JUEGO = '/api/moodle/juegos/encargar';
+    const RUTA_ENCARGO_JUEGO  = '/api/moodle/juegos/encargo';
 
     /**
      * Objetivo de recorte del material: el contrato permite hasta 300.000
@@ -141,7 +159,7 @@ class epica_client {
             $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY, (string)$course->id);
             $body = array_merge(['token' => $token], $envelope);
             $respuesta = \local_awkepica\epica::pedir(
-                self::endpoint(self::RUTA_ENCARGAR),
+                self::endpoint(self::ruta_encargar((string)$encargo->tool)),
                 $body,
                 \local_awkepica\epica::ESPERA_LARGA_S
             );
@@ -263,9 +281,16 @@ class epica_client {
             // Token NUEVO en cada sondeo: el jti se gasta al recibirlo, así
             // que reenviar el mismo token da 401 "reusado".
             $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY, (string)$course->id);
+            $tool = (string)$encargo->tool;
             $body = ['token' => $token, 'trabajo' => $encargo->epica_job_id];
+            if ($tool === creation_quota::TOOL_GAMIFICACION) {
+                // El contrato de gamificacion pide "herramienta" tambien al
+                // sondear (carta 5 §3.3); el de laminas no lo exige y no se
+                // le añade para no tocar un sobre ya probado en producción.
+                $body['herramienta'] = self::HERRAMIENTA_GAMIFICACION;
+            }
             $respuesta = \local_awkepica\epica::pedir(
-                self::endpoint(self::RUTA_ENCARGO),
+                self::endpoint(self::ruta_encargo($tool)),
                 $body,
                 \local_awkepica\epica::ESPERA_LARGA_S
             );
@@ -413,6 +438,20 @@ class epica_client {
     }
 
     /**
+     * Despacha por herramienta: la lámina y el juego llegan con formas
+     * completamente distintas (anidada bajo "lamina" una, en la raíz el
+     * otro — docs/epica_gamificacion_carta6.md §A1), así que cada una tiene
+     * su propio recoger_*().
+     */
+    private static function recoger(\stdClass $encargo, array $data, $traza, array $respuesta): void {
+        if ((string)$encargo->tool === creation_quota::TOOL_GAMIFICACION) {
+            self::recoger_juego($encargo, $data, $traza, $respuesta);
+            return;
+        }
+        self::recoger_lamina($encargo, $data, $traza, $respuesta);
+    }
+
+    /**
      * Guarda el PNG con la File API de Moodle (nunca en el historial del chat
      * ni en un log: son ~1,7 MB en base64) y cierra el encargo como "listo".
      * Mira siempre "mock": si llega true, el PNG es de relleno pero válido —
@@ -432,7 +471,7 @@ class epica_client {
      * imagen desaparece, contestan "desconocido"), así que si el diagnóstico
      * vuelve a saltar es señal de que algo ha cambiado, no un caso resuelto.
      */
-    private static function recoger(\stdClass $encargo, array $data, $traza, array $respuesta): void {
+    private static function recoger_lamina(\stdClass $encargo, array $data, $traza, array $respuesta): void {
         global $DB;
 
         $lamina = isset($data['lamina']) && is_array($data['lamina']) ? $data['lamina'] : [];
@@ -533,6 +572,121 @@ class epica_client {
         return $filename;
     }
 
+    /**
+     * La entrega de un juego va EN LA RAÍZ, sin envoltura (al revés que la
+     * lámina): html, titulo, tema, verificado, puntua, mock
+     * (docs/epica_gamificacion_carta6.md §A1/A2). Ninguno es null salvo lo
+     * que decidimos nosotros al guardar: "verificado" con "tema" vacío
+     * significa "no se comprobó" y se guarda como null (igual que en
+     * láminas); con "tema" no vacío, verificado es 1/0 de verdad.
+     *
+     * "titulo"/"puntua"/"arquetipo"/"avisos" no existen para un juego salvo
+     * los tres primeros — Épica confirma "no hay ningún campo más" — así que
+     * arquetipo/avisos se dejan sin tocar (permanecen null, como se crearon).
+     */
+    private static function recoger_juego(\stdClass $encargo, array $data, $traza, array $respuesta): void {
+        global $DB;
+
+        $html = (string)($data['html'] ?? '');
+        $filename = $html !== '' ? self::guardar_juego($encargo, $html) : null;
+        $motivo = $filename ? null : self::diagnosticar_listo_sin_html($data, $respuesta);
+
+        $tema = (string)($data['tema'] ?? '');
+        $verificado = null;
+        if ($tema !== '' && array_key_exists('verificado', $data) && $data['verificado'] !== null) {
+            $verificado = (int)(bool)$data['verificado'];
+        }
+        $puntua = array_key_exists('puntua', $data) && $data['puntua'] !== null ? (int)(bool)$data['puntua'] : null;
+
+        $DB->update_record('block_pulso_encargos', (object)[
+            'id' => $encargo->id,
+            'status' => $filename ? 'listo' : 'fallado',
+            'filename' => $filename,
+            'titulo' => mb_substr((string)($data['titulo'] ?? ''), 0, 255, 'UTF-8'),
+            'tema' => mb_substr($tema, 0, 255, 'UTF-8'),
+            'mock' => !empty($data['mock']) ? 1 : 0,
+            'verificado' => $verificado,
+            'puntua' => $puntua,
+            'epica_traza' => $traza ? mb_substr((string)$traza, 0, 32, 'UTF-8') : $encargo->epica_traza,
+            'motivo' => $motivo,
+            'pollcount' => (int)$encargo->pollcount + 1,
+            'timemodified' => time(),
+        ]);
+
+        if ($filename) {
+            mtrace("Pulso Epica: encargo {$encargo->id} (juego) → listo" . (!empty($data['mock']) ? ' (mock)' : '') . '.');
+        } else {
+            mtrace("Pulso Epica: encargo {$encargo->id} (juego) → listo sin html válido, se marca como fallado. {$motivo}");
+        }
+
+        self::notify_completion((int)$encargo->id, $filename ? 'listo' : 'fallado');
+    }
+
+    /**
+     * Mismo espíritu que diagnosticar_listo_sin_imagen(): la FORMA de la
+     * respuesta, nunca su contenido. Para un juego eso significa ni una letra
+     * del HTML (lo escribió un modelo a partir de un material que puede ser
+     * del centro) — solo tipo y longitud, nunca un fragmento del marcado.
+     */
+    private static function diagnosticar_listo_sin_html(array $data, array $respuesta): string {
+        $nivel1 = array_keys($data);
+        $nivel2 = [];
+        foreach ($data as $key => $value) {
+            if (is_array($value)) {
+                $nivel2[$key] = array_keys($value);
+            }
+        }
+
+        $partes = [];
+        $partes[] = 'claves_nivel1=' . json_encode($nivel1, JSON_UNESCAPED_UNICODE);
+        if (!empty($nivel2)) {
+            $partes[] = 'claves_nivel2=' . json_encode($nivel2, JSON_UNESCAPED_UNICODE);
+        }
+
+        if (array_key_exists('html', $data)) {
+            $valor = $data['html'];
+            $partes[] = 'html_tipo=' . gettype($valor);
+            $partes[] = 'html_len=' . (is_string($valor) ? mb_strlen($valor, 'UTF-8') : 0);
+        } else {
+            $partes[] = 'html_tipo=ausente';
+        }
+
+        $partes[] = 'datos_null=' . (($respuesta['datos'] ?? null) === null ? 'si' : 'no');
+        $partes[] = 'crudo_len=' . strlen((string)($respuesta['crudo'] ?? ''));
+
+        return mb_substr('La respuesta "listo" no traía un HTML válido. ' . implode(' ', $partes), 0, 2000, 'UTF-8');
+    }
+
+    /**
+     * Guarda el HTML LIMPIO, exactamente como llega — el puente de puntuación
+     * y la CSP se inyectan al SERVIRLO (paso 3), nunca aquí. Filearea propia
+     * "juego" (no "encargo", que es del PNG): block_pulso_pluginfile() la
+     * bloquea por completo en este paso (lib.php) porque servir HTML escrito
+     * por un modelo sin sandbox/CSP ejecutaría su JavaScript con el origen y
+     * la sesión de Moodle de quien abra el enlace.
+     */
+    private static function guardar_juego(\stdClass $encargo, string $html): ?string {
+        if (trim($html) === '') {
+            return null;
+        }
+
+        $context = \context_course::instance((int)$encargo->courseid);
+        $fs = get_file_storage();
+        $fs->delete_area_files($context->id, 'block_pulso', 'juego', $encargo->id);
+
+        $filename = clean_filename('juego_' . $encargo->id . '.html');
+        $fs->create_file_from_string([
+            'contextid' => $context->id,
+            'component' => 'block_pulso',
+            'filearea'  => 'juego',
+            'itemid'    => $encargo->id,
+            'filepath'  => '/',
+            'filename'  => $filename,
+        ], $html);
+
+        return $filename;
+    }
+
     private static function marcar_fallo(\stdClass $encargo, string $motivo, $traza = null, string $status = 'fallado'): void {
         global $DB;
         $DB->update_record('block_pulso_encargos', (object)[
@@ -586,15 +740,21 @@ class epica_client {
         $course = get_course((int)$encargo->courseid);
         $courseurl = new \moodle_url('/course/view.php', ['id' => $course->id]);
 
+        // "juego" es masculino, "infografía" femenino: no basta con
+        // sustituir la palabra, cambia también el adjetivo/artículo.
+        $esjuego = (string)$encargo->tool === creation_quota::TOOL_GAMIFICACION;
+        $sustantivo = $esjuego ? 'El juego' : 'La infografía';
+
         if ($status === 'listo') {
-            $subject = 'Tu infografía está lista';
-            $body = 'La infografía que pediste en "' . format_string($course->fullname) . '" ya está lista'
-                . (!empty($encargo->titulo) ? ' ("' . $encargo->titulo . '")' : '') . '. Ábrela desde el curso: '
-                . $courseurl->out(false);
+            $subject = $esjuego ? 'Tu juego está listo' : 'Tu infografía está lista';
+            $body = $sustantivo . ' que pediste en "' . format_string($course->fullname) . '" ya está '
+                . ($esjuego ? 'listo' : 'lista')
+                . (!empty($encargo->titulo) ? ' ("' . $encargo->titulo . '")' : '') . '. Ábre'
+                . ($esjuego ? 'lo' : 'la') . ' desde el curso: ' . $courseurl->out(false);
         } else {
             $motivo = ($encargo->motivo !== null && $encargo->motivo !== '') ? $encargo->motivo : 'sin motivo especificado';
-            $subject = 'Tu infografía no se ha podido generar';
-            $body = 'La infografía que pediste en "' . format_string($course->fullname) . '" no se ha podido generar ('
+            $subject = $esjuego ? 'Tu juego no se ha podido generar' : 'Tu infografía no se ha podido generar';
+            $body = $sustantivo . ' que pediste en "' . format_string($course->fullname) . '" no se ha podido generar ('
                 . $motivo . '). Puedes intentarlo de nuevo desde el curso: ' . $courseurl->out(false);
         }
 
@@ -629,30 +789,46 @@ class epica_client {
      * antes de enviar, o se omite en modo de ensayo: firmar de verdad
      * requiere el secreto de local_awkepica, que en ensayo puede no estar
      * configurado todavía).
+     *
+     * Forma 1 únicamente para los dos: "peticion" + "material" + "contexto" +
+     * "curso" + "alumno" (docs/epica_gamificacion_carta5.md §3.1). Lo que
+     * distingue a gamificación es lo que NO lleva: sin "formato" (es propio
+     * de la lámina), sin "plantilla" ni "juego_actual" (formas 2/3, fuera de
+     * alcance de este paso). Y dos recortes que Épica pidió para las DOS
+     * herramientas (carta 6 §B4): sin "curso.nombre_corto" (no lo lee
+     * ninguna) y sin "curso.materia" (la categoría de Moodle no es una
+     * materia real; se omite en vez de mandar un dato falso).
      */
     private static function build_envelope(\stdClass $encargo, \stdClass $course, array $textrow, \stdClass $user): array {
+        $tool = (string)$encargo->tool;
+        $esjuego = $tool === creation_quota::TOOL_GAMIFICACION;
+
         $alumno = [
             'idioma' => 'es',
-            'intento' => self::resolve_intento((int)$encargo->userid, (int)$encargo->cmid, (int)$encargo->id),
+            'intento' => self::resolve_intento((int)$encargo->userid, (int)$encargo->cmid, $tool, (int)$encargo->id),
         ];
         $grupo = self::resolve_grupo((int)$encargo->courseid, (int)$user->id);
         if ($grupo !== '') {
             $alumno['grupo'] = $grupo;
         }
 
-        return [
-            'herramienta' => self::HERRAMIENTA,
+        $envelope = [
+            'herramienta' => $esjuego ? self::HERRAMIENTA_GAMIFICACION : self::HERRAMIENTA_INFOGRAFIA,
             'peticion' => $encargo->prompt,
-            'formato' => $encargo->format,
             'contexto' => self::resolve_contexto_seccion((int)$encargo->courseid, (int)$encargo->sectionnum),
             'curso' => [
                 'nombre' => trim((string)$course->fullname),
-                'nombre_corto' => trim((string)$course->shortname),
                 'idioma' => 'es',
             ],
             'alumno' => $alumno,
             'material' => self::resolve_material($textrow),
         ];
+
+        if (!$esjuego) {
+            $envelope['formato'] = $encargo->format;
+        }
+
+        return $envelope;
     }
 
     /**
@@ -746,17 +922,18 @@ class epica_client {
     }
 
     /**
-     * Número de intento de este usuario sobre ESTE recurso concreto (encargos
-     * previos, cualquiera que fuese su estado, +1). No es un intento de
-     * cuestionario: es cuántas veces ha pedido ya una infografía de este
-     * material.
+     * Número de intento de este usuario sobre ESTE recurso concreto y con
+     * ESTA MISMA herramienta (encargos previos, cualquiera que fuese su
+     * estado, +1). Filtrado por "tool": un alumno con 3 infografías previas
+     * de un recurso que ahora pide su primer juego sobre ese mismo recurso
+     * es "intento" 1, no 4 — son catálogos de intentos independientes.
      */
-    private static function resolve_intento(int $userid, int $cmid, int $excludeid): int {
+    private static function resolve_intento(int $userid, int $cmid, string $tool, int $excludeid): int {
         global $DB;
         $count = $DB->count_records_select(
             'block_pulso_encargos',
-            'userid = :userid AND cmid = :cmid AND id < :excludeid',
-            ['userid' => $userid, 'cmid' => $cmid, 'excludeid' => $excludeid]
+            'userid = :userid AND cmid = :cmid AND tool = :tool AND id < :excludeid',
+            ['userid' => $userid, 'cmid' => $cmid, 'tool' => $tool, 'excludeid' => $excludeid]
         );
         return $count + 1;
     }
@@ -814,6 +991,14 @@ class epica_client {
     private static function endpoint(string $ruta): string {
         $base = rtrim((string)get_config('block_pulso', 'epica_base_url'), '/');
         return $base . $ruta;
+    }
+
+    private static function ruta_encargar(string $tool): string {
+        return $tool === creation_quota::TOOL_GAMIFICACION ? self::RUTA_ENCARGAR_JUEGO : self::RUTA_ENCARGAR_LAMINA;
+    }
+
+    private static function ruta_encargo(string $tool): string {
+        return $tool === creation_quota::TOOL_GAMIFICACION ? self::RUTA_ENCARGO_JUEGO : self::RUTA_ENCARGO_LAMINA;
     }
 
     /**

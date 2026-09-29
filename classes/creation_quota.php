@@ -19,8 +19,11 @@ require_once(__DIR__ . '/full_text_store.php');
 
 class creation_quota {
 
-    /** @var string Unica herramienta en v1.18.0; 'reto'/'presentacion' llegaran despues. */
+    /** @var string Infografias (v1.18.0). 'presentacion' llegara despues. */
     const TOOL_INFOGRAFIA = 'infografia';
+
+    /** @var string Gamificacion — juegos HTML (v1.21.0). Mismo ciclo con Epica que las infografias. */
+    const TOOL_GAMIFICACION = 'gamificacion';
 
     /** @var string */
     const STATUS_PENDING = 'pendiente';

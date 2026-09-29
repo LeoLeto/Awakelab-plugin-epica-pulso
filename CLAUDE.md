@@ -599,6 +599,87 @@ infografía, en vez del «Encargo guardado» estático del paso 1. Vive en
   instalaciones que ya existían. Si se toca esta tabla otra vez, comprobar
   SIEMPRE los dos ficheros a la vez — ese es el bug a no repetir.
 
+## Gamificación — paso 1: ciclo con Épica reutilizado para juegos HTML (v1.21.0)
+
+Segunda herramienta de Épica. **Un solo ciclo** (`classes/epica_client.php` +
+`classes/task/epica_ciclo_adhoc.php`) sirve a las dos: firmar, encargar,
+sondear y recoger son exactamente el mismo código, con la misma cadencia y el
+mismo criterio de transitorio/tope de errores. Lo que cambia por herramienta
+se decide con `$encargo->tool` (`creation_quota::TOOL_INFOGRAFIA` /
+`TOOL_GAMIFICACION`), nunca duplicando el ciclo. Sin botón ni UI todavía —eso
+es el paso 2— y sin página de juego, puente ni CSP —eso es el paso 3—.
+
+- **La entrega va en la RAÍZ, al revés que la lámina.** Un `listo` de
+  `/api/moodle/juegos/encargo` trae `html`, `titulo`, `tema`, `verificado`,
+  `puntua`, `mock` sueltos en la raíz de la respuesta; la lámina sigue
+  anidada bajo `lamina`. Son decisiones de dos momentos distintos de Épica y
+  no se van a unificar, así que `epica_client::recoger()` despacha por
+  `$encargo->tool` a `recoger_lamina()` o `recoger_juego()` — no hay una
+  forma común que sirva a las dos.
+- **`verificado: true` con `tema` vacío significa "no se comprobó", no "está
+  bien"** (para juegos, igual que para láminas): se guarda como `null`, y
+  solo es `1`/`0` de verdad cuando `tema` no está vacío. `puntua` es una
+  columna PROPIA de esta herramienta (int nullable, `null` para infografías o
+  antes de "listo") — no reutiliza `verificado`, son dos señales distintas
+  aunque las dos vengan como booleano de Épica.
+- **`html` vacío es fallo terminal**, con el mismo espíritu que
+  `diagnosticar_listo_sin_imagen()`: `diagnosticar_listo_sin_html()` registra
+  la FORMA de la respuesta (claves de primer/segundo nivel, tipo y
+  LONGITUD del campo `html`) y nunca su contenido — ni un fragmento del
+  marcado, aunque sea corto. El HTML lo escribió un modelo a partir de
+  material que puede ser del centro; no hay "preview seguro" como el de la
+  imagen (30 bytes de base64 no dicen nada, 30 caracteres de HTML sí).
+- **Se guarda LIMPIO, exactamente como llega**, en una filearea PROPIA
+  (`juego`, no `encargo`: ese nombre es del PNG) — `guardar_juego()`. El
+  puente de puntuación y la CSP se inyectan al SERVIRLO (paso 3), nunca en
+  el fichero guardado: si se inyectaran aquí, cambiar el puente algún día
+  obligaría a regenerar todos los juegos ya guardados.
+- **`block_pulso_pluginfile()` no sirve la filearea `juego` en este paso, y
+  no hace falta ningún cambio para lograrlo**: el filtro ya existente
+  (`$filearea !== 'encargo'` → 404) bloquea cualquier filearea que no sea
+  `encargo`, `juego` incluida. Es a propósito y está documentado en el
+  código: el HTML lo escribió un modelo, y servirlo sin `sandbox`/CSP
+  ejecutaría su JavaScript con el origen y la sesión de Moodle de quien abra
+  el enlace. Habilitarla es currar el paso 3 completo (puente + CSP +
+  iframe `sandbox="allow-scripts"`), no añadir una filearea a una lista.
+- **El sobre es forma 1 únicamente** (`peticion` + `material` + `contexto` +
+  `curso` + `alumno`): sin `formato` (es propio de la lámina), sin
+  `plantilla` ni `juego_actual` (formas 2/3, fuera de alcance). Dos recortes
+  que Épica pidió para las **dos** herramientas a la vez (carta 6 §B4):
+  **`curso.nombre_corto` desaparece del sobre de las dos** (no lo lee
+  ninguna) y **`curso.materia` no se manda nunca** (la categoría de Moodle
+  no es una materia real; se omite en vez de mandar un dato falso — el día
+  que un centro configure una materia de verdad en un campo propio, se
+  añade, no antes).
+- **`alumno.intento` cuenta por herramienta**, no solo por recurso:
+  `resolve_intento()` añade `tool` al filtro. Un alumno con tres infografías
+  previas de un recurso que pide su primer JUEGO sobre ese mismo recurso es
+  intento 1, no 4 — son catálogos de intentos independientes (misma lógica
+  que las cuotas independientes de Épica, carta 5 §6.1).
+- **`herramienta: "gamificacion"` va también en el sondeo**, no solo al
+  encargar (carta 5 §3.3 lo pide explícitamente para esta herramienta). El
+  de láminas NO lo lleva y no se le añade: es un sobre ya probado en
+  producción y "lo demás no cambia" es parte del contrato de este paso.
+- **La galería de infografías filtra por `tool = 'infografia'`** en
+  `api_create_status.php` — sin este filtro, en cuanto exista el primer
+  juego `listo` (que también tiene `filename` relleno, solo que en su propia
+  filearea) empezaría a colarse en la galería de infografías. La galería de
+  juegos es del paso 2, con su propia UI y su propia consulta.
+- **`notify_completion()` distingue género, no solo la palabra**: "el juego"
+  (masculino) vs. "la infografía" (femenino) cambia también el adjetivo
+  (listo/lista) y el artículo (ábrelo/ábrela) — sustituir solo el sustantivo
+  habría dejado mensajes gramaticalmente rotos.
+- **Los cupos siguen siendo un contador conjunto** (carta 5 §9, decisión ya
+  tomada del lado de Épica): `creation_quota::record_encargo()` no filtra por
+  `tool` al contar, así que el mismo contador protege a las dos herramientas
+  hoy. Cuando el piloto necesite separarlos, es una decisión de producto
+  nueva, no un bug de este paso.
+- **`api_create_submit.php` acepta `tool`** (`infografia` por defecto, para
+  no romper al cliente actual, que no manda ese parámetro todavía). Con
+  `gamificacion`, `format` no se pide ni se valida — se guarda como cadena
+  vacía, que la columna ya admite (`NOTNULL DEFAULT ''`), así que no hizo
+  falta ningún cambio de esquema para ese campo.
+
 ## Cómo se trabaja este repo con prompts
 
 El trabajo entra por prompts escritos para Claude Code, uno por paso, y **cada paso en una

@@ -338,5 +338,19 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092502, 'pulso');
     }
 
+    if ($oldversion < 2026092900) {
+        // Gamificacion paso 1: la entrega de un juego trae "puntua" (si el
+        // juego llama a window.reportAwakegameScore) ademas de "verificado" —
+        // ninguno de los dos existe para infografias, asi que es una columna
+        // propia y no una reutilizacion de "verificado". Ver CLAUDE.md.
+        $table = new xmldb_table('block_pulso_encargos');
+        $field = new xmldb_field('puntua', XMLDB_TYPE_INTEGER, '1', null, null, null, null, 'verificado');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_block_savepoint(true, 2026092900, 'pulso');
+    }
+
     return true;
 }

@@ -556,6 +556,18 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
            preguntas, este es una acción que cuesta dinero y genera algo.
            Fondo navy sólido + texto blanco (nunca cian como color de texto,
            regla del tema claro), acento cian solo en el icono. */
+        /* Fila con los dos CTA de "Crear" (infografía / juego), lado a lado -
+           mismo patrón repetido, no un formulario distinto por herramienta. */
+        .pulso-create-cta-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .pulso-create-cta-row .pulso-create-cta {
+            flex: 1;
+            min-width: 0;
+        }
+
         .pulso-create-cta {
             display: flex;
             align-items: center;
@@ -882,6 +894,41 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             aspect-ratio: 1 / 1;
             object-fit: cover;
             display: block;
+        }
+
+        /* Tarjeta de juego: sin imagen (no la hay), icono + título de respaldo. */
+        .pulso-create-gallery-icon {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--pulso-surface-2);
+            color: var(--pulso-muted);
+        }
+
+        .pulso-create-gallery-icon svg {
+            width: 26px;
+            height: 26px;
+        }
+
+        .pulso-create-gallery-item-title {
+            font-size: 0.68rem;
+            font-weight: 600;
+            color: var(--pulso-ink);
+            padding: 0 4px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* "Juego" / "Infografía" — nunca cian como color de texto. */
+        .pulso-create-gallery-tag {
+            font-size: 0.62rem;
+            font-weight: 600;
+            color: var(--pulso-slate);
+            padding: 0 4px;
         }
 
         .pulso-create-gallery-date {
@@ -1961,15 +2008,26 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     <div class="pulso-home-section-head">
                         <span class="pulso-home-section-title">Crear</span>
                     </div>
-                    <button type="button" class="pulso-create-cta" onclick="openCreatePanel()">
-                        <span class="pulso-create-cta-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-                        </span>
-                        <span class="pulso-create-cta-text">
-                            <span class="pulso-create-cta-title">Crear infografía</span>
-                            <span class="pulso-create-cta-sub">Genera una infografía a partir de un recurso del curso</span>
-                        </span>
-                    </button>
+                    <div class="pulso-create-cta-row">
+                        <button type="button" class="pulso-create-cta" onclick="openCreatePanel('infografia')">
+                            <span class="pulso-create-cta-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                            </span>
+                            <span class="pulso-create-cta-text">
+                                <span class="pulso-create-cta-title">Crear infografía</span>
+                                <span class="pulso-create-cta-sub">A partir de un recurso del curso</span>
+                            </span>
+                        </button>
+                        <button type="button" class="pulso-create-cta" onclick="openCreatePanel('gamificacion')">
+                            <span class="pulso-create-cta-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+                            </span>
+                            <span class="pulso-create-cta-text">
+                                <span class="pulso-create-cta-title">Crear juego</span>
+                                <span class="pulso-create-cta-sub">A partir de un recurso del curso</span>
+                            </span>
+                        </button>
+                    </div>
                 </div>
                 <!--PULSO_CREATE_ONLY_END-->
             </div>
@@ -1980,7 +2038,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     <button type="button" class="pulso-create-back" onclick="closeCreatePanel()" aria-label="Volver a la pantalla de inicio">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
                     </button>
-                    <h4>Crear infografía</h4>
+                    <h4 id="pulso-create-title">Crear infografía</h4>
                 </div>
                 <div class="pulso-create-body" id="pulso-create-body">
                     <p class="pulso-create-hint">Cargando…</p>
@@ -3317,11 +3375,44 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // comprueba cupo y guarda el encargo como "pendiente".
         let pulsoCreateResources = [];
 
-        function openCreatePanel() {
+        // Un único formulario parametrizado por herramienta, no una copia por
+        // herramienta (CLAUDE.md, paso 1: "añadirlos es repetir este mismo
+        // patrón"). pulsoCreateTool decide textos, si se pide formato y qué
+        // envía submitCreate() — el desplegable de recursos y los cupos son
+        // iguales para las dos (contador conjunto, CLAUDE.md paso 3).
+        let pulsoCreateTool = 'infografia';
+
+        const PULSO_CREATE_TOOL_LABELS = {
+            infografia: {
+                panelTitle: 'Crear infografía',
+                promptLabel: '¿Qué infografía quieres?',
+                promptPlaceholder: 'Ej: Una infografía que resuma las fases del proceso para repasarlas de un vistazo.',
+                submitLabel: 'Crear infografía',
+                noResourcesDefault: 'No hay recursos disponibles para crear una infografía en este curso.',
+                noUsableReason: 'Ninguno de los recursos de este curso tiene texto que se pueda aprovechar para generar una infografía.'
+            },
+            gamificacion: {
+                panelTitle: 'Crear juego',
+                promptLabel: '¿Qué juego quieres?',
+                promptPlaceholder: 'Ej: Un juego de emparejar términos con su definición, diez pares.',
+                submitLabel: 'Crear juego',
+                noResourcesDefault: 'No hay recursos disponibles para crear un juego en este curso.',
+                noUsableReason: 'Ninguno de los recursos de este curso tiene texto que se pueda aprovechar para generar un juego.'
+            }
+        };
+
+        function pulsoCreateSetTool(tool) {
+            pulsoCreateTool = tool === 'gamificacion' ? 'gamificacion' : 'infografia';
+            const titleEl = document.getElementById('pulso-create-title');
+            if (titleEl) titleEl.textContent = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool].panelTitle;
+        }
+
+        function openCreatePanel(tool) {
             const messagesDiv = document.getElementById('pulso-messages');
             const body = document.getElementById('pulso-create-body');
             if (!messagesDiv || !body) return;
 
+            pulsoCreateSetTool(tool || pulsoCreateTool);
             stopCreatePolling();
             messagesDiv.classList.add('pulso-showing-create');
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
@@ -3373,17 +3464,21 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         function renderCreateNoResources(reason) {
+            const labels = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool];
             const messages = {
                 'not_indexed': 'Este curso todavía no se ha indexado. La indexación es nocturna: si el curso es nuevo, vuelve a intentarlo mañana.',
-                'no_usable': 'Ninguno de los recursos de este curso tiene texto que se pueda aprovechar para generar una infografía.',
+                'no_usable': labels.noUsableReason,
                 'no_visible': 'No tienes acceso a ningún recurso indexado de este curso.'
             };
-            renderCreateNotice(messages[reason] || 'No hay recursos disponibles para crear una infografía en este curso.');
+            renderCreateNotice(messages[reason] || labels.noResourcesDefault);
         }
 
         function renderCreateForm(resources) {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
+
+            const labels = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool];
+            const isjuego = pulsoCreateTool === 'gamificacion';
 
             let optionsHtml = '';
             resources.forEach(function(r) {
@@ -3393,17 +3488,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     + '</option>';
             });
 
-            body.innerHTML = ''
-                + '<div class="pulso-create-field">'
-                + '<label for="pulso-create-resource">Recurso</label>'
-                + '<select id="pulso-create-resource">' + optionsHtml + '</select>'
-                + '<div class="pulso-create-hint" id="pulso-create-section-hint"></div>'
-                + '</div>'
-                + '<div class="pulso-create-field">'
-                + '<label for="pulso-create-prompt">Qué quieres</label>'
-                + '<textarea id="pulso-create-prompt" maxlength="4000" placeholder="Ej: Una infografía que resuma las fases del proceso para repasarlas de un vistazo."></textarea>'
-                + '</div>'
-                + '<div class="pulso-create-field">'
+            // El formato es solo de las infografías (CLAUDE.md, paso 3): un
+            // juego no lleva ese campo, ni en el formulario ni en el envío.
+            const formatFieldHtml = isjuego ? '' : (
+                '<div class="pulso-create-field">'
                 + '<label for="pulso-create-format">Formato</label>'
                 + '<select id="pulso-create-format">'
                 + '<option value="poster_2_3">Póster (2:3)</option>'
@@ -3411,7 +3499,20 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '<option value="landscape_3_2">Horizontal (3:2)</option>'
                 + '</select>'
                 + '</div>'
-                + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" onclick="submitCreateInfografia()">Crear infografía</button>'
+            );
+
+            body.innerHTML = ''
+                + '<div class="pulso-create-field">'
+                + '<label for="pulso-create-resource">Recurso</label>'
+                + '<select id="pulso-create-resource">' + optionsHtml + '</select>'
+                + '<div class="pulso-create-hint" id="pulso-create-section-hint"></div>'
+                + '</div>'
+                + '<div class="pulso-create-field">'
+                + '<label for="pulso-create-prompt">' + escapeHtmlText(labels.promptLabel) + '</label>'
+                + '<textarea id="pulso-create-prompt" maxlength="4000" placeholder="' + escapeHtmlText(labels.promptPlaceholder) + '"></textarea>'
+                + '</div>'
+                + formatFieldHtml
+                + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" onclick="submitCreate()">' + escapeHtmlText(labels.submitLabel) + '</button>'
                 + '<div id="pulso-create-gallery"></div>';
 
             const select = document.getElementById('pulso-create-resource');
@@ -3447,12 +3548,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             }
         }
 
-        function submitCreateInfografia() {
+        function submitCreate() {
             const select = document.getElementById('pulso-create-resource');
             const promptEl = document.getElementById('pulso-create-prompt');
             const formatEl = document.getElementById('pulso-create-format');
             const btn = document.getElementById('pulso-create-submit-btn');
-            if (!select || !promptEl || !formatEl) return;
+            if (!select || !promptEl) return;
+
+            const isjuego = pulsoCreateTool === 'gamificacion';
+            const labels = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool];
 
             const prompt = promptEl.value.trim();
             if (!prompt) {
@@ -3470,7 +3574,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             formData.append('courseid', window.courseid);
             formData.append('cmid', select.value);
             formData.append('prompt', prompt);
-            formData.append('format', formatEl.value);
+            formData.append('tool', pulsoCreateTool);
+            if (!isjuego && formatEl) {
+                formData.append('format', formatEl.value);
+            }
 
             fetch(window.apiCreateSubmitUrl, { method: 'POST', credentials: 'same-origin', body: formData })
                 .then(function(r) { return r.json(); })
@@ -3483,7 +3590,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         renderCreateNotice(data.message || 'No se ha podido guardar el encargo. Inténtalo de nuevo.');
                         if (btn) {
                             btn.disabled = false;
-                            btn.textContent = 'Crear infografía';
+                            btn.textContent = labels.submitLabel;
                         }
                     }
                 })
@@ -3491,7 +3598,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     renderCreateNotice('No se ha podido conectar para guardar el encargo. Inténtalo de nuevo.');
                     if (btn) {
                         btn.disabled = false;
-                        btn.textContent = 'Crear infografía';
+                        btn.textContent = labels.submitLabel;
                     }
                 });
         }
@@ -3597,8 +3704,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // es fallo nuestro, nunca del usuario.
         function pulsoCreateFailureMessage(encargo) {
             const motivo = String(encargo.motivo || '');
+            const noun = encargo.tool === 'gamificacion' ? 'el juego' : 'la infografía';
             if (/cuota-agotada/i.test(motivo)) {
-                return 'Has pedido varias infografías seguidas y se ha agotado tu cupo de generación. '
+                return 'Has pedido varias creaciones seguidas y se ha agotado tu cupo de generación. '
                     + 'Vuelve a intentarlo en unos minutos.';
             }
             if (/cuota-del-centro/i.test(motivo)) {
@@ -3608,25 +3716,39 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             if (/material-ilegible/i.test(motivo)) {
                 return 'Hubo un problema para leer el material de este recurso. No es culpa tuya: lo estamos revisando.';
             }
-            return motivo ? ('No se ha podido generar la infografía: ' + motivo) : 'No se ha podido generar la infografía.';
+            return motivo ? ('No se ha podido generar ' + noun + ': ' + motivo) : ('No se ha podido generar ' + noun + '.');
         }
 
         function renderCreateStatus(encargo) {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
 
+            const esjuego = encargo.tool === 'gamificacion';
+            pulsoCreateSetTool(esjuego ? 'gamificacion' : 'infografia');
+
             const pillClass = pulsoCreateStatusPillClass(encargo.status);
             const pillLabel = pulsoCreateStatusLabel(encargo.status);
 
+            // Estimación de juegos (carta 6 C3): posicion × 35s en cola, y
+            // "casi listo" trabajando en vez del tiempo genérico de lámina.
+            // Para infografías se mantiene el texto de siempre.
             let progressLine = '';
             if (encargo.status === 'encolado') {
-                progressLine = encargo.posicion
-                    ? ('Posición en cola: ' + encargo.posicion)
-                    : 'Esperando turno en la cola de Épica.';
+                if (esjuego && encargo.posicion) {
+                    const estSeconds = encargo.posicion * 35;
+                    const estLabel = estSeconds < 60 ? (estSeconds + ' s') : (Math.round(estSeconds / 60) + ' min');
+                    progressLine = 'Tienes ' + encargo.posicion + ' por delante · unos ' + estLabel;
+                } else {
+                    progressLine = encargo.posicion
+                        ? ('Posición en cola: ' + encargo.posicion)
+                        : 'Esperando turno en la cola de Épica.';
+                }
             } else if (encargo.status === 'trabajando') {
-                progressLine = 'Generando la lámina… puede tardar un par de minutos.';
+                progressLine = esjuego
+                    ? 'Casi listo, suele tardar alrededor de un minuto.'
+                    : 'Generando la lámina… puede tardar un par de minutos.';
             } else if (encargo.status === 'pendiente') {
-                progressLine = 'Preparando el encargo…';
+                progressLine = esjuego ? 'Generando tu juego…' : 'Generando tu infografía…';
             }
 
             let html = '<div class="pulso-create-status">'
@@ -3638,6 +3760,13 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 html += '<p class="pulso-create-hint">' + escapeHtmlText(progressLine) + '</p>';
             }
 
+            // Pasados 2 minutos sin terminar, deja claro que no hace falta
+            // seguir mirando: el aviso de mensajería ya lo manda
+            // notify_completion() en servidor cuando el encargo termine.
+            if (!encargo.terminal && (Date.now() - pulsoCreatePollStart) >= 120000) {
+                html += '<p class="pulso-create-hint">Te avisaremos cuando esté listo; puedes cerrar el chat.</p>';
+            }
+
             // "motivo" en un estado NO terminal es el último error de red del
             // reintento (el servidor ya lo filtra a solo viewanalytics — ver
             // api_create_status.php). Es un aviso técnico de que se está
@@ -3647,28 +3776,41 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     + escapeHtmlText(encargo.motivo) + '</div>';
             }
 
-            if (encargo.status === 'listo' && encargo.imageurl) {
+            if (encargo.status === 'listo' && (encargo.imageurl || encargo.playurl)) {
                 if (encargo.mock) {
-                    html += '<div class="pulso-create-notice-inline warn">Esta lámina es de prueba, no una generación real.</div>';
+                    html += '<div class="pulso-create-notice-inline warn">'
+                        + (esjuego ? 'Este juego es de prueba' : 'Esta lámina es de prueba') + ', no una generación real.</div>';
                 }
                 if (encargo.verificado === false || (encargo.avisos && encargo.avisos.length)) {
-                    html += '<div class="pulso-create-notice-inline warn">Épica marcó esta lámina para revisar'
+                    html += '<div class="pulso-create-notice-inline warn">Épica marcó ' + (esjuego ? 'este juego' : 'esta lámina') + ' para revisar'
                         + (encargo.avisos && encargo.avisos.length
                             ? ': ' + encargo.avisos.map(function(a) { return escapeHtmlText(String(a)); }).join('; ')
                             : '')
                         + '.</div>';
                 }
-                html += '<img class="pulso-create-image" src="' + escapeHtmlText(encargo.imageurl) + '" alt="'
-                    + escapeHtmlText(encargo.titulo || 'Infografía generada') + '">';
-                if (encargo.titulo) html += '<div class="pulso-create-image-title">' + escapeHtmlText(encargo.titulo) + '</div>';
-                if (encargo.tema) html += '<div class="pulso-create-image-tema">' + escapeHtmlText(encargo.tema) + '</div>';
-                html += '<div class="pulso-create-image-actions">'
-                    + '<a href="' + escapeHtmlText(encargo.imageurl) + '" target="_blank" rel="noopener">Abrir a tamaño completo</a>'
-                    + '<a href="' + escapeHtmlText(encargo.downloadurl) + '">Descargar</a>'
-                    + '</div>';
+
+                if (esjuego) {
+                    // El juego se juega FUERA del widget (juego.php), nunca
+                    // en un iframe dentro del chat: es estrecho, y el juego
+                    // corre en un marco aislado con su propia CSP/sandbox.
+                    if (encargo.titulo) html += '<div class="pulso-create-image-title">' + escapeHtmlText(encargo.titulo) + '</div>';
+                    if (encargo.tema) html += '<div class="pulso-create-image-tema">' + escapeHtmlText(encargo.tema) + '</div>';
+                    html += '<div class="pulso-create-image-actions">'
+                        + '<a href="' + escapeHtmlText(encargo.playurl) + '" target="_blank" rel="noopener">Jugar</a>'
+                        + '</div>';
+                } else {
+                    html += '<img class="pulso-create-image" src="' + escapeHtmlText(encargo.imageurl) + '" alt="'
+                        + escapeHtmlText(encargo.titulo || 'Infografía generada') + '">';
+                    if (encargo.titulo) html += '<div class="pulso-create-image-title">' + escapeHtmlText(encargo.titulo) + '</div>';
+                    if (encargo.tema) html += '<div class="pulso-create-image-tema">' + escapeHtmlText(encargo.tema) + '</div>';
+                    html += '<div class="pulso-create-image-actions">'
+                        + '<a href="' + escapeHtmlText(encargo.imageurl) + '" target="_blank" rel="noopener">Abrir a tamaño completo</a>'
+                        + '<a href="' + escapeHtmlText(encargo.downloadurl) + '">Descargar</a>'
+                        + '</div>';
+                }
             } else if (encargo.status === 'fallado' || encargo.status === 'desconocido') {
                 html += '<div class="pulso-create-notice-inline danger">' + escapeHtmlText(pulsoCreateFailureMessage(encargo)) + '</div>'
-                    + '<button type="button" class="pulso-create-submit" onclick="openCreatePanel()">Crear un encargo nuevo</button>';
+                    + '<button type="button" class="pulso-create-submit" onclick="openCreatePanel(\'' + pulsoCreateTool + '\')">Crear un encargo nuevo</button>';
             } else if (encargo.status === 'ensayo') {
                 html += '<div class="pulso-create-notice-inline warn">Modo de ensayo activo: el sobre se construyó pero no se envió a Épica.</div>';
                 if (encargo.sobre) {
@@ -3677,7 +3819,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 }
             }
 
-            html += '<button type="button" class="pulso-create-back-link" onclick="openCreatePanel()">← Volver al formulario</button>'
+            html += '<button type="button" class="pulso-create-back-link" onclick="openCreatePanel(\'' + pulsoCreateTool + '\')">← Volver al formulario</button>'
                 + '</div><div id="pulso-create-gallery"></div>';
 
             body.innerHTML = html;
@@ -3699,22 +3841,39 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 .catch(function() { /* la galería es un extra, no bloquea el panel */ });
         }
 
+        // Galería conjunta (paso 3): infografía y juego mezclados, más
+        // recientes primero. Una infografía se ENSEÑA (miniatura real); un
+        // juego se JUEGA, así que su tarjeta no tiene imagen (pluginfile.php
+        // sigue bloqueando su filearea a propósito) — icono + título de
+        // respaldo + etiqueta. Ninguna de las dos usa el cian como texto.
         function renderCreateGallery(encargos) {
             const container = document.getElementById('pulso-create-gallery');
             if (!container) return;
             if (!encargos.length) {
-                container.innerHTML = '<p class="pulso-create-hint">Aún no has creado ninguna infografía en este curso.</p>';
+                container.innerHTML = '<p class="pulso-create-hint">Aún no has creado ninguna infografía ni ningún juego en este curso.</p>';
                 return;
             }
 
-            // El servidor ya filtra a status='listo' con imagen (ver
+            // El servidor ya filtra a status='listo' con fichero (ver
             // api_create_status.php), así que aquí no hay placeholder de
-            // estado: todas las tarjetas tienen imagen real.
-            let html = '<div class="pulso-create-gallery-title">Tus últimas infografías</div><div class="pulso-create-gallery-grid">';
+            // estado: todas las tarjetas son creaciones terminadas.
+            let html = '<div class="pulso-create-gallery-title">Tus últimas creaciones</div><div class="pulso-create-gallery-grid">';
             encargos.forEach(function(e) {
                 const dateLabel = new Date(e.timecreated * 1000).toLocaleDateString();
-                html += '<button type="button" class="pulso-create-gallery-item" onclick="openCreateGalleryItem(' + e.id + ')">'
-                    + '<img src="' + escapeHtmlText(e.imageurl) + '" alt="">'
+                const esjuego = e.tool === 'gamificacion';
+                const tag = esjuego ? 'Juego' : 'Infografía';
+                html += '<button type="button" class="pulso-create-gallery-item" onclick="openCreateGalleryItem(' + e.id + ", '" + e.tool + "')\">";
+                if (esjuego) {
+                    html += '<span class="pulso-create-gallery-icon" aria-hidden="true">'
+                        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+                        + '<rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/>'
+                        + '<line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>'
+                        + '</span>'
+                        + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(e.titulo || 'Juego') + '</span>';
+                } else {
+                    html += '<img src="' + escapeHtmlText(e.imageurl) + '" alt="">';
+                }
+                html += '<span class="pulso-create-gallery-tag">' + tag + '</span>'
                     + '<span class="pulso-create-gallery-date">' + escapeHtmlText(dateLabel) + '</span>'
                     + '</button>';
             });
@@ -3722,10 +3881,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             container.innerHTML = html;
         }
 
-        function openCreateGalleryItem(encargoid) {
+        function openCreateGalleryItem(encargoid, tool) {
             const messagesDiv = document.getElementById('pulso-messages');
             const body = document.getElementById('pulso-create-body');
             if (!messagesDiv || !body) return;
+            pulsoCreateSetTool(tool);
             messagesDiv.classList.add('pulso-showing-create');
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
             // Si sigue en curso, se sondea igual que un encargo recién creado.

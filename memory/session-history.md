@@ -1,5 +1,59 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-29 — Gamificación paso 3: «Crear juego» en el bloque Crear (v1.23.0)
+
+Tercer paso de Gamificación: interfaz del bloque Crear con el segundo CTA,
+repitiendo el patrón de infografías en vez de duplicarlo. Contexto releído:
+`docs/epica_gamificacion_carta6.md` (C3, tiempos) y todo el bloque Crear en
+`chat_simple_view.php`/`api_create_*.php`. Las reglas que deben persistir
+están en `CLAUDE.md` → "Gamificación — paso 3"; aquí lo que costó encontrar.
+
+- **El payload de `api_create_status.php` distinguía juego de infografía por
+  la PRESENCIA de `tool`** (solo se añadía dentro del `if ($esjuego)`), lo
+  cual funcionaba mientras la galería filtraba a una sola herramienta. En
+  cuanto la galería pasa a ser conjunta, el frontend necesita `tool` en TODA
+  fila para decidir tarjeta/icono — sacarlo del `if` y dejarlo en la
+  construcción base del payload fue el único cambio de servidor no trivial;
+  `puntua`/`playurl` se quedan donde estaban (exclusivos de un juego).
+  Corregida también la línea de `CLAUDE.md` (paso 2) que decía "`tool`/
+  `puntua` solo se añaden al payload de un juego" — ya no es cierto para
+  `tool`.
+- **El título de respaldo del juego («Juego sobre X») se calculó en
+  servidor, no en el JS de la galería**, aunque el encargo original solo lo
+  pedía para la tarjeta: `renderCreateStatus()` (la vista de detalle)
+  también enseña `encargo.titulo`, y si el cálculo viviera solo en
+  `renderCreateGallery()` las dos vistas podrían mostrar títulos distintos
+  para el mismo encargo según cuál se abriera primero. Un único punto
+  (`pulso_status_encargo_payload()`) que replica exactamente el criterio de
+  `juego.php` (tema → nombre del recurso vía `get_fast_modinfo()` → "Juego").
+- **`openCreatePanel()`/`openCreateGalleryItem()` no tenían forma de saber
+  qué herramienta reabrir.** Antes de este paso solo existía una, así que
+  "Volver al formulario" y "Crear un encargo nuevo" no necesitaban acordarse
+  de nada. Con dos CTA, ambos botones (y el clic en una tarjeta de galería)
+  tienen que propagar el `tool` del encargo que se está viendo —
+  `pulsoCreateSetTool()` nuevo centraliza esa asignación (además de refrescar
+  el `<h4 id="pulso-create-title">` del panel) para no repetirla suelta en
+  cuatro sitios distintos.
+- **La estimación de cola de un juego (`posición × 35 s`) no tenía ningún
+  campo de servidor nuevo que leer**: `posicion` ya viajaba en el payload
+  desde el paso 4 de Épica (`epica_posicion`), solo hacía falta la fórmula
+  del lado cliente en `renderCreateStatus()`, distinta de la de una
+  infografía ("Posición en cola: N" sin estimar segundos, porque esa carta
+  nunca dio una cifra equivalente para láminas).
+- **El aviso "pasados 2 minutos" reutiliza `pulsoCreatePollStart`**, ya
+  existente desde el paso 4 para la ventana de 30 minutos de sondeo en
+  primer plano — no hizo falta ninguna variable ni temporizador nuevo, solo
+  una segunda comparación contra el mismo reloj.
+- **Verificado con lógica aislada**: `php -l` (PHP 8.3 portátil del
+  scratchpad) en los 3 ficheros PHP tocados, y el bloque `<script>` completo
+  de `chat_simple_view.php` extraído y pasado por `node --check`. Diff
+  mostrado antes de aplicar, como pidió Marcos.
+- **Sin verificar contra Moodle real** (mismo bloqueo de siempre): que las
+  dos tarjetas quepan bien en el ancho real del bloque en las tres anchuras
+  de columna de Moodle; el botón «Jugar» abriendo `juego.php` en pestaña
+  nueva desde un `sandbox` real; y la galería mezclando de verdad una lámina
+  y un juego del mismo curso.
+
 ## 2026-09-29 — Gamificación paso 2: jugar un juego de forma segura (v1.22.0)
 
 Segundo paso de Gamificación: `juego_html.php` (sirve el HTML modificado) y

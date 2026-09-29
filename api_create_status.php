@@ -8,8 +8,9 @@
  * GET params:
  *   courseid  (obligatorio)
  *   encargoid (opcional): con él, detalle de UN encargo; sin él, la galería
- *             con los últimos encargos 'listo' (con imagen) de ESTE usuario
- *             en el curso — pendientes/fallidos/de ensayo no salen ahí.
+ *             con los últimos encargos 'listo' (con fichero) de ESTE usuario
+ *             en el curso, infografías Y juegos — pendientes/fallidos/de
+ *             ensayo no salen ahí.
  *
  * Nunca se devuelve el base64 de la imagen: solo la URL de pluginfile.php,
  * que ya valida el acceso ella misma (block_pulso_pluginfile() en lib.php).
@@ -71,6 +72,27 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         $avisos = is_array($decoded) ? $decoded : null;
     }
 
+    // Título de respaldo SOLO para juegos sin título propio, mismo criterio
+    // que juego.php: tema -> nombre del recurso -> "Juego". Una infografía
+    // sin título se queda en null (comportamiento sin cambios).
+    $titulo = $encargo->titulo !== null ? trim((string)$encargo->titulo) : '';
+    if ($esjuego && $titulo === '') {
+        $tema = trim((string)($encargo->tema ?? ''));
+        if ($tema !== '') {
+            $titulo = 'Juego sobre ' . $tema;
+        } else {
+            $resourcename = '';
+            try {
+                $modinfo = get_fast_modinfo($encargo->courseid);
+                $cm = $modinfo->get_cm($encargo->cmid);
+                $resourcename = trim((string)$cm->name);
+            } catch (\Throwable $e) {
+                $resourcename = '';
+            }
+            $titulo = $resourcename !== '' ? ('Juego sobre ' . $resourcename) : 'Juego';
+        }
+    }
+
     $sobre = null;
     if ($canviewanalytics && $encargo->status === 'ensayo' && !empty($encargo->sobre_json)) {
         $decoded = json_decode($encargo->sobre_json, true);
@@ -94,7 +116,8 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         'terminal' => $terminal,
         'posicion' => isset($encargo->epica_posicion) && $encargo->epica_posicion !== null ? (int)$encargo->epica_posicion : null,
         'format' => $encargo->format,
-        'titulo' => $encargo->titulo !== null && $encargo->titulo !== '' ? $encargo->titulo : null,
+        'tool' => $encargo->tool,
+        'titulo' => $titulo !== '' ? $titulo : null,
         'tema' => $encargo->tema !== null && $encargo->tema !== '' ? $encargo->tema : null,
         'mock' => !empty($encargo->mock),
         'verificado' => isset($encargo->verificado) && $encargo->verificado !== null ? (bool)$encargo->verificado : null,
@@ -107,10 +130,10 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         'timemodified' => (int)$encargo->timemodified,
     ];
 
-    // Campos propios de gamificación: no se añaden a una infografía (payload
-    // sin cambios para esa herramienta).
+    // "puntua"/"playurl" son propios de un juego; una infografía no los lleva.
+    // "tool" sí viaja para las dos, desde el paso 3 (Gamificación): la
+    // galería conjunta lo necesita para distinguir tarjeta e icono.
     if ($esjuego) {
-        $payload['tool'] = $encargo->tool;
         $payload['puntua'] = isset($encargo->puntua) && $encargo->puntua !== null ? (bool)$encargo->puntua : null;
         $payload['playurl'] = $playurl;
     }
@@ -150,22 +173,23 @@ try {
         ], JSON_UNESCAPED_UNICODE);
     } else {
         // Galería: solo LOS PROPIOS encargos del usuario en este curso que son
-        // infografías de verdad (status = 'listo' con fichero guardado), más
+        // creaciones de verdad (status = 'listo' con fichero guardado), más
         // recientes primero. No es un listado de todo el curso (eso seguiría
         // exigiendo viewanalytics por fila, no por vista completa), y no
         // enseña encargos en curso/fallidos/de ensayo: esos los sigue el panel
         // de progreso, no la galería.
         //
-        // "tool = infografia" es deliberado (Gamificación paso 1): un juego
-        // 'listo' también tiene "filename" relleno (el .html, en su propia
-        // filearea), así que sin este filtro la galería de infografías
-        // empezaría a mezclar juegos en cuanto existiera el primero. La
-        // galería de juegos es del paso 2, con su propia UI.
+        // Desde Gamificación paso 3, SIN filtro de "tool": la galería es
+        // conjunta de infografías y juegos (cada fila lleva "tool" en el
+        // payload para que el frontend distinga tarjeta e icono). Antes
+        // filtraba a "infografia" porque un juego 'listo' también tiene
+        // "filename" relleno (el .html, en su propia filearea) y todavía no
+        // existía UI para enseñarlo aquí.
         $rows = $DB->get_records_select(
             'block_pulso_encargos',
-            "courseid = :courseid AND userid = :userid AND status = :status AND tool = :tool
+            "courseid = :courseid AND userid = :userid AND status = :status
                 AND filename IS NOT NULL AND filename <> ''",
-            ['courseid' => $courseid, 'userid' => $userid, 'status' => 'listo', 'tool' => creation_quota::TOOL_INFOGRAFIA],
+            ['courseid' => $courseid, 'userid' => $userid, 'status' => 'listo'],
             'timecreated DESC',
             '*',
             0,

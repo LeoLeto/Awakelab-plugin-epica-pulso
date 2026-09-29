@@ -731,8 +731,10 @@ de un paso futuro (ver `lib.php`). Reglas que no se pueden romper:
   infografía sigue con `imageurl`/`downloadurl` de `pluginfile.php`, sin
   ningún campo nuevo; un juego lleva `playurl` (a `juego.php`) y **nunca**
   `imageurl`/`downloadurl` — esa URL apuntaría a la filearea `juego`, que
-  `pluginfile.php` bloquea a propósito. `tool`/`puntua` solo se añaden al
-  payload de un juego, no al de una infografía.
+  `pluginfile.php` bloquea a propósito. `puntua` solo se añade al payload de
+  un juego, no al de una infografía. **`tool` sí viaja en los dos** desde el
+  paso 3 (antes solo en el de un juego): la galería conjunta lo necesita para
+  distinguir tarjeta e icono sin adivinarlo por la ausencia de `imageurl`.
 - **`juego.php`/`juego_html.php` comparten el mismo criterio de acceso que
   `block_pulso_pluginfile()`** (dueño del encargo o `viewanalytics` en el
   curso) y el mismo orden: existe → `require_login()` → acceso → `tool`/
@@ -746,6 +748,60 @@ de un paso futuro (ver `lib.php`). Reglas que no se pueden romper:
   acentos y otro UTF-8 real, y cortar a mitad de un carácter multibyte
   corrompería el documento entero (mismo motivo que la regla ya existente
   para el material que se manda a Épica).
+
+## Gamificación — paso 3: «Crear juego» en el bloque Crear (v1.23.0)
+
+Añade el segundo CTA a la interfaz repitiendo el patrón de infografías —el
+paso 1 ya lo dejó dicho: "añadirlos es repetir este mismo patrón, no
+descomentar algo ya puesto"—. Reglas que deben persistir:
+
+- **Un único formulario parametrizado por herramienta, nunca una copia.**
+  `pulsoCreateTool` (`'infografia'`/`'gamificacion'`) decide en
+  `chat_simple_view.php` los textos (`PULSO_CREATE_TOOL_LABELS`), si se pide
+  el selector de formato (solo infografías) y qué manda `submitCreate()`
+  (antes `submitCreateInfografia()`, renombrada al dejar de ser exclusiva de
+  una herramienta). El desplegable de recursos, el cupo por sección y el
+  resto de cupos son el mismo código sin cambios: son un contador conjunto
+  (carta 6 B5) y las dos herramientas comparten `get_resources_context()`.
+- **El juego se juega FUERA del widget, siempre.** El botón «Jugar» de
+  `renderCreateStatus()` abre `playurl` (`juego.php`) con
+  `target="_blank" rel="noopener"` — nunca un `<iframe>` del juego dentro del
+  panel de chat: el panel es estrecho y el juego ya corre en su propio marco
+  aislado con CSP/`sandbox` (paso 2). Para una infografía se mantiene la
+  vista actual (imagen + "Abrir a tamaño completo"/"Descargar").
+- **La galería es conjunta, con `tool` en cada fila.** `api_create_status.php`
+  quitó el filtro `tool = 'infografia'` de la rama sin `encargoid`: ahora
+  devuelve los últimos 8 encargos `listo` con fichero de las DOS
+  herramientas, más recientes primero. Consecuencia en el payload
+  (`pulso_status_encargo_payload()`): **`tool` viaja para las dos** (antes
+  solo para un juego) — sin ese campo el frontend no podría decidir tarjeta
+  ni icono en la galería mezclada. `puntua`/`playurl` siguen siendo
+  exclusivos de un juego.
+- **Título de respaldo del juego, calculado en SERVIDOR, no en el cliente.**
+  Mismo criterio que `juego.php`: si `titulo` viene vacío, `tema` → nombre
+  del recurso (`get_fast_modinfo()->get_cm($cmid)->name`) → `"Juego"`.
+  Calculado una vez en `pulso_status_encargo_payload()` y reutilizado tanto
+  en el detalle del encargo como en la galería — evita reimplementar la
+  regla en JavaScript y que las dos vistas puedan divergir.
+- **Tarjeta de juego sin imagen, a propósito.** `pluginfile.php` sigue
+  bloqueando la filearea `juego` (paso 1), así que un juego nunca lleva
+  `imageurl`/`downloadurl`: su tarjeta en la galería es icono de gamepad +
+  título de respaldo + fecha, no una miniatura. Etiqueta «Juego»/«Infografía»
+  en cada tarjeta con `#34547A` — nunca cian como color de texto (regla del
+  tema claro, sigue aplicando).
+- **Estimación de espera de un juego, de la carta 6 (C3), no inventada:**
+  en cola, `posición × 35 s`; trabajando, «Casi listo, suele tardar
+  alrededor de un minuto». Para infografías se mantienen los textos de
+  siempre (carta de láminas, ~150 s). El aviso genérico a los 2 minutos sin
+  terminar («Te avisaremos cuando esté listo; puedes cerrar el chat») es
+  independiente de la herramienta y solo un texto — el aviso real ya lo
+  manda `notify_completion()` (paso 4) al llegar a un estado terminal.
+- **Reabrir con la herramienta correcta.** «Crear un encargo nuevo», «←
+  Volver al formulario» y abrir un ítem de la galería
+  (`openCreateGalleryItem(id, tool)`) propagan el `tool` del encargo que se
+  está viendo, nunca vuelven a `'infografia'` por defecto — si no, un alumno
+  que falla creando un juego y pulsa «Crear un encargo nuevo» aterrizaría en
+  el formulario de infografía sin darse cuenta.
 
 ## Cómo se trabaja este repo con prompts
 

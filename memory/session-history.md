@@ -1,5 +1,18 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-30 — Ampliación: relevancia primero y público (v1.24.1)
+
+Primera prueba real (curso 92): un artículo de escalas de depresión (53.814 citas) para un tema de
+muestreo, y dos vídeos para profesores en un manual de alumnado. Causa: elegir por popularidad
+entre los 10 resultados. Ahora solo los 5 primeros por relevancia compiten por vistas/citas
+(criterio en `CLAUDE.md`). Dos detalles que costó ver:
+- `videos.list` **no devuelve los ítems en el orden de `search.list`**: hay que recorrer los ids en
+  el orden de la búsqueda, o el "top 5 por relevancia" sería un top 5 arbitrario.
+- El prompt de Haiku ahora deduce el público y lo mete en `query_videos`; `query_articulos` no.
+- El paso de upgrade 2026093003 borra TODA la caché de ampliaciones (solo había pruebas). Efecto
+  colateral aceptado: esas filas dejan de contar en los topes del día del despliegue.
+- Sin verificar contra las APIs reales: solo `php -l` y prueba aislada de la selección.
+
 ## 2026-09-30 — Ampliación de recursos paso 1: servidor (v1.24.0)
 
 Herramienta nueva y propia (sin Épica): tema con Haiku + 2 vídeos YouTube + 2 artículos OpenAlex,

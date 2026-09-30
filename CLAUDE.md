@@ -1066,14 +1066,24 @@ Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya i
 - **Semántica de `videos_json`/`articulos_json`**: `NULL` = fuente no consultada o fallida; `[]` =
   consultada sin resultados. Los avisos de un `listo` viajan en `motivo` (una línea por aviso) para
   que la caché los devuelva tal cual; en un `fallado`, `motivo` es la causa.
-- **YouTube**: `search.list` (10, `safeSearch=strict`, `videoEmbeddable`, `regionCode=ES`,
-  `relevanceLanguage` = idioma del curso) + `videos.list` (1 unidad); se descartan < 120 s
-  (Shorts) y se quedan los 2 con más `viewCount`. **OpenAlex**: `type:article|review,
-  has_abstract:true`, 10 resultados, los 2 de más citas; "a igualdad aproximada" = un artículo
-  en acceso abierto pesa ×1,2. URLs validadas (solo `https://www.youtube.com/watch?v=`,
+- **Criterio de selección: relevancia primero, popularidad después** (v1.24.1; la primera
+  prueba real eligió «The CES-D Scale», 53.814 citas y fuera de tema, y dos vídeos para
+  profesores en un manual de alumnado, por ser los más vistos de 10). Solo los
+  `RELEVANCE_POOL` (5) primeros por relevancia que pasen los filtros compiten por
+  popularidad; nunca se elige entre los 10. **YouTube**: `search.list` (10, ya en orden de
+  relevancia, `safeSearch=strict`, `videoEmbeddable`, `regionCode=ES`, `relevanceLanguage` =
+  idioma del curso) + `videos.list` (1 unidad, que NO conserva el orden: se recorre en el de
+  `search.list`); los 5 primeros ≥ 120 s (sin Shorts), y de ellos los 2 con más `viewCount`,
+  prefiriendo canales distintos (por `channelId`) mientras el pool lo permita. **OpenAlex**:
+  `type:article|review,has_abstract:true`, `sort=relevance_score:desc`, los 5 primeros válidos
+  y de ellos los 2 de más citas; "a igualdad aproximada" = un artículo en acceso abierto pesa
+  ×1,2. **Público**: Haiku deduce a quién va el recurso (alumnado/profesorado/general) y lo
+  refleja en `query_videos` ("para estudiantes"…) salvo que sea general; `query_articulos`
+  sigue siendo académica, sin público. URLs validadas (solo `https://www.youtube.com/watch?v=`,
   `https://i.ytimg.com/`, `https://doi.org/`, `https://openalex.org/` o la de acceso abierto
   `https://`); lo externo (títulos, canales, autores) se guarda tal cual y **se escapa al pintarlo**
-  (paso 2).
+  (paso 2). Cambiar este criterio o el prompt deja obsoletas las filas ya cacheadas: hace falta
+  un paso de upgrade que las borre (como el de 2026093003).
 - **Hueco RGPD documentado**: la tabla guarda `userid` (quién la generó) pero el plugin NO tiene
   `classes/privacy/provider.php`, así que no hay metadata/export/borrado ni para esta tabla ni
   para las demás. Pendiente como tarea propia; tampoco hay limpieza de filas al borrar un curso.

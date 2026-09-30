@@ -1029,6 +1029,55 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
   usuario sin `email` → fallado con motivo claro (el token sale sin claim `email`,
   y sin ella Épica tampoco tiene con quién contactar).
 
+## Ampliación de recursos — paso 1 (v1.24.0)
+
+Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya indexado
+(`block_pulso_full_text`, `usable=1`), Haiku saca el tema y se buscan 2 vídeos de YouTube y
+2 artículos de OpenAlex. Lógica en `classes/ampliacion_service.php`, endpoint
+`api_ampliacion.php` (POST). Sin UI todavía (paso 2). Reglas que deben persistir:
+
+- **La caché por `content_hash` es la pieza central, no una optimización.** `search.list` de
+  YouTube cuesta 100 unidades y el proyecto tiene ~100 búsquedas al día EN TOTAL. Una fila de
+  `block_pulso_ampliaciones` por `(courseid, cmid, content_hash)` (índice único), compartida por
+  todos los usuarios del curso. `listo` < `ampliacion_ttl_dias` (30) → se sirve sin llamar a
+  nada; texto reindexado → otro hash → otra ampliación. Un `fallado` se cachea como máximo 1 h.
+  La regeneración actualiza la fila EN SITIO y renueva `timecreated` (es lo que cuentan los
+  topes); las filas de hashes viejos solo se borran si son de días anteriores (las de hoy siguen
+  contando en los topes).
+- **Topes propios, independientes de infografías/juegos** (no escriben en
+  `block_pulso_encargos`): `ampliacion_max_dia_sitio` (80, deja margen a las 100 búsquedas) y
+  `ampliacion_max_dia_usuario` (5), solo ampliaciones NUEVAS (la caché no cuenta). Cuentan filas
+  generadas hoy, `fallado` incluidas (un fallo también pudo gastar una búsqueda). Un candado
+  (`lock_config`, por recurso) evita que dos peticiones simultáneas gasten dos búsquedas.
+- **Orden del endpoint**: autenticar → sesskey → `createactivity` → `check_enabled` → el `cmid`
+  se RECALCULA contra `creation_quota::get_resources_context()` (visible + usable; nunca el del
+  cliente) → `session\manager::write_close()` → servicio. Caché → tope → generar, en ese orden.
+- **Qué viaja a las APIs**: solo las consultas generadas (`query_videos`, `query_articulos`).
+  Nunca el texto del recurso ni datos del usuario. Haiku (`FAST_MODEL`, vía
+  `anthropic_connector::send_fast_query()`, que usa `encode_payload()`) recibe nombre del
+  recurso, sección y 6.000 caracteres (`mb_substr`); su system prompt es propio, no toca el
+  prompt base cacheado, y declara el texto del recurso como material, no instrucciones.
+- **Claves por cabecera, nunca en la URL** (`X-Goog-Api-Key`, `Authorization: Bearer` de
+  OpenAlex — la doc de OpenAlex las da por equivalentes a `?api_key=`). `scrub()` las borra de
+  cualquier mensaje antes de guardarlo o devolverlo; el cliente nunca ve claves ni respuestas
+  crudas. Sin una clave, la herramienta sigue con la otra fuente y un aviso; sin ninguna, el
+  endpoint responde "no configurada". Cada fuente falla por separado (`listo` + aviso); solo si
+  fallan TODAS las configuradas es `fallado`.
+- **Semántica de `videos_json`/`articulos_json`**: `NULL` = fuente no consultada o fallida; `[]` =
+  consultada sin resultados. Los avisos de un `listo` viajan en `motivo` (una línea por aviso) para
+  que la caché los devuelva tal cual; en un `fallado`, `motivo` es la causa.
+- **YouTube**: `search.list` (10, `safeSearch=strict`, `videoEmbeddable`, `regionCode=ES`,
+  `relevanceLanguage` = idioma del curso) + `videos.list` (1 unidad); se descartan < 120 s
+  (Shorts) y se quedan los 2 con más `viewCount`. **OpenAlex**: `type:article|review,
+  has_abstract:true`, 10 resultados, los 2 de más citas; "a igualdad aproximada" = un artículo
+  en acceso abierto pesa ×1,2. URLs validadas (solo `https://www.youtube.com/watch?v=`,
+  `https://i.ytimg.com/`, `https://doi.org/`, `https://openalex.org/` o la de acceso abierto
+  `https://`); lo externo (títulos, canales, autores) se guarda tal cual y **se escapa al pintarlo**
+  (paso 2).
+- **Hueco RGPD documentado**: la tabla guarda `userid` (quién la generó) pero el plugin NO tiene
+  `classes/privacy/provider.php`, así que no hay metadata/export/borrado ni para esta tabla ni
+  para las demás. Pendiente como tarea propia; tampoco hay limpieza de filas al borrar un curso.
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

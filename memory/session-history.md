@@ -1,5 +1,30 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-30 — Ampliación de recursos paso 1: servidor (v1.24.0)
+
+Herramienta nueva y propia (sin Épica): tema con Haiku + 2 vídeos YouTube + 2 artículos OpenAlex,
+cacheados por `(courseid, cmid, content_hash)`. Reglas permanentes en `CLAUDE.md` → "Ampliación de
+recursos — paso 1". Lo que costó encontrar / decidir:
+
+- **`get_resource_text()` no devolvía el `content_hash`**, que es la clave de la caché; se añadió
+  (cambio aditivo, nadie más lo lee).
+- **`anthropic_connector::encode_payload()` es `private`** y CLAUDE.md pide usarlo: en vez de
+  volverlo público se añadió `send_fast_query()` (Haiku, system propio) que lo usa por dentro.
+- **Claves por cabecera** en vez de `&api_key=` como sugería el encargo: la documentación de
+  OpenAlex da las dos vías por equivalentes y así la clave nunca aparece en una URL de log.
+  Verificado en la doc actual (help.openalex.org): `Authorization: Bearer`, filtros con coma = AND
+  y `|` = OR. La doc de YouTube consultada dice "1 unidad / 100 diarias" para `search.list`, lo
+  contrario de lo que sabemos (100 unidades, ~100 búsquedas) — se mantiene el dato del proyecto,
+  pero conviene confirmarlo en la consola de Google del proyecto.
+- **Caché de fallos** (≤ 1 h) y topes cuentan `fallado` también; el candado por recurso es lo que
+  evita que dos pulsaciones simultáneas gasten dos búsquedas.
+- **Avisos de un `listo` dentro de `motivo`** para no añadir columna a una tabla con columnas
+  fijadas por el encargo.
+- **Sin provider de privacidad** en el plugin entero: hueco documentado, no creado.
+- Desplegar: pasar por Notificaciones (tabla nueva) y poner `youtube_api_key`/`openalex_api_key`.
+- Sin verificar contra APIs reales (no hay claves en local): ni YouTube ni OpenAlex ni Haiku se
+  han llamado; solo `php -l` y pruebas aisladas del parseo.
+
 ## 2026-09-30 — Parche Gamificación: género en la píldora y mensaje de `desconocido` (v1.23.1)
 
 Visto en sanase-test con los encargos 10 y 11 (juegos):

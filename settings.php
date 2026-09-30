@@ -258,6 +258,53 @@ if ($ADMIN->fulltree) {
     ));
 
     // ============================================================
+    // Ampliacion de recursos: YouTube + OpenAlex (v1.24.0)
+    // ============================================================
+    $settings->add(new admin_setting_heading(
+        'block_pulso/ampliacion_heading',
+        get_string('ampliacion_heading', 'block_pulso'),
+        get_string('ampliacion_heading_desc', 'block_pulso')
+    ));
+
+    $settings->add(new admin_setting_configpasswordunmask(
+        'block_pulso/youtube_api_key',
+        get_string('youtube_api_key', 'block_pulso'),
+        get_string('youtube_api_key_desc', 'block_pulso'),
+        ''
+    ));
+
+    $settings->add(new admin_setting_configpasswordunmask(
+        'block_pulso/openalex_api_key',
+        get_string('openalex_api_key', 'block_pulso'),
+        get_string('openalex_api_key_desc', 'block_pulso'),
+        ''
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/ampliacion_max_dia_sitio',
+        get_string('ampliacion_max_dia_sitio', 'block_pulso'),
+        get_string('ampliacion_max_dia_sitio_desc', 'block_pulso'),
+        80,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/ampliacion_max_dia_usuario',
+        get_string('ampliacion_max_dia_usuario', 'block_pulso'),
+        get_string('ampliacion_max_dia_usuario_desc', 'block_pulso'),
+        5,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/ampliacion_ttl_dias',
+        get_string('ampliacion_ttl_dias', 'block_pulso'),
+        get_string('ampliacion_ttl_dias_desc', 'block_pulso'),
+        30,
+        PARAM_INT
+    ));
+
+    // ============================================================
     // Ciclo con Epica: dónde apuntar y modo de ensayo (v1.19.0)
     // ============================================================
     $settings->add(new admin_setting_heading(

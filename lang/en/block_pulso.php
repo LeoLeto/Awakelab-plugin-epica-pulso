@@ -100,6 +100,20 @@ $string['quota_course_day_multiplier_desc'] = 'Multiplied by the course\'s enrol
 $string['quota_teacher_day'] = 'Per teacher and day (all courses)';
 $string['quota_teacher_day_desc'] = 'Maximum creation requests a single teaching-staff member can submit per day, across ALL their courses.';
 
+// === Resource expansion: YouTube + OpenAlex (v1.24.0) ===
+$string['ampliacion_heading'] = 'Resource expansion — videos and articles';
+$string['ampliacion_heading_desc'] = 'For a course resource, Pulse finds 2 YouTube videos and 2 OpenAlex articles on its topic. One expansion is generated per resource and text version and shared by the whole course (cached), because YouTube search is limited to about 100 searches per day for the whole project. Only the generated search queries are sent to YouTube/OpenAlex — never the resource text or user data. Without a YouTube key only articles are offered, and vice versa.';
+$string['youtube_api_key'] = 'YouTube Data API key';
+$string['youtube_api_key_desc'] = 'YouTube Data API v3 key. search.list costs 100 quota units; videos.list costs 1.';
+$string['openalex_api_key'] = 'OpenAlex API key';
+$string['openalex_api_key_desc'] = 'OpenAlex API key (required since February 2026; the free tier gives about 1,000 searches per day).';
+$string['ampliacion_max_dia_sitio'] = 'New expansions per day (whole site)';
+$string['ampliacion_max_dia_sitio_desc'] = 'Maximum NEW expansions generated per day across the site; cached ones do not count. Keep it below your daily YouTube search quota (default 80 of ~100).';
+$string['ampliacion_max_dia_usuario'] = 'New expansions per user and day';
+$string['ampliacion_max_dia_usuario_desc'] = 'Maximum NEW expansions a single user can trigger per day; cached ones do not count.';
+$string['ampliacion_ttl_dias'] = 'Cache lifetime (days)';
+$string['ampliacion_ttl_dias_desc'] = 'After this many days a cached expansion is regenerated the next time someone asks for it. A changed resource text always generates a new one.';
+
 // === Epica cycle: sign, order, poll, collect (v1.19.0) ===
 $string['task_epica_ciclo_adhoc'] = 'One step of the Epica creation cycle (Pulse AI)';
 $string['epica_heading'] = 'Epica integration — creation cycle';

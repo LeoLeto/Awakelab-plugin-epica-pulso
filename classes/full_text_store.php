@@ -151,7 +151,7 @@ class full_text_store {
      * @param int $courseid
      * @param int $cmid
      * @return array{module_type: string, module_name: string, texto: string,
-     *               caracteres: int, extraido_por: string}|null
+     *               caracteres: int, extraido_por: string, content_hash: string}|null
      */
     public static function get_resource_text(int $courseid, int $cmid): ?array {
         global $DB;
@@ -171,6 +171,7 @@ class full_text_store {
             'texto'        => (string)$row->texto,
             'caracteres'   => (int)$row->caracteres,
             'extraido_por' => $row->extraido_por,
+            'content_hash' => (string)$row->content_hash,
         ];
     }
 

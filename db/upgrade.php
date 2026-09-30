@@ -352,5 +352,34 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026092900, 'pulso');
     }
 
+    if ($oldversion < 2026093002) {
+        // Ampliacion de recursos paso 1: cache por (courseid, cmid, content_hash).
+        // Debe coincidir con la definicion de install.xml (comprobar los dos a la vez).
+        $table = new xmldb_table('block_pulso_ampliaciones');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('cmid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('content_hash', XMLDB_TYPE_CHAR, '64', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('status', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'listo');
+            $table->add_field('tema', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('query_videos', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('query_articulos', XMLDB_TYPE_CHAR, '255', null, null, null, null);
+            $table->add_field('videos_json', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('articulos_json', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('motivo', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('uniq_course_cm_hash', XMLDB_INDEX_UNIQUE, ['courseid', 'cmid', 'content_hash']);
+            $table->add_index('idx_timecreated', XMLDB_INDEX_NOTUNIQUE, ['timecreated']);
+            $table->add_index('idx_userid_timecreated', XMLDB_INDEX_NOTUNIQUE, ['userid', 'timecreated']);
+            $dbman->create_table($table);
+        }
+
+        upgrade_block_savepoint(true, 2026093002, 'pulso');
+    }
+
     return true;
 }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="blocks/pulso/db" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    VERSION="20260924"
+    VERSION="20260930"
     COMMENT="XMLDB file for Moodle block Pulso"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
   <TABLES>
@@ -101,6 +101,32 @@
         <INDEX NAME="idx_userid" UNIQUE="false" FIELDS="userid"/>
         <INDEX NAME="idx_timecreated" UNIQUE="false" FIELDS="timecreated"/>
         <INDEX NAME="idx_courseid_timecreated" UNIQUE="false" FIELDS="courseid, timecreated"/>
+        <INDEX NAME="idx_userid_timecreated" UNIQUE="false" FIELDS="userid, timecreated"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="block_pulso_ampliaciones" COMMENT="Ampliacion de recursos (tema + videos de YouTube + articulos de OpenAlex). Una fila por recurso y version de su texto, compartida por todo el curso: es la cache que protege la cuota de YouTube.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="course_modules.id del recurso"/>
+        <FIELD NAME="content_hash" TYPE="char" LENGTH="64" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="content_hash de block_pulso_full_text: otro texto, otra ampliacion"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="listo" SEQUENCE="false" COMMENT="listo | fallado"/>
+        <FIELD NAME="tema" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="query_videos" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="query_articulos" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="videos_json" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="NULL = fuente no consultada o fallida; [] = consultada sin resultados"/>
+        <FIELD NAME="articulos_json" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="NULL = fuente no consultada o fallida; [] = consultada sin resultados"/>
+        <FIELD NAME="motivo" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="fallado: motivo del fallo. listo: avisos, uno por linea"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Quien la genero; solo auditoria y tope por usuario"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Momento de la ultima GENERACION (se renueva al regenerar): es lo que cuentan los topes diarios"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="uniq_course_cm_hash" UNIQUE="true" FIELDS="courseid, cmid, content_hash"/>
+        <INDEX NAME="idx_timecreated" UNIQUE="false" FIELDS="timecreated"/>
         <INDEX NAME="idx_userid_timecreated" UNIQUE="false" FIELDS="userid, timecreated"/>
       </INDEXES>
     </TABLE>

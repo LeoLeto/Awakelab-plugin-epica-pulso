@@ -323,6 +323,73 @@ class anthropic_connector {
     }
 
     /**
+     * Llamada corta de una sola vuelta a FAST_MODEL (Haiku), con su propio system
+     * prompt (string): para tareas auxiliares que NO son el chat — hoy el tema de
+     * la ampliacion de recursos. No toca el prompt base cacheado del chat.
+     *
+     * El payload va por encode_payload() (invariante: nunca json_encode a pelo).
+     * Haiku si admite temperature; sin prefill de assistant (la conversacion
+     * termina en "user").
+     *
+     * @param string $system_prompt
+     * @param string $user_message
+     * @param int $max_tokens
+     * @return string Texto de la respuesta.
+     * @throws \moodle_exception
+     */
+    public function send_fast_query(string $system_prompt, string $user_message, int $max_tokens = 300): string {
+        global $CFG;
+
+        $payload = [
+            'model' => self::FAST_MODEL,
+            'system' => $system_prompt,
+            'messages' => [['role' => 'user', 'content' => $user_message]],
+            'max_tokens' => $max_tokens,
+            'temperature' => 0.2,
+        ];
+
+        require_once($CFG->libdir . '/filelib.php');
+        $json_payload = $this->encode_payload($payload);
+
+        $attempt = 0;
+        while (true) {
+            $curl = new \curl();
+            $curl->setopt(['CURLOPT_TIMEOUT' => 25]);
+            $curl->setHeader($this->headers());
+
+            $response_raw = $curl->post($this->apiurl, $json_payload);
+            $http_status = (int)($curl->info['http_code'] ?? 0);
+
+            if ($curl->errno) {
+                throw new \moodle_exception('error_api_connection', 'block_pulso', '', 'cURL error: ' . $curl->error);
+            }
+            if (!$this->should_retry($http_status, $attempt)) {
+                break;
+            }
+            $attempt++;
+            sleep($this->retry_delay($attempt));
+        }
+
+        $response = json_decode($response_raw, true);
+        if (isset($response['error'])) {
+            $err_message = $response['error']['message'] ?? 'Unknown API error';
+            throw new \moodle_exception(
+                'error_api_response',
+                'block_pulso',
+                '',
+                $err_message,
+                'HTTP ' . $http_status . ': ' . $err_message
+            );
+        }
+
+        $text = trim($this->extract_text($response['content'] ?? []));
+        if ($text === '') {
+            throw new \moodle_exception('error_empty_response', 'block_pulso', '', 'No content in Anthropic response');
+        }
+        return $text;
+    }
+
+    /**
      * Igual que send_query_with_context() pero en modo STREAMING (SSE).
      *
      * Abre la petición a Anthropic con stream=true y va invocando $ondelta con

@@ -3676,12 +3676,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             container.appendChild(div);
         }
 
-        function pulsoCreateStatusLabel(status) {
+        function pulsoCreateStatusLabel(status, tool) {
+            // Mismo criterio de género que notify_completion(): juego = masculino.
+            const esjuego = tool === 'gamificacion';
             const labels = {
                 pendiente: 'En preparación',
                 encolado: 'En cola',
                 trabajando: 'Generando',
-                listo: 'Lista',
+                listo: esjuego ? 'Listo' : 'Lista',
                 fallado: 'No se pudo generar',
                 desconocido: 'No se pudo generar',
                 ensayo: 'Modo de ensayo'
@@ -3704,7 +3706,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // es fallo nuestro, nunca del usuario.
         function pulsoCreateFailureMessage(encargo) {
             const motivo = String(encargo.motivo || '');
-            const noun = encargo.tool === 'gamificacion' ? 'el juego' : 'la infografía';
+            const esjuego = encargo.tool === 'gamificacion';
+            // "desconocido": Épica ya no reconoce el trabajo (p. ej. reinicio
+            // del servicio a mitad de generación). El encargo SÍ cuenta en
+            // nuestros topes, así que no se promete lo contrario.
+            if (encargo.status === 'desconocido') {
+                return (esjuego ? 'Este juego' : 'Esta infografía')
+                    + ' se ha perdido en el servicio de generación. No es un error tuyo: crea '
+                    + (esjuego ? 'uno nuevo.' : 'una nueva.');
+            }
             if (/cuota-agotada/i.test(motivo)) {
                 return 'Has pedido varias creaciones seguidas y se ha agotado tu cupo de generación. '
                     + 'Vuelve a intentarlo en unos minutos.';
@@ -3716,7 +3726,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             if (/material-ilegible/i.test(motivo)) {
                 return 'Hubo un problema para leer el material de este recurso. No es culpa tuya: lo estamos revisando.';
             }
-            return motivo ? ('No se ha podido generar ' + noun + ': ' + motivo) : ('No se ha podido generar ' + noun + '.');
+            // Nunca se enseña el texto de relleno de marcar_fallo()
+            // ("Sin motivo especificado.") ni un motivo vacío.
+            if (!motivo.trim() || /^sin motivo especificado\.?$/i.test(motivo.trim())) {
+                return 'No se ha podido generar. Prueba a crear un encargo nuevo.';
+            }
+            return 'No se ha podido generar ' + (esjuego ? 'el juego' : 'la infografía') + ': ' + motivo;
         }
 
         function renderCreateStatus(encargo) {
@@ -3727,7 +3742,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             pulsoCreateSetTool(esjuego ? 'gamificacion' : 'infografia');
 
             const pillClass = pulsoCreateStatusPillClass(encargo.status);
-            const pillLabel = pulsoCreateStatusLabel(encargo.status);
+            const pillLabel = pulsoCreateStatusLabel(encargo.status, encargo.tool);
 
             // Estimación de juegos (carta 6 C3): posicion × 35s en cola, y
             // "casi listo" trabajando en vez del tiempo genérico de lámina.

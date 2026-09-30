@@ -1,5 +1,19 @@
 # Historial de sesiones — block_pulso
 
+## 2026-09-30 — Parche Gamificación: género en la píldora y mensaje de `desconocido` (v1.23.1)
+
+Visto en sanase-test con los encargos 10 y 11 (juegos):
+- **Encargo 10 acabó en `desconocido` a mitad de generación** — probable reinicio
+  del QA de Épica con el trabajo en marcha. El 11, idéntico, salió bien. No es un
+  bug nuestro: `desconocido` = Épica ya no reconoce el trabajo.
+- La UI enseñaba «No se ha podido generar el juego: Sin motivo especificado.»,
+  porque `marcar_fallo()` guarda ese relleno cuando Épica no da motivo. Ahora
+  `pulsoCreateFailureMessage()` trata `desconocido` aparte y filtra el relleno
+  en cualquier `fallado`. No se promete que no se gastó cupo: el encargo sí cuenta.
+- La píldora decía «Lista» para un juego; ahora concuerda según `tool`
+  (mismo criterio que `notify_completion()`). Solo `listo` tiene género; los
+  demás textos son neutros. Cambio solo de cliente: servidor y ciclo intactos.
+
 ## 2026-09-29 — Gamificación paso 3: «Crear juego» en el bloque Crear (v1.23.0)
 
 Tercer paso de Gamificación: interfaz del bloque Crear con el segundo CTA,

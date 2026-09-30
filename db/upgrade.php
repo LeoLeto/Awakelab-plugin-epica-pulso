@@ -381,5 +381,17 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026093002, 'pulso');
     }
 
+    if ($oldversion < 2026093003) {
+        // v1.24.1: nuevo criterio de seleccion (relevancia primero) y prompt con
+        // publico. Las filas cacheadas hasta ahora son solo de pruebas y se
+        // eligieron con el criterio viejo (popularidad entre 10): se borran para
+        // que se regeneren. Nota: dejan de contar en los topes de hoy.
+        if ($dbman->table_exists(new xmldb_table('block_pulso_ampliaciones'))) {
+            $DB->delete_records_select('block_pulso_ampliaciones', 'timecreated <= :now', ['now' => time()]);
+        }
+
+        upgrade_block_savepoint(true, 2026093003, 'pulso');
+    }
+
     return true;
 }

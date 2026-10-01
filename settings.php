@@ -305,6 +305,39 @@ if ($ADMIN->fulltree) {
     ));
 
     // ============================================================
+    // Retos de Epica: topes propios (v1.26.0)
+    // ============================================================
+    $settings->add(new admin_setting_heading(
+        'block_pulso/retos_heading',
+        get_string('retos_heading', 'block_pulso'),
+        get_string('retos_heading_desc', 'block_pulso')
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/retos_max_propuestas_usuario_dia',
+        get_string('retos_max_propuestas_usuario_dia', 'block_pulso'),
+        get_string('retos_max_propuestas_usuario_dia_desc', 'block_pulso'),
+        6,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/retos_max_elegidos_usuario_dia',
+        get_string('retos_max_elegidos_usuario_dia', 'block_pulso'),
+        get_string('retos_max_elegidos_usuario_dia_desc', 'block_pulso'),
+        3,
+        PARAM_INT
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'block_pulso/retos_max_elegidos_curso_dia',
+        get_string('retos_max_elegidos_curso_dia', 'block_pulso'),
+        get_string('retos_max_elegidos_curso_dia_desc', 'block_pulso'),
+        40,
+        PARAM_INT
+    ));
+
+    // ============================================================
     // Ciclo con Epica: dónde apuntar y modo de ensayo (v1.19.0)
     // ============================================================
     $settings->add(new admin_setting_heading(

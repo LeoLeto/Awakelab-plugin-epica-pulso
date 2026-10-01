@@ -114,6 +114,16 @@ $string['ampliacion_max_dia_usuario_desc'] = 'Maximum NEW expansions a single us
 $string['ampliacion_ttl_dias'] = 'Cache lifetime (days)';
 $string['ampliacion_ttl_dias_desc'] = 'After this many days a cached expansion is regenerated the next time someone asks for it. A changed resource text always generates a new one.';
 
+// === Epica Retos (challenges): own daily limits (v1.26.0) ===
+$string['retos_heading'] = 'Challenges (Epica) — own daily limits';
+$string['retos_heading_desc'] = 'Pulse asks Epica for six challenges, the user picks one and Epica returns a link where it is solved and graded. These limits are independent of Epica\'s own limits and of the infographic, game and expansion limits, and are checked BEFORE calling Epica. Epica additionally limits students to 3 requests (propose, "propose others" and pick together) every 10 minutes, and the centre to 100 proposals/picks per day.';
+$string['retos_max_propuestas_usuario_dia'] = 'Proposals per user and day';
+$string['retos_max_propuestas_usuario_dia_desc'] = 'Maximum challenge proposals (including "propose others") one user can request per day, across all courses.';
+$string['retos_max_elegidos_usuario_dia'] = 'Challenges picked per user and day';
+$string['retos_max_elegidos_usuario_dia_desc'] = 'Maximum challenges one user can pick (each creates a challenge in Epica) per day, across all courses.';
+$string['retos_max_elegidos_curso_dia'] = 'Challenges picked per course and day';
+$string['retos_max_elegidos_curso_dia_desc'] = 'Maximum challenges picked in a single course per day, by everyone. Keep it well below Epica\'s centre-wide daily limit.';
+
 // === Epica cycle: sign, order, poll, collect (v1.19.0) ===
 $string['task_epica_ciclo_adhoc'] = 'One step of the Epica creation cycle (Pulse AI)';
 $string['epica_heading'] = 'Epica integration — creation cycle';

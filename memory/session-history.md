@@ -1,5 +1,28 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-01 — Retos paso 1: servidor desde la petición web (v1.26.0)
+
+`api_retos.php` + `classes/retos_service.php` + 2 tablas. Reglas en `CLAUDE.md` → "Retos — paso 1".
+Lo que costó ver / decidir:
+- **Qué se refactorizó en `epica_client`**: solo visibilidad (`private`→`public` de 8 helpers) y
+  `precondiciones_error()` extraída. El ciclo adhoc de láminas/juegos no cambia de comportamiento.
+- **La propuesta se inserta DESPUÉS del 202**, no antes: si Épica rechaza, no queda una fila huérfana
+  que gaste el tope diario de la persona. Contrapartida: si el insert fallara tras el 202, el cupo de
+  Épica ya se gastó y no hay rastro (improbable; sale 500 genérico y queda en `error_log`).
+- **`origen-contradictorio` es 400**, no 409 (mi primer borrador lo puso 409; la carta 7 §4 lo agrupa con
+  `material-*`). Solo `herramienta-no-contratada` es 409.
+- **`titulo` ≠ `titulo_final`** (carta 8, tabla de correcciones): elegir devuelve el título del reto
+  PROPUESTO; el de la página es otro. Se recoge en `refrescar`.
+- **Doble clic**: añadido un candado por usuario (no pedido en el encargo) por la advertencia de la carta
+  7 §5 — cada `proponer`/`elegir` duplicado gasta cupo del centro.
+- **Verificación**: `php -l` y un arnés con `$DB` y `local_awkepica\epica` simulados (≈75 comprobaciones:
+  pertenencia de ids, topes, traducción de motivos, enlaces maliciosos, nota solo con `viewanalytics`,
+  sondeo sin corte, token nuevo por llamada). **NO verificado contra `sanase-test` real**: ni
+  `proponer`→`listo`→`elegir`→`refrescar`→`curso` ni los casos de error se han llamado todavía; es lo
+  primero que hay que hacer al desplegar (carta 8 §4: sois los primeros en llamar con token firmado).
+- Desplegar: pasar por Notificaciones (2 tablas nuevas + 3 ajustes). Recordar que Épica pide avisar
+  antes de una actividad de clase entera (cupo del centro: 100/día).
+
 ## 2026-10-01 — Ampliación: artículos en el idioma del curso (v1.25.1)
 
 Los artículos salían siempre en inglés. Reglas en `CLAUDE.md` → paso 1 («Artículos en el idioma del

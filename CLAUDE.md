@@ -1154,6 +1154,91 @@ Casi todo cliente (`chat_simple_view.php`); en servidor solo `api_create_form.ph
   el panel): si el usuario pulsa «Volver» mientras busca, la respuesta tardía no pisa la
   pantalla que esté viendo.
 
+## Retos — paso 1: servidor, desde la petición web (v1.26.0)
+
+Tercera herramienta de Épica: el usuario elige un recurso o escribe un tema, Épica propone SEIS
+retos, elige uno (o escribe el suyo) y Épica devuelve un ENLACE donde se resuelve y se corrige.
+Lógica en `classes/retos_service.php`, errores en `classes/reto_error.php`, endpoint
+`api_retos.php` (POST, una `accion`: `proponer`, `propuesta`, `elegir`, `refrescar`, `curso`,
+`mis_retos`). Sin UI todavía (paso 2). Contrato: `docs/epica_retos_carta7.md`; **la carta 8 manda
+sobre la 7**. Reglas que deben persistir:
+
+- **Retos se llama desde la PETICIÓN WEB, no desde una tarea adhoc — y SOLO Retos.** Es la
+  excepción aprobada por Épica (carta 8 §1): sus puertas contestan enseguida (`proponer` no
+  llama al modelo: valida el token, guarda el material y encola; lo lento ocurre en su cola) y
+  el usuario está delante esperando para elegir. La regla de la carta 5 (adhoc, un paso por
+  ejecución) **sigue valiendo para láminas y juegos y no se toca**. El navegador sondea
+  NUESTRO endpoint; nunca habla con Épica. Orden del endpoint: `require_login` → sesskey →
+  `createactivity` → `check_enabled` → `write_close` → Épica. `epica_dry_run` NO aplica a Retos
+  (llama siempre de verdad).
+- **Se reutiliza `epica_client`, no se copia**: los métodos que Retos necesita pasaron de
+  `private` a `public` (`resolve_material`, `resolve_contexto_seccion`, `resolve_grupo`,
+  `es_transitorio`, `describir_transitorio`, `normalize_response`, `retry_after`, `endpoint`) y
+  la comprobación de precondiciones se extrajo a `precondiciones_error()` (sin efectos; la
+  versión adhoc la envuelve con `marcar_fallo`). Cualquier cambio en cómo se construye el material
+  (literal, recorte por párrafo a ~100.000, `truncado`, `extraido_por`) afecta a las tres
+  herramientas a la vez — es lo que se quiere.
+- **Token nuevo en CADA llamada, también en cada sondeo**, firmado con `(string)$course->id` y la
+  capability `createactivity` en contexto de curso. Un fallo transitorio (`errno ≠ 0 || http === 0
+  || http >= 500`, o una excepción al firmar/pedir) se devuelve como error recuperable
+  (`epica-no-disponible`, 503, `reintentable: true`) **sin cambiar el estado guardado**: reintentar
+  es firmar otro token, no hay contador de errores seguidos como en la tarea adhoc (aquí reintenta
+  el cliente). Espera larga (`ESPERA_LARGA_S`) solo en `proponer` CON material; el resto, la corta.
+- **El sondeo NO se corta mientras la propuesta esté `en-cola`** (carta 8 §1): cortar a los 2 min
+  y que el alumno vuelva a pulsar encola una segunda propuesta y gasta otra unidad del cupo (el
+  cupo se gasta al admitir). El límite de 2 minutos del cliente cuenta desde el PRIMER
+  `trabajando` — `timetrabajando` se guarda una sola vez y `accion=propuesta` devuelve
+  `trabajando_desde` (segundos). `listo`/`fallado`/`desconocido` son terminales también en
+  nuestra tabla: una vez ahí no se vuelve a llamar a Épica.
+- **Ningún id del cliente se usa sin comprobar que la fila es de ESE usuario y ESE curso**:
+  `cargar_propuesta()` filtra por `id`+`userid`+`courseid` y una ajena da el mismo
+  `propuesta-desconocida` que una inexistente; `refrescar` busca el `codigo` con `userid`+
+  `courseid`. El `cmid` se RECALCULA contra `get_resources_context(..., false)` (visible + usable).
+  `elegir` solo acepta un `reto` que esté entre los seis GUARDADOS (`retos_json`): uno inventado
+  es `reto-desconocido`, **nunca "el primero"**. «Proponer otros» exige `propuesta` SOLA (con
+  recurso o tema es `encargo-ambiguo`) y hereda `cmid`/`tema` del padre; solo se admite sobre una
+  propuesta `listo` y de menos de 7 días (la caducidad de Épica, comprobada antes de gastar cupo).
+- **Dos capas de tope, las dos ANTES de llamar a Épica.** Propios (ajustes, independientes de
+  Épica/infografías/juegos/ampliación; se cuentan filas de HOY en nuestras tablas):
+  `retos_max_propuestas_usuario_dia` (6; cuentan también los «otros»), `retos_max_elegidos_usuario_dia`
+  (3) y `retos_max_elegidos_curso_dia` (40). El de propuestas es por usuario en TODOS los cursos.
+  Y el ritmo de Épica (carta 8 §3): **proponer, «otros» y elegir comparten 3 cada 10 minutos para
+  estudiantes** con una sola llave — no lo replicamos, lo recibimos como 429 `cuota-agotada` y se
+  devuelve con `esperaS` (del cuerpo, `pedir()` no pasa cabeceras). `cuota-del-centro` (100/día del
+  centro, proponer y elegir por separado) lleva OTRO mensaje a propósito: no es culpa de quien
+  pidió. Avisar a Épica antes de una actividad de clase entera. Un **candado por usuario**
+  (`lock_config`) rechaza la segunda petición simultánea (`peticion-en-curso`, 409): proponer dos
+  veces son dos propuestas y elegir dos veces son dos retos, y los dos gastan cupo (doble clic).
+- **Los errores de Épica se traducen por `motivo`, nunca por el texto** (`traducir_error()`):
+  `encargo-sin-tema`, `encargo-ambiguo`, `propuesta-desconocida` (también caducada; en `elegir`
+  marca además nuestra fila como `desconocido`), `reto-desconocido`, `material-excesivo`,
+  `material-ilegible`, `origen-contradictorio` (400), `herramienta-no-contratada` (409),
+  `cuota-agotada`/`cuota-del-centro` (429). Un motivo desconocido sale como 502 con el motivo
+  saneado. La `traza` de Épica, cuando viene, va a `error_log` junto a nuestro id — nunca material
+  ni token.
+- **`titulo` vs `titulo_final`.** El `titulo` que devuelve `elegir` es el del reto PROPUESTO (el reto
+  aún no se ha escrito); al escribirlo, el modelo le pone otro, y ese es el que enseñan la página
+  del reto y `retos/curso`. `accion=refrescar` lo guarda en `titulo_final` cuando el reto está
+  `listo` (el enlace vale desde el primer momento; no hace falta esperar). `mis_retos` y `refrescar`
+  devuelven `titulo_final` si existe y, si no, `titulo`.
+- **La nota es del reto, no de quien lo pidió, y solo se da al profesorado** (carta 8 §2):
+  `intentos`/`analizados`/`ultimaPuntuacion` son de CUALQUIERA que abrió el enlace (el intento lo
+  crea el navegador y no viaja a Pulse), así que `refrescar` los incluye solo si
+  `chat_pipeline::user_can_view_analytics()`; al alumno, solo estado, título y enlace. `intentos`
+  cuenta intentos que pidieron corrección, no personas. En Pulse no existen notas del alumno.
+- **Lo que viene de Épica se guarda con solo los campos conocidos y tipos coaccionados**
+  (`normalizar_retos()`/`normalizar_documento()`, `texto_corto()` con `mb_*`) y se escapa al
+  pintarlo (paso 2, con `pulsoEscapeAttr` en atributos). **Los enlaces se validan**
+  (`enlace_epica()`): solo `https://` y exactamente el host de `epica_base_url` (sin userinfo, sin
+  sufijos tipo `host.evil.com`), máx. 512 caracteres; uno inválido en `elegir` es
+  `respuesta-inesperada` y no se guarda nada; en `curso` se descarta esa fila. La lista de
+  `curso` incluye retos de TODO el curso (de cualquier alumno, `origen` = clase, nunca quién):
+  es decisión de Épica, no nuestra.
+- **Tablas** `block_pulso_reto_propuestas` (una fila por `proponer`, incluidos los «otros»; se
+  inserta DESPUÉS del 202, así que un fallo no cuenta para los topes) y `block_pulso_retos` (una por
+  `elegir`; `codigo` único). `install.xml` y `upgrade.php` (2026100104) describen lo mismo — si se
+  tocan, los dos a la vez. Sin `privacy\provider` (el hueco RGPD del plugin sigue abierto).
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

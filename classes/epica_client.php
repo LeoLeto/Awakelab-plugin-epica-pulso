@@ -10,6 +10,12 @@
  * decide con encargo->tool (creation_quota::TOOL_*), nunca duplicando el
  * ciclo entero.
  *
+ * Los metodos PUBLICOS que no son procesar_paso() (precondiciones_error,
+ * es_transitorio, resolve_material, resolve_contexto_seccion, resolve_grupo,
+ * endpoint, normalize_response, retry_after…) son los que reutiliza Retos
+ * (classes/retos_service.php), que SI se llama desde la peticion web: no se
+ * duplica la logica del material ni el criterio de transitorio.
+ *
  * Contrato resumido (ver CLAUDE.md, docs/epica_gamificacion_carta5.md y
  * docs/epica_gamificacion_carta6.md):
  *   POST /api/moodle/laminas/encargar -> 202 {plataforma, trabajo, posicion, estado}
@@ -207,13 +213,26 @@ class epica_client {
      * @return array{requeue: bool, delay: int}|null null si se puede seguir.
      */
     private static function verificar_precondiciones(\stdClass $encargo, ?\stdClass $user): ?array {
-        if (!\local_awkepica\epica::configurado()) {
-            self::marcar_fallo($encargo, 'local_awkepica no tiene configurada la plataforma o el secreto en este sitio.');
+        $motivo = self::precondiciones_error($user);
+        if ($motivo !== null) {
+            self::marcar_fallo($encargo, $motivo);
             return ['requeue' => false, 'delay' => 0];
         }
+        return null;
+    }
+
+    /**
+     * Las dos comprobaciones previas a firmar, sin efectos: devuelve el motivo
+     * o null. Las comparten el ciclo adhoc (láminas/juegos) y Retos
+     * (retos_service, que lo traduce a un error para el navegador). Requiere
+     * que local_awkepica exista (quien llama lo comprueba antes).
+     */
+    public static function precondiciones_error(?\stdClass $user): ?string {
+        if (!\local_awkepica\epica::configurado()) {
+            return 'local_awkepica no tiene configurada la plataforma o el secreto en este sitio.';
+        }
         if (empty($user) || empty($user->email)) {
-            self::marcar_fallo($encargo, 'El usuario que hizo el encargo no tiene correo electrónico configurado.');
-            return ['requeue' => false, 'delay' => 0];
+            return 'El usuario que hizo el encargo no tiene correo electrónico configurado.';
         }
         return null;
     }
@@ -382,13 +401,13 @@ class epica_client {
      * procesar_error_encargar()/procesar_error_sondeo() tratan aparte porque
      * trae su propio Retry-After en el cuerpo.
      */
-    private static function es_transitorio(array $respuesta): bool {
+    public static function es_transitorio(array $respuesta): bool {
         $errno = (int)($respuesta['errno'] ?? 0);
         $http = (int)($respuesta['http'] ?? 0);
         return $errno !== 0 || $http === 0 || $http >= 500;
     }
 
-    private static function describir_transitorio(array $respuesta): string {
+    public static function describir_transitorio(array $respuesta): string {
         $errno = (int)($respuesta['errno'] ?? 0);
         if ($errno !== 0) {
             $error = trim((string)($respuesta['error'] ?? ''));
@@ -843,7 +862,7 @@ class epica_client {
      * propio lo respeta, y sin él da el nombre por defecto del formato del
      * curso (p. ej. "Tema 2"), que es lo que ve el profesorado en la UI.
      */
-    private static function resolve_contexto_seccion(int $courseid, int $sectionnum): array {
+    public static function resolve_contexto_seccion(int $courseid, int $sectionnum): array {
         global $DB;
 
         $course = get_course($courseid);
@@ -904,7 +923,7 @@ class epica_client {
      * usuario en el curso. Sin grupos o sin la API disponible, cadena vacía:
      * el contexto de sección sostiene el tema igualmente.
      */
-    private static function resolve_grupo(int $courseid, int $userid): string {
+    public static function resolve_grupo(int $courseid, int $userid): string {
         if (!function_exists('groups_get_user_groups')) {
             return '';
         }
@@ -946,7 +965,7 @@ class epica_client {
      * material contra el original para verificar fidelidad, y una frase
      * cortada envenena esa comparación.
      */
-    private static function resolve_material(array $textrow): array {
+    public static function resolve_material(array $textrow): array {
         $texto = $textrow['texto'];
         if (mb_strlen($texto, 'UTF-8') > self::MATERIAL_HARD_LIMIT) {
             $texto = mb_substr($texto, 0, self::MATERIAL_HARD_LIMIT, 'UTF-8');
@@ -988,7 +1007,7 @@ class epica_client {
     // Transporte.
     // ----------------------------------------------------------------
 
-    private static function endpoint(string $ruta): string {
+    public static function endpoint(string $ruta): string {
         $base = rtrim((string)get_config('block_pulso', 'epica_base_url'), '/');
         return $base . $ruta;
     }
@@ -1010,7 +1029,7 @@ class epica_client {
      *
      * @return array{0: int, 1: array}
      */
-    private static function normalize_response(array $respuesta): array {
+    public static function normalize_response(array $respuesta): array {
         $httpcode = (int)($respuesta['http'] ?? 0);
         $datos = $respuesta['datos'] ?? null;
         return [$httpcode, is_array($datos) ? $datos : []];
@@ -1021,7 +1040,7 @@ class epica_client {
      * en el 429 de cuota, Épica manda el mismo valor en el cuerpo, en
      * "esperaS" (backend/src/server.ts, según el propio documento).
      */
-    private static function retry_after(array $data): int {
+    public static function retry_after(array $data): int {
         $val = (int)($data['esperaS'] ?? 0);
         return $val > 0 ? $val : 60;
     }

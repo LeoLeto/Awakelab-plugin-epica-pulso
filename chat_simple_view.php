@@ -1061,6 +1061,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             background: rgba(15, 122, 87, 0.12);
         }
 
+        .pulso-amp-tag-lang {
+            color: #34547A;
+            background: rgba(52, 84, 122, 0.10);
+        }
+
         .pulso-amp-footnote {
             font-size: 0.72rem;
             color: var(--pulso-muted);
@@ -3831,8 +3836,19 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '</span>');
         }
 
-        function pulsoAmpArticleCard(a) {
+        // «En inglés»: solo si el articulo trae idioma y no es el del curso.
+        function pulsoAmpLangLabel(code) {
+            if (!code) return 'En otro idioma';
+            try {
+                const name = new Intl.DisplayNames(['es'], { type: 'language' }).of(code);
+                if (name && name !== code) return 'En ' + name;
+            } catch (e) { /* navegador sin Intl.DisplayNames */ }
+            return 'En otro idioma';
+        }
+
+        function pulsoAmpArticleCard(a, courseLang) {
             const title = a.titulo || 'Sin título';
+            const otherLang = a.idioma && courseLang && a.idioma !== courseLang;
             const line = [a.autores || '', a.anio ? String(a.anio) : '', a.revista || ''].filter(Boolean);
             const cites = Number(a.citas) || 0;
             return pulsoAmpCard(a.url,
@@ -3841,6 +3857,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + (line.length ? '<span class="pulso-amp-card-meta">' + escapeHtmlText(line.join(' · ')) + '</span>' : '')
                 + (cites > 0 ? '<span class="pulso-amp-card-meta">' + escapeHtmlText(cites.toLocaleString('es-ES') + (cites === 1 ? ' cita' : ' citas')) + '</span>' : '')
                 + (a.acceso_abierto ? '<span class="pulso-amp-tag">Acceso abierto</span>' : '')
+                + (otherLang ? '<span class="pulso-amp-tag pulso-amp-tag-lang">' + escapeHtmlText(pulsoAmpLangLabel(a.idioma)) + '</span>' : '')
                 + '</span>');
         }
 
@@ -3877,7 +3894,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             }
             if (articulos.length) {
                 html += '<div><div class="pulso-amp-section-title">Artículos académicos</div><div class="pulso-amp-list">'
-                    + articulos.map(pulsoAmpArticleCard).join('') + '</div></div>';
+                    + articulos.map(function (a) { return pulsoAmpArticleCard(a, data.idioma_curso); }).join('') + '</div></div>';
             }
             avisos.forEach(function(a) {
                 html += '<div class="pulso-create-notice-inline">' + escapeHtmlText(a) + '</div>';

@@ -1,5 +1,22 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-01 — Retos paso 2: «Crear reto» en la interfaz (v1.27.0)
+
+Cuarto CTA sobre el mismo panel; reglas en `CLAUDE.md` → "Retos — paso 2". Lo que costó ver:
+- **Tres formas de respuesta distintas** en `api_retos.php` (`proponer` id plano, `propuesta` anidado,
+  `elegir` plano): el primer borrador leía `data.propuesta.id` también en `proponer`.
+- **`stopCreatePolling()` no invalidaba nada** al abrir un ítem de la galería (`openCreateGalleryItem`
+  no incrementa `pulsoAmpToken`): una respuesta tardía de Retos podía pisar la pantalla. Por eso
+  `pulsoRetosReset()` incrementa el token.
+- **«Seguir esperando» necesitaba memoria:** `trabajando_desde` sigue ≥120 tras reanudar, así que sin
+  `pulsoRetosGrace` el sondeo se volvía a cortar en el acto.
+- **`window.open` tras `fetch`** lo bloquea el navegador: «Ver todos los retos» abre la pestaña en el clic.
+- **Verificación:** `node --check` del JS extraído y un arnés con DOM/fetch simulados (409 silencioso,
+  sondeo sin corte en cola, corte a 120 s, respuesta tardía ignorada, escape de contenido hostil). **NO
+  probado en navegador ni contra `sanase-test`** (curso 92): los cuatro botones en el ancho real del
+  widget, el flujo completo y el doble clic quedan por verificar. Cada prueba completa gasta 2 de los 100
+  del centro y, como estudiante, 3 acciones/10 min.
+
 ## 2026-10-01 — Retos paso 1: servidor desde la petición web (v1.26.0)
 
 `api_retos.php` + `classes/retos_service.php` + 2 tablas. Reglas en `CLAUDE.md` → "Retos — paso 1".

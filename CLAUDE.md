@@ -1129,7 +1129,7 @@ Casi todo cliente (`chat_simple_view.php`); en servidor solo `api_create_form.ph
   reutiliza `#pulso-create-panel`, `openCreatePanel()` y `api_create_form.php`. El
   formulario es solo recurso + «Ampliar» (sin texto libre ni formato). Misma capability
   (`createactivity`) y mismos marcadores `PULSO_CREATE_ONLY_*`. La fila de CTA pasó de
-  `flex` a rejilla de 2 columnas (el tercero a todo el ancho; 1 columna a ≤420px).
+  `flex` a rejilla de 2 columnas (con el cuarto CTA de Retos, v1.27, es 2×2; 1 columna a ≤420px).
 - **Los cupos de Épica no aplican, tampoco en servidor.** No se pinta el aviso de cupo por
   sección ni se bloquea por él. `api_create_form.php` acepta `tool=ampliacion` (el cliente lo
   manda al abrir el panel): salta `check_general_quota()` (`quota_ok` siempre true) y pide
@@ -1238,6 +1238,53 @@ sobre la 7**. Reglas que deben persistir:
   inserta DESPUÉS del 202, así que un fallo no cuenta para los topes) y `block_pulso_retos` (una por
   `elegir`; `codigo` único). `install.xml` y `upgrade.php` (2026100104) describen lo mismo — si se
   tocan, los dos a la vez. Sin `privacy\provider` (el hueco RGPD del plugin sigue abierto).
+
+## Retos — paso 2: «Crear reto» en el bloque Crear (v1.27.0)
+
+Cuarto CTA del bloque Crear, solo cliente (`chat_simple_view.php`, funciones `pulsoRetos*`) más una
+línea en `api_create_form.php`. Habla únicamente con `api_retos.php`. Sin `db/`. Reglas que deben
+persistir:
+
+- **Mismo panel y mismo desplegable** (`pulsoCreateTool = 'retos'`, `renderRetosForm()`); la rejilla
+  de CTA es 2×2 (1 columna a ≤420 px; se quitó la regla del «último impar a todo el ancho»).
+  `api_create_form.php` trata `tool=retos` igual que `ampliacion` (sin cupos de Épica ni
+  `sectionused`). **Sin recursos el formulario sigue siendo usable** (opción «Sin recurso, solo un
+  tema»): `openCreatePanel()` no pinta el aviso de «no hay recursos» para `retos`.
+- **El sondeo no se corta en cola.** `accion=propuesta` cada 4 s; `en-cola` se sondea SIN límite
+  (carta 8 §1: cortar y volver a pulsar encola otra propuesta y gasta otra unidad del cupo del centro).
+  El tope de 2 min cuenta desde `trabajando_desde` y, al superarlo, solo ofrece **«Seguir esperando»**,
+  que reanuda la MISMA propuesta (`pulsoRetosGrace` guarda el `trabajando_desde` ya tolerado, para que
+  no vuelva a cortar al instante). Nunca hay un botón que proponga de nuevo sin querer;
+  «Volver a intentarlo» solo existe tras `fallado` (propuesta nueva a propósito).
+- **Formas distintas por acción** (fácil de confundir): `proponer` devuelve el id PLANO en
+  `propuesta` (número); `accion=propuesta` devuelve el estado ANIDADO en `propuesta`; `elegir`
+  devuelve plano `{codigo, enlace, enlace_curso, titulo}`.
+- **Antidoble clic:** `pulsoRetosSetBusy()` desactiva TODAS las acciones de la pantalla
+  (`data-retos-action`) mientras hay una en vuelo; las acciones que gastan cupo (`proponer`,
+  «otros», `elegir`) no rehacen la pantalla hasta tener respuesta, así que un 409
+  `peticion-en-curso` se ignora en silencio (se restaura el botón y no se pinta nada).
+  `stopCreatePolling()` llama a `pulsoRetosReset()`: para temporizadores, libera el busy e
+  **incrementa `pulsoAmpToken`**, que invalida cualquier respuesta tardía (mismo token que Ampliación).
+- **Errores: se decide por `error`, nunca por el texto.** Solo se reescribe el texto de
+  `cuota-agotada` (con `esperaS`), `cuota-del-centro`, `material-ilegible`, `propuesta-desconocida`
+  (pantalla final) y `reto-desconocido`; el resto usa el `mensaje` del servidor. «Reintentar» solo
+  sale si `reintentable === true` y repite la MISMA acción (`pulsoRetosRetryFn`).
+- **El reto se elige por ÍNDICE** (`pulsoRetosList[i]`): el `id` que vino de Épica no va a ningún
+  atributo ni `onclick`; solo viaja en el POST. Todo texto de Épica con `escapeHtmlText`, atributos
+  con `pulsoEscapeAttr`, enlaces solo `https://`. **Ningún iframe**: el reto se abre en pestaña
+  nueva (`target="_blank" rel="noopener noreferrer"`; Épica sirve `X-Frame-Options: DENY`).
+- **Título final:** tras elegir se muestra el título del reto PROPUESTO; a los ~45 s
+  (`PULSO_RETOS_REFRESH_MS`) una llamada a `accion=refrescar` lo cambia por `titulo_final`, sin
+  bloquear nada y en silencio si falla. **«N intentos · última nota X» solo si la respuesta trae
+  `intentos`** — el servidor solo lo manda con `viewanalytics` (nota agregada de cualquiera que
+  abrió el reto, nunca del alumno que lo pidió), así que el cliente no decide el rol, solo pinta
+  lo que llega.
+- **Galería conjunta:** `loadCreateGallery()` pide a la vez `api_create_status.php` y
+  `accion=mis_retos` (esta no llama a Épica) y mezcla por fecha; cada fuente falla por separado. La
+  tarjeta de reto es un `<a>` a su enlace (pestaña nueva), etiqueta «Reto» en `#34547A`.
+- **«Ver todos los retos del curso»** llama a `accion=curso` y abre su `enlace`; no se pinta la lista.
+  Como el navegador bloquea un `window.open` tras un `fetch`, se abre la pestaña EN el clic y se le
+  pone la URL al llegar (si el navegador la bloquea, se ofrece un enlace).
 
 ## Dev notes
 

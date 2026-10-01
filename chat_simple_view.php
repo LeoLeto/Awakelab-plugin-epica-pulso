@@ -42,6 +42,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $create_submit_url = $CFG->wwwroot . '/blocks/pulso/api_create_submit.php';
     $create_status_url = $CFG->wwwroot . '/blocks/pulso/api_create_status.php';
     $ampliacion_url = $CFG->wwwroot . '/blocks/pulso/api_ampliacion.php';
+    $retos_url = $CFG->wwwroot . '/blocks/pulso/api_retos.php';
 
     // Leer la versión directamente de version.php (no de la BD) para que el
     // badge del header refleje siempre el código desplegado, incluso antes
@@ -67,6 +68,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         window.apiCreateSubmitUrl = '{$create_submit_url}';
         window.apiCreateStatusUrl = '{$create_status_url}';
         window.apiAmpliacionUrl = '{$ampliacion_url}';
+        window.apiRetosUrl = '{$retos_url}';
         window.pulsoSesskey = '{$pulso_sesskey}';
         // Solo para adaptar la UI: el servidor decide qué datos se devuelven.
         window.pulsoIsTeacher = {$pulso_isteacher};
@@ -558,9 +560,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
            preguntas, este es una acción que cuesta dinero y genera algo.
            Fondo navy sólido + texto blanco (nunca cian como color de texto,
            regla del tema claro), acento cian solo en el icono. */
-        /* Fila con los CTA de "Crear" (infografía / juego / ampliar): rejilla de
-           2 columnas con el tercero a todo el ancho; 1 columna en pantallas
-           estrechas. Mismo patrón repetido, no un formulario por herramienta. */
+        /* Fila con los CTA de "Crear" (infografía / juego / ampliar / reto):
+           rejilla 2×2; 1 columna en pantallas estrechas. Mismo patrón
+           repetido, no un formulario por herramienta. */
         .pulso-create-cta-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -569,10 +571,6 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         .pulso-create-cta-row .pulso-create-cta {
             min-width: 0;
-        }
-
-        .pulso-create-cta-row .pulso-create-cta:last-child:nth-child(odd) {
-            grid-column: 1 / -1;
         }
 
         @media (max-width: 420px) {
@@ -1075,6 +1073,229 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             display: flex;
             flex-direction: column;
             gap: 6px;
+        }
+
+        /* ========== CREAR RETO (formulario, propuestas, reto elegido) ==========
+           Colores de estado del tema claro (éxito #0F7A57, aviso #8A6100,
+           error #B3261E); el cian solo en bordes/foco, nunca como texto. */
+        .pulso-retos {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .pulso-retos-doc-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--pulso-ink);
+            overflow-wrap: anywhere;
+        }
+
+        .pulso-retos-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 6px;
+        }
+
+        .pulso-retos-chip {
+            font-size: 0.68rem;
+            padding: 1px 8px;
+            border-radius: 999px;
+            color: #34547A;
+            background: rgba(52, 84, 122, 0.10);
+            overflow-wrap: anywhere;
+        }
+
+        .pulso-reto-card {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            padding: 12px;
+            border: 1px solid var(--pulso-line);
+            border-radius: 12px;
+            background: var(--pulso-surface);
+            color: var(--pulso-ink);
+            font-family: var(--pulso-font);
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.2s;
+        }
+
+        .pulso-reto-card:hover:not(:disabled) {
+            border-color: var(--pulso-cyan);
+            box-shadow: 0 2px 8px rgba(1, 25, 50, 0.12);
+        }
+
+        .pulso-reto-card:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .pulso-reto-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .pulso-reto-icon {
+            flex-shrink: 0;
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            background: var(--pulso-surface-2);
+            color: var(--pulso-cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pulso-reto-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .pulso-reto-title {
+            font-size: 0.86rem;
+            font-weight: 600;
+            line-height: 1.35;
+            overflow-wrap: anywhere;
+        }
+
+        .pulso-reto-desc {
+            font-size: 0.78rem;
+            line-height: 1.45;
+            color: var(--pulso-slate);
+            overflow-wrap: anywhere;
+        }
+
+        .pulso-reto-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 4px 6px;
+        }
+
+        .pulso-reto-diff {
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 1px 8px;
+            border-radius: 999px;
+            color: #34547A;
+            background: rgba(52, 84, 122, 0.10);
+        }
+
+        .pulso-reto-diff.ok { color: #0F7A57; background: rgba(15, 122, 87, 0.12); }
+        .pulso-reto-diff.warn { color: #8A6100; background: rgba(138, 97, 0, 0.14); }
+        .pulso-reto-diff.danger { color: #B3261E; background: rgba(179, 38, 30, 0.12); }
+
+        .pulso-reto-min {
+            font-size: 0.72rem;
+            color: var(--pulso-slate);
+        }
+
+        .pulso-reto-cta {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--pulso-navy);
+        }
+
+        .pulso-create-secondary {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--pulso-navy);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--pulso-navy);
+            font-family: var(--pulso-font);
+            font-weight: 600;
+            font-size: 0.86rem;
+            cursor: pointer;
+            text-align: center;
+            text-decoration: none;
+            box-sizing: border-box;
+            display: block;
+        }
+
+        .pulso-create-secondary:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .pulso-retos-msg {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .pulso-retos-msg:empty {
+            display: none;
+        }
+
+        .pulso-create-field + .pulso-retos-msg:not(:empty) {
+            margin-bottom: 10px;
+        }
+
+        .pulso-retos-own {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .pulso-retos-own[hidden] {
+            display: none;
+        }
+
+        .pulso-retos-own textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px 12px;
+            border: 1px solid var(--pulso-line);
+            border-radius: 10px;
+            font-family: var(--pulso-font);
+            font-size: 0.86rem;
+            color: var(--pulso-ink);
+            background: var(--pulso-surface);
+            resize: vertical;
+            min-height: 64px;
+        }
+
+        .pulso-retos-own-count {
+            align-self: flex-end;
+            font-size: 0.7rem;
+            color: var(--pulso-muted);
+        }
+
+        .pulso-retos-done {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pulso-retos-done-head {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #0F7A57;
+        }
+
+        a.pulso-retos-open {
+            display: block;
+            text-align: center;
+            text-decoration: none;
+            box-sizing: border-box;
+            color: #ffffff !important;
+        }
+
+        .pulso-retos-note {
+            font-size: 0.76rem;
+            color: var(--pulso-slate);
+            line-height: 1.45;
+        }
+
+        a.pulso-create-gallery-item {
+            text-decoration: none;
         }
 
         .pulso-message {
@@ -2174,6 +2395,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                             <span class="pulso-create-cta-text">
                                 <span class="pulso-create-cta-title">Ampliar recurso</span>
                                 <span class="pulso-create-cta-sub">Vídeos y artículos sobre un recurso del curso</span>
+                            </span>
+                        </button>
+                        <button type="button" class="pulso-create-cta" onclick="openCreatePanel('retos')">
+                            <span class="pulso-create-cta-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                            </span>
+                            <span class="pulso-create-cta-text">
+                                <span class="pulso-create-cta-title">Crear reto</span>
+                                <span class="pulso-create-cta-sub">Un caso práctico que corrige la IA</span>
                             </span>
                         </button>
                     </div>
@@ -3555,11 +3785,17 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 submitLabel: 'Ampliar',
                 noResourcesDefault: 'No hay recursos disponibles para ampliar en este curso.',
                 noUsableReason: 'Ninguno de los recursos de este curso tiene texto que se pueda aprovechar para buscar vídeos y artículos.'
+            },
+            // Retos (Épica, vía api_retos.php): recurso O tema. Sin recursos sigue
+            // siendo usable (solo tema), así que no hay textos de "sin recursos".
+            retos: {
+                panelTitle: 'Crear reto',
+                submitLabel: 'Proponer retos'
             }
         };
 
         function pulsoCreateSetTool(tool) {
-            pulsoCreateTool = (tool === 'gamificacion' || tool === 'ampliacion') ? tool : 'infografia';
+            pulsoCreateTool = (tool === 'gamificacion' || tool === 'ampliacion' || tool === 'retos') ? tool : 'infografia';
             const titleEl = document.getElementById('pulso-create-title');
             if (titleEl) titleEl.textContent = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool].panelTitle;
         }
@@ -3578,7 +3814,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const params = new URLSearchParams();
             params.set('courseid', window.courseid);
             params.set('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
-            if (pulsoCreateTool === 'ampliacion') params.set('tool', 'ampliacion');
+            if (pulsoCreateTool === 'ampliacion' || pulsoCreateTool === 'retos') params.set('tool', pulsoCreateTool);
 
             fetch(window.apiCreateFormUrl + '?' + params.toString(), { credentials: 'same-origin' })
                 .then(function(r) { return r.json(); })
@@ -3591,11 +3827,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         renderCreateNotice(data.quota_message || 'Has alcanzado el límite de encargos.');
                         return;
                     }
-                    if (!data.resources || data.resources.length === 0) {
+                    // Retos sigue siendo usable sin recursos: queda la opción de solo tema.
+                    if ((!data.resources || data.resources.length === 0) && pulsoCreateTool !== 'retos') {
                         renderCreateNoResources(data.noresourcesreason);
                         return;
                     }
-                    pulsoCreateResources = data.resources;
+                    pulsoCreateResources = data.resources || [];
                     renderCreateForm(data.resources);
                 })
                 .catch(function() {
@@ -3641,6 +3878,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const labels = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool];
             const isjuego = pulsoCreateTool === 'gamificacion';
             const isamp = pulsoCreateTool === 'ampliacion';
+
+            if (pulsoCreateTool === 'retos') {
+                renderRetosForm(resources);
+                return;
+            }
 
             let optionsHtml = '';
             resources.forEach(function(r) {
@@ -3949,6 +4191,520 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 });
         }
 
+        // ---- Crear reto (api_retos.php, v1.27) ----
+        // Mismo panel y mismo desplegable que el resto de Crear. Retos se llama desde la
+        // petición web (carta 8 §1): el navegador sondea NUESTRO endpoint cada 4 s y
+        // nunca habla con Épica. Todo lo que viene de Épica se escapa (atributos con
+        // pulsoEscapeAttr), los enlaces solo si son https:// y no hay ningún iframe:
+        // el reto se abre siempre en pestaña nueva (Épica sirve X-Frame-Options: DENY).
+        const PULSO_RETOS_POLL_MS = 4000;
+        const PULSO_RETOS_SLOW_S = 120;        // límite de espera, contado desde el primer "trabajando"
+        const PULSO_RETOS_REFRESH_MS = 45000;  // cuándo pedir el título final del reto escrito
+        const PULSO_RETO_PROPIO_MIN = 8;
+        const PULSO_RETO_PROPIO_MAX = 140;
+
+        let pulsoRetosBusy = false;            // antidoble clic: una sola acción en vuelo
+        let pulsoRetosCourseBusy = false;
+        let pulsoRetosPollTimer = null;
+        let pulsoRetosRefreshTimer = null;
+        let pulsoRetosPropuestaId = 0;
+        let pulsoRetosList = [];               // los seis retos; se elige por ÍNDICE, el id nunca va a un atributo
+        let pulsoRetosGrace = 0;               // "Seguir esperando": trabajando_desde ya tolerado
+        let pulsoRetosLastSeen = 0;
+        let pulsoRetosLastParams = null;       // para «Volver a intentarlo» (propuesta nueva)
+        let pulsoRetosRetryFn = null;          // «Reintentar» repite la MISMA acción
+
+        // Los doce nombres fijos de icono de Épica; uno desconocido cae en 'flag'.
+        const PULSO_RETOS_ICONS = {
+            wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+            shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+            chart: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+            network: '<rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>',
+            users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+            lightbulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+            code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+            book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
+            cpu: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>',
+            target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+            briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+            leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+            flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>'
+        };
+
+        function pulsoRetosIconSvg(name) {
+            const key = String(name || '').toLowerCase();
+            const path = Object.prototype.hasOwnProperty.call(PULSO_RETOS_ICONS, key) ? PULSO_RETOS_ICONS[key] : PULSO_RETOS_ICONS.flag;
+            return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + path + '</svg>';
+        }
+
+        // Inicial / Intermedio / Avanzado con los colores de estado del tema claro.
+        function pulsoRetosDiff(raw) {
+            const key = String(raw || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+            const known = { inicial: ['Inicial', 'ok'], basico: ['Inicial', 'ok'], intermedio: ['Intermedio', 'warn'], avanzado: ['Avanzado', 'danger'] };
+            if (Object.prototype.hasOwnProperty.call(known, key)) return { label: known[key][0], cls: known[key][1] };
+            return raw ? { label: String(raw), cls: '' } : null;
+        }
+
+        // Llamada única a api_retos.php. Nunca rechaza: devuelve el JSON del servidor
+        // ({ok:true,…} o {ok:false,error,mensaje,…}) o un error de red reintentable.
+        function pulsoRetosCall(accion, fields) {
+            const fd = new FormData();
+            fd.append('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+            fd.append('courseid', window.courseid);
+            fd.append('accion', accion);
+            Object.keys(fields || {}).forEach(function(k) { fd.append(k, fields[k]); });
+            return fetch(window.apiRetosUrl, { method: 'POST', credentials: 'same-origin', body: fd })
+                .then(function(r) {
+                    return r.json().catch(function() {
+                        return { ok: false, error: 'respuesta-invalida', mensaje: 'La respuesta del servidor no es válida. Inténtalo de nuevo.', reintentable: true };
+                    });
+                })
+                .catch(function() {
+                    return { ok: false, error: 'sin-conexion', mensaje: 'No se ha podido conectar. Comprueba tu conexión e inténtalo de nuevo.', reintentable: true };
+                });
+        }
+
+        // Al salir del panel o abrir otra pantalla (la llama stopCreatePolling):
+        // para sondeo y refresco, libera el antidoble clic e invalida con
+        // pulsoAmpToken cualquier respuesta tardía.
+        function pulsoRetosReset() {
+            if (pulsoRetosPollTimer) { clearTimeout(pulsoRetosPollTimer); pulsoRetosPollTimer = null; }
+            if (pulsoRetosRefreshTimer) { clearTimeout(pulsoRetosRefreshTimer); pulsoRetosRefreshTimer = null; }
+            pulsoRetosBusy = false;
+            pulsoRetosCourseBusy = false;
+            pulsoRetosRetryFn = null;
+            pulsoAmpToken++;
+        }
+
+        // Antidoble clic: con una acción en vuelo se desactivan TODAS las de la pantalla.
+        function pulsoRetosSetBusy(busy) {
+            pulsoRetosBusy = busy;
+            document.querySelectorAll('#pulso-create-body [data-retos-action]').forEach(function(el) { el.disabled = busy; });
+        }
+
+        const PULSO_RETOS_BANNER_ACTIONS = {
+            retry: ['Reintentar', 'pulsoRetosRetry()'],
+            wait: ['Seguir esperando', 'pulsoRetosSeguirEsperando()']
+        };
+
+        // Aviso en #pulso-retos-msg (texto siempre con textContent). action: 'retry' | 'wait'.
+        function pulsoRetosBanner(text, kind, action) {
+            const el = document.getElementById('pulso-retos-msg');
+            if (!el) return;
+            if (!text) { el.innerHTML = ''; return; }
+            const act = action ? PULSO_RETOS_BANNER_ACTIONS[action] : null;
+            el.innerHTML = '<div class="pulso-create-notice-inline ' + (kind || '') + '"></div>'
+                + (act ? '<button type="button" class="pulso-create-secondary" onclick="' + act[1] + '">' + act[0] + '</button>' : '');
+            el.firstChild.textContent = text;
+        }
+
+        // Se decide por `error`, nunca por el texto. Solo se reescribe lo que tiene
+        // texto propio; el resto (topes propios, herramienta-no-contratada,
+        // epica-no-disponible, encargo-sin-tema…) usa el mensaje del servidor.
+        function pulsoRetosErrorText(d) {
+            const msg = (d && typeof d.mensaje === 'string' && d.mensaje) ? d.mensaje : 'No hemos podido completar la operación. Inténtalo de nuevo.';
+            switch (d && d.error) {
+                case 'cuota-agotada': {
+                    const s = Number(d.esperaS) || 0;
+                    return s > 0 ? 'Has pedido varios seguidos; espera ' + Math.max(1, Math.ceil(s / 60)) + ' min.'
+                                 : 'Has pedido varios seguidos; espera unos minutos.';
+                }
+                case 'cuota-del-centro': return 'El centro ha alcanzado el límite de hoy. No es nada que hayas hecho tú.';
+                case 'material-ilegible': return 'No hemos podido leer este recurso; prueba con otro o con un tema.';
+                case 'propuesta-desconocida': return 'Esta propuesta ya no está disponible.';
+                case 'reto-desconocido': return 'Ese reto no estaba entre los propuestos. Elige otro de la lista.';
+                default: return msg;
+            }
+        }
+
+        function pulsoRetosHandleError(d) {
+            const code = d && d.error;
+            if (code === 'peticion-en-curso') return; // ya hay una en vuelo: en silencio
+            if (code === 'propuesta-desconocida') {
+                pulsoRetosRenderEnd('danger', pulsoRetosErrorText(d), 'Proponer retos de nuevo', 'form');
+                return;
+            }
+            pulsoRetosBanner(pulsoRetosErrorText(d), 'danger',
+                (d && d.reintentable === true && typeof pulsoRetosRetryFn === 'function') ? 'retry' : null);
+        }
+
+        function pulsoRetosRetry() {
+            const fn = pulsoRetosRetryFn;
+            if (pulsoRetosBusy || typeof fn !== 'function') return;
+            pulsoRetosBanner('');
+            fn();
+        }
+
+        // --- Formulario ---
+        function renderRetosForm(resources) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+
+            let optionsHtml = '<option value="0">Sin recurso, solo un tema</option>';
+            resources.forEach(function(r) {
+                const flag = r.lowtext ? ' — texto escaso, resultado limitado' : '';
+                optionsHtml += '<option value="' + r.cmid + '">'
+                    + escapeHtmlText(r.moduletypelabel) + ': ' + escapeHtmlText(r.name) + escapeHtmlText(flag)
+                    + '</option>';
+            });
+
+            body.innerHTML = ''
+                + '<div class="pulso-create-field">'
+                + '<label for="pulso-create-resource">Recurso</label>'
+                + '<select id="pulso-create-resource" data-retos-action>' + optionsHtml + '</select>'
+                + '</div>'
+                + '<div class="pulso-create-field">'
+                + '<label for="pulso-retos-tema">Tema (opcional)</label>'
+                + '<textarea id="pulso-retos-tema" data-retos-action maxlength="500" placeholder="'
+                + pulsoEscapeAttr('Por ejemplo: muestreo estratificado en una encuesta sobre ocio juvenil') + '"></textarea>'
+                + '<div class="pulso-create-hint">Obligatorio si eliges «Sin recurso». Con un recurso, acota los retos dentro de su contenido.</div>'
+                + '</div>'
+                + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
+                + '<button type="button" class="pulso-create-submit" id="pulso-retos-propose-btn" data-retos-action onclick="pulsoRetosProponer()">Proponer retos</button>'
+                + '<button type="button" class="pulso-create-back-link" onclick="pulsoRetosVerCurso()">Ver todos los retos del curso</button>'
+                + '<div id="pulso-create-gallery"></div>';
+            loadCreateGallery();
+        }
+
+        function pulsoRetosProponer() {
+            const select = document.getElementById('pulso-create-resource');
+            const temaEl = document.getElementById('pulso-retos-tema');
+            if (!select || !temaEl || pulsoRetosBusy) return;
+            const cmid = parseInt(select.value, 10) || 0;
+            const tema = temaEl.value.trim();
+            if (!cmid && !tema) {
+                pulsoRetosBanner('Elige un recurso o escribe un tema para los retos.', 'warn');
+                temaEl.focus();
+                return;
+            }
+            const params = {};
+            if (cmid > 0) params.cmid = String(cmid);
+            if (tema) params.tema = tema;
+            pulsoRetosEnviarProponer(params, 'pulso-retos-propose-btn');
+        }
+
+        // «Proponer otros»: SOLO `propuesta` (con recurso o tema sería encargo-ambiguo).
+        function pulsoRetosOtros() {
+            pulsoRetosEnviarProponer({ propuesta: String(pulsoRetosPropuestaId) }, 'pulso-retos-others-btn');
+        }
+
+        // «Volver a intentarlo» tras un fallado: es una propuesta nueva.
+        function pulsoRetosVolverAIntentar() {
+            if (!pulsoRetosLastParams) { openCreatePanel('retos'); return; }
+            pulsoRetosEnviarProponer(pulsoRetosLastParams, 'pulso-retos-end-btn');
+        }
+
+        // Una propuesta nueva (gasta cupo): un solo vuelo a la vez. La pantalla
+        // actual se queda como está hasta tener respuesta (así un 409 ignorado
+        // no deja nada roto); solo el botón pulsado cambia de texto.
+        function pulsoRetosEnviarProponer(params, btnId) {
+            if (pulsoRetosBusy) return;
+            pulsoRetosSetBusy(true);
+            const token = pulsoAmpToken;
+            const btn = document.getElementById(btnId);
+            const label = btn ? btn.textContent : '';
+            if (btn) btn.textContent = 'Enviando…';
+            pulsoRetosBanner('');
+            pulsoRetosRetryFn = function() { pulsoRetosEnviarProponer(params, btnId); };
+
+            pulsoRetosCall('proponer', params).then(function(d) {
+                if (token !== pulsoAmpToken) return; // el usuario ya salió de esta pantalla
+                // proponer devuelve el id PLANO en `propuesta` (el sondeo lo devuelve anidado).
+                const id = Number(d.propuesta && typeof d.propuesta === 'object' ? d.propuesta.id : d.propuesta) || 0;
+                if (!d.ok || !id) {
+                    pulsoRetosSetBusy(false);
+                    if (btn) btn.textContent = label;
+                    pulsoRetosHandleError(d.ok ? { error: 'respuesta-inesperada', mensaje: 'No hemos recibido el identificador de la propuesta. Inténtalo de nuevo.' } : d);
+                    return;
+                }
+                pulsoRetosSetBusy(false);
+                pulsoRetosPropuestaId = id;
+                pulsoRetosLastParams = params;
+                pulsoRetosGrace = 0;
+                pulsoRetosLastSeen = 0;
+                pulsoRetosRenderWaiting();
+                pulsoRetosShowStatus(d.estado, d.posicion);
+                pulsoRetosRetryFn = function() { pulsoRetosPoll(pulsoAmpToken); };
+                pulsoRetosSchedulePoll(token);
+            });
+        }
+
+        // --- Esperando las propuestas ---
+        function pulsoRetosRenderWaiting() {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+            body.innerHTML = '<div class="pulso-retos">'
+                + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
+                + '<div class="pulso-amp-loading" role="status">'
+                + '<span class="pulso-typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>'
+                + '<span id="pulso-retos-status">Preparando tus retos…</span></div>'
+                + '</div>';
+        }
+
+        function pulsoRetosShowStatus(estado, posicion) {
+            const el = document.getElementById('pulso-retos-status');
+            if (!el) return;
+            const n = Number(posicion) || 0;
+            el.textContent = estado === 'trabajando' ? 'Escribiendo seis retos para ti…'
+                : (n > 0 ? 'Hay ' + n + ' por delante…' : 'Preparando tus retos…');
+        }
+
+        function pulsoRetosSchedulePoll(token) {
+            pulsoRetosPollTimer = setTimeout(function() { pulsoRetosPoll(token); }, PULSO_RETOS_POLL_MS);
+        }
+
+        // NO se corta mientras esté `en-cola` (carta 8 §1: cortar y volver a pulsar
+        // encola otra propuesta y gasta otra unidad del cupo). El límite de 2 min
+        // cuenta desde el primer `trabajando` (trabajando_desde) y solo ofrece
+        // «Seguir esperando», que reanuda la MISMA propuesta.
+        function pulsoRetosPoll(token) {
+            pulsoRetosPollTimer = null;
+            if (token !== pulsoAmpToken) return;
+            pulsoRetosRetryFn = function() { pulsoRetosPoll(pulsoAmpToken); };
+
+            pulsoRetosCall('propuesta', { propuesta: String(pulsoRetosPropuestaId) }).then(function(d) {
+                if (token !== pulsoAmpToken) return;
+                if (!d.ok) { pulsoRetosHandleError(d); return; } // el sondeo se detiene; «Reintentar» lo reanuda
+                const p = d.propuesta || {};
+
+                if (p.estado === 'listo') { pulsoRetosRenderPropuestas(p); return; }
+                if (p.estado === 'fallado') {
+                    pulsoRetosRenderEnd('danger', 'No hemos podido preparar los retos' + (p.motivo ? ': ' + p.motivo : '.'), 'Volver a intentarlo', 'retry');
+                    return;
+                }
+                if (p.estado === 'desconocido') {
+                    pulsoRetosRenderEnd('warn', 'Esta propuesta ya no está disponible.', 'Volver al formulario', 'form');
+                    return;
+                }
+
+                pulsoRetosShowStatus(p.estado, p.posicion);
+                if (p.estado === 'trabajando') {
+                    pulsoRetosLastSeen = Number(p.trabajando_desde) || 0;
+                    if (pulsoRetosLastSeen - pulsoRetosGrace >= PULSO_RETOS_SLOW_S) {
+                        pulsoRetosBanner('Está tardando más de lo normal.', 'warn', 'wait');
+                        return;
+                    }
+                }
+                pulsoRetosSchedulePoll(token);
+            });
+        }
+
+        function pulsoRetosSeguirEsperando() {
+            pulsoRetosGrace = pulsoRetosLastSeen; // otros 2 min a partir de ahora
+            pulsoRetosBanner('');
+            pulsoRetosPoll(pulsoAmpToken);
+        }
+
+        // Pantalla final de error/aviso: act 'retry' = propuesta nueva con los mismos datos; 'form' = formulario.
+        function pulsoRetosRenderEnd(kind, text, label, act) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+            body.innerHTML = '<div class="pulso-retos">'
+                + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
+                + '<button type="button" class="pulso-create-submit" id="pulso-retos-end-btn" data-retos-action onclick="'
+                + (act === 'retry' ? 'pulsoRetosVolverAIntentar()' : "openCreatePanel('retos')") + '">' + escapeHtmlText(label) + '</button>'
+                + '</div>';
+            pulsoRetosBanner(text, kind);
+        }
+
+        // --- Las seis propuestas ---
+        function pulsoRetosChip(text) {
+            return '<span class="pulso-retos-chip">' + escapeHtmlText(text) + '</span>';
+        }
+
+        function pulsoRetosRenderPropuestas(p) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+            pulsoRetosList = Array.isArray(p.retos) ? p.retos : [];
+            if (!pulsoRetosList.length) {
+                pulsoRetosRenderEnd('danger', 'No hemos recibido ningún reto. Inténtalo de nuevo.', 'Volver a intentarlo', 'retry');
+                return;
+            }
+            const doc = p.documento || {};
+            const temas = Array.isArray(doc.temas) ? doc.temas : [];
+
+            let html = '<div class="pulso-retos">'
+                + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
+                + '<div><div class="pulso-retos-doc-title">' + escapeHtmlText(doc.titulo || 'Retos para ti') + '</div>'
+                + (temas.length ? '<div class="pulso-retos-chips">' + temas.map(pulsoRetosChip).join('') + '</div>' : '')
+                + '</div>'
+                + '<div class="pulso-create-hint">Elige el reto que quieras hacer.</div>';
+
+            pulsoRetosList.forEach(function(r, i) {
+                const diff = pulsoRetosDiff(r.dificultad);
+                const minutos = Number(r.minutos) || 0;
+                const comps = Array.isArray(r.competencias) ? r.competencias : [];
+                html += '<button type="button" class="pulso-reto-card" data-retos-action onclick="pulsoRetosElegir(' + i + ')">'
+                    + '<span class="pulso-reto-top">'
+                    + '<span class="pulso-reto-icon" aria-hidden="true">' + pulsoRetosIconSvg(r.icono) + '</span>'
+                    + '<span class="pulso-reto-title">' + escapeHtmlText(r.titulo) + '</span></span>'
+                    + (r.descripcion ? '<span class="pulso-reto-desc">' + escapeHtmlText(r.descripcion) + '</span>' : '')
+                    + '<span class="pulso-reto-meta">'
+                    + (diff ? '<span class="pulso-reto-diff ' + diff.cls + '">' + escapeHtmlText(diff.label) + '</span>' : '')
+                    + (minutos > 0 ? '<span class="pulso-reto-min">' + minutos + ' min</span>' : '')
+                    + comps.map(pulsoRetosChip).join('')
+                    + '</span>'
+                    + '<span class="pulso-reto-cta">Elegir este reto</span>'
+                    + '</button>';
+            });
+
+            html += '<button type="button" class="pulso-create-secondary" id="pulso-retos-others-btn" data-retos-action onclick="pulsoRetosOtros()">Proponer otros</button>'
+                + '<button type="button" class="pulso-create-secondary" id="pulso-retos-idea-btn" data-retos-action aria-expanded="false" aria-controls="pulso-retos-own" onclick="pulsoRetosToggleIdea()">¿Tienes otra idea?</button>'
+                + '<div class="pulso-retos-own" id="pulso-retos-own" hidden>'
+                + '<label class="pulso-retos-note" for="pulso-retos-own-text">Cuéntanos qué reto quieres (entre ' + PULSO_RETO_PROPIO_MIN + ' y ' + PULSO_RETO_PROPIO_MAX + ' caracteres)</label>'
+                + '<textarea id="pulso-retos-own-text" data-retos-action maxlength="' + PULSO_RETO_PROPIO_MAX + '" oninput="pulsoRetosOwnCount()"></textarea>'
+                + '<span class="pulso-retos-own-count" id="pulso-retos-own-count">0/' + PULSO_RETO_PROPIO_MAX + '</span>'
+                + '<button type="button" class="pulso-create-submit" id="pulso-retos-own-btn" data-retos-action onclick="pulsoRetosElegirPropio()">Crear mi reto</button>'
+                + '</div>'
+                + '<button type="button" class="pulso-create-back-link" data-retos-action onclick="openCreatePanel(\'retos\')">← Volver al formulario</button>'
+                + '</div>';
+            body.innerHTML = html;
+        }
+
+        function pulsoRetosToggleIdea() {
+            const box = document.getElementById('pulso-retos-own');
+            const btn = document.getElementById('pulso-retos-idea-btn');
+            if (!box || pulsoRetosBusy) return;
+            box.hidden = !box.hidden;
+            if (btn) btn.setAttribute('aria-expanded', box.hidden ? 'false' : 'true');
+            if (!box.hidden) {
+                const ta = document.getElementById('pulso-retos-own-text');
+                if (ta) ta.focus();
+            }
+        }
+
+        function pulsoRetosOwnCount() {
+            const ta = document.getElementById('pulso-retos-own-text');
+            const out = document.getElementById('pulso-retos-own-count');
+            if (ta && out) out.textContent = ta.value.length + '/' + PULSO_RETO_PROPIO_MAX;
+        }
+
+        // --- Elegir ---
+        function pulsoRetosElegir(i) {
+            const r = pulsoRetosList[i];
+            if (!r || !r.id) return;
+            const card = document.querySelectorAll('.pulso-reto-card')[i];
+            pulsoRetosEnviarElegir({ reto: String(r.id) }, card ? card.querySelector('.pulso-reto-cta') : null);
+        }
+
+        function pulsoRetosElegirPropio() {
+            const ta = document.getElementById('pulso-retos-own-text');
+            if (!ta || pulsoRetosBusy) return;
+            const text = ta.value.trim();
+            if (text.length < PULSO_RETO_PROPIO_MIN) {
+                pulsoRetosBanner('Describe tu reto con al menos ' + PULSO_RETO_PROPIO_MIN + ' caracteres.', 'warn');
+                ta.focus();
+                return;
+            }
+            if (text.length > PULSO_RETO_PROPIO_MAX) {
+                pulsoRetosBanner('Tu reto es demasiado largo (máximo ' + PULSO_RETO_PROPIO_MAX + ' caracteres).', 'warn');
+                return;
+            }
+            pulsoRetosEnviarElegir({ propio: text }, document.getElementById('pulso-retos-own-btn'));
+        }
+
+        // elegir devuelve el resultado PLANO: {codigo, enlace, enlace_curso, titulo}.
+        function pulsoRetosEnviarElegir(fields, labelEl) {
+            if (pulsoRetosBusy) return;
+            pulsoRetosSetBusy(true);
+            const token = pulsoAmpToken;
+            const label = labelEl ? labelEl.textContent : '';
+            if (labelEl) labelEl.textContent = 'Creando tu reto…';
+            pulsoRetosBanner('');
+            pulsoRetosRetryFn = function() { pulsoRetosEnviarElegir(fields, labelEl); };
+
+            pulsoRetosCall('elegir', Object.assign({ propuesta: String(pulsoRetosPropuestaId) }, fields)).then(function(d) {
+                if (token !== pulsoAmpToken) return;
+                if (!d.ok || !pulsoAmpIsHttps(d.enlace)) {
+                    pulsoRetosSetBusy(false);
+                    if (labelEl) labelEl.textContent = label;
+                    pulsoRetosHandleError(d.ok ? { error: 'respuesta-inesperada', mensaje: 'No hemos podido obtener el enlace del reto. Inténtalo de nuevo.' } : d);
+                    return;
+                }
+                pulsoRetosSetBusy(false);
+                pulsoRetosRenderDone(d, token);
+            });
+        }
+
+        // --- El reto elegido ---
+        function pulsoRetosRenderDone(d, token) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+            body.innerHTML = '<div class="pulso-retos-done">'
+                + '<div class="pulso-retos-done-head">¡Tu reto está listo!</div>'
+                + '<div class="pulso-reto-title" id="pulso-retos-done-title">' + escapeHtmlText(d.titulo || 'Reto') + '</div>'
+                + '<div id="pulso-retos-done-stats" class="pulso-retos-note"></div>'
+                + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
+                + '<a class="pulso-create-submit pulso-retos-open" href="' + pulsoEscapeAttr(d.enlace) + '" target="_blank" rel="noopener noreferrer">Abrir reto</a>'
+                + '<div class="pulso-retos-note">Se abre en una pestaña nueva. Si lo abres enseguida verás "Creando tu reto": tarda menos de un minuto.</div>'
+                + (pulsoAmpIsHttps(d.enlace_curso)
+                    ? '<a class="pulso-create-secondary" href="' + pulsoEscapeAttr(d.enlace_curso) + '" target="_blank" rel="noopener noreferrer">Ver retos del curso</a>'
+                    : '')
+                + '<button type="button" class="pulso-create-secondary" onclick="openCreatePanel(\'retos\')">Crear otro reto</button>'
+                + '</div><div id="pulso-create-gallery"></div>';
+            loadCreateGallery();
+
+            // Sin bloquear nada: pasado ~45 s, el título que ve la página del reto.
+            const codigo = String(d.codigo || '');
+            if (codigo) {
+                pulsoRetosRefreshTimer = setTimeout(function() { pulsoRetosRefrescar(token, codigo); }, PULSO_RETOS_REFRESH_MS);
+            }
+        }
+
+        function pulsoRetosRefrescar(token, codigo) {
+            pulsoRetosRefreshTimer = null;
+            if (token !== pulsoAmpToken) return;
+            pulsoRetosCall('refrescar', { codigo: codigo }).then(function(d) {
+                if (token !== pulsoAmpToken || !d.ok) return; // es un extra: si falla, no se dice nada
+                const title = document.getElementById('pulso-retos-done-title');
+                if (title && d.titulo) title.textContent = d.titulo;
+                // intentos/nota solo llegan si quien pregunta tiene viewanalytics: nunca al alumno.
+                const stats = document.getElementById('pulso-retos-done-stats');
+                if (stats && typeof d.intentos === 'number') {
+                    const n = d.intentos;
+                    stats.textContent = n + (n === 1 ? ' intento' : ' intentos')
+                        + (d.ultimaPuntuacion === null || d.ultimaPuntuacion === undefined ? ' · aún sin nota' : ' · última nota ' + d.ultimaPuntuacion);
+                }
+                if (d.estado === 'fallado') {
+                    pulsoRetosBanner('No se ha podido crear este reto' + (d.motivo ? ': ' + d.motivo : '.'), 'danger');
+                }
+            });
+        }
+
+        // «Ver todos los retos del curso»: la lista vive en Épica, no se pinta aquí.
+        // Se abre una pestaña EN el clic (si no, el navegador bloquea el pop-up tras el
+        // fetch) y se le pone el enlace al llegar; sin permiso, se ofrece un enlace.
+        function pulsoRetosVerCurso() {
+            if (pulsoRetosCourseBusy || pulsoRetosBusy) return;
+            pulsoRetosCourseBusy = true;
+            const token = pulsoAmpToken;
+            pulsoRetosRetryFn = pulsoRetosVerCurso;
+            pulsoRetosBanner('');
+            const win = window.open('', '_blank');
+            if (win) win.opener = null; // la página de Épica no debe poder tocar la pestaña de Moodle
+
+            pulsoRetosCall('curso').then(function(d) {
+                if (token !== pulsoAmpToken) { if (win) win.close(); return; }
+                pulsoRetosCourseBusy = false;
+                if (d.ok && pulsoAmpIsHttps(d.enlace)) {
+                    if (win) {
+                        win.location.href = d.enlace;
+                    } else {
+                        const el = document.getElementById('pulso-retos-msg');
+                        if (el) el.innerHTML = '<a class="pulso-create-secondary" href="' + pulsoEscapeAttr(d.enlace)
+                            + '" target="_blank" rel="noopener noreferrer">Abrir los retos del curso</a>';
+                    }
+                    return;
+                }
+                if (win) win.close();
+                if (d.ok) {
+                    pulsoRetosBanner('Todavía no hay una página de retos para este curso.', 'warn');
+                } else {
+                    pulsoRetosHandleError(d);
+                }
+            });
+        }
+
         // ---- Estado del encargo (paso 4): sondeo del panel, nunca de Epica ----
         // El navegador solo habla con api_create_status.php; quien sondea a
         // Epica de verdad es la tarea adhoc (classes/epica_client.php). Una
@@ -3966,6 +4722,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 clearTimeout(pulsoCreatePollTimer);
                 pulsoCreatePollTimer = null;
             }
+            pulsoRetosReset(); // sondeo y refresco de Retos, antidoble clic
         }
 
         function startCreatePolling(encargoid) {
@@ -4193,13 +4950,20 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             params.set('courseid', window.courseid);
             params.set('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
 
-            fetch(window.apiCreateStatusUrl + '?' + params.toString(), { credentials: 'same-origin' })
+            // Infografías/juegos (api_create_status.php) y retos (api_retos.php
+            // mis_retos, que no llama a Épica) se piden a la vez y se mezclan.
+            // Cada fuente falla por separado: si una cae, se pinta la otra.
+            const encargosP = fetch(window.apiCreateStatusUrl + '?' + params.toString(), { credentials: 'same-origin' })
                 .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (!data.success) return;
-                    renderCreateGallery(data.encargos || []);
-                })
-                .catch(function() { /* la galería es un extra, no bloquea el panel */ });
+                .then(function(data) { return data.success ? (data.encargos || []) : null; })
+                .catch(function() { return null; });
+            const retosP = pulsoRetosCall('mis_retos')
+                .then(function(d) { return d.ok && Array.isArray(d.retos) ? d.retos : []; });
+
+            Promise.all([encargosP, retosP]).then(function(res) {
+                if (res[0] === null && !res[1].length) return;
+                renderCreateGallery(res[0] || [], res[1]);
+            }).catch(function() { /* la galería es un extra, no bloquea el panel */ });
         }
 
         // Galería conjunta (paso 3): infografía y juego mezclados, más
@@ -4207,19 +4971,36 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // juego se JUEGA, así que su tarjeta no tiene imagen (pluginfile.php
         // sigue bloqueando su filearea a propósito) — icono + título de
         // respaldo + etiqueta. Ninguna de las dos usa el cian como texto.
-        function renderCreateGallery(encargos) {
+        // Retos (v1.27): tarjetas-enlace a Épica (pestaña nueva, sin iframe),
+        // mezcladas por fecha con las demás; etiqueta «Reto» en slate.
+        function renderCreateGallery(encargos, retos) {
             const container = document.getElementById('pulso-create-gallery');
             if (!container) return;
-            if (!encargos.length) {
-                container.innerHTML = '<p class="pulso-create-hint">Aún no has creado ninguna infografía ni ningún juego en este curso.</p>';
+            retos = (retos || []).filter(function(r) { return pulsoAmpIsHttps(r.enlace); }).slice(0, 8);
+            if (!encargos.length && !retos.length) {
+                container.innerHTML = '<p class="pulso-create-hint">Aún no has creado nada en este curso.</p>';
                 return;
             }
+
+            const items = encargos.map(function(e) { return { t: e.timecreated, e: e }; })
+                .concat(retos.map(function(r) { return { t: r.creado, r: r }; }))
+                .sort(function(a, b) { return b.t - a.t; });
 
             // El servidor ya filtra a status='listo' con fichero (ver
             // api_create_status.php), así que aquí no hay placeholder de
             // estado: todas las tarjetas son creaciones terminadas.
             let html = '<div class="pulso-create-gallery-title">Tus últimas creaciones</div><div class="pulso-create-gallery-grid">';
-            encargos.forEach(function(e) {
+            items.forEach(function(it) {
+                if (it.r) {
+                    html += '<a class="pulso-create-gallery-item" href="' + pulsoEscapeAttr(it.r.enlace) + '" target="_blank" rel="noopener noreferrer">'
+                        + '<span class="pulso-create-gallery-icon" aria-hidden="true">' + pulsoRetosIconSvg('target') + '</span>'
+                        + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(it.r.titulo || 'Reto') + '</span>'
+                        + '<span class="pulso-create-gallery-tag">Reto</span>'
+                        + '<span class="pulso-create-gallery-date">' + escapeHtmlText(new Date(it.r.creado * 1000).toLocaleDateString()) + '</span>'
+                        + '</a>';
+                    return;
+                }
+                const e = it.e;
                 const dateLabel = new Date(e.timecreated * 1000).toLocaleDateString();
                 const esjuego = e.tool === 'gamificacion';
                 const tag = esjuego ? 'Juego' : 'Infografía';

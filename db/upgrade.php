@@ -405,5 +405,17 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026100101, 'pulso');
     }
 
+    if ($oldversion < 2026100103) {
+        // v1.25.1: articulos en el idioma del curso primero (query local +
+        // filter=language) y campo "idioma" en cada articulo. Las filas
+        // cacheadas no lo tienen y se eligieron solo en ingles: se borran para
+        // que se regeneren. Nota: dejan de contar en los topes de hoy.
+        if ($dbman->table_exists(new xmldb_table('block_pulso_ampliaciones'))) {
+            $DB->delete_records_select('block_pulso_ampliaciones', 'timecreated <= :now', ['now' => time()]);
+        }
+
+        upgrade_block_savepoint(true, 2026100103, 'pulso');
+    }
+
     return true;
 }

@@ -1101,6 +1101,21 @@ Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya i
   `https://`); lo externo (títulos, canales, autores) se guarda tal cual y **se escapa al pintarlo**
   (paso 2). Cambiar este criterio o el prompt deja obsoletas las filas ya cacheadas: hace falta
   un paso de upgrade que las borre (como el de 2026093003).
+- **Artículos en el idioma del CURSO primero (v1.25.1).** Haiku devuelve además
+  `query_articulos_local` (la misma descripción en el idioma del curso; vacía exactamente cuando
+  `query_articulos` lo está — el servidor lo fuerza). Curso no inglés: 1ª búsqueda
+  `search.semantic=<local>&filter=language:<iso>,type:article|review,has_abstract:true`, con juez
+  y criterio de siempre; si quedan < 2 aprobados, 2ª búsqueda en inglés SIN filtro de idioma
+  (descartando URLs ya elegidas) para completar, siempre con los del idioma del curso delante.
+  Curso en inglés: una sola búsqueda. Si la local falla, se sigue con la inglesa. Verificado en
+  la doc de OpenAlex (help.openalex.org/api/semantic-search): `language` se combina con
+  `search.semantic`; solo `last_known_institutions.country_code` y `cited_by_count` no. Entre las
+  dos búsquedas se espera hasta 1,1 s (límite de 1 req/s). Cada artículo guarda `idioma` (campo
+  `language` de OpenAlex, validado `^[a-z]{2,3}$`, `''` si falta). **El idioma es el del CURSO**
+  (`course_language()`, el mismo de `relevanceLanguage` de YouTube), nunca el del usuario: la
+  caché es compartida por recurso. `from_row()` devuelve `idioma_curso` (calculado al leer, no
+  guardado) y el cliente pinta la etiqueta «En inglés» (`Intl.DisplayNames`, es) solo si
+  `idioma` está y difiere de él, en `#34547A`. Upgrade 2026100103 vacía la caché.
 - **Hueco RGPD documentado**: la tabla guarda `userid` (quién la generó) pero el plugin NO tiene
   `classes/privacy/provider.php`, así que no hay metadata/export/borrado ni para esta tabla ni
   para las demás. Pendiente como tarea propia; tampoco hay limpieza de filas al borrar un curso.

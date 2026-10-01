@@ -2,8 +2,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026100102; // Ampliacion paso 2: tercer CTA y resultados en el bloque Crear
-$plugin->release   = '1.25.0';      // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026100103; // Ampliacion: articulos en el idioma del curso primero
+$plugin->release   = '1.25.1';      // Semver visible en el header del chat — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->dependencies = [

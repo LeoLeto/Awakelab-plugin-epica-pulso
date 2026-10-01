@@ -1,5 +1,15 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-01 — Ampliación: artículos en el idioma del curso (v1.25.1)
+
+Los artículos salían siempre en inglés. Reglas en `CLAUDE.md` → paso 1 («Artículos en el idioma del
+CURSO»). Decisiones/dudas:
+- La etiqueta necesita el idioma del curso en el cliente: `from_row()` lo devuelve como
+  `idioma_curso` (no se guarda en BD: no hay cambio de esquema; el upgrade solo vacía la caché).
+- La segunda búsqueda excluye las URLs ya elegidas para no duplicar.
+- Sin verificar contra OpenAlex real: solo la doc (`language` combina con `search.semantic`) y
+  `php -l`. Si el filtro se ignorara, bastaría filtrar en local por `language` de los resultados.
+
 ## 2026-10-01 — Ampliación paso 2: «Ampliar recurso» en el bloque Crear (v1.25.0)
 
 Tercer CTA que llama a `api_ampliacion.php`. Solo cliente; reglas en `CLAUDE.md` → "Ampliación

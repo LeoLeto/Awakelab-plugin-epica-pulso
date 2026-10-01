@@ -417,5 +417,54 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026100103, 'pulso');
     }
 
+    if ($oldversion < 2026100104) {
+        // Retos (Epica) paso 1: propuestas de seis retos y retos elegidos.
+        // Deben coincidir con las definiciones de install.xml (comprobar los dos a la vez).
+        $table = new xmldb_table('block_pulso_reto_propuestas');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('cmid', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $table->add_field('tema', XMLDB_TYPE_CHAR, '500', null, null, null, null);
+            $table->add_field('epica_propuesta', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('estado', XMLDB_TYPE_CHAR, '20', null, XMLDB_NOTNULL, null, 'en-cola');
+            $table->add_field('posicion', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $table->add_field('documento_json', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('retos_json', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('motivo', XMLDB_TYPE_TEXT, null, null, null, null, null);
+            $table->add_field('timetrabajando', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('idx_userid_courseid', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']);
+            $table->add_index('idx_courseid_timecreated', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'timecreated']);
+            $dbman->create_table($table);
+        }
+
+        $table = new xmldb_table('block_pulso_retos');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('userid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('propuestaid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('codigo', XMLDB_TYPE_CHAR, '64', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('enlace', XMLDB_TYPE_CHAR, '512', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('enlace_curso', XMLDB_TYPE_CHAR, '512', null, null, null, null);
+            $table->add_field('titulo', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('titulo_final', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('propio', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('uniq_codigo', XMLDB_INDEX_UNIQUE, ['codigo']);
+            $table->add_index('idx_userid_courseid', XMLDB_INDEX_NOTUNIQUE, ['userid', 'courseid']);
+            $table->add_index('idx_courseid_timecreated', XMLDB_INDEX_NOTUNIQUE, ['courseid', 'timecreated']);
+            $dbman->create_table($table);
+        }
+
+        upgrade_block_savepoint(true, 2026100104, 'pulso');
+    }
+
     return true;
 }

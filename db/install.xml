@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <XMLDB PATH="blocks/pulso/db" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    VERSION="20260930"
+    VERSION="20261001"
     COMMENT="XMLDB file for Moodle block Pulso"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd">
   <TABLES>
@@ -128,6 +128,55 @@
         <INDEX NAME="uniq_course_cm_hash" UNIQUE="true" FIELDS="courseid, cmid, content_hash"/>
         <INDEX NAME="idx_timecreated" UNIQUE="false" FIELDS="timecreated"/>
         <INDEX NAME="idx_userid_timecreated" UNIQUE="false" FIELDS="userid, timecreated"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="block_pulso_reto_propuestas" COMMENT="Retos (Epica): propuestas de seis retos. Una fila por llamada a retos/proponer (tambien 'proponer otros'); cuenta para los topes diarios.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="cmid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="course_modules.id del recurso; NULL si la propuesta es solo de un tema"/>
+        <FIELD NAME="tema" TYPE="char" LENGTH="500" NOTNULL="false" SEQUENCE="false" COMMENT="Tema escrito por la persona (maximo 500)"/>
+        <FIELD NAME="epica_propuesta" TYPE="char" LENGTH="100" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="Id de la propuesta en Epica (se inserta al recibir el 202)"/>
+        <FIELD NAME="estado" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="en-cola" SEQUENCE="false" COMMENT="en-cola | trabajando | listo | fallado | desconocido; los tres ultimos son terminales"/>
+        <FIELD NAME="posicion" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="documento_json" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="documento (titulo, resumen, temas) de Epica, solo con los campos conocidos"/>
+        <FIELD NAME="retos_json" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Los seis retos propuestos; 'elegir' solo acepta ids guardados aqui"/>
+        <FIELD NAME="motivo" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Motivo de fallado/desconocido, tal cual lo dio Epica o la causa local"/>
+        <FIELD NAME="timetrabajando" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Primer 'trabajando' visto: el limite de 2 min del sondeo cuenta desde aqui, no desde la cola"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_userid_courseid" UNIQUE="false" FIELDS="userid, courseid"/>
+        <INDEX NAME="idx_courseid_timecreated" UNIQUE="false" FIELDS="courseid, timecreated"/>
+      </INDEXES>
+    </TABLE>
+    <TABLE NAME="block_pulso_retos" COMMENT="Retos (Epica): retos elegidos. Una fila por llamada a retos/elegir; cuenta para los topes diarios.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="propuestaid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="block_pulso_reto_propuestas.id de la que salio (recurso y tema se leen ahi)"/>
+        <FIELD NAME="codigo" TYPE="char" LENGTH="64" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="Codigo del reto en Epica (24 bytes al azar en base64url)"/>
+        <FIELD NAME="enlace" TYPE="char" LENGTH="512" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="https y host de epica_base_url, validado al guardar"/>
+        <FIELD NAME="enlace_curso" TYPE="char" LENGTH="512" NOTNULL="false" SEQUENCE="false" COMMENT="Pagina de retos del curso; vacio si el token no traia curso"/>
+        <FIELD NAME="titulo" TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="Titulo del reto PROPUESTO (el que devuelve elegir)"/>
+        <FIELD NAME="titulo_final" TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="Titulo escrito, el que ve la pagina del reto; se rellena al refrescar cuando esta listo. Vacio mientras tanto"/>
+        <FIELD NAME="propio" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 si es un reto escrito por la persona"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="uniq_codigo" UNIQUE="true" FIELDS="codigo"/>
+        <INDEX NAME="idx_userid_courseid" UNIQUE="false" FIELDS="userid, courseid"/>
+        <INDEX NAME="idx_courseid_timecreated" UNIQUE="false" FIELDS="courseid, timecreated"/>
       </INDEXES>
     </TABLE>
   </TABLES>

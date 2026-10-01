@@ -1105,6 +1105,40 @@ Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya i
   `classes/privacy/provider.php`, así que no hay metadata/export/borrado ni para esta tabla ni
   para las demás. Pendiente como tarea propia; tampoco hay limpieza de filas al borrar un curso.
 
+## Ampliación de recursos — paso 2: «Ampliar recurso» en el bloque Crear (v1.25.0)
+
+Tercer CTA del bloque Crear que llama a `api_ampliacion.php` y pinta vídeos + artículos.
+Casi todo cliente (`chat_simple_view.php`); en servidor solo `api_create_form.php` (ver abajo). Sin `db/`. Reglas:
+
+- **Mismo panel y mismo desplegable, no uno nuevo.** `pulsoCreateTool = 'ampliacion'`
+  reutiliza `#pulso-create-panel`, `openCreatePanel()` y `api_create_form.php`. El
+  formulario es solo recurso + «Ampliar» (sin texto libre ni formato). Misma capability
+  (`createactivity`) y mismos marcadores `PULSO_CREATE_ONLY_*`. La fila de CTA pasó de
+  `flex` a rejilla de 2 columnas (el tercero a todo el ancho; 1 columna a ≤420px).
+- **Los cupos de Épica no aplican, tampoco en servidor.** No se pinta el aviso de cupo por
+  sección ni se bloquea por él. `api_create_form.php` acepta `tool=ampliacion` (el cliente lo
+  manda al abrir el panel): salta `check_general_quota()` (`quota_ok` siempre true) y pide
+  `get_resources_context(..., $withusage=false)`, con los mismos filtros visible+usable pero sin
+  `sectionused`/`sectionlimit`. Sin ese parámetro el flujo de infografías/juegos es el de siempre.
+  Ampliación tiene sus propios topes en `api_ampliacion.php`.
+- **No se incrusta YouTube**: ni iframe ni reproductor. Cada tarjeta es un `<a>` a
+  `url` con `target="_blank" rel="noopener noreferrer"`.
+- **Todo lo externo se escapa** (títulos, canales, autores, revistas, tema, avisos) con
+  `escapeHtmlText`; para valores de atributo se usa `pulsoEscapeAttr()`, porque
+  `escapeHtmlText` (vía `innerHTML`) NO escapa comillas y un título con `"` rompería
+  `alt`/`href`; **cualquier valor de atributo del bloque Crear usa `pulsoEscapeAttr`** (7 usos
+  de `escapeHtmlText` en atributos del estado/galería/formulario se migraron en v1.25.0). URLs solo si empiezan por `https://`; miniaturas solo si empiezan por
+  `https://i.ytimg.com/` (si no, hueco con icono), con `loading="lazy"` y
+  `referrerpolicy="no-referrer"`. Segunda red tras la validación del servidor.
+- **Una sección vacía no pinta cabecera**; en su lugar sale el aviso que venga en
+  `avisos`. «Acceso abierto» en success `#0F7A57`; sin cian como texto.
+- **Sin galería y sin historial.** Una ampliación no es una creación del usuario (es
+  compartida por recurso y cacheada por `content_hash`), así que no entra en «Tus últimas
+  creaciones», y el panel no es un mensaje de chat.
+- **Peticiones en vuelo** se invalidan con `pulsoAmpToken` (se incrementa al abrir/cerrar
+  el panel): si el usuario pulsa «Volver» mientras busca, la respuesta tardía no pisa la
+  pantalla que esté viendo.
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

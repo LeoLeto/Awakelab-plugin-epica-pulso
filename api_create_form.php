@@ -25,6 +25,8 @@ use block_pulso\chat_pipeline;
 use block_pulso\creation_quota;
 
 $courseid = required_param('courseid', PARAM_INT);
+// 'ampliacion' no pasa por los cupos de encargos de Epica; cualquier otro valor = flujo de siempre.
+$isampliacion = optional_param('tool', '', PARAM_ALPHA) === 'ampliacion';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -43,7 +45,10 @@ try {
     $userid = (int)$USER->id;
     $isteacher = chat_pipeline::user_can_view_analytics($courseid);
 
-    $quota = creation_quota::check_general_quota($courseid, $userid, $isteacher);
+    // Ampliacion tiene sus propios topes (en api_ampliacion.php): no se comprueba ni bloquea el cupo de encargos.
+    $quota = $isampliacion
+        ? ['allowed' => true, 'reason' => '']
+        : creation_quota::check_general_quota($courseid, $userid, $isteacher);
 
     $response = [
         'success' => true,
@@ -54,7 +59,7 @@ try {
     ];
 
     if ($quota['allowed']) {
-        $ctx = creation_quota::get_resources_context($courseid, $userid);
+        $ctx = creation_quota::get_resources_context($courseid, $userid, !$isampliacion);
         $response['resources'] = $ctx['resources'];
         $response['noresourcesreason'] = $ctx['reason'];
     }

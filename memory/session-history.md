@@ -1,5 +1,17 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-01 — Ampliación paso 2: «Ampliar recurso» en el bloque Crear (v1.25.0)
+
+Tercer CTA que llama a `api_ampliacion.php`. Solo cliente; reglas en `CLAUDE.md` → "Ampliación
+de recursos — paso 2". Lo que costó ver:
+- **`api_create_form.php` no devolvía recursos con el cupo de Épica agotado**, acoplando Ampliación a
+  un cupo ajeno. Resuelto con `tool=ampliacion`: sin cupo y sin consumo por sección
+  (`get_resources_context(..., $withusage=false)`).
+- **`escapeHtmlText()` no escapa comillas** (usa `textContent`→`innerHTML`): válida para texto,
+  no para atributos. Se añadió `pulsoEscapeAttr()` y se migraron también 7 usos previos en atributos (placeholder, href, src, alt) del estado y la galería de Crear. Probado con un título
+  `a"><img onerror>` y una URL `javascript:`.
+- Sin verificar en navegador contra sanase-test (solo prueba aislada de las funciones de pintado).
+
 ## 2026-10-01 — Ampliación: juez antes de elegir y búsqueda semántica en OpenAlex (v1.24.2)
 
 Segunda prueba real (curso 92): vídeos mejor, artículos peor — «A Survey of Corporate Governance»

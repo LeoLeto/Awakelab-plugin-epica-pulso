@@ -50,7 +50,7 @@ class creation_quota {
      *               'not_indexed'|'no_usable'|'no_visible' cuando resources
      *               esta vacio; null si hay resultados.
      */
-    public static function get_resources_context(int $courseid, int $userid): array {
+    public static function get_resources_context(int $courseid, int $userid, bool $withusage = true): array {
         $raw = full_text_store::get_available_resources($courseid);
         if (empty($raw)) {
             $reason = full_text_store::has_any_indexed($courseid) ? 'no_usable' : 'not_indexed';
@@ -60,6 +60,11 @@ class creation_quota {
         $visible = self::filter_visible($raw, $courseid);
         if (empty($visible)) {
             return ['resources' => [], 'reason' => 'no_visible'];
+        }
+
+        // Ampliación no usa el cupo por sección de los encargos: sin consumo.
+        if (!$withusage) {
+            return ['resources' => array_values($visible), 'reason' => null];
         }
 
         return ['resources' => self::attach_section_usage($visible, $courseid, $userid), 'reason' => null];

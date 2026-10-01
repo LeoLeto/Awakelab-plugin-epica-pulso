@@ -41,6 +41,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $create_form_url = $CFG->wwwroot . '/blocks/pulso/api_create_form.php';
     $create_submit_url = $CFG->wwwroot . '/blocks/pulso/api_create_submit.php';
     $create_status_url = $CFG->wwwroot . '/blocks/pulso/api_create_status.php';
+    $ampliacion_url = $CFG->wwwroot . '/blocks/pulso/api_ampliacion.php';
 
     // Leer la versión directamente de version.php (no de la BD) para que el
     // badge del header refleje siempre el código desplegado, incluso antes
@@ -65,6 +66,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         window.apiCreateFormUrl = '{$create_form_url}';
         window.apiCreateSubmitUrl = '{$create_submit_url}';
         window.apiCreateStatusUrl = '{$create_status_url}';
+        window.apiAmpliacionUrl = '{$ampliacion_url}';
         window.pulsoSesskey = '{$pulso_sesskey}';
         // Solo para adaptar la UI: el servidor decide qué datos se devuelven.
         window.pulsoIsTeacher = {$pulso_isteacher};
@@ -556,16 +558,27 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
            preguntas, este es una acción que cuesta dinero y genera algo.
            Fondo navy sólido + texto blanco (nunca cian como color de texto,
            regla del tema claro), acento cian solo en el icono. */
-        /* Fila con los dos CTA de "Crear" (infografía / juego), lado a lado -
-           mismo patrón repetido, no un formulario distinto por herramienta. */
+        /* Fila con los CTA de "Crear" (infografía / juego / ampliar): rejilla de
+           2 columnas con el tercero a todo el ancho; 1 columna en pantallas
+           estrechas. Mismo patrón repetido, no un formulario por herramienta. */
         .pulso-create-cta-row {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
 
         .pulso-create-cta-row .pulso-create-cta {
-            flex: 1;
             min-width: 0;
+        }
+
+        .pulso-create-cta-row .pulso-create-cta:last-child:nth-child(odd) {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 420px) {
+            .pulso-create-cta-row {
+                grid-template-columns: 1fr;
+            }
         }
 
         .pulso-create-cta {
@@ -935,6 +948,128 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             font-size: 0.65rem;
             color: var(--pulso-muted);
             padding: 0 4px 4px;
+        }
+
+        /* ========== AMPLIAR RECURSO (resultados) ==========
+           Tarjetas de vídeo/artículo enlazadas a contenido EXTERNO. Nunca
+           cian como texto: tinta/slate/muted; "Acceso abierto" en success. */
+        .pulso-amp {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .pulso-amp-loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px;
+            border-radius: 12px;
+            background: var(--pulso-surface);
+            border-left: 3px solid var(--pulso-cyan);
+            font-size: 0.86rem;
+            line-height: 1.5;
+            color: var(--pulso-ink);
+        }
+
+        .pulso-amp-head {
+            font-size: 0.92rem;
+            color: var(--pulso-ink);
+            overflow-wrap: anywhere;
+        }
+
+        .pulso-amp-section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--pulso-slate);
+            margin-bottom: 6px;
+        }
+
+        .pulso-amp-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .pulso-amp-card {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            padding: 8px;
+            border: 1px solid var(--pulso-line);
+            border-radius: 12px;
+            background: var(--pulso-surface);
+            color: var(--pulso-ink) !important;
+            text-decoration: none;
+            font-family: var(--pulso-font);
+        }
+
+        a.pulso-amp-card:hover {
+            border-color: var(--pulso-cyan);
+            box-shadow: 0 2px 8px rgba(1, 25, 50, 0.12);
+        }
+
+        .pulso-amp-thumb {
+            flex-shrink: 0;
+            width: 96px;
+            aspect-ratio: 16 / 9;
+            border-radius: 8px;
+            object-fit: cover;
+            background: var(--pulso-surface-2);
+        }
+
+        .pulso-amp-thumb-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--pulso-muted);
+        }
+
+        .pulso-amp-thumb-empty svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .pulso-amp-card-text {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+
+        .pulso-amp-card-title {
+            font-size: 0.84rem;
+            font-weight: 600;
+            line-height: 1.35;
+            color: var(--pulso-ink);
+        }
+
+        .pulso-amp-card-meta {
+            font-size: 0.74rem;
+            color: var(--pulso-slate);
+            line-height: 1.4;
+        }
+
+        .pulso-amp-tag {
+            align-self: flex-start;
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 1px 8px;
+            border-radius: 999px;
+            color: #0F7A57;
+            background: rgba(15, 122, 87, 0.12);
+        }
+
+        .pulso-amp-footnote {
+            font-size: 0.72rem;
+            color: var(--pulso-muted);
+        }
+
+        .pulso-amp-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
         .pulso-message {
@@ -2025,6 +2160,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                             <span class="pulso-create-cta-text">
                                 <span class="pulso-create-cta-title">Crear juego</span>
                                 <span class="pulso-create-cta-sub">A partir de un recurso del curso</span>
+                            </span>
+                        </button>
+                        <button type="button" class="pulso-create-cta" onclick="openCreatePanel('ampliacion')">
+                            <span class="pulso-create-cta-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                            </span>
+                            <span class="pulso-create-cta-text">
+                                <span class="pulso-create-cta-title">Ampliar recurso</span>
+                                <span class="pulso-create-cta-sub">Vídeos y artículos sobre un recurso del curso</span>
                             </span>
                         </button>
                     </div>
@@ -3398,11 +3542,19 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 submitLabel: 'Crear juego',
                 noResourcesDefault: 'No hay recursos disponibles para crear un juego en este curso.',
                 noUsableReason: 'Ninguno de los recursos de este curso tiene texto que se pueda aprovechar para generar un juego.'
+            },
+            // Ampliación no es una creación de Épica: sin texto libre, sin formato
+            // ni cupos de encargos (tiene sus propios topes en el servidor).
+            ampliacion: {
+                panelTitle: 'Ampliar recurso',
+                submitLabel: 'Ampliar',
+                noResourcesDefault: 'No hay recursos disponibles para ampliar en este curso.',
+                noUsableReason: 'Ninguno de los recursos de este curso tiene texto que se pueda aprovechar para buscar vídeos y artículos.'
             }
         };
 
         function pulsoCreateSetTool(tool) {
-            pulsoCreateTool = tool === 'gamificacion' ? 'gamificacion' : 'infografia';
+            pulsoCreateTool = (tool === 'gamificacion' || tool === 'ampliacion') ? tool : 'infografia';
             const titleEl = document.getElementById('pulso-create-title');
             if (titleEl) titleEl.textContent = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool].panelTitle;
         }
@@ -3414,12 +3566,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
             pulsoCreateSetTool(tool || pulsoCreateTool);
             stopCreatePolling();
+            pulsoAmpToken++;
             messagesDiv.classList.add('pulso-showing-create');
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
 
             const params = new URLSearchParams();
             params.set('courseid', window.courseid);
             params.set('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+            if (pulsoCreateTool === 'ampliacion') params.set('tool', 'ampliacion');
 
             fetch(window.apiCreateFormUrl + '?' + params.toString(), { credentials: 'same-origin' })
                 .then(function(r) { return r.json(); })
@@ -3446,6 +3600,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         function closeCreatePanel() {
             stopCreatePolling();
+            pulsoAmpToken++;
             const messagesDiv = document.getElementById('pulso-messages');
             if (messagesDiv) {
                 messagesDiv.classList.remove('pulso-showing-create');
@@ -3458,9 +3613,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         function renderCreateNotice(text) {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
-            body.innerHTML = '<div class="pulso-create-notice"></div><div id="pulso-create-gallery"></div>';
+            const isamp = pulsoCreateTool === 'ampliacion';
+            body.innerHTML = '<div class="pulso-create-notice"></div>' + (isamp ? '' : '<div id="pulso-create-gallery"></div>');
             body.querySelector('.pulso-create-notice').textContent = text;
-            loadCreateGallery();
+            if (!isamp) loadCreateGallery();
         }
 
         function renderCreateNoResources(reason) {
@@ -3479,6 +3635,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
             const labels = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool];
             const isjuego = pulsoCreateTool === 'gamificacion';
+            const isamp = pulsoCreateTool === 'ampliacion';
 
             let optionsHtml = '';
             resources.forEach(function(r) {
@@ -3501,6 +3658,19 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '</div>'
             );
 
+            // Ampliación: solo recurso + botón. Sin aviso de cupo por sección ni
+            // galería (una ampliación es compartida por recurso, no del usuario).
+            if (isamp) {
+                body.innerHTML = ''
+                    + '<div class="pulso-create-field">'
+                    + '<label for="pulso-create-resource">Recurso</label>'
+                    + '<select id="pulso-create-resource">' + optionsHtml + '</select>'
+                    + '</div>'
+                    + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" onclick="submitAmpliacion()">'
+                    + escapeHtmlText(labels.submitLabel) + '</button>';
+                return;
+            }
+
             body.innerHTML = ''
                 + '<div class="pulso-create-field">'
                 + '<label for="pulso-create-resource">Recurso</label>'
@@ -3509,7 +3679,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '</div>'
                 + '<div class="pulso-create-field">'
                 + '<label for="pulso-create-prompt">' + escapeHtmlText(labels.promptLabel) + '</label>'
-                + '<textarea id="pulso-create-prompt" maxlength="4000" placeholder="' + escapeHtmlText(labels.promptPlaceholder) + '"></textarea>'
+                + '<textarea id="pulso-create-prompt" maxlength="4000" placeholder="' + pulsoEscapeAttr(labels.promptPlaceholder) + '"></textarea>'
                 + '</div>'
                 + formatFieldHtml
                 + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" onclick="submitCreate()">' + escapeHtmlText(labels.submitLabel) + '</button>'
@@ -3600,6 +3770,165 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         btn.disabled = false;
                         btn.textContent = labels.submitLabel;
                     }
+                });
+        }
+
+        // ---- Ampliar recurso: vídeos + artículos (api_ampliacion.php) ----
+        // Misma pantalla y mismo desplegable que Crear. TODO lo que viene de
+        // fuera (títulos, canales, autores, revistas, tema, avisos) se escapa;
+        // las URLs solo se pintan si son https://, y no se incrusta YouTube.
+        let pulsoAmpToken = 0;
+
+        // escapeHtmlText no escapa comillas: para CUALQUIER valor de atributo (href, src, alt, placeholder…) usar esta.
+        function pulsoEscapeAttr(text) {
+            return escapeHtmlText(text).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function pulsoAmpIsHttps(url) {
+            return typeof url === 'string' && url.indexOf('https://') === 0;
+        }
+
+        function pulsoAmpFormatViews(n) {
+            n = Number(n) || 0;
+            if (n <= 0) return '';
+            if (n >= 1000000) {
+                return (n / 1000000).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + ' M de visualizaciones';
+            }
+            return n.toLocaleString('es-ES') + (n === 1 ? ' visualización' : ' visualizaciones');
+        }
+
+        function pulsoAmpFormatDuration(seconds) {
+            const s = Math.round(Number(seconds) || 0);
+            if (s <= 0) return '';
+            if (s < 60) return s + ' s';
+            const m = Math.round(s / 60);
+            if (m < 60) return m + ' min';
+            const h = Math.floor(m / 60);
+            const r = m % 60;
+            return h + ' h' + (r ? ' ' + r + ' min' : '');
+        }
+
+        function pulsoAmpCard(url, inner) {
+            if (pulsoAmpIsHttps(url)) {
+                return '<a class="pulso-amp-card" href="' + pulsoEscapeAttr(url) + '" target="_blank" rel="noopener noreferrer">' + inner + '</a>';
+            }
+            return '<div class="pulso-amp-card">' + inner + '</div>';
+        }
+
+        function pulsoAmpVideoCard(v) {
+            const title = v.titulo || 'Sin título';
+            const thumbOk = typeof v.miniatura === 'string' && v.miniatura.indexOf('https://i.ytimg.com/') === 0;
+            const thumb = thumbOk
+                ? '<img class="pulso-amp-thumb" src="' + pulsoEscapeAttr(v.miniatura) + '" alt="' + pulsoEscapeAttr(title)
+                    + '" loading="lazy" referrerpolicy="no-referrer">'
+                : '<span class="pulso-amp-thumb pulso-amp-thumb-empty" aria-hidden="true">'
+                    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><polygon points="10 9 15 12 10 15 10 9"/></svg></span>';
+            const meta = [v.canal || '', pulsoAmpFormatViews(v.vistas), pulsoAmpFormatDuration(v.duracion)].filter(Boolean);
+            return pulsoAmpCard(v.url, thumb
+                + '<span class="pulso-amp-card-text">'
+                + '<span class="pulso-amp-card-title">' + escapeHtmlText(title) + '</span>'
+                + (meta.length ? '<span class="pulso-amp-card-meta">' + escapeHtmlText(meta.join(' · ')) + '</span>' : '')
+                + '</span>');
+        }
+
+        function pulsoAmpArticleCard(a) {
+            const title = a.titulo || 'Sin título';
+            const line = [a.autores || '', a.anio ? String(a.anio) : '', a.revista || ''].filter(Boolean);
+            const cites = Number(a.citas) || 0;
+            return pulsoAmpCard(a.url,
+                '<span class="pulso-amp-card-text">'
+                + '<span class="pulso-amp-card-title">' + escapeHtmlText(title) + '</span>'
+                + (line.length ? '<span class="pulso-amp-card-meta">' + escapeHtmlText(line.join(' · ')) + '</span>' : '')
+                + (cites > 0 ? '<span class="pulso-amp-card-meta">' + escapeHtmlText(cites.toLocaleString('es-ES') + (cites === 1 ? ' cita' : ' citas')) + '</span>' : '')
+                + (a.acceso_abierto ? '<span class="pulso-amp-tag">Acceso abierto</span>' : '')
+                + '</span>');
+        }
+
+        function pulsoAmpActions(primaryLabel) {
+            return '<div class="pulso-amp-actions">'
+                + '<button type="button" class="pulso-create-submit" onclick="openCreatePanel(\'ampliacion\')">' + escapeHtmlText(primaryLabel) + '</button>'
+                + '<button type="button" class="pulso-create-back-link" onclick="closeCreatePanel()">Volver</button>'
+                + '</div>';
+        }
+
+        function renderAmpliacionError(message) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+            body.innerHTML = '<div class="pulso-amp">'
+                + '<div class="pulso-create-notice-inline danger">' + escapeHtmlText(message) + '</div>'
+                + pulsoAmpActions('Ampliar otro recurso')
+                + '</div>';
+        }
+
+        function renderAmpliacion(data) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+            const videos = Array.isArray(data.videos) ? data.videos : [];
+            const articulos = Array.isArray(data.articulos) ? data.articulos : [];
+            const avisos = Array.isArray(data.avisos) ? data.avisos : [];
+
+            let html = '<div class="pulso-amp">';
+            if (data.tema) {
+                html += '<div class="pulso-amp-head">Para ampliar: <strong>' + escapeHtmlText(data.tema) + '</strong></div>';
+            }
+            if (videos.length) {
+                html += '<div><div class="pulso-amp-section-title">Vídeos</div><div class="pulso-amp-list">'
+                    + videos.map(pulsoAmpVideoCard).join('') + '</div></div>';
+            }
+            if (articulos.length) {
+                html += '<div><div class="pulso-amp-section-title">Artículos académicos</div><div class="pulso-amp-list">'
+                    + articulos.map(pulsoAmpArticleCard).join('') + '</div></div>';
+            }
+            avisos.forEach(function(a) {
+                html += '<div class="pulso-create-notice-inline">' + escapeHtmlText(a) + '</div>';
+            });
+            if (!videos.length && !articulos.length && !avisos.length) {
+                html += '<div class="pulso-create-notice-inline">No hemos encontrado contenido para ampliar este recurso.</div>';
+            }
+            html += '<div class="pulso-amp-footnote">'
+                + (window.pulsoIsTeacher
+                    ? 'Contenido externo seleccionado automáticamente. Revísalo antes de usarlo en clase.'
+                    : 'Contenido externo seleccionado automáticamente.')
+                + '</div>'
+                + pulsoAmpActions('Ampliar otro recurso')
+                + '</div>';
+            body.innerHTML = html;
+        }
+
+        function submitAmpliacion() {
+            const select = document.getElementById('pulso-create-resource');
+            const btn = document.getElementById('pulso-create-submit-btn');
+            const body = document.getElementById('pulso-create-body');
+            if (!select || !body || (btn && btn.disabled)) return;
+            if (btn) btn.disabled = true;
+
+            const cmid = parseInt(select.value, 10);
+            const resource = pulsoCreateResources.find(function(r) { return r.cmid === cmid; });
+            const name = resource ? resource.name : '';
+            const token = ++pulsoAmpToken;
+
+            body.innerHTML = '<div class="pulso-amp-loading" role="status">'
+                + '<span class="pulso-typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>'
+                + '<span>Buscando vídeos y artículos sobre ' + escapeHtmlText(name) + '…</span></div>';
+
+            const formData = new FormData();
+            formData.append('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+            formData.append('courseid', window.courseid);
+            formData.append('cmid', String(cmid));
+
+            fetch(window.apiAmpliacionUrl, { method: 'POST', credentials: 'same-origin', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (token !== pulsoAmpToken) return; // el usuario ya salió de esta pantalla
+                    if (data && data.success) {
+                        renderAmpliacion(data);
+                    } else {
+                        renderAmpliacionError((data && data.message) || 'No se ha podido ampliar el recurso. Inténtalo de nuevo.');
+                    }
+                })
+                .catch(function() {
+                    if (token !== pulsoAmpToken) return;
+                    renderAmpliacionError('No se ha podido conectar para ampliar el recurso. Inténtalo de nuevo.');
                 });
         }
 
@@ -3811,16 +4140,16 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     if (encargo.titulo) html += '<div class="pulso-create-image-title">' + escapeHtmlText(encargo.titulo) + '</div>';
                     if (encargo.tema) html += '<div class="pulso-create-image-tema">' + escapeHtmlText(encargo.tema) + '</div>';
                     html += '<div class="pulso-create-image-actions">'
-                        + '<a href="' + escapeHtmlText(encargo.playurl) + '" target="_blank" rel="noopener">Jugar</a>'
+                        + '<a href="' + pulsoEscapeAttr(encargo.playurl) + '" target="_blank" rel="noopener">Jugar</a>'
                         + '</div>';
                 } else {
-                    html += '<img class="pulso-create-image" src="' + escapeHtmlText(encargo.imageurl) + '" alt="'
-                        + escapeHtmlText(encargo.titulo || 'Infografía generada') + '">';
+                    html += '<img class="pulso-create-image" src="' + pulsoEscapeAttr(encargo.imageurl) + '" alt="'
+                        + pulsoEscapeAttr(encargo.titulo || 'Infografía generada') + '">';
                     if (encargo.titulo) html += '<div class="pulso-create-image-title">' + escapeHtmlText(encargo.titulo) + '</div>';
                     if (encargo.tema) html += '<div class="pulso-create-image-tema">' + escapeHtmlText(encargo.tema) + '</div>';
                     html += '<div class="pulso-create-image-actions">'
-                        + '<a href="' + escapeHtmlText(encargo.imageurl) + '" target="_blank" rel="noopener">Abrir a tamaño completo</a>'
-                        + '<a href="' + escapeHtmlText(encargo.downloadurl) + '">Descargar</a>'
+                        + '<a href="' + pulsoEscapeAttr(encargo.imageurl) + '" target="_blank" rel="noopener">Abrir a tamaño completo</a>'
+                        + '<a href="' + pulsoEscapeAttr(encargo.downloadurl) + '">Descargar</a>'
                         + '</div>';
                 }
             } else if (encargo.status === 'fallado' || encargo.status === 'desconocido') {
@@ -3886,7 +4215,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         + '</span>'
                         + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(e.titulo || 'Juego') + '</span>';
                 } else {
-                    html += '<img src="' + escapeHtmlText(e.imageurl) + '" alt="">';
+                    html += '<img src="' + pulsoEscapeAttr(e.imageurl) + '" alt="">';
                 }
                 html += '<span class="pulso-create-gallery-tag">' + tag + '</span>'
                     + '<span class="pulso-create-gallery-date">' + escapeHtmlText(dateLabel) + '</span>'

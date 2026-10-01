@@ -73,6 +73,7 @@ try {
         'videos' => $result['videos'],
         'articulos' => $result['articulos'],
         'avisos' => $result['avisos'],
+        'idioma_curso' => $result['idioma_curso'],
     ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
 
 } catch (\Throwable $e) {

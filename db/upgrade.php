@@ -393,5 +393,17 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026093003, 'pulso');
     }
 
+    if ($oldversion < 2026100101) {
+        // v1.24.2: OpenAlex por filter=title_and_abstract.search, query de articulos
+        // sin terminos genericos (o vacia) y un juez (Haiku) antes de elegir. Las
+        // filas cacheadas se eligieron con el criterio anterior: se borran para
+        // que se regeneren. Nota: dejan de contar en los topes de hoy.
+        if ($dbman->table_exists(new xmldb_table('block_pulso_ampliaciones'))) {
+            $DB->delete_records_select('block_pulso_ampliaciones', 'timecreated <= :now', ['now' => time()]);
+        }
+
+        upgrade_block_savepoint(true, 2026100101, 'pulso');
+    }
+
     return true;
 }

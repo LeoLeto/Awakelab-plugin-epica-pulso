@@ -1066,6 +1066,23 @@ Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya i
 - **Semántica de `videos_json`/`articulos_json`**: `NULL` = fuente no consultada o fallida; `[]` =
   consultada sin resultados. Los avisos de un `listo` viajan en `motivo` (una línea por aviso) para
   que la caché los devuelva tal cual; en un `fallado`, `motivo` es la causa.
+- **Juez antes de elegir (v1.24.2)** — la relevancia/popularidad sola no garantiza el tema (v1.24.1
+  aún dejó «A Survey of Corporate Governance» en un recurso de muestreo). Cada fuente genera hasta
+  `CANDIDATES` (10) candidatos que pasan los filtros; una 2ª llamada a Haiku (`judge()`, prompt
+  propio, títulos como DATOS) devuelve los índices que tratan claramente del tema Y encajan con el
+  público; solo los aprobados siguen al criterio de abajo (`pick_videos()`/`pick_articles()`).
+  Devuelve los que haya (<2 es válido); 0 aprobados → aviso «No hemos encontrado vídeos/artículos
+  claramente relacionados con este recurso.» y `listo`, no fallo. Si el juez falla se usa la
+  selección sin juez (`error_log`, sin aviso al usuario). **OpenAlex**: búsqueda SEMÁNTICA,
+  `search.semantic=<frase>&filter=type:article|review,has_abstract:true&per_page=10` (embeddings
+  sobre título+abstract; máx. 2.000 caracteres, 1 req/s, un solo parámetro de búsqueda por
+  petición). NO `search=` (busca también en fulltext y su `relevance_score` pondera las citas: de
+  ahí «Corporate Governance» en un recurso de muestreo) ni `filter=title_and_abstract.search`
+  (deprecado). `query_articulos` = UNA o DOS frases en inglés que describan el tema académico
+  (no lista de palabras), `mb_substr` a 500, solo URL-encode; **vacía si el recurso no tiene base
+  académica** (manual de uso, avisos, normativa): entonces no se consulta OpenAlex. Se ordena por
+  `relevance_score` (similitud, no sesgada por citas).
+  Cambiar prompts o criterio exige un upgrade que borre la caché (2026100101).
 - **Criterio de selección: relevancia primero, popularidad después** (v1.24.1; la primera
   prueba real eligió «The CES-D Scale», 53.814 citas y fuera de tema, y dos vídeos para
   profesores en un manual de alumnado, por ser los más vistos de 10). Solo los
@@ -1075,7 +1092,7 @@ Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya i
   idioma del curso) + `videos.list` (1 unidad, que NO conserva el orden: se recorre en el de
   `search.list`); los 5 primeros ≥ 120 s (sin Shorts), y de ellos los 2 con más `viewCount`,
   prefiriendo canales distintos (por `channelId`) mientras el pool lo permita. **OpenAlex**:
-  `type:article|review,has_abstract:true`, `sort=relevance_score:desc`, los 5 primeros válidos
+  `type:article|review,has_abstract:true`, por `relevance_score`, los 5 primeros aprobados
   y de ellos los 2 de más citas; "a igualdad aproximada" = un artículo en acceso abierto pesa
   ×1,2. **Público**: Haiku deduce a quién va el recurso (alumnado/profesorado/general) y lo
   refleja en `query_videos` ("para estudiantes"…) salvo que sea general; `query_articulos`

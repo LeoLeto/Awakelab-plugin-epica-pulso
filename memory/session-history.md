@@ -1,5 +1,21 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-01 — Ampliación: juez antes de elegir y búsqueda semántica en OpenAlex (v1.24.2)
+
+Segunda prueba real (curso 92): vídeos mejor, artículos peor — «A Survey of Corporate Governance»
+para muestreo y dos de conducción autónoma para un manual de uso de la plataforma. Causa: `search=`
+de OpenAlex busca también en fulltext y su `relevance_score` incluye las citas, y ni relevancia ni
+popularidad garantizan el tema.
+- OpenAlex pasa a `search.semantic=` (embeddings sobre título+abstract). Se descartó
+  `filter=title_and_abstract.search` por estar deprecado (la doc de help.openalex.org lo dice).
+- `query_articulos`: 1-2 frases en inglés describiendo el tema; **vacía** si el recurso no tiene
+  base académica (y entonces no se llama a OpenAlex).
+- Juez: 2ª llamada a Haiku por fuente con hasta 10 candidatos; solo los aprobados compiten por
+  relevancia/popularidad. 0 aprobados = aviso, `listo`. Si el juez falla se usa la selección sin juez
+  y queda en `error_log` (no en los avisos del usuario).
+- Upgrade 2026100101 borra otra vez toda la caché de ampliaciones.
+- Sin verificar contra las APIs reales (solo la doc): ni `search.semantic` ni el juez se han llamado.
+
 ## 2026-09-30 — Ampliación: relevancia primero y público (v1.24.1)
 
 Primera prueba real (curso 92): un artículo de escalas de depresión (53.814 citas) para un tema de

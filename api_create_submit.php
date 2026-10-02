@@ -56,7 +56,9 @@ try {
         throw new \Exception('Formato de infografía no reconocido.');
     }
     if ($prompt === '') {
-        throw new \Exception('Describe qué infografía quieres antes de enviarla.');
+        throw new \Exception($isjuego
+            ? 'Describe qué juego quieres antes de enviarlo.'
+            : 'Describe qué infografía quieres antes de enviarla.');
     }
     $prompt = mb_substr($prompt, 0, creation_quota::MAX_PROMPT_LENGTH, 'UTF-8');
 
@@ -79,23 +81,42 @@ try {
         throw new \Exception('Ese recurso ya no está disponible para generar contenido con Pulse.');
     }
 
-    $quota = creation_quota::check_general_quota($courseid, $userid, $isteacher);
-    if ($quota['allowed']) {
-        $quota = creation_quota::check_section_quota($courseid, $userid, (int)$resource['sectionnum']);
+    // Candado por usuario alrededor de "comprobar cupo + insertar": sin el, dos
+    // envios simultaneos (doble clic, dos pestañas) pasan los dos la comprobacion
+    // y el cupo se sobrepasa en 1. Mismo patron que Retos (retos_service::con_candado).
+    $lock = null;
+    try {
+        $factory = \core\lock\lock_config::get_lock_factory('block_pulso_encargos');
+        $lock = $factory->get_lock('encargo_' . $userid, 5, 60);
+    } catch (\Throwable $e) {
+        $lock = null; // Sin factoria de candados: se sigue sin proteccion extra.
     }
-    if (!$quota['allowed']) {
-        throw new \Exception($quota['reason']);
+    if ($lock === false) {
+        throw new \Exception('Ya tienes un encargo en marcha. Espera un momento antes de enviar otro.');
     }
+    try {
+        $quota = creation_quota::check_general_quota($courseid, $userid, $isteacher);
+        if ($quota['allowed']) {
+            $quota = creation_quota::check_section_quota($courseid, $userid, (int)$resource['sectionnum']);
+        }
+        if (!$quota['allowed']) {
+            throw new \Exception($quota['reason']);
+        }
 
-    $encargoid = creation_quota::record_encargo(
-        $courseid,
-        $cmid,
-        (int)$resource['sectionnum'],
-        $userid,
-        $tool,
-        $prompt,
-        $format
-    );
+        $encargoid = creation_quota::record_encargo(
+            $courseid,
+            $cmid,
+            (int)$resource['sectionnum'],
+            $userid,
+            $tool,
+            $prompt,
+            $format
+        );
+    } finally {
+        if ($lock) {
+            $lock->release();
+        }
+    }
 
     echo json_encode([
         'success' => true,

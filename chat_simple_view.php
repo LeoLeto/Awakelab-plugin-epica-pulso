@@ -171,7 +171,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             width: min(640px, calc(100vw - 48px));
             height: min(600px, calc(100vh - 130px));
             min-width: 300px;
-            min-height: 300px;
+            min-height: min(300px, calc(100vh - 112px));
             max-width: calc(100vw - 48px);
             max-height: calc(100vh - 112px);
             z-index: 9999;
@@ -199,8 +199,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             display: flex;
         }
 
+        /* El panel sube 50px: height/max-height descuentan el bottom real (100px
+           + 12px de margen superior = 112px; 150px + 12px = 162px), para que la
+           cabecera nunca se salga por arriba en ventanas bajas. */
         .pulso-chat-container.drawer-collapsed {
             bottom: 150px;
+            height: min(600px, calc(100vh - 180px));
+            min-height: min(300px, calc(100vh - 162px));
+            max-height: calc(100vh - 162px);
         }
 
         @keyframes pulso-slideUp {
@@ -4747,6 +4753,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         function pollCreateStatusOnce(encargoid) {
+            // Mismo patron que Retos: si el usuario pulsa «Volver», abre otra
+            // herramienta o cierra el panel mientras la peticion esta en vuelo,
+            // pulsoAmpToken cambia y la respuesta tardia no pinta ni reprograma.
+            const token = pulsoAmpToken;
             const params = new URLSearchParams();
             params.set('courseid', window.courseid);
             params.set('encargoid', encargoid);
@@ -4755,6 +4765,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             fetch(window.apiCreateStatusUrl + '?' + params.toString(), { credentials: 'same-origin' })
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
+                    if (token !== pulsoAmpToken) return; // el usuario ya salió de esta pantalla
                     if (!data.success) {
                         stopCreatePolling();
                         renderCreateNotice(data.message || 'No se ha podido comprobar el estado del encargo.');
@@ -4764,10 +4775,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     if (!data.encargo.terminal) {
                         scheduleNextCreatePoll(encargoid);
                     } else {
+                        // Estado terminal: la galeria se refresca UNA vez (hay una creacion nueva).
                         loadCreateGallery();
                     }
                 })
                 .catch(function() {
+                    if (token !== pulsoAmpToken) return;
                     // Fallo de red puntual: no dar el encargo por perdido,
                     // seguir intentando mientras quede ventana.
                     scheduleNextCreatePoll(encargoid);
@@ -4778,7 +4791,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             if (Date.now() - pulsoCreatePollStart >= PULSO_CREATE_POLL_WINDOW_MS) {
                 appendCreateStatusNotice(
                     'Esto está tardando más de lo normal. Hemos dejado de comprobarlo aquí automáticamente: '
-                    + 'te avisaremos en cuanto esté lista.', 'warn'
+                    + 'te avisaremos en cuanto esté ' + (pulsoCreateTool === 'gamificacion' ? 'listo' : 'lista') + '.', 'warn'
                 );
                 return;
             }
@@ -4897,7 +4910,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             // seguir mirando: el aviso de mensajería ya lo manda
             // notify_completion() en servidor cuando el encargo termine.
             if (!encargo.terminal && (Date.now() - pulsoCreatePollStart) >= 120000) {
-                html += '<p class="pulso-create-hint">Te avisaremos cuando esté listo; puedes cerrar el chat.</p>';
+                html += '<p class="pulso-create-hint">Te avisaremos cuando esté ' + (esjuego ? 'listo' : 'lista') + '; puedes cerrar el chat.</p>';
             }
 
             // "motivo" en un estado NO terminal es el último error de red del
@@ -4914,12 +4927,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     html += '<div class="pulso-create-notice-inline warn">'
                         + (esjuego ? 'Este juego es de prueba' : 'Esta lámina es de prueba') + ', no una generación real.</div>';
                 }
-                if (encargo.verificado === false || (encargo.avisos && encargo.avisos.length)) {
-                    html += '<div class="pulso-create-notice-inline warn">Épica marcó ' + (esjuego ? 'este juego' : 'esta lámina') + ' para revisar'
-                        + (encargo.avisos && encargo.avisos.length
-                            ? ': ' + encargo.avisos.map(function(a) { return escapeHtmlText(String(a)); }).join('; ')
-                            : '')
-                        + '.</div>';
+                if (encargo.verificado === false) {
+                    html += '<div class="pulso-create-notice-inline warn">No hemos podido confirmar que '
+                        + (esjuego ? 'este juego' : 'esta infografía') + ' trate de '
+                        + (encargo.tema ? escapeHtmlText(encargo.tema) : 'el tema pedido') + '.</div>';
+                }
+                if (encargo.avisos && encargo.avisos.length) {
+                    html += '<div class="pulso-create-notice-inline warn">'
+                        + encargo.avisos.map(function(a) { return escapeHtmlText(String(a)); }).join('; ') + '</div>';
                 }
 
                 if (esjuego) {
@@ -4956,11 +4971,24 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '</div><div id="pulso-create-gallery"></div>';
 
             body.innerHTML = html;
-            loadCreateGallery();
+            // La galeria NO se pide en cada sondeo (2 peticiones extra cada 7 s):
+            // se repinta desde la ultima carga y solo se pide si nunca se cargo.
+            // En estado terminal la pide pollCreateStatusOnce justo despues.
+            if (pulsoGalleryCache) {
+                renderCreateGallery(pulsoGalleryCache.encargos, pulsoGalleryCache.retos);
+            } else if (!encargo.terminal && !pulsoGalleryLoading) {
+                loadCreateGallery();
+            }
         }
+
+        let pulsoGalleryCache = null;   // {encargos, retos} de la ultima carga correcta
+        let pulsoGalleryLoading = false;
+        let pulsoGallerySeq = 0;        // solo vale la ultima peticion lanzada
 
         // La galería es un extra: si falla, no debe romper el resto del panel.
         function loadCreateGallery() {
+            const seq = ++pulsoGallerySeq;
+            pulsoGalleryLoading = true;
             const params = new URLSearchParams();
             params.set('courseid', window.courseid);
             params.set('sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
@@ -4976,9 +5004,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 .then(function(d) { return d.ok && Array.isArray(d.retos) ? d.retos : []; });
 
             Promise.all([encargosP, retosP]).then(function(res) {
+                if (seq !== pulsoGallerySeq) return;
+                pulsoGalleryLoading = false;
                 if (res[0] === null && !res[1].length) return;
-                renderCreateGallery(res[0] || [], res[1]);
-            }).catch(function() { /* la galería es un extra, no bloquea el panel */ });
+                pulsoGalleryCache = { encargos: res[0] || [], retos: res[1] };
+                renderCreateGallery(pulsoGalleryCache.encargos, pulsoGalleryCache.retos);
+            }).catch(function() {
+                if (seq === pulsoGallerySeq) pulsoGalleryLoading = false;
+                /* la galería es un extra, no bloquea el panel */
+            });
         }
 
         // Galería conjunta (paso 3): infografía y juego mezclados, más
@@ -5019,7 +5053,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 const dateLabel = new Date(e.timecreated * 1000).toLocaleDateString();
                 const esjuego = e.tool === 'gamificacion';
                 const tag = esjuego ? 'Juego' : 'Infografía';
-                html += '<button type="button" class="pulso-create-gallery-item" onclick="openCreateGalleryItem(' + e.id + ", '" + e.tool + "')\">";
+                // "tool" entra en un onclick: solo uno de los dos valores conocidos, y el id como entero.
+                const toolSeguro = esjuego ? 'gamificacion' : 'infografia';
+                html += '<button type="button" class="pulso-create-gallery-item" onclick="openCreateGalleryItem(' + (parseInt(e.id, 10) || 0) + ", '" + toolSeguro + "')\">";
                 if (esjuego) {
                     html += '<span class="pulso-create-gallery-icon" aria-hidden="true">'
                         + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -5028,7 +5064,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         + '</span>'
                         + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(e.titulo || 'Juego') + '</span>';
                 } else {
-                    html += '<img src="' + pulsoEscapeAttr(e.imageurl) + '" alt="">';
+                    html += '<img src="' + pulsoEscapeAttr(e.imageurl) + '" alt="">'
+                        + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(e.titulo || 'Infografía') + '</span>';
                 }
                 html += '<span class="pulso-create-gallery-tag">' + tag + '</span>'
                     + '<span class="pulso-create-gallery-date">' + escapeHtmlText(dateLabel) + '</span>'

@@ -1,5 +1,20 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-02 — Crear juego: tres tipos de partida (v1.28.0)
+
+Carta 9 de Épica; reglas en `CLAUDE.md` → «Gamificación — paso 4». Solo cliente. Lo que costó ver:
+- **El `name` del recurso ya viene limpio**: el prefijo «Archivo: » y el sufijo «— texto escaso» los
+  añade `renderCreateForm()` al pintar la `<option>`, no el servidor. Leer `name` de
+  `pulsoCreateResources` evita tener que quitarlos con regex frágil sobre el texto de la opción.
+- **Los chips se reconstruyen solo si cambia el tema** (`pulsoJuegoRenderedTema`): si no, cada
+  `input` del textarea los repintaba.
+- **`select` tiene dos listeners `change`** (cupo de sección + ejemplos): independientes a propósito;
+  el de cupo sigue desactivando el envío aunque los chips estén visibles.
+- **NO probado en navegador** (sin PHP/JS local): solo `node --check` del JS. Pendiente en sanase-test
+  (curso 92): los tres chips con «Apuntes Tema 4», visibilidad al escribir/vaciar, cambio de recurso con
+  ejemplo sin editar/editado, extensión quitada, y que el clic no genere petición. Probar además los
+  tres tipos contra el modelo con temas muy distintos (ciencias, letras, cálculo, técnico), como pide la carta.
+
 ## 2026-10-02 — QA general de Épica (v1.27.2)
 
 17 puntos del QA de infografías/juegos/retos; reglas permanentes en `CLAUDE.md` → «QA general de

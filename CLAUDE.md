@@ -1035,6 +1035,40 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
   usuario sin `email` → fallado con motivo claro (el token sale sin claim `email`,
   y sin ella Épica tampoco tiene con quién contactar).
 
+## Gamificación — paso 4: tres juegos de partida (carta 9) (v1.28.0)
+
+Debajo del cuadro de la petición de «Crear juego», tres botones («Prueba con:») que
+rellenan el cuadro con un juego ya escrito. Solo cliente (`chat_simple_view.php`:
+`PULSO_JUEGO_EJEMPLOS`, `pulsoJuegoRefresh()`, `pulsoJuegoPickEjemplo()`). Sin servidor,
+sin `db/`, sin sobre, sin cuotas. Reglas que deben persistir:
+
+- **Los textos de `peticion` son LITERALES de la carta 9 §2** y no se retocan: cada detalle
+  tiene motivo (§4). «sobre el contenido de «{tema}»» y no «sobre {tema}» porque el motor deja
+  que la petición cambie el tema y un nombre como «Unidad 3» no es un tema; «hasta» diez/ocho
+  porque el motor no puede inventar datos con un material corto; «tocando, sin arrastrar»
+  porque arrastrar falla en móvil; opciones incorrectas del mismo material para que no se
+  cuelen datos inventados. Si el QA con el modelo real demuestra que un tipo sale mal con un
+  tema, se cambia el texto de la carta con Épica, no el contrato ni el código de aquí.
+- **`{tema}` = `name` del recurso** de `pulsoCreateResources` (por `cmid`, nunca el texto de la
+  `<option>`), que ya no lleva el prefijo de tipo («Archivo: ») ni el sufijo «— texto escaso»
+  (los pinta `renderCreateForm()`). Se le quita la extensión final con `/\.[A-Za-z]{2,5}$/`.
+  Se sustituye con `split/join`, no `String.replace` (un tema con `$&` se interpretaría).
+- **Un clic rellena y NO envía.** Pone el texto en `.value` (nunca `innerHTML`), foco con el
+  cursor al final y nada más: ni `submitCreate()` ni petición. Se manda lo que haya en el
+  cuadro, tal cual. **No hay campo `tipo`** en el POST ni en el sobre: Épica no lo lee y un
+  campo que el servidor no lee hace creer que hace algo.
+- **Solo con recurso válido y cuadro vacío** (`trim()`): al escribir desaparecen, al vaciar
+  vuelven (`input`). El cupo de sección sigue mandando: `updateCreateSectionHint()` desactiva
+  el envío sin esconder los chips (rellenar no gasta nada).
+- **Cambio de recurso con el ejemplo SIN editar** → se re-escribe con el nuevo tema (si no, se
+  enviaría un juego del tema anterior sobre el material nuevo). `pulsoJuegoFill` guarda el
+  último texto puesto por un chip; solo si el cuadro es EXACTAMENTE eso se sustituye. Editado,
+  no se toca.
+- **El mismo tipo dos veces sobre el mismo recurso** ya sale con `alumno.intento` 2, 3…:
+  `resolve_intento()` cuenta por `userid + cmid + tool` (carta 6 B3). No requirió cambios.
+- Los textos son castellano fijo, como el resto del bloque Crear; el idioma del juego lo decide
+  `curso.idioma` del sobre. Nada de esto aparece en infografía, ampliación ni retos.
+
 ## Ampliación de recursos — paso 1 (v1.24.0)
 
 Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya indexado

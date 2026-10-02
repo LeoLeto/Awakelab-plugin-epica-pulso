@@ -4199,7 +4199,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // el reto se abre siempre en pestaña nueva (Épica sirve X-Frame-Options: DENY).
         const PULSO_RETOS_POLL_MS = 4000;
         const PULSO_RETOS_SLOW_S = 120;        // límite de espera, contado desde el primer "trabajando"
-        const PULSO_RETOS_REFRESH_MS = 45000;  // cuándo pedir el título final del reto escrito
+        const PULSO_RETOS_REFRESH_MS = 45000;  // primera petición del título final del reto escrito
+        const PULSO_RETOS_REFRESH_RETRY_MS = 20000;  // reintentos mientras Épica siga en-cola/trabajando
+        const PULSO_RETOS_REFRESH_MAX_MS = 180000;   // tope total desde que se pinta el reto
         const PULSO_RETO_PROPIO_MIN = 8;
         const PULSO_RETO_PROPIO_MAX = 140;
 
@@ -4230,6 +4232,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
             flag: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>'
         };
+
+        // Texto de Épica → HTML: el escape va SIEMPRE antes; luego solo **negrita**, nada más de markdown.
+        function pulsoRetosMd(text) {
+            return escapeHtmlText(text).replace(/\*\*([^*\r\n]+?)\*\*/g, '<strong>$1</strong>');
+        }
 
         function pulsoRetosIconSvg(name) {
             const key = String(name || '').toLowerCase();
@@ -4526,6 +4533,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             let html = '<div class="pulso-retos">'
                 + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
                 + '<div><div class="pulso-retos-doc-title">' + escapeHtmlText(doc.titulo || 'Retos para ti') + '</div>'
+                + (doc.resumen ? '<div class="pulso-retos-note">' + pulsoRetosMd(doc.resumen) + '</div>' : '')
                 + (temas.length ? '<div class="pulso-retos-chips">' + temas.map(pulsoRetosChip).join('') + '</div>' : '')
                 + '</div>'
                 + '<div class="pulso-create-hint">Elige el reto que quieras hacer.</div>';
@@ -4538,7 +4546,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     + '<span class="pulso-reto-top">'
                     + '<span class="pulso-reto-icon" aria-hidden="true">' + pulsoRetosIconSvg(r.icono) + '</span>'
                     + '<span class="pulso-reto-title">' + escapeHtmlText(r.titulo) + '</span></span>'
-                    + (r.descripcion ? '<span class="pulso-reto-desc">' + escapeHtmlText(r.descripcion) + '</span>' : '')
+                    + (r.descripcion ? '<span class="pulso-reto-desc">' + pulsoRetosMd(r.descripcion) + '</span>' : '')
                     + '<span class="pulso-reto-meta">'
                     + (diff ? '<span class="pulso-reto-diff ' + diff.cls + '">' + escapeHtmlText(diff.label) + '</span>' : '')
                     + (minutos > 0 ? '<span class="pulso-reto-min">' + minutos + ' min</span>' : '')
@@ -4644,18 +4652,25 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '</div><div id="pulso-create-gallery"></div>';
             loadCreateGallery();
 
-            // Sin bloquear nada: pasado ~45 s, el título que ve la página del reto.
+            // Sin bloquear nada: a los ~45 s, y luego cada 20 s mientras no esté listo, hasta 3 min en total.
             const codigo = String(d.codigo || '');
             if (codigo) {
-                pulsoRetosRefreshTimer = setTimeout(function() { pulsoRetosRefrescar(token, codigo); }, PULSO_RETOS_REFRESH_MS);
+                const started = Date.now();
+                pulsoRetosRefreshTimer = setTimeout(function() { pulsoRetosRefrescar(token, codigo, started); }, PULSO_RETOS_REFRESH_MS);
             }
         }
 
-        function pulsoRetosRefrescar(token, codigo) {
+        function pulsoRetosRefrescar(token, codigo, started) {
             pulsoRetosRefreshTimer = null;
             if (token !== pulsoAmpToken) return;
             pulsoRetosCall('refrescar', { codigo: codigo }).then(function(d) {
                 if (token !== pulsoAmpToken || !d.ok) return; // es un extra: si falla, no se dice nada
+                // Aún en cola/trabajando: otra vuelta a los 20 s si cabe en los 3 min totales.
+                if (d.estado !== 'listo' && d.estado !== 'fallado' && d.estado !== 'desconocido'
+                        && Date.now() - started + PULSO_RETOS_REFRESH_RETRY_MS <= PULSO_RETOS_REFRESH_MAX_MS) {
+                    pulsoRetosRefreshTimer = setTimeout(function() { pulsoRetosRefrescar(token, codigo, started); }, PULSO_RETOS_REFRESH_RETRY_MS);
+                    return;
+                }
                 const title = document.getElementById('pulso-retos-done-title');
                 if (title && d.titulo) title.textContent = d.titulo;
                 // intentos/nota solo llegan si quien pregunta tiene viewanalytics: nunca al alumno.

@@ -341,6 +341,16 @@ class creation_quota {
         } catch (\Throwable $e) {
             error_log('Pulso: no se pudo encolar el ciclo de Epica para el encargo '
                 . $encargo->id . ': ' . $e->getMessage());
+            // Sin tarea nadie lo procesara: no se queda "pendiente" gastando cupo para siempre.
+            // notified = 1: no hay generacion de la que avisar.
+            global $DB;
+            $DB->update_record('block_pulso_encargos', (object)[
+                'id' => $encargo->id,
+                'status' => 'fallado',
+                'motivo' => 'No hemos podido poner tu encargo en cola. Prueba a crear uno nuevo más tarde.',
+                'notified' => 1,
+                'timemodified' => time(),
+            ]);
         }
     }
 

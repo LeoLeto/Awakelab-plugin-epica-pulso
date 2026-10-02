@@ -138,6 +138,12 @@ class epica_client {
 
         $envelope = self::build_envelope($encargo, $course, $textrow, $user);
 
+        // pedir() no comprueba json_encode(): con UTF-8 invalido mandaria un cuerpo vacio.
+        if (json_encode($envelope) === false) {
+            self::marcar_fallo($encargo, 'No hemos podido leer el material de este recurso. Prueba con otro recurso.');
+            return ['requeue' => false, 'delay' => 0];
+        }
+
         if (!empty(get_config('block_pulso', 'epica_dry_run'))) {
             $DB->update_record('block_pulso_encargos', (object)[
                 'id' => $encargo->id,
@@ -231,6 +237,10 @@ class epica_client {
         if (!\local_awkepica\epica::configurado()) {
             return 'local_awkepica no tiene configurada la plataforma o el secreto en este sitio.';
         }
+        $urlerror = self::base_url_error();
+        if ($urlerror !== null) {
+            return $urlerror;
+        }
         if (empty($user) || empty($user->email)) {
             return 'El usuario que hizo el encargo no tiene correo electrónico configurado.';
         }
@@ -280,7 +290,7 @@ class epica_client {
 
         $course = get_course((int)$encargo->courseid);
         $user = \core_user::get_user((int)$encargo->userid, '*', IGNORE_MISSING);
-        if (!$user) {
+        if (!$user || !empty($user->deleted)) {
             self::marcar_fallo($encargo, 'El usuario que hizo el encargo ya no existe.');
             return ['requeue' => false, 'delay' => 0];
         }
@@ -439,9 +449,12 @@ class epica_client {
 
         $errorcount = (int)$encargo->error_count + 1;
         if ($errorcount >= self::CONSECUTIVE_ERROR_THRESHOLD) {
+            // El detalle tecnico (clase y mensaje de la excepcion) se queda en el
+            // log: el motivo terminal lo ve el alumno y viaja en la notificacion.
+            error_log("Pulso Epica: encargo {$encargo->id} fallado tras {$errorcount} fallos transitorios seguidos al {$accion}: {$clase}: {$mensaje}");
             self::marcar_fallo(
                 $encargo,
-                "Fallo transitorio repetido al {$accion} ({$errorcount} intentos seguidos): {$clase}: {$mensaje}"
+                'No hemos podido conectar con el servicio de generación. Prueba a crear un encargo nuevo más tarde.'
             );
             return ['requeue' => false, 'delay' => 0];
         }
@@ -498,8 +511,10 @@ class epica_client {
         $filename = $imagen !== '' ? self::guardar_artefacto($encargo, $imagen) : null;
         $motivo = $filename ? null : self::diagnosticar_listo_sin_imagen($data, $respuesta);
 
+        // "verificado" con "tema" vacio = "no se comprobo" (null), igual que en juegos.
+        $tema = (string)($lamina['tema'] ?? '');
         $verificado = null;
-        if (array_key_exists('verificado', $lamina) && $lamina['verificado'] !== null) {
+        if ($tema !== '' && array_key_exists('verificado', $lamina) && $lamina['verificado'] !== null) {
             $verificado = (int)(bool)$lamina['verificado'];
         }
 
@@ -508,7 +523,7 @@ class epica_client {
             'status' => $filename ? 'listo' : 'fallado',
             'filename' => $filename,
             'titulo' => mb_substr((string)($lamina['titulo'] ?? ''), 0, 255, 'UTF-8'),
-            'tema' => mb_substr((string)($lamina['tema'] ?? ''), 0, 255, 'UTF-8'),
+            'tema' => mb_substr($tema, 0, 255, 'UTF-8'),
             'arquetipo' => mb_substr((string)($lamina['arquetipo'] ?? ''), 0, 100, 'UTF-8'),
             'mock' => !empty($lamina['mock']) ? 1 : 0,
             'verificado' => $verificado,
@@ -742,9 +757,35 @@ class epica_client {
         if ($status === 'ensayo') {
             return;
         }
-        if (!$DB->record_exists('block_pulso_encargos', ['id' => $encargoid, 'notified' => 0])) {
-            return;
+        // "Una sola vez" atomico: se reclama el aviso (UPDATE ... WHERE notified = 0)
+        // ANTES de mandarlo, y solo manda quien lo reclama. Moodle no devuelve las
+        // filas afectadas de execute(), asi que el UPDATE va bajo un candado por
+        // encargo y se comprueba antes con record_exists().
+        $lock = null;
+        try {
+            $factory = \core\lock\lock_config::get_lock_factory('block_pulso_notify');
+            $lock = $factory->get_lock('notify_' . $encargoid, 5, 60);
+        } catch (\Throwable $e) {
+            $lock = null; // Sin factoria de candados: se sigue sin proteccion extra.
         }
+        if ($lock === false) {
+            return; // Otro proceso esta avisando este mismo encargo.
+        }
+        try {
+            if (!$DB->record_exists('block_pulso_encargos', ['id' => $encargoid, 'notified' => 0])) {
+                return;
+            }
+            $DB->execute('UPDATE {block_pulso_encargos} SET notified = 1 WHERE id = :id AND notified = 0', ['id' => $encargoid]);
+            self::enviar_aviso($encargoid, $status);
+        } finally {
+            if ($lock) {
+                $lock->release();
+            }
+        }
+    }
+
+    private static function enviar_aviso(int $encargoid, string $status): void {
+        global $DB;
 
         $encargo = $DB->get_record('block_pulso_encargos', ['id' => $encargoid]);
         if (!$encargo) {
@@ -795,8 +836,6 @@ class epica_client {
         } catch (\Throwable $e) {
             error_log('Pulso Epica: fallo al enviar la notificación del encargo ' . $encargoid . ': ' . $e->getMessage());
         }
-
-        $DB->set_field('block_pulso_encargos', 'notified', 1, ['id' => $encargoid]);
     }
 
     // ----------------------------------------------------------------
@@ -1009,7 +1048,21 @@ class epica_client {
 
     public static function endpoint(string $ruta): string {
         $base = rtrim((string)get_config('block_pulso', 'epica_base_url'), '/');
+        $urlerror = self::base_url_error();
+        if ($urlerror !== null) {
+            // El token y el material no pueden viajar sin cifrar.
+            throw new \RuntimeException($urlerror);
+        }
         return $base . $ruta;
+    }
+
+    /** Motivo por el que epica_base_url no es usable (solo https://), o null si lo es. */
+    public static function base_url_error(): ?string {
+        $base = trim((string)get_config('block_pulso', 'epica_base_url'));
+        if (stripos($base, 'https://') !== 0 || !parse_url($base, PHP_URL_HOST)) {
+            return 'La URL de Épica configurada en el plugin no es https://, así que no se envía nada (el token y el material no pueden viajar sin cifrar).';
+        }
+        return null;
     }
 
     private static function ruta_encargar(string $tool): string {

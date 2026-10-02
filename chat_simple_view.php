@@ -751,6 +751,59 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             color: #8A6100;
         }
 
+        /* Tres tipos de juego ya escritos (carta 9): solo en "Crear juego" */
+        .pulso-create-ejemplos {
+            margin-top: 8px;
+        }
+
+        .pulso-create-ejemplos-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--pulso-slate);
+            margin-bottom: 6px;
+        }
+
+        .pulso-create-ejemplos-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .pulso-create-ejemplo {
+            flex: 1 1 140px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            padding: 8px 12px;
+            border: 1px solid var(--pulso-line);
+            border-radius: 12px;
+            background: var(--pulso-surface-2);
+            color: var(--pulso-ink);
+            font-family: var(--pulso-font);
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .pulso-create-ejemplo:hover {
+            border-color: var(--pulso-teal);
+        }
+
+        .pulso-create-ejemplo:focus-visible {
+            outline: 2px solid var(--pulso-teal);
+            outline-offset: 2px;
+        }
+
+        .pulso-create-ejemplo-title {
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        .pulso-create-ejemplo-desc {
+            font-size: 0.72rem;
+            color: var(--pulso-slate);
+        }
+
         .pulso-create-submit {
             width: 100%;
             padding: 12px;
@@ -3800,6 +3853,116 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             }
         };
 
+        // Tres tipos de juego ya escritos (carta 9 de Épica, §2). Los textos de
+        // "peticion" están copiados LITERALMENTE de la carta: cada detalle tiene un
+        // motivo (§4) — "sobre el contenido de «{tema}»" para que el tema lo siga
+        // poniendo el material, "hasta" para no obligar a inventar datos, "tocando,
+        // sin arrastrar" para el móvil. No se retocan sin leer esa tabla. {tema} es
+        // el nombre del recurso elegido (pulsoJuegoTema()).
+        const PULSO_JUEGO_EJEMPLOS = [
+            {
+                id: 'preguntas',
+                etiqueta: 'Preguntas con pista',
+                descripcion: 'Un test de opción múltiple sobre {tema}',
+                peticion: 'Un juego de preguntas de opción múltiple sobre el contenido de «{tema}»: hasta diez preguntas con cuatro respuestas cada una y una pista opcional por pregunta, que si se usa da menos puntos. Al responder, se dice si es correcta y por qué. Al terminar, la puntuación y un repaso de las preguntas falladas con su respuesta correcta.'
+            },
+            {
+                id: 'emparejar',
+                etiqueta: 'Emparejar conceptos',
+                descripcion: 'Une cada concepto de {tema} con su definición',
+                peticion: 'Un juego de emparejar sobre el contenido de «{tema}»: hasta ocho conceptos clave, cada uno con su definición o explicación tal como aparecen en el material. Se empareja tocando un concepto y después su definición, sin arrastrar, para que funcione igual con ratón, con teclado y en el móvil. Las parejas acertadas quedan fijadas y cada fallo resta puntos. Al terminar, la puntuación y la lista de todas las parejas correctas.'
+            },
+            {
+                id: 'completar',
+                etiqueta: 'Completar frases',
+                descripcion: 'Elige la palabra que falta en frases de {tema}',
+                peticion: 'Un juego de completar frases sobre el contenido de «{tema}»: hasta diez frases importantes del material a las que les falta una palabra clave, que hay que elegir entre tres opciones. Las opciones incorrectas son otras palabras del mismo material. Al responder, se enseña la frase completa. Al terminar, la puntuación y las frases falladas con su palabra correcta.'
+            }
+        ];
+
+        // Último texto que puso un chip ({idx, text}) o null. Sirve para saber si el
+        // usuario lo ha tocado: solo un ejemplo SIN editar se re-escribe al cambiar
+        // de recurso. pulsoJuegoRenderedTema evita reconstruir los chips en cada input.
+        let pulsoJuegoFill = null;
+        let pulsoJuegoRenderedTema = null;
+
+        // {tema} = name del recurso (campo del servidor, nunca el texto de la
+        // <option>, que lleva el prefijo de tipo y el aviso de texto escaso) sin la
+        // extensión final de archivo.
+        function pulsoJuegoTema() {
+            const select = document.getElementById('pulso-create-resource');
+            if (!select) return '';
+            const cmid = parseInt(select.value, 10);
+            const resource = pulsoCreateResources.find(function(r) { return r.cmid === cmid; });
+            if (!resource) return '';
+            return String(resource.name || '').replace(/\.[A-Za-z]{2,5}$/, '').trim();
+        }
+
+        // split/join y no String.replace: el tema puede traer "$&" o similares.
+        function pulsoJuegoFillText(text, tema) {
+            return text.split('{tema}').join(tema);
+        }
+
+        // Pinta los chips (si el tema cambió) y los muestra solo con tema válido y el
+        // cuadro vacío. resourceChanged: re-escribe un ejemplo sin editar con el
+        // tema nuevo; si el usuario lo había editado, no lo toca.
+        function pulsoJuegoRefresh(resourceChanged) {
+            const box = document.getElementById('pulso-juego-ejemplos');
+            const promptEl = document.getElementById('pulso-create-prompt');
+            if (!box || !promptEl) return;
+
+            const tema = pulsoJuegoTema();
+
+            if (resourceChanged && pulsoJuegoFill) {
+                if (promptEl.value === pulsoJuegoFill.text) {
+                    if (tema) {
+                        const text = pulsoJuegoFillText(PULSO_JUEGO_EJEMPLOS[pulsoJuegoFill.idx].peticion, tema);
+                        promptEl.value = text;
+                        pulsoJuegoFill.text = text;
+                    } else {
+                        promptEl.value = '';
+                        pulsoJuegoFill = null;
+                    }
+                } else {
+                    pulsoJuegoFill = null;
+                }
+            }
+
+            if (tema !== pulsoJuegoRenderedTema) {
+                pulsoJuegoRenderedTema = tema;
+                let html = '';
+                if (tema) {
+                    html = '<div class="pulso-create-ejemplos-label">Prueba con:</div><div class="pulso-create-ejemplos-list">';
+                    PULSO_JUEGO_EJEMPLOS.forEach(function(ej, i) {
+                        const desc = pulsoJuegoFillText(ej.descripcion, tema);
+                        html += '<button type="button" class="pulso-create-ejemplo" data-ejemplo="' + i + '" title="' + pulsoEscapeAttr(desc) + '">'
+                            + '<span class="pulso-create-ejemplo-title">' + escapeHtmlText(ej.etiqueta) + '</span>'
+                            + '<span class="pulso-create-ejemplo-desc">' + escapeHtmlText(desc) + '</span>'
+                            + '</button>';
+                    });
+                    html += '</div>';
+                }
+                box.innerHTML = html;
+            }
+
+            box.style.display = (tema && promptEl.value.trim() === '') ? '' : 'none';
+        }
+
+        // Un clic rellena el cuadro y NADA más: ni submitCreate() ni ninguna petición.
+        function pulsoJuegoPickEjemplo(idx) {
+            const promptEl = document.getElementById('pulso-create-prompt');
+            const ej = PULSO_JUEGO_EJEMPLOS[idx];
+            const tema = pulsoJuegoTema();
+            if (!promptEl || !ej || !tema) return;
+
+            const text = pulsoJuegoFillText(ej.peticion, tema);
+            promptEl.value = text;
+            pulsoJuegoFill = { idx: idx, text: text };
+            promptEl.focus();
+            promptEl.setSelectionRange(text.length, text.length);
+            pulsoJuegoRefresh(false);
+        }
+
         function pulsoCreateSetTool(tool) {
             pulsoCreateTool = (tool === 'gamificacion' || tool === 'ampliacion' || tool === 'retos') ? tool : 'infografia';
             const titleEl = document.getElementById('pulso-create-title');
@@ -3933,6 +4096,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '<div class="pulso-create-field">'
                 + '<label for="pulso-create-prompt">' + escapeHtmlText(labels.promptLabel) + '</label>'
                 + '<textarea id="pulso-create-prompt" maxlength="4000" placeholder="' + pulsoEscapeAttr(labels.promptPlaceholder) + '"></textarea>'
+                + (isjuego ? '<div class="pulso-create-ejemplos" id="pulso-juego-ejemplos" style="display:none"></div>' : '')
                 + '</div>'
                 + formatFieldHtml
                 + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" onclick="submitCreate()">' + escapeHtmlText(labels.submitLabel) + '</button>'
@@ -3942,6 +4106,22 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             if (select) {
                 select.addEventListener('change', updateCreateSectionHint);
                 updateCreateSectionHint();
+            }
+
+            if (isjuego) {
+                pulsoJuegoFill = null;
+                pulsoJuegoRenderedTema = null;
+                const promptEl = document.getElementById('pulso-create-prompt');
+                const box = document.getElementById('pulso-juego-ejemplos');
+                if (select) select.addEventListener('change', function() { pulsoJuegoRefresh(true); });
+                if (promptEl) promptEl.addEventListener('input', function() { pulsoJuegoRefresh(false); });
+                if (box) {
+                    box.addEventListener('click', function(e) {
+                        const chip = e.target.closest('[data-ejemplo]');
+                        if (chip) pulsoJuegoPickEjemplo(parseInt(chip.getAttribute('data-ejemplo'), 10));
+                    });
+                }
+                pulsoJuegoRefresh(false);
             }
             loadCreateGallery();
         }

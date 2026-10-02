@@ -1,5 +1,22 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-02 — QA general de Épica (v1.27.2)
+
+17 puntos del QA de infografías/juegos/retos; reglas permanentes en `CLAUDE.md` → «QA general de
+Épica». Lo que costó ver:
+- **`notified` no admite «reclamar» con un valor único** (int(1)) y `$DB->execute()` no devuelve
+  filas afectadas, así que el `UPDATE … WHERE notified = 0` pedido no dice quién ganó: se añadió un
+  `lock_config` por encargo y el UPDATE va dentro. Mismo motivo del candado en `api_create_submit`.
+- **La galería se vaciaba al repintar**: `renderCreateStatus()` reemplaza el `innerHTML` entero,
+  incluido `#pulso-create-gallery`; dejar de pedirla en cada sondeo exigió cachearla y repintarla.
+- **`stopCreatePolling()` ya incrementaba `pulsoAmpToken`** (vía `pulsoRetosReset`); lo que faltaba era
+  que `pollCreateStatusOnce` lo capturase y lo comprobase.
+- **El `motivo` técnico ya guardado** en filas anteriores no se reescribe (sin `db/`).
+- **NO probado**: sin PHP local (`php -l` pendiente) ni navegador. Solo `node --check` de los dos
+  `<script>` de `chat_simple_view.php`. Verificar en sanase-test: ventana de ~600 px con y sin
+  `.drawer-collapsed`, lanzar infografía y abrir Retos mientras genera, y que durante el sondeo no
+  haya peticiones de galería.
+
 ## 2026-10-02 — Retos: reintentos del título y negrita (v1.27.1)
 
 Dos ajustes tras probar v1.27.0 en sanase-test; reglas en `CLAUDE.md` → "Retos — paso 2".

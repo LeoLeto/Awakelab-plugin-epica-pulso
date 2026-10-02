@@ -742,6 +742,12 @@ de un paso futuro (ver `lib.php`). Reglas que no se pueden romper:
   no distinguir "no es tuyo" de "no está listo" a quien no tiene acceso de
   todas formas. `juego_html.php` no exige sesskey: es el `src` de un
   `<iframe>`, una petición GET idempotente sin efectos.
+- **`juego.php`/`juego_html.php` NO comprueban `createactivity` ni `check_enabled()`, a
+  propósito** (v1.27.2). Un juego ya generado es del usuario: sigue jugable aunque el
+  centro le quite la capability al rol o desactive Pulse en el curso. Esas dos puertas
+  gobiernan CREAR (encargar gasta cupo y cuesta dinero), no ver lo ya creado. El control de
+  acceso de verdad es dueño-o-`viewanalytics` + `status`/`tool`. No "arreglarlo" añadiendo
+  las comprobaciones.
 - **Ninguna operación de texto sobre el HTML corta por bytes.** La
   inyección de la meta CSP y del puente usa `mb_stripos`/`mb_strripos`/
   `mb_substr` (nunca `strpos`/`substr` a secas): el HTML puede traer
@@ -1293,6 +1299,44 @@ persistir:
 - **«Ver todos los retos del curso»** llama a `accion=curso` y abre su `enlace`; no se pinta la lista.
   Como el navegador bloquea un `window.open` tras un `fetch`, se abre la pestaña EN el clic y se le
   pone la URL al llegar (si el navegador la bloquea, se ofrece un enlace).
+
+## QA general de Épica — reglas permanentes (v1.27.2)
+
+- **El sondeo de infografías/juegos lleva token, como Retos.** `pollCreateStatusOnce()`
+  captura `pulsoAmpToken` al lanzar y sale en `.then`/`.catch` si ya no coincide
+  (`stopCreatePolling()` lo incrementa vía `pulsoRetosReset()`). Sin eso, una respuesta
+  tardía pintaba encima de Retos o de otra pantalla y reprogramaba el sondeo.
+- **La galería NO se pide en cada sondeo.** `renderCreateStatus()` repinta desde
+  `pulsoGalleryCache` y solo pide si nunca se cargó (y el encargo no es terminal);
+  `pollCreateStatusOnce()` la refresca UNA vez al llegar a estado terminal. Cada carga son 2
+  peticiones (`api_create_status` + `mis_retos`); `pulsoGallerySeq` descarta respuestas
+  de cargas ya superadas.
+- **El `motivo` TERMINAL nunca lleva detalle técnico.** Al tope de fallos transitorios,
+  `reintentar_o_fallar_transitorio()` guarda un motivo genérico («No hemos podido conectar
+  con el servicio de generación…») y deja clase y mensaje de la excepción solo en
+  `error_log`: el motivo terminal lo ve el alumno en el panel y en la notificación. (Filas
+  anteriores a v1.27.2 pueden conservar el texto técnico.)
+- **`epica_base_url` solo `https://`**: `epica_client::base_url_error()` se comprueba en
+  `precondiciones_error()` (ciclo adhoc y Retos) y, como red, `endpoint()` lanza. El token y
+  el material no pueden viajar sin cifrar. El valor por defecto no cambia.
+- **El aviso de `notify_completion()` es atómico**: se reclama (`UPDATE … SET notified = 1
+  WHERE id = ? AND notified = 0`) ANTES de mandar, bajo un candado por encargo (Moodle no
+  devuelve filas afectadas en `execute()`, y `notified` es int(1): no admite un valor
+  único por proceso). Si el mensaje falla, queda `notified = 1`: se prefiere perder un
+  aviso a mandarlo dos veces.
+- **Un encargo cuya tarea adhoc no se pudo encolar** (`dispatch_to_epica()`) pasa a
+  `fallado` con `notified = 1`: si no, quedaba `pendiente` para siempre gastando cupo.
+- **`api_create_submit.php` serializa «comprobar cupo + insertar» con un `lock_config` por
+  usuario** (doble envío ya no pasa el tope en 1). `paso_pendiente()` comprueba que
+  `json_encode()` del sobre no dé `false` antes de firmar (UTF-8 inválido = cuerpo vacío).
+- **`recoger_lamina()` aplica «`tema` vacío ⇒ `verificado = null`»**, como `recoger_juego()`.
+  El panel avisa de `verificado === false` con el texto de la carta 5 §3.4 (el mismo de
+  `juego.php`), nunca con «Épica marcó…».
+- **`.pulso-chat-container.drawer-collapsed` redefine `height`/`max-height`/`min-height`**
+  descontando su `bottom` real (150 px + 12 de margen): si se cambia un `bottom`, hay que
+  cambiar su `max-height` a la vez, o la cabecera se sale por arriba en ventanas bajas.
+- **Retos**: `enlace_epica()` compara también el puerto; `consultar_propuesta()` marca la
+  fila `desconocido` ante un 4xx `propuesta-desconocida` (igual que `elegir`).
 
 ## Dev notes
 

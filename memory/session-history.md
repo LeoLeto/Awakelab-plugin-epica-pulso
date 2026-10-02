@@ -1,5 +1,14 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-02 — Retos: reintentos del título y negrita (v1.27.1)
+
+Dos ajustes tras probar v1.27.0 en sanase-test; reglas en `CLAUDE.md` → "Retos — paso 2".
+- **Refresco con reintentos:** una sola llamada a `refrescar` a los 45 s dejaba título propuesto y sin
+  línea de intentos si el reto tardaba más. Ahora 45 s + cada 20 s hasta estado terminal o 3 min.
+- **`**negrita**` de Épica:** `pulsoRetosMd()` (escape antes, solo negrita). `documento.resumen` no se
+  pintaba en el cliente: se añadió bajo el título del documento.
+- **NO probado en navegador** (sin PHP/JS local): pendiente verificar en sanase-test.
+
 ## 2026-10-01 — Retos paso 2: «Crear reto» en la interfaz (v1.27.0)
 
 Cuarto CTA sobre el mismo panel; reglas en `CLAUDE.md` → "Retos — paso 2". Lo que costó ver:

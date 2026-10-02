@@ -1273,9 +1273,17 @@ persistir:
   atributo ni `onclick`; solo viaja en el POST. Todo texto de Épica con `escapeHtmlText`, atributos
   con `pulsoEscapeAttr`, enlaces solo `https://`. **Ningún iframe**: el reto se abre en pestaña
   nueva (`target="_blank" rel="noopener noreferrer"`; Épica sirve `X-Frame-Options: DENY`).
-- **Título final:** tras elegir se muestra el título del reto PROPUESTO; a los ~45 s
-  (`PULSO_RETOS_REFRESH_MS`) una llamada a `accion=refrescar` lo cambia por `titulo_final`, sin
-  bloquear nada y en silencio si falla. **«N intentos · última nota X» solo si la respuesta trae
+- **Markdown en textos de Épica (v1.27.1):** descripciones y resumen del documento pueden traer
+  `**negrita**` (visto: «**Tabla 1**»). `pulsoRetosMd()` escapa SIEMPRE antes (`escapeHtmlText`) y
+  después convierte solo `**texto**` en `<strong>`; nada más de markdown. Todo texto largo de Épica
+  que se pinte en este panel pasa por ahí (hoy: descripción de tarjeta y `documento.resumen`).
+- **Título final (v1.27.1: con reintentos):** tras elegir se muestra el título del reto PROPUESTO;
+  a los ~45 s (`PULSO_RETOS_REFRESH_MS`) una llamada a `accion=refrescar` lo cambia por
+  `titulo_final`, y mientras devuelva en-cola/trabajando se repite cada 20 s
+  (`PULSO_RETOS_REFRESH_RETRY_MS`) hasta `listo`/`fallado`/`desconocido` o 3 min en total desde que
+  se pinta el reto (`PULSO_RETOS_REFRESH_MAX_MS`). Una sola llamada dejaba el título propuesto y sin
+  línea de intentos si el reto tardaba más. Se corta si cambia `pulsoAmpToken`; sin bloquear nada y
+  en silencio si falla. **«N intentos · última nota X» solo si la respuesta trae
   `intentos`** — el servidor solo lo manda con `viewanalytics` (nota agregada de cualquiera que
   abrió el reto, nunca del alumno que lo pidió), así que el cliente no decide el rol, solo pinta
   lo que llega.

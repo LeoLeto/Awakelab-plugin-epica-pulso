@@ -183,7 +183,17 @@ class retos_service {
         $course = get_course($courseid);
         [$http, $datos] = self::llamar(self::RUTA_PROPUESTA, ['propuesta' => (string)$row->epica_propuesta], $user, $course);
         if ($http !== 200) {
-            throw self::traducir_error($http, $datos);
+            $error = self::traducir_error($http, $datos);
+            if ($error->motivo === 'propuesta-desconocida') {
+                // Caducó o no existe: ya no sirve para nada (igual que en elegir).
+                $DB->update_record('block_pulso_reto_propuestas', (object)[
+                    'id' => $row->id,
+                    'estado' => self::ESTADO_DESCONOCIDO,
+                    'motivo' => 'Épica ya no reconoce esta propuesta (caducó o no es de este centro).',
+                    'timemodified' => time(),
+                ]);
+            }
+            throw $error;
         }
 
         $estado = (string)($datos['estado'] ?? '');
@@ -771,7 +781,13 @@ class retos_service {
         if (strtolower($partes['scheme'] ?? '') !== 'https' || isset($partes['user']) || isset($partes['pass'])) {
             return '';
         }
-        return strtolower($partes['host']) === strtolower($base['host']) ? $url : '';
+        if (strtolower($partes['host']) !== strtolower($base['host'])) {
+            return '';
+        }
+        // Mismo puerto que epica_base_url (el implicito de https es 443).
+        $puerto = (int)($partes['port'] ?? 443);
+        $puertobase = (int)($base['port'] ?? 443);
+        return $puerto === $puertobase ? $url : '';
     }
 
     private static function estado_conocido($estado, string $defecto): string {
@@ -813,7 +829,10 @@ class retos_service {
             return;
         }
         error_log('Pulso Retos: ' . $que . ' #' . $id . ' (' . mb_substr($detalle, 0, 200, 'UTF-8')
-            . ') traza Épica=' . mb_substr((string)$traza, 0, 64, 'UTF-8'));
+            . ') traza Épica=' . mb_substr(
+                is_scalar($traza) ? (string)$traza : (string)json_encode($traza, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE),
+                0, 64, 'UTF-8'
+            ));
     }
 
     private static function formatear_espera(int $segundos): string {

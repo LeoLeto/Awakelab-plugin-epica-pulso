@@ -1595,6 +1595,24 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   visible; un contenedor con `hidden` que se destapa no se anuncia.
 - `console.log` solo tras `window.pulsoDebug` (`pulsoLog()`).
 
+## Fase 4 — arquitectura cacheable (pasos 1–3, en curso; ver docs/plan_fase4.md)
+
+Refactor SIN cambios visuales. Al terminar la fase se reescribe el resto de este fichero (la sección
+"Architecture" y las "Dev notes" describen todavía el chat con CSS/JS en línea).
+
+- **CSS en `styles.css` (v1.33.0).** Moodle lo mete en el CSS del tema: se cachea, pero se carga en TODAS
+  las páginas del sitio. Todo va con prefijo `.pulso-`/`#pulso-`; **ningún selector de elemento global**. Al
+  cambiarlo hay que **purgar cachés** al desplegar. `[[font:block_pulso|…]]` y `[[pix:block_pulso|…]]` solo
+  se resuelven dentro de `styles.css`, no en CSS en línea (`juego.php` lleva su `<style>` propio y toma
+  Poppins del `@font-face` de `styles.css`).
+- **Sin terceros en la carga de la página.** Poppins 400/500/600/700 (subconjunto latino, woff2) en `fonts/` con
+  `OFL.txt`; isotipos en `pix/` (96×98 px; en HTML por `%%PULSO_ISOTIPO%%` → `$OUTPUT->image_url()`).
+  La familia del `@font-face` es **`Pulso Poppins`** (no `Poppins`: styles.css va a todo el sitio y se
+  mezclaría con la del tema); el 700 existe para `<strong>`/`h2`/`h3` (sin él, negrita sintética).
+  Prohibido volver a `@import` de Google Fonts o a `media.awakelab.world`. Si se añade un tercero, va a
+  `thirdpartylibs.xml` (que lista fuentes y `lib/pdfparser`). Excepción consciente: miniaturas
+  `i.ytimg.com` de Ampliación, solo al pedir una ampliación.
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

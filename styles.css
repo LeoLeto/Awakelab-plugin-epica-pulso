@@ -1,0 +1,2513 @@
+/**
+ * Estilos del bloque Pulse AI (chat flotante, Crear, Retos, Ampliacion).
+ *
+ * Moodle mete este fichero en el CSS del tema (se cachea, pero se carga en TODAS las
+ * paginas del sitio): todo va con prefijo .pulso-/#pulso-, sin selectores de elemento
+ * globales. La fuente se llama 'Pulso Poppins' (no 'Poppins') para no mezclarse con la
+ * Poppins del tema si la tiene. Fuentes e isotipo viajan con el plugin (fonts/, pix/): nada de terceros.
+ * Al cambiar este fichero hay que purgar cachés (la revision del tema no cambia sola).
+ */
+
+@font-face {
+    font-family: 'Pulso Poppins';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url([[font:block_pulso|poppins-400.woff2]]) format('woff2');
+}
+@font-face {
+    font-family: 'Pulso Poppins';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url([[font:block_pulso|poppins-500.woff2]]) format('woff2');
+}
+@font-face {
+    font-family: 'Pulso Poppins';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url([[font:block_pulso|poppins-600.woff2]]) format('woff2');
+}
+@font-face {
+    font-family: 'Pulso Poppins';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url([[font:block_pulso|poppins-700.woff2]]) format('woff2');
+}
+
+/* ==================================================================
+   PULSO AI — Identidad Awakelab 2026, tema CLARO (variante B)
+   Cuerpo claro con cabecera azul profunda de marca como ancla oscura;
+   cian como acento funcional (iconos, bordes, foco), nunca como color
+   de texto sobre superficie clara. Poppins.
+   ================================================================== */
+.pulso-chat-bubble,
+.pulso-chat-container {
+    --pulso-ink: #27334F;                      /* texto principal */
+    --pulso-deep: #003670;                     /* azul profundo de marca (cabecera) */
+    --pulso-navy: #003670;                     /* azul profundo secundario */
+    --pulso-slate: #34547A;                     /* texto secundario */
+    --pulso-muted: #3B6996;                     /* texto terciario / hints */
+    --pulso-cyan: #0B93AA;                      /* acento (iconos/bordes/foco, no texto) */
+    --pulso-cyan-soft: #D9FBFF;                 /* fondo del bloque de siguiente paso */
+    --pulso-teal: #0B93AA;                      /* acento funcional (focus) */
+    --pulso-teal-ink: #0B93AA;                  /* marcadores */
+    --pulso-bg: #FFFFFF;                        /* fondo del panel */
+    --pulso-surface: #F7F9FD;                   /* tarjetas / superficies */
+    --pulso-surface-2: #EDF1FA;                 /* cabecera de tabla / anidado */
+    --pulso-line: #DCE3F2;                      /* bordes y divisores */
+    --pulso-font: 'Pulso Poppins', 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ========== BOTÓN CIRCULAR INICIAL ========== */
+.pulso-chat-bubble {
+    position: fixed;
+    bottom: 28px;
+    right: 32px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(160deg, #003670 0%, #012142 62%);
+    color: #D9FBFF;
+    border: 1px solid rgba(17, 234, 234, 0.35);
+    cursor: pointer;
+    z-index: 9999;
+    box-shadow: 0 8px 24px rgba(1, 25, 50, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.pulso-chat-bubble img {
+    width: 30px;
+    height: 30px;
+    display: block;
+    pointer-events: none;
+}
+
+.pulso-chat-bubble:hover {
+    transform: scale(1.08);
+    box-shadow: 0 10px 28px rgba(1, 25, 50, 0.4), 0 0 0 4px rgba(17, 234, 234, 0.18);
+}
+
+.pulso-chat-bubble:active {
+    transform: scale(0.95);
+}
+
+.pulso-chat-bubble.has-chat {
+    animation: pulso-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulso-pulse {
+    0%, 100% { box-shadow: 0 8px 24px rgba(1, 25, 50, 0.35), 0 0 0 0 rgba(17, 234, 234, 0.35); }
+    50% { box-shadow: 0 8px 24px rgba(1, 25, 50, 0.35), 0 0 0 7px rgba(17, 234, 234, 0); }
+}
+
+.pulso-chat-bubble.drawer-collapsed {
+    bottom: 88px;
+}
+
+/* ========== CHAT CONTAINER (oculto por defecto) ========== */
+.pulso-chat-container {
+    display: none;
+    position: fixed;
+    top: auto;
+    bottom: 100px;
+    right: 32px;
+    width: min(640px, calc(100vw - 48px));
+    height: min(600px, calc(100vh - 130px));
+    min-width: min(300px, calc(100vw - 32px));
+    min-height: min(300px, calc(100vh - 112px));
+    max-width: calc(100vw - 48px);
+    max-height: calc(100vh - 112px);
+    z-index: 9999;
+    background: var(--pulso-bg);
+    border: 1px solid var(--pulso-line);
+    border-radius: 16px;
+    overflow: hidden;
+    flex-direction: column;
+    box-shadow: 0 24px 64px rgba(1, 25, 50, 0.18);
+    font-family: var(--pulso-font);
+    font-size: 0.92rem;
+    color: var(--pulso-ink);
+    box-sizing: border-box;
+    resize: both;
+    animation: pulso-slideUp 0.3s ease-out;
+}
+
+.pulso-chat-container :focus-visible,
+.pulso-chat-bubble:focus-visible {
+    outline: 2px solid var(--pulso-teal);
+    outline-offset: 2px;
+}
+
+.pulso-chat-container.is-open {
+    display: flex;
+}
+
+/* El panel sube 50px: height/max-height descuentan el bottom real (100px
+   + 12px de margen superior = 112px; 150px + 12px = 162px), para que la
+   cabecera nunca se salga por arriba en ventanas bajas. */
+.pulso-chat-container.drawer-collapsed {
+    bottom: 150px;
+    height: min(600px, calc(100vh - 180px));
+    min-height: min(300px, calc(100vh - 162px));
+    max-height: calc(100vh - 162px);
+}
+
+@keyframes pulso-slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pulso-chat-header {
+    background: linear-gradient(150deg, #003670 0%, #012142 70%);
+    color: #ffffff;
+    padding: 12px 16px;
+    border-bottom: 2px solid rgba(17, 234, 234, 0.45);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    cursor: move;
+    flex-shrink: 0;
+}
+
+.pulso-header-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.pulso-header-logo {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+}
+
+.pulso-chat-header h2 {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 600;
+    font-family: var(--pulso-font);
+    letter-spacing: 0.01em;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.pulso-header-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #D9FBFF;
+    opacity: 0.85;
+    margin-top: 1px;
+}
+
+.pulso-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--pulso-cyan);
+    box-shadow: 0 0 6px rgba(17, 234, 234, 0.9);
+    flex-shrink: 0;
+}
+
+.pulso-version-badge {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--pulso-cyan-soft);
+    background: rgba(17, 234, 234, 0.14);
+    border: 1px solid rgba(17, 234, 234, 0.3);
+    padding: 1px 8px;
+    border-radius: 999px;
+    margin-left: 8px;
+    vertical-align: middle;
+    letter-spacing: 0.04em;
+}
+
+.header-controls {
+    display: flex;
+    gap: 6px;
+    margin-left: 12px;
+}
+
+.header-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: #ffffff;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header-btn svg {
+    width: 15px;
+    height: 15px;
+    display: block;
+}
+
+.header-btn:hover {
+    background: rgba(17, 234, 234, 0.18);
+    border-color: rgba(17, 234, 234, 0.5);
+}
+
+.header-btn:active {
+    transform: scale(0.95);
+}
+
+.pulso-chat-messages {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    overflow-x: auto;
+    padding: 16px 14px;
+    background: var(--pulso-bg);
+    min-height: 120px;
+    width: 100%;
+}
+
+.pulso-chat-messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+.pulso-chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(39, 51, 79, 0.18);
+    border-radius: 8px;
+}
+
+.pulso-chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(39, 51, 79, 0.32);
+}
+
+/* ========== PANTALLA DE INICIO (acciones predefinidas) ========== */
+.pulso-home {
+    padding: 4px 2px 10px;
+}
+
+.pulso-home-hello {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 4px 0 18px;
+}
+
+.pulso-home-avatar {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--pulso-deep) url([[pix:block_pulso|isotipo-oscuro]]) center / 24px 24px no-repeat;
+    border: 1px solid rgba(11, 147, 170, 0.4);
+}
+
+.pulso-home-hello h3 {
+    margin: 0;
+    font-size: 1.02rem;
+    font-weight: 600;
+    font-family: var(--pulso-font);
+    color: var(--pulso-ink);
+    line-height: 1.4;
+}
+
+/* Botón "¿Qué puede hacer Pulso?" — descubrimiento rápido para recién llegados. */
+.pulso-home-help-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(11, 147, 170, 0.4);
+    background: linear-gradient(135deg, rgba(11, 147, 170, 0.12), rgba(11, 147, 170, 0.03));
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+
+.pulso-home-help-btn:hover {
+    border-color: rgba(11, 147, 170, 0.7);
+}
+
+.pulso-home-help-btn:active {
+    transform: scale(0.99);
+}
+
+.pulso-home-help-btn svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    color: var(--pulso-cyan);
+}
+
+.pulso-home-help-btn .pulso-home-help-sub {
+    display: block;
+    font-weight: 400;
+    font-size: 0.76rem;
+    color: var(--pulso-slate);
+    margin-top: 1px;
+}
+
+/* Bloque de preguntas sugeridas en lista (evita el corte en 2 columnas). */
+.pulso-suggest {
+    padding: 10px 14px;
+}
+
+.pulso-suggest-title {
+    font-weight: 600;
+    color: var(--pulso-navy);
+    font-size: 0.88rem;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pulso-suggest ul {
+    margin: 0;
+    padding-left: 20px;
+    line-height: 1.55;
+}
+
+.pulso-suggest li {
+    margin: 5px 0;
+}
+
+.pulso-suggest li::marker {
+    color: var(--pulso-cyan);
+}
+
+.pulso-home-section {
+    margin-bottom: 18px;
+}
+
+.pulso-home-section-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+
+.pulso-home-section-title {
+    margin: 0;
+    font-family: var(--pulso-font);
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--pulso-ink);
+}
+
+.pulso-home-context-chip {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(39, 51, 79, 0.06);
+    border: 1px solid var(--pulso-line);
+    color: var(--pulso-slate);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pulso-home-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.pulso-action-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px;
+    background: var(--pulso-surface);
+    border: 1px solid var(--pulso-line);
+    border-radius: 14px;
+    cursor: pointer;
+    text-align: left;
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+}
+
+.pulso-action-card:hover {
+    border-color: rgba(11, 147, 170, 0.55);
+    background: var(--pulso-surface-2);
+    transform: translateY(-1px);
+}
+
+.pulso-action-card:active {
+    transform: translateY(0);
+}
+
+/* Sección de contenido del curso: tarjetas con tinte azul de marca. */
+.pulso-home-section.course .pulso-action-card {
+    background: #F0F3FC;
+    border-color: rgba(78, 126, 165, 0.35);
+}
+
+.pulso-home-section.course .pulso-action-card:hover {
+    border-color: rgba(11, 147, 170, 0.55);
+    background: #E2E6F2;
+}
+
+.pulso-action-icon {
+    width: 20px;
+    height: 20px;
+    color: var(--pulso-cyan);
+}
+
+.pulso-action-label {
+    font-size: 0.84rem;
+    font-weight: 500;
+    line-height: 1.3;
+    padding-right: 30px;
+}
+
+.pulso-action-chevron {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(39, 51, 79, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pulso-slate);
+}
+
+.pulso-action-chevron svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* ========== BLOQUE "CREAR" (encargos a Epica) ==========
+   Distinto a propósito de los otros dos bloques: aquellos son
+   preguntas, este es una acción que cuesta dinero y genera algo.
+   Fondo navy sólido + texto blanco (nunca cian como color de texto,
+   regla del tema claro), acento cian solo en el icono. */
+/* Fila con los CTA de "Crear" (infografía / juego / ampliar / reto):
+   rejilla 2×2; 1 columna en pantallas estrechas. Mismo patrón
+   repetido, no un formulario por herramienta. */
+.pulso-create-cta-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.pulso-create-cta-row .pulso-create-cta {
+    min-width: 0;
+}
+
+@media (max-width: 420px) {
+    .pulso-create-cta-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.pulso-create-cta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 14px 16px;
+    border: none;
+    border-radius: 14px;
+    background: var(--pulso-navy);
+    color: #ffffff;
+    font-family: var(--pulso-font);
+    cursor: pointer;
+    text-align: left;
+    box-shadow: 0 2px 10px rgba(1, 25, 50, 0.18);
+    transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.pulso-create-cta:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(1, 25, 50, 0.26);
+}
+
+.pulso-create-cta:active {
+    transform: translateY(0);
+}
+
+.pulso-create-cta-icon {
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(11, 147, 170, 0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pulso-create-cta-icon svg {
+    width: 20px;
+    height: 20px;
+    color: var(--pulso-cyan-soft);
+}
+
+.pulso-create-cta-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pulso-create-cta-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.pulso-create-cta-sub {
+    font-size: 0.75rem;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.78);
+}
+
+/* Pantalla de "Crear infografía": NO es un mensaje de chat, es una
+   pantalla propia que sustituye a la home/mensajes mientras está
+   abierta (misma capa, se alternan con una clase en #pulso-scroll
+   para no duplicar el scroll). */
+.pulso-create-panel {
+    display: none;
+}
+
+#pulso-scroll.pulso-showing-create > *:not(.pulso-create-panel) {
+    display: none;
+}
+
+#pulso-scroll.pulso-showing-create .pulso-create-panel {
+    display: block;
+}
+
+.pulso-create-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.pulso-create-back {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--pulso-line);
+    background: var(--pulso-surface);
+    color: var(--pulso-ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.pulso-create-head svg {
+    width: 16px;
+    height: 16px;
+}
+
+.pulso-create-head h3 {
+    margin: 0;
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+}
+
+.pulso-create-body {
+    font-family: var(--pulso-font);
+    color: var(--pulso-ink);
+    font-size: 0.88rem;
+}
+
+.pulso-create-field {
+    margin-bottom: 14px;
+}
+
+.pulso-create-field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--pulso-slate);
+    margin-bottom: 6px;
+}
+
+.pulso-create-field select,
+.pulso-create-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 10px;
+    font-family: var(--pulso-font);
+    font-size: 0.86rem;
+    color: var(--pulso-ink);
+    background: var(--pulso-surface);
+}
+
+.pulso-create-field select:focus,
+.pulso-create-field textarea:focus {
+    outline: 2px solid transparent; /* visible en modo de alto contraste */
+    border-color: var(--pulso-cyan);
+    box-shadow: 0 0 0 2px var(--pulso-cyan);
+}
+
+.pulso-create-field textarea {
+    resize: vertical;
+    min-height: 76px;
+}
+
+.pulso-create-hint {
+    font-size: 0.75rem;
+    color: var(--pulso-muted);
+    margin-top: 4px;
+    min-height: 1em;
+}
+
+.pulso-create-hint.warn {
+    color: #8A6100;
+}
+
+/* Tres tipos de juego ya escritos (carta 9): solo en "Crear juego" */
+.pulso-create-ejemplos {
+    margin-top: 8px;
+}
+
+.pulso-create-ejemplos-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--pulso-slate);
+    margin-bottom: 6px;
+}
+
+.pulso-create-ejemplos-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pulso-create-ejemplo {
+    flex: 1 1 140px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 8px 12px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    background: var(--pulso-surface-2);
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+    text-align: left;
+    cursor: pointer;
+}
+
+.pulso-create-ejemplo:hover {
+    border-color: var(--pulso-teal);
+}
+
+.pulso-create-ejemplo:focus-visible {
+    outline: 2px solid var(--pulso-teal);
+    outline-offset: 2px;
+}
+
+.pulso-create-ejemplo-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.pulso-create-ejemplo-desc {
+    font-size: 0.75rem;
+    color: var(--pulso-slate);
+}
+
+.pulso-create-submit {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 999px;
+    background: var(--pulso-navy);
+    color: #ffffff;
+    font-family: var(--pulso-font);
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.pulso-create-submit:disabled,
+.pulso-create-submit[aria-disabled="true"] {
+    background: #72A3C4;   /* #27334F encima: 4,63 */
+    color: #27334F;
+    cursor: not-allowed;
+}
+
+.pulso-create-notice {
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--pulso-surface);
+    border-left: 3px solid var(--pulso-cyan);
+    font-size: 0.86rem;
+    line-height: 1.5;
+}
+
+/* ========== ESTADO DEL ENCARGO (paso 4) ==========
+   Progreso del encargo recien creado, o de uno abierto desde la
+   galeria. Mismos colores de estado que el resto del plugin (nunca
+   cian como texto): exito #0F7A57, aviso #8A6100, error #B3261E. */
+.pulso-create-status {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pulso-create-status-head {
+    display: flex;
+    align-items: center;
+}
+
+.pulso-create-notice-inline {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--pulso-surface);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    border-left: 3px solid var(--pulso-line);
+}
+
+.pulso-create-notice-inline.warn {
+    border-left-color: #8A6100;
+    color: #8A6100;
+}
+
+.pulso-create-notice-inline.danger {
+    border-left-color: #B3261E;
+    color: #B3261E;
+}
+
+.pulso-create-image {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--pulso-line);
+    display: block;
+}
+
+.pulso-create-image-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--pulso-ink);
+}
+
+.pulso-create-image-tema {
+    font-size: 0.8rem;
+    color: var(--pulso-slate);
+    margin-top: -6px;
+}
+
+.pulso-create-image-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.pulso-create-image-actions a {
+    flex: 1;
+    text-align: center;
+    padding: 9px 12px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    background: var(--pulso-navy);
+    color: #ffffff !important;
+}
+
+.pulso-create-back-link {
+    align-self: flex-start;
+    border: none;
+    background: transparent;
+    color: var(--pulso-slate);
+    font-family: var(--pulso-font);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 4px 0;
+    text-decoration: underline;
+}
+
+.pulso-create-sobre summary {
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--pulso-slate);
+}
+
+.pulso-create-sobre pre {
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 10px;
+    background: var(--pulso-surface-2);
+    font-size: 0.75rem;
+    line-height: 1.4;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Galeria de encargos anteriores del usuario en el curso. */
+.pulso-create-gallery-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--pulso-slate);
+    margin: 18px 0 8px;
+}
+
+/* «Mi historial» (carta 10): enlace discreto, texto slate (nunca cian). */
+.pulso-historial-link {
+    background: none;
+    border: 0;
+    padding: 2px 4px;
+    font: inherit;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--pulso-slate);
+    text-decoration: underline;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+.pulso-historial-link.head {
+    margin-left: auto;
+}
+
+.pulso-historial-link:hover {
+    color: var(--pulso-navy);
+}
+
+.pulso-create-gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.pulso-create-gallery-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 0;
+    border: 1px solid var(--pulso-line);
+    border-radius: 10px;
+    background: var(--pulso-surface);
+    cursor: pointer;
+    overflow: hidden;
+    font-family: var(--pulso-font);
+}
+
+.pulso-create-gallery-item img {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    display: block;
+}
+
+/* Tarjeta de juego: sin imagen (no la hay), icono + título de respaldo. */
+.pulso-create-gallery-icon {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--pulso-surface-2);
+    color: var(--pulso-muted);
+}
+
+.pulso-create-gallery-icon svg {
+    width: 26px;
+    height: 26px;
+}
+
+.pulso-create-gallery-item-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--pulso-ink);
+    padding: 0 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* "Juego" / "Infografía" — nunca cian como color de texto. */
+.pulso-create-gallery-tag {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--pulso-slate);
+    padding: 0 4px;
+}
+
+.pulso-create-gallery-date {
+    font-size: 0.75rem;
+    color: var(--pulso-muted);
+    padding: 0 4px 4px;
+}
+
+/* ========== AMPLIAR RECURSO (resultados) ==========
+   Tarjetas de vídeo/artículo enlazadas a contenido EXTERNO. Nunca
+   cian como texto: tinta/slate/muted; "Acceso abierto" en success. */
+.pulso-amp {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pulso-amp-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--pulso-surface);
+    border-left: 3px solid var(--pulso-cyan);
+    font-size: 0.86rem;
+    line-height: 1.5;
+    color: var(--pulso-ink);
+}
+
+.pulso-amp-head {
+    font-size: 0.92rem;
+    color: var(--pulso-ink);
+    overflow-wrap: anywhere;
+}
+
+.pulso-amp-section-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--pulso-slate);
+    margin-bottom: 6px;
+}
+
+.pulso-amp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pulso-amp-card {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    background: var(--pulso-surface);
+    color: var(--pulso-ink) !important;
+    text-decoration: none;
+    font-family: var(--pulso-font);
+}
+
+a.pulso-amp-card:hover {
+    border-color: var(--pulso-cyan);
+    box-shadow: 0 2px 8px rgba(1, 25, 50, 0.12);
+}
+
+.pulso-amp-thumb {
+    flex-shrink: 0;
+    width: 96px;
+    aspect-ratio: 16 / 9;
+    border-radius: 8px;
+    object-fit: cover;
+    background: var(--pulso-surface-2);
+}
+
+.pulso-amp-thumb-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--pulso-muted);
+}
+
+.pulso-amp-thumb-empty svg {
+    width: 24px;
+    height: 24px;
+}
+
+.pulso-amp-card-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.pulso-amp-card-title {
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--pulso-ink);
+}
+
+.pulso-amp-card-meta {
+    font-size: 0.75rem;
+    color: var(--pulso-slate);
+    line-height: 1.4;
+}
+
+.pulso-amp-tag {
+    align-self: flex-start;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 999px;
+    color: #0F7A57;
+    background: rgba(15, 122, 87, 0.12);
+}
+
+.pulso-amp-tag-lang {
+    color: #34547A;
+    background: rgba(52, 84, 122, 0.10);
+}
+
+.pulso-amp-footnote {
+    font-size: 0.75rem;
+    color: var(--pulso-muted);
+}
+
+.pulso-amp-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* ========== CREAR RETO (formulario, propuestas, reto elegido) ==========
+   Colores de estado del tema claro (éxito #0F7A57, aviso #8A6100,
+   error #B3261E); el cian solo en bordes/foco, nunca como texto. */
+.pulso-retos {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pulso-retos-doc-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--pulso-ink);
+    overflow-wrap: anywhere;
+}
+
+.pulso-retos-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.pulso-retos-chip {
+    font-size: 0.75rem;
+    padding: 1px 8px;
+    border-radius: 999px;
+    color: #34547A;
+    background: rgba(52, 84, 122, 0.10);
+    overflow-wrap: anywhere;
+}
+
+.pulso-reto-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 12px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    background: var(--pulso-surface);
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.2s;
+}
+
+.pulso-reto-card:hover:not(:disabled) {
+    border-color: var(--pulso-cyan);
+    box-shadow: 0 2px 8px rgba(1, 25, 50, 0.12);
+}
+
+.pulso-reto-card:disabled,
+.pulso-reto-card[aria-disabled="true"] {
+    background: #E2E6F2;
+    border-color: #72A3C4;
+    color: #27334F;
+    cursor: not-allowed;
+}
+
+.pulso-reto-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.pulso-reto-icon {
+    flex-shrink: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: var(--pulso-surface-2);
+    color: var(--pulso-cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pulso-reto-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.pulso-reto-title {
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.pulso-reto-desc {
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--pulso-slate);
+    overflow-wrap: anywhere;
+}
+
+.pulso-reto-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+}
+
+.pulso-reto-diff {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 1px 8px;
+    border-radius: 999px;
+    color: #34547A;
+    background: rgba(52, 84, 122, 0.10);
+}
+
+.pulso-reto-diff.ok { color: #0F7A57; background: rgba(15, 122, 87, 0.12); }
+.pulso-reto-diff.warn { color: #8A6100; background: rgba(138, 97, 0, 0.14); }
+.pulso-reto-diff.danger { color: #B3261E; background: rgba(179, 38, 30, 0.12); }
+
+.pulso-reto-min {
+    font-size: 0.75rem;
+    color: var(--pulso-slate);
+}
+
+.pulso-reto-cta {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--pulso-navy);
+}
+
+.pulso-create-secondary {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--pulso-navy);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--pulso-navy);
+    font-family: var(--pulso-font);
+    font-weight: 600;
+    font-size: 0.86rem;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    box-sizing: border-box;
+    display: block;
+}
+
+.pulso-create-secondary:disabled,
+.pulso-create-secondary[aria-disabled="true"] {
+    background: #E2E6F2;
+    border-color: #72A3C4;
+    color: #34547A;        /* 6,2 sobre #E2E6F2 */
+    cursor: not-allowed;
+}
+
+.pulso-retos-msg {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pulso-retos-msg:empty {
+    display: none;
+}
+
+.pulso-create-field + .pulso-retos-msg:not(:empty) {
+    margin-bottom: 10px;
+}
+
+.pulso-retos-own {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pulso-retos-own[hidden] {
+    display: none;
+}
+
+.pulso-retos-own textarea:focus {
+    outline: 2px solid transparent;
+    border-color: var(--pulso-cyan);
+    box-shadow: 0 0 0 2px var(--pulso-cyan);
+}
+
+.pulso-retos-own textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 10px;
+    font-family: var(--pulso-font);
+    font-size: 0.86rem;
+    color: var(--pulso-ink);
+    background: var(--pulso-surface);
+    resize: vertical;
+    min-height: 64px;
+}
+
+.pulso-retos-own-count {
+    align-self: flex-end;
+    font-size: 0.75rem;
+    color: var(--pulso-muted);
+}
+
+.pulso-retos-done {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pulso-retos-done-head {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #0F7A57;
+}
+
+a.pulso-retos-open {
+    display: block;
+    text-align: center;
+    text-decoration: none;
+    box-sizing: border-box;
+    color: #ffffff !important;
+}
+
+.pulso-retos-note {
+    font-size: 0.76rem;
+    color: var(--pulso-slate);
+    line-height: 1.45;
+}
+
+a.pulso-create-gallery-item {
+    text-decoration: none;
+}
+
+.pulso-message {
+    margin-bottom: 14px;
+    display: flex;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pulso-message.user {
+    justify-content: flex-end;
+}
+
+.pulso-message.ai {
+    justify-content: flex-start;
+}
+
+/* Avatar del asistente: isotipo sobre disco azul profundo. */
+.pulso-message.ai::before {
+    content: '';
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: var(--pulso-deep) url([[pix:block_pulso|isotipo-oscuro]]) center / 16px 16px no-repeat;
+    border: 1px solid rgba(17, 234, 234, 0.35);
+    align-self: flex-start;
+}
+
+.pulso-message-content {
+    max-width: calc(98% - 36px);
+    padding: 11px 14px;
+    border-radius: 14px;
+    word-wrap: break-word;
+    overflow-x: auto;
+    font-size: 0.92rem;
+    line-height: 1.55;
+}
+
+.pulso-message.user .pulso-message-content {
+    background: var(--pulso-navy);
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+    max-width: 85%;
+    box-shadow: 0 2px 8px rgba(1, 25, 50, 0.2);
+}
+
+.pulso-message.ai .pulso-message-content {
+    background: var(--pulso-surface);
+    color: var(--pulso-ink);
+    border: 1px solid var(--pulso-line);
+    border-top-left-radius: 4px;
+    box-shadow: 0 2px 10px rgba(1, 25, 50, 0.1);
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Revelado escalonado del contenido de la respuesta. */
+.pulso-message.ai .pulso-rich-answer > * {
+    opacity: 0;
+    animation: pulsoFadeUp 0.4s ease forwards;
+}
+
+.pulso-message.ai .pulso-rich-answer > *:nth-child(1) { animation-delay: 0.03s; }
+.pulso-message.ai .pulso-rich-answer > *:nth-child(2) { animation-delay: 0.12s; }
+.pulso-message.ai .pulso-rich-answer > *:nth-child(3) { animation-delay: 0.21s; }
+.pulso-message.ai .pulso-rich-answer > *:nth-child(4) { animation-delay: 0.3s; }
+.pulso-message.ai .pulso-rich-answer > *:nth-child(5) { animation-delay: 0.39s; }
+.pulso-message.ai .pulso-rich-answer > *:nth-child(n+6) { animation-delay: 0.48s; }
+
+@keyframes pulsoFadeUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.pulso-rich-answer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pulso-rich-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--pulso-navy);
+    margin-bottom: 2px;
+    line-height: 1.35;
+}
+
+.pulso-rich-summary {
+    background: var(--pulso-surface-2);
+    border: 1px solid var(--pulso-line);
+    border-left: 3px solid var(--pulso-cyan);
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: var(--pulso-ink);
+    line-height: 1.6;
+}
+
+/* Enlace directo "Ir a ..." de una actividad o recurso del curso. */
+.pulso-goto-wrap {
+    margin-top: 4px;
+}
+
+.pulso-goto-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border-radius: 10px;
+    background: var(--pulso-navy);
+    color: #ffffff !important;
+    font-weight: 600;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    text-decoration: none !important;
+    border: 1px solid var(--pulso-navy);
+    transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.pulso-goto-link:hover,
+.pulso-goto-link:focus {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
+    text-decoration: none !important;
+    color: #ffffff !important;
+}
+
+.pulso-goto-icon {
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.pulso-rich-paragraph {
+    margin: 2px 0;
+    line-height: 1.65;
+    color: var(--pulso-ink);
+}
+
+.pulso-rich-steps {
+    margin: 4px 0;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    line-height: 1.65;
+}
+
+.pulso-rich-steps li {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--pulso-line);
+    background: var(--pulso-surface-2);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.pulso-step-badge {
+    display: inline-block;
+    align-self: flex-start;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--pulso-navy);
+    color: var(--pulso-cyan-soft);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+.pulso-step-body {
+    color: var(--pulso-ink);
+    line-height: 1.62;
+}
+
+.pulso-rich-bullets {
+    margin: 2px 0;
+    padding-left: 20px;
+    line-height: 1.6;
+}
+
+.pulso-rich-bullets li {
+    margin: 6px 0;
+}
+
+.pulso-rich-bullets li::marker {
+    color: var(--pulso-teal-ink);
+}
+
+.pulso-meta-card {
+    background: var(--pulso-surface-2);
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 4px 0;
+}
+
+.pulso-meta-row {
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    gap: 4px 12px;
+    align-items: baseline;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--pulso-line);
+}
+
+.pulso-meta-card .pulso-meta-row:last-child {
+    border-bottom: none;
+}
+
+.pulso-meta-key {
+    font-weight: 600;
+    color: var(--pulso-navy);
+    font-size: 0.85em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.pulso-meta-value {
+    color: var(--pulso-ink);
+    line-height: 1.55;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.pulso-card-item {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--pulso-line);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.pulso-meta-card .pulso-card-item:last-child {
+    border-bottom: none;
+}
+
+.pulso-card-item-title {
+    font-weight: 600;
+    color: var(--pulso-navy);
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pulso-card-item-body {
+    color: var(--pulso-slate);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.pulso-activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 2px 0;
+}
+
+.pulso-activity-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--pulso-surface-2);
+    border: 1px solid var(--pulso-line);
+}
+
+.pulso-activity-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 74px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(11, 147, 170, 0.12);
+    color: var(--pulso-navy);
+    border: 1px solid rgba(11, 147, 170, 0.3);
+}
+
+.pulso-activity-badge.resource {
+    background: rgba(15, 122, 87, 0.12);
+    color: #0F7A57;
+    border-color: rgba(15, 122, 87, 0.3);
+}
+
+.pulso-activity-badge.label {
+    background: rgba(138, 97, 0, 0.12);
+    color: #8A6100;
+    border-color: rgba(138, 97, 0, 0.3);
+}
+
+.pulso-activity-badge.page,
+.pulso-activity-badge.book,
+.pulso-activity-badge.wiki {
+    background: rgba(52, 84, 122, 0.12);
+    color: #34547A;
+    border-color: rgba(52, 84, 122, 0.3);
+}
+
+.pulso-activity-name {
+    color: var(--pulso-ink);
+    font-weight: 500;
+    line-height: 1.45;
+}
+
+.pulso-formula {
+    background: #E2E6F2;
+    border: 1px solid var(--pulso-line);
+    border-left: 3px solid var(--pulso-cyan);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--pulso-ink);
+    font-family: Consolas, Monaco, "Courier New", monospace;
+    font-size: 0.88em;
+    line-height: 1.45;
+    overflow-x: auto;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.pulso-result-box {
+    background: rgba(15, 122, 87, 0.1);
+    border: 1px solid rgba(15, 122, 87, 0.25);
+    border-left: 3px solid #0F7A57;
+    color: #0F7A57;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-weight: 500;
+    line-height: 1.55;
+}
+
+/* ===== Secciones de análisis (Insights / Recomendaciones) ===== */
+.pulso-section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--pulso-slate);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.pulso-section-label::before {
+    content: '';
+    width: 14px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--pulso-cyan);
+}
+
+.pulso-insights,
+.pulso-recos {
+    background: var(--pulso-surface-2);
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-top: 4px;
+}
+
+/* Ofrecimiento del siguiente paso (campo 'next_step'). Cierra la respuesta,
+   así que se distingue del cuerpo con el acento cian a la izquierda pero sin
+   tarjeta: no es una sección más, es la última frase. */
+.pulso-next-step {
+    margin-top: 10px;
+    padding: 8px 0 8px 12px;
+    border-left: 2px solid var(--pulso-cyan);
+    background: var(--pulso-cyan-soft);
+    color: var(--pulso-navy);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.pulso-insights ul,
+.pulso-recos ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.pulso-insights li,
+.pulso-recos li {
+    margin: 5px 0;
+    line-height: 1.55;
+    color: var(--pulso-ink);
+}
+
+.pulso-insights li::marker {
+    color: var(--pulso-teal-ink);
+}
+
+.pulso-recos li::marker {
+    color: var(--pulso-muted);
+}
+
+/* ===== Tarjetas de lista (resultados por alumno/actividad) ===== */
+.pulso-list-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 4px 0;
+}
+
+.pulso-list-card {
+    padding: 11px 14px;
+    background: var(--pulso-surface-2);
+    border: 1px solid var(--pulso-line);
+    border-left: 3px solid var(--pulso-muted);
+    border-radius: 10px;
+}
+
+.pulso-list-card.success { border-left-color: #0F7A57; }
+.pulso-list-card.info    { border-left-color: var(--pulso-cyan); }
+.pulso-list-card.warn    { border-left-color: #8A6100; }
+.pulso-list-card.danger  { border-left-color: #B3261E; }
+
+.pulso-list-card-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+    color: var(--pulso-ink);
+}
+
+.pulso-kv-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    font-size: 0.85em;
+}
+
+.pulso-kv-grid.secondary {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--pulso-line);
+    font-size: 0.82em;
+}
+
+.pulso-kv-key {
+    color: var(--pulso-slate);
+    font-weight: 500;
+}
+
+.pulso-kv-val {
+    color: var(--pulso-ink);
+}
+
+.pulso-list-card-desc {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--pulso-line);
+    font-size: 0.88em;
+    color: var(--pulso-slate);
+    line-height: 1.5;
+}
+
+.pulso-list-item-simple {
+    padding: 10px 12px;
+    border-left: 3px solid var(--pulso-cyan);
+    background: var(--pulso-surface-2);
+    border-top: 1px solid var(--pulso-line);
+    border-right: 1px solid var(--pulso-line);
+    border-bottom: 1px solid var(--pulso-line);
+    border-radius: 10px;
+    color: var(--pulso-ink);
+}
+
+.pulso-empty {
+    color: var(--pulso-slate);
+    font-size: 0.9em;
+    padding: 12px 14px;
+    background: var(--pulso-surface-2);
+    border-radius: 10px;
+    border: 1px dashed rgba(59, 105, 150, 0.35);
+    margin: 4px 0;
+}
+
+/* ========== TABLA DE DATOS ========== */
+.pulso-table-card {
+    background: var(--pulso-surface-2);
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--pulso-line);
+    margin: 4px 0;
+}
+
+.pulso-table-toolbar {
+    padding: 10px 12px;
+    background: var(--pulso-surface-2);
+    border-bottom: 1px solid var(--pulso-line);
+}
+
+.pulso-table-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 12px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 8px;
+    font-size: 0.85em;
+    font-family: var(--pulso-font);
+    color: var(--pulso-ink);
+    background: var(--pulso-bg);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.pulso-table-search:focus {
+    outline: 2px solid transparent;
+    border-color: var(--pulso-teal);
+    box-shadow: 0 0 0 2px var(--pulso-cyan);
+}
+
+.pulso-table-search::placeholder {
+    color: var(--pulso-muted);
+}
+
+.pulso-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.pulso-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88em;
+    min-width: 480px;
+}
+
+.pulso-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.pulso-table th {
+    background: var(--pulso-deep);
+    padding: 0;
+    text-align: left;
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 0.95em;
+    letter-spacing: 0.02em;
+    user-select: none;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: background 0.2s;
+}
+
+.pulso-table th:hover {
+    background: var(--pulso-navy);
+}
+
+.pulso-table th.is-sorted {
+    background: var(--pulso-navy);
+    border-bottom-color: var(--pulso-cyan);
+}
+
+/* La ordenación es un <button> dentro del <th> (alcanzable con teclado). */
+.pulso-table .pulso-sort-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    padding: 11px 14px;
+}
+
+.pulso-table .pulso-sort-btn:focus-visible {
+    outline: 3px solid var(--pulso-cyan-soft);
+    outline-offset: -3px;
+}
+
+.pulso-table th .pulso-sort-mark {
+    font-size: 0.9em;
+    margin-left: 4px;
+    opacity: 0.6;
+}
+
+.pulso-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--pulso-line);
+    color: var(--pulso-ink);
+}
+
+.pulso-table tbody tr:nth-child(even) {
+    background: rgba(3, 54, 112, 0.03);
+}
+
+.pulso-table tbody tr {
+    transition: background 0.15s;
+}
+
+.pulso-table tbody tr:hover {
+    background: rgba(11, 147, 170, 0.1);
+}
+
+.pulso-no-results td {
+    padding: 20px;
+    text-align: center;
+    color: var(--pulso-muted);
+}
+
+.pulso-table-footer {
+    padding: 10px 12px;
+    background: var(--pulso-surface-2);
+    border-top: 1px solid var(--pulso-line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pulso-table-count {
+    color: var(--pulso-slate);
+    font-size: 0.82em;
+    font-weight: 500;
+}
+
+.pulso-table-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.pulso-export-btn {
+    padding: 6px 14px;
+    background: transparent;
+    color: var(--pulso-navy);
+    border: 1px solid var(--pulso-line);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.84em;
+    font-weight: 500;
+    font-family: var(--pulso-font);
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.pulso-export-btn:hover {
+    border-color: rgba(11, 147, 170, 0.55);
+    background: rgba(11, 147, 170, 0.1);
+}
+
+/* Píldoras de estado en celdas */
+.pulso-status-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.85em;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.pulso-status-pill.success { background: rgba(15, 122, 87, 0.14); color: #0F7A57; }
+.pulso-status-pill.danger  { background: rgba(179, 38, 30, 0.14); color: #B3261E; }
+.pulso-status-pill.warning { background: rgba(138, 97, 0, 0.14); color: #8A6100; }
+.pulso-status-pill.neutral { background: rgba(52, 84, 122, 0.1); color: var(--pulso-slate); }
+
+.pulso-message-content ul,
+.pulso-message-content ol {
+    margin: 10px 0;
+    padding-left: 25px;
+}
+
+.pulso-message-content li {
+    margin: 6px 0;
+}
+
+.pulso-message-content p {
+    margin: 10px 0;
+}
+
+.pulso-message-content strong {
+    font-weight: 600;
+}
+
+/* ========== FOLLOW-UP QUESTIONS CHIPS (T2.4.12) ========== */
+.pulso-followup-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 0 10px 36px;
+}
+
+.pulso-followup-chip {
+    background: var(--pulso-surface);
+    border: 1px solid var(--pulso-line);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: 0.84rem;
+    font-family: var(--pulso-font);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    color: var(--pulso-navy);
+    font-weight: 500;
+    white-space: normal;
+    text-align: left;
+    line-height: 1.4;
+    max-width: 100%;
+}
+
+.pulso-followup-chip:hover {
+    border-color: rgba(11, 147, 170, 0.55);
+    background: var(--pulso-surface-2);
+    transform: translateY(-1px);
+}
+
+.pulso-followup-chip:active {
+    transform: translateY(0);
+}
+
+/* ========== BURBUJA "ESCRIBIENDO" (tres puntos estilo WhatsApp) ========== */
+.pulso-typing-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 2px;
+}
+
+.pulso-typing-dots span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--pulso-cyan);
+    opacity: 0.35;
+    animation: pulso-typing-bounce 1.2s ease-in-out infinite;
+}
+
+.pulso-typing-dots span:nth-child(2) { animation-delay: 0.16s; }
+.pulso-typing-dots span:nth-child(3) { animation-delay: 0.32s; }
+
+@keyframes pulso-typing-bounce {
+    0%, 70%, 100% {
+        transform: translateY(0) scale(1);
+        opacity: 0.35;
+        box-shadow: none;
+    }
+    35% {
+        transform: translateY(-7px) scale(1.18);
+        opacity: 1;
+        box-shadow: 0 0 8px rgba(11, 147, 170, 0.55);
+    }
+}
+
+/* Latido suave (solo opacidad) para movimiento reducido. */
+@keyframes pulso-typing-fade {
+    0%, 100% { opacity: 0.3; }
+    50%      { opacity: 1; }
+}
+
+/* ========== STREAMING (respuesta en vivo) ========== */
+.pulso-stream-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.pulso-stream-cursor {
+    display: inline-block;
+    width: 3px;
+    height: 1.05em;
+    margin-left: 3px;
+    border-radius: 2px;
+    background: var(--pulso-cyan);
+    vertical-align: text-bottom;
+    animation: pulso-blink 1s steps(2, start) infinite;
+}
+
+@keyframes pulso-blink {
+    to { visibility: hidden; }
+}
+
+.pulso-chat-input-area {
+    border-top: 1px solid var(--pulso-line);
+    padding: 12px 14px;
+    background: var(--pulso-bg);
+    flex-shrink: 0;
+}
+
+.pulso-input-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.pulso-input-group input {
+    flex: 1;
+    padding: 11px 16px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-family: var(--pulso-font);
+    color: var(--pulso-ink);
+    background: var(--pulso-surface);
+    min-width: 0;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.pulso-input-group input::placeholder {
+    color: var(--pulso-muted);
+}
+
+.pulso-input-group input:focus {
+    outline: 2px solid transparent;
+    border-color: var(--pulso-cyan);
+    background: var(--pulso-surface-2);
+    box-shadow: 0 0 0 2px var(--pulso-cyan);
+}
+
+.pulso-send-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--pulso-cyan);
+    color: var(--pulso-deep);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+
+.pulso-send-btn svg {
+    width: 17px;
+    height: 17px;
+    display: block;
+    margin-left: 2px;
+}
+
+.pulso-send-btn:hover {
+    background: #19F7F1;
+    box-shadow: 0 0 16px rgba(11, 147, 170, 0.35);
+}
+
+.pulso-send-btn:active {
+    transform: scale(0.94);
+}
+
+/* Campo vacío o petición en vuelo: sigue enfocable (aria-disabled, no disabled). */
+.pulso-send-btn[aria-disabled="true"],
+.pulso-send-btn[aria-disabled="true"]:hover {
+    background: #72A3C4;
+    color: #27334F;
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+.pulso-mic-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--pulso-surface);
+    color: var(--pulso-cyan);
+    border: 1px solid var(--pulso-line);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+
+.pulso-mic-btn svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.pulso-mic-btn:hover {
+    background: var(--pulso-surface-2);
+    border-color: rgba(11, 147, 170, 0.5);
+}
+
+.pulso-mic-btn:active {
+    transform: scale(0.94);
+}
+
+/* Estado grabando: acento cian con anillo pulsante */
+.pulso-mic-btn.pulso-mic-recording {
+    background: var(--pulso-cyan);
+    color: var(--pulso-deep);
+    border-color: var(--pulso-cyan);
+    animation: pulso-mic-pulse 1.4s ease-out infinite;
+}
+
+@keyframes pulso-mic-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(11, 147, 170, 0.5); }
+    70%  { box-shadow: 0 0 0 10px rgba(11, 147, 170, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(11, 147, 170, 0); }
+}
+
+.pulso-char-count {
+    font-size: 0.75rem;
+    color: var(--pulso-muted);
+    margin-top: 6px;
+    text-align: right;
+    padding-right: 6px;
+}
+
+.pulso-char-count[hidden] {
+    display: none;
+}
+
+.pulso-char-count.is-near {
+    color: #8A6100;
+}
+
+/* ========== ACCESIBILIDAD: movimiento reducido ========== */
+@media (prefers-reduced-motion: reduce) {
+    .pulso-chat-bubble,
+    .pulso-chat-bubble *,
+    .pulso-chat-container,
+    .pulso-chat-container *,
+    .pulso-chat-container *::before,
+    .pulso-chat-container *::after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
+
+    .pulso-chat-bubble:hover,
+    .pulso-chat-bubble:active,
+    .pulso-create-cta:hover,
+    .pulso-followup-chip:hover {
+        transform: none !important;
+    }
+
+    .pulso-message.ai .pulso-rich-answer > * {
+        opacity: 1;
+    }
+
+    /* Sin desplazamiento, pero mantiene un latido de opacidad para que se note "pensando". */
+    .pulso-typing-dots span {
+        animation: pulso-typing-fade 1.4s ease-in-out infinite !important;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+}
+
+/* ========== FASE 3 UX (v1.32.0) ========== */
+
+/* Texto solo para lectores de pantalla. */
+.pulso-sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* El registro (log) solo contiene mensajes; la home y el panel Crear viven fuera. */
+.pulso-log {
+    display: block;
+}
+
+/* Foco sobre la cabecera azul: el cian de marca no contrasta ahí, el cian claro sí. */
+.pulso-chat-header :focus-visible {
+    outline-color: var(--pulso-cyan-soft);
+}
+
+.pulso-create-head h3:focus {
+    outline: none;
+}
+
+.pulso-create-head h3:focus-visible {
+    outline: 2px solid var(--pulso-cyan);
+    outline-offset: 3px;
+    border-radius: 4px;
+}
+
+.pulso-home-hello h3 {
+    margin: 0;
+}
+
+/* Turnos guardados de la sesión anterior (digests de texto, no respuestas formateadas). */
+.pulso-history-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 2px 0 14px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--pulso-slate);
+}
+
+.pulso-history-divider::before,
+.pulso-history-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--pulso-line);
+}
+
+.pulso-message-history .pulso-message-content {
+    white-space: pre-line;
+}
+
+/* Burbuja de error con reintento. */
+.pulso-error-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: #B3261E;
+}
+
+.pulso-error-head svg {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+}
+
+.pulso-error-head span {
+    color: var(--pulso-ink);
+}
+
+.pulso-error-head strong {
+    color: #B3261E;
+}
+
+.pulso-error-retry {
+    margin-top: 10px;
+    min-height: 36px;
+    padding: 6px 16px;
+    border: 1px solid var(--pulso-navy);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--pulso-navy);
+    font-family: var(--pulso-font);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pulso-error-retry:hover {
+    background: var(--pulso-surface-2);
+}
+
+.pulso-error-retry[aria-disabled="true"] {
+    background: #E2E6F2;
+    border-color: #72A3C4;
+    color: #34547A;
+    cursor: not-allowed;
+}
+
+/* Aviso persistente de falta de conexión (entre los mensajes y el cuadro de texto). */
+.pulso-offline {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    background: #FFF8E8;
+    border-top: 1px solid #8A6100;
+    color: #8A6100;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.pulso-offline[hidden] {
+    display: none;
+}
+
+/* ========== MÓVIL: pantalla completa ========== */
+@media (max-width: 480px) {
+    .pulso-chat-bubble,
+    .pulso-chat-bubble.drawer-collapsed {
+        right: 16px;
+        bottom: 16px;
+    }
+
+    /* !important: toggleChat() y el arrastre dejan estilos en línea (px) en el contenedor. */
+    .pulso-chat-container,
+    .pulso-chat-container.drawer-collapsed {
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        max-width: none !important;
+        max-height: none !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        border: 0;
+        border-radius: 0;
+        resize: none;
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    .pulso-chat-header {
+        cursor: default;
+        padding-top: calc(12px + env(safe-area-inset-top));
+    }
+
+    .pulso-chat-input-area {
+        padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    }
+
+    #pulso-expand-btn {
+        display: none;
+    }
+
+    /* Objetivos táctiles de 44 px */
+    .header-btn,
+    .pulso-create-back,
+    .pulso-mic-btn,
+    .pulso-send-btn {
+        width: 44px;
+        height: 44px;
+    }
+
+    .pulso-create-back-link,
+    .pulso-historial-link {
+        min-height: 44px;
+    }
+
+    /* 16 px evita el zoom automático de iOS al enfocar el campo */
+    .pulso-input-group input {
+        font-size: 1rem;
+    }
+
+    .pulso-chat-messages {
+        padding: 16px 12px;
+    }
+
+    .pulso-followup-container {
+        padding-left: 0;
+    }
+
+    .pulso-create-gallery-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .pulso-home-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

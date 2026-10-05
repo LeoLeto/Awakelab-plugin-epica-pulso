@@ -84,7 +84,7 @@ $puntua = !empty($encargo->puntua);
 echo $OUTPUT->header();
 ?>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
+/* Poppins viene de styles.css del bloque (@font-face local): sin Google Fonts. */
 .pulso-juego-page {
     --pulso-surface: #F7F9FD;
     --pulso-ink: #27334F;
@@ -93,7 +93,7 @@ echo $OUTPUT->header();
     --pulso-deep: #003670;
     --pulso-cyan-soft: #D9FBFF;
     --pulso-warning: #8A6100;
-    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Pulso Poppins', 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: var(--pulso-ink);
     max-width: 960px;
     margin: 0 auto;

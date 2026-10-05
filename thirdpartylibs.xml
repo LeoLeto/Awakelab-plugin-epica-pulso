@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<libraries>
+  <library>
+    <location>fonts</location>
+    <name>Poppins</name>
+    <description>Familia tipografica Poppins 400/500/600/700 (subconjunto latino, woff2), servida desde el plugin para no cargarla de Google Fonts.</description>
+    <version>v24</version>
+    <license>OFL-1.1</license>
+    <licenseversion>1.1</licenseversion>
+  </library>
+  <library>
+    <location>lib/pdfparser</location>
+    <name>smalot/pdfparser</name>
+    <description>Extraccion de texto de PDF (vendorizada 2026-07-14, sin fichero de version de origen: ver lib/pdfparser/VERSION).</description>
+    <version>unknown</version>
+    <license>LGPL-3.0</license>
+    <licenseversion>3.0</licenseversion>
+  </library>
+</libraries>

@@ -37,6 +37,28 @@ class ampliacion_service {
     /** @var int Un fallo no se cachea mas de 1 hora (puede ser una clave mal puesta ya corregida). */
     const FAILURE_TTL = HOURSECS;
 
+    /**
+     * @var int Un fallo TRANSITORIO (red, 429/5xx/529, presupuesto agotado) no se cachea más
+     * de 5 minutos: es un hipo del proveedor, no algo que dure una hora.
+     */
+    const TRANSIENT_FAILURE_TTL = 5 * MINSECS;
+
+    /** Marca al inicio de `motivo` de una fila `fallado` transitoria (sin columna nueva en BD). */
+    const TRANSIENT_MARK = '[transitorio] ';
+
+    /**
+     * @var int Presupuesto TOTAL de tiempo de una generación (s). Peor caso antes: varios
+     * minutos (Haiku ×3 reintentos + juez + YouTube + OpenAlex) con el candado puesto y la
+     * petición abierta. Agotado, se salta el juez y se responde con lo que haya.
+     */
+    const TIME_BUDGET_S = 45;
+
+    /** @var int Con menos de esto de presupuesto, el juez (una llamada a Haiku) no se intenta. */
+    const JUDGE_MIN_S = 10;
+
+    /** @var float Instante (microtime) en que se agota el presupuesto de la generación en curso. */
+    private static $deadline = 0.0;
+
     /** @var int Caracteres del texto literal que ven Haiku (mb_substr, nunca substr). */
     const TEXT_CHARS = 6000;
 
@@ -110,7 +132,8 @@ class ampliacion_service {
         $lock = null;
         try {
             $factory = \core\lock\lock_config::get_lock_factory('block_pulso_ampliacion');
-            $lock = $factory->get_lock("amp_{$courseid}_{$cmid}", 30);
+            // Espera de 30 s por el candado; vida máxima 120 s (presupuesto 45 s + margen).
+            $lock = $factory->get_lock("amp_{$courseid}_{$cmid}", 30, 120);
         } catch (\Throwable $e) {
             $lock = null;
         }
@@ -149,7 +172,39 @@ class ampliacion_service {
             $ttldays = (int)self::cfg('ampliacion_ttl_dias', 30);
             return $age < max(1, $ttldays) * DAYSECS ? $row : null;
         }
-        return $age < self::FAILURE_TTL ? $row : null;
+        $ttl = self::is_transient_row($row) ? self::TRANSIENT_FAILURE_TTL : self::FAILURE_TTL;
+        return $age < $ttl ? $row : null;
+    }
+
+    private static function is_transient_row(\stdClass $row): bool {
+        return strpos((string)$row->motivo, self::TRANSIENT_MARK) === 0;
+    }
+
+    /** Segundos que quedan del presupuesto de la generación en curso (puede ser negativo). */
+    private static function remaining(): float {
+        return self::$deadline - microtime(true);
+    }
+
+    /**
+     * ¿Es un fallo transitorio (red, 429/5xx/529, presupuesto agotado) y no de configuración
+     * o de la petición? Decide cuánto tiempo se cachea un `fallado`.
+     */
+    private static function is_transient(\Throwable $e): bool {
+        if ($e instanceof \moodle_exception) {
+            if ($e->errorcode === 'error_api_connection') {
+                return true;
+            }
+            if ($e->errorcode === 'error_api_response') {
+                return (bool)preg_match('/^HTTP (429|5\d\d)\b/', (string)($e->debuginfo ?? ''));
+            }
+            return false;
+        }
+        if ($e instanceof \RuntimeException) {
+            // http_get_json: código 0 = red / presupuesto / respuesta ilegible; si no, el HTTP.
+            $code = (int)$e->getCode();
+            return $code === 0 || $code === 429 || $code >= 500;
+        }
+        return false;
     }
 
     /**
@@ -182,6 +237,9 @@ class ampliacion_service {
     }
 
     private static function generate(int $courseid, int $cmid, string $hash, int $userid, array $res, array $have): array {
+        // El reloj del presupuesto arranca aquí: ya con el candado, ya fuera de la caché.
+        self::$deadline = microtime(true) + self::TIME_BUDGET_S;
+
         $course = get_course($courseid);
         $langcode = self::course_language($course);
         $sectionname = self::section_name($courseid, $cmid);
@@ -197,7 +255,7 @@ class ampliacion_service {
             $motivo = 'No hemos podido identificar el tema de este recurso ahora mismo.';
             self::save($courseid, $cmid, $hash, $userid, [
                 'status' => self::STATUS_FALLADO,
-                'motivo' => $motivo,
+                'motivo' => (self::is_transient($e) ? self::TRANSIENT_MARK : '') . $motivo,
             ]);
             throw new pulso_error('busy', $motivo, 503);
         }
@@ -216,7 +274,7 @@ class ampliacion_service {
                     $avisos[] = self::NOT_RELATED_VIDEOS;
                 }
             } catch (\Throwable $e) {
-                $errores[] = 'youtube';
+                $errores['youtube'] = self::is_transient($e);
                 error_log('block_pulso ampliacion: busqueda de videos fallida: ' . self::scrub($e->getMessage()));
                 $avisos[] = 'No hemos podido buscar vídeos ahora mismo.';
             }
@@ -231,7 +289,7 @@ class ampliacion_service {
                     $avisos[] = self::NOT_RELATED_ARTICLES;
                 }
             } catch (\Throwable $e) {
-                $errores[] = 'openalex';
+                $errores['openalex'] = self::is_transient($e);
                 error_log('block_pulso ampliacion: busqueda de articulos fallida: ' . self::scrub($e->getMessage()));
                 $avisos[] = 'No hemos podido buscar artículos ahora mismo.';
             }
@@ -242,14 +300,16 @@ class ampliacion_service {
         // 3. "fallado" solo si NINGUNA fuente configurada respondio.
         $configured = ($have['youtube'] ? 1 : 0) + ($have['openalex'] ? 1 : 0);
         if (count($errores) >= $configured) {
-            // $errores solo lleva marcadores ('youtube'/'openalex'); el detalle ya esta en el log.
+            // $errores: fuente => ¿transitorio?; el detalle ya esta en el log. Transitorio solo
+            // si TODOS los fallos lo son (un error de clave/cuota diaria no se arregla en 5 min).
+            $transient = !in_array(false, $errores, true);
             $motivo = 'No hemos podido buscar vídeos ni artículos ahora mismo.';
             self::save($courseid, $cmid, $hash, $userid, [
                 'status' => self::STATUS_FALLADO,
                 'tema' => $topic['tema'],
                 'query_videos' => $topic['query_videos'],
                 'query_articulos' => $topic['query_articulos'],
-                'motivo' => $motivo,
+                'motivo' => ($transient ? self::TRANSIENT_MARK : '') . $motivo,
             ]);
             throw new pulso_error('busy', $motivo, 503);
         }
@@ -309,10 +369,14 @@ class ampliacion_service {
         // Un reintento si el JSON no se puede leer; los errores de API/red ya
         // se reintentan dentro del conector y suben tal cual.
         for ($attempt = 1; $attempt <= 2; $attempt++) {
-            $raw = $connector->send_fast_query($system, $user, 400);
+            // Cada llamada se acota al presupuesto que queda; sin margen no se intenta otra.
+            $raw = $connector->send_fast_query($system, $user, 400, self::$deadline);
             $parsed = self::parse_topic($raw);
             if ($parsed !== null) {
                 return $parsed;
+            }
+            if (self::remaining() < self::JUDGE_MIN_S) {
+                break;
             }
         }
         throw new \Exception('la respuesta de Claude no tenía el formato esperado.');
@@ -673,6 +737,11 @@ class ampliacion_service {
         if (!$candidates) {
             return [];
         }
+        // Presupuesto casi agotado: se salta el juez y se responde con la selección sin juez.
+        if (self::remaining() < self::JUDGE_MIN_S) {
+            error_log('block_pulso ampliacion: sin tiempo para el juez de ' . $kind . ', se usa la seleccion sin juez.');
+            return $candidates;
+        }
         try {
             return self::judge($kind, $topic, $candidates);
         } catch (\Throwable $e) {
@@ -710,7 +779,7 @@ class ampliacion_service {
             . 'Público: ' . $topic['publico'] . "\n"
             . 'Candidatos (' . $kind . "):\n" . implode("\n", $lines);
 
-        $raw = (new anthropic_connector())->send_fast_query($system, $user, 200);
+        $raw = (new anthropic_connector())->send_fast_query($system, $user, 200, self::$deadline);
         $start = mb_strpos($raw, '{', 0, 'UTF-8');
         $end = mb_strrpos($raw, '}', 0, 'UTF-8');
         $data = ($start !== false && $end !== false && $end > $start)
@@ -743,20 +812,29 @@ class ampliacion_service {
         global $CFG;
         require_once($CFG->libdir . '/filelib.php');
 
+        // Presupuesto de la generación: cada llamada se acota a lo que queda. Sin margen
+        // útil se corta (código 0 = transitorio: no se cachea como fallo largo).
+        $left = self::remaining();
+        if ($left < 2) {
+            throw new \RuntimeException("{$service}: presupuesto de tiempo agotado.", 0);
+        }
+        $timeout = (int)max(2, min(self::HTTP_TIMEOUT, floor($left)));
+
         $curl = new \curl();
-        $curl->setopt(['CURLOPT_TIMEOUT' => self::HTTP_TIMEOUT, 'CURLOPT_CONNECTTIMEOUT' => 10]);
+        $curl->setopt(['CURLOPT_TIMEOUT' => $timeout, 'CURLOPT_CONNECTTIMEOUT' => min(10, $timeout)]);
         $curl->setHeader($headers);
         $raw = $curl->get($url);
 
         if ($curl->errno) {
-            throw new \RuntimeException("{$service}: error de red (cURL {$curl->errno}).");
+            throw new \RuntimeException("{$service}: error de red (cURL {$curl->errno}).", 0);
         }
         $http = (int)($curl->info['http_code'] ?? 0);
         $data = json_decode((string)$raw, true);
 
         if ($http < 200 || $http >= 300) {
             $reason = is_array($data) ? (string)($data['error']['errors'][0]['reason'] ?? '') : '';
-            throw new \RuntimeException("{$service}: HTTP {$http}" . ($reason !== '' ? " ({$reason})" : '') . '.');
+            // El código de la excepción es el HTTP: is_transient() distingue 429/5xx del resto.
+            throw new \RuntimeException("{$service}: HTTP {$http}" . ($reason !== '' ? " ({$reason})" : '') . '.', $http);
         }
         if (!is_array($data)) {
             throw new \RuntimeException("{$service}: respuesta no válida.");
@@ -827,7 +905,9 @@ class ampliacion_service {
             // Texto fijo, NO el motivo guardado: las filas anteriores a v1.30.0 pueden
             // llevar codigos HTTP y mensajes de las APIs externas.
             throw new pulso_error('busy', 'No hemos podido generar la ampliación de este recurso ahora mismo. '
-                . 'Se volverá a intentar pasada una hora.', 503);
+                . (self::is_transient_row($row)
+                    ? 'Vuelve a intentarlo en unos minutos.'
+                    : 'Se volverá a intentar pasada una hora.'), 503);
         }
         $videos = $row->videos_json ? json_decode($row->videos_json, true) : [];
         $articulos = $row->articulos_json ? json_decode($row->articulos_json, true) : [];

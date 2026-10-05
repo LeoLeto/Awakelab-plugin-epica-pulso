@@ -1,5 +1,38 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-05 — Auditoría de UX fase 3: estados, teclado, lector de pantalla y móvil (v1.32.0)
+
+Reglas en `CLAUDE.md` → «Auditoría de UX, fase 3». Sin `db/`. Lo que costó ver:
+- **El `#pulso-messages` era a la vez scroll, log y contenedor de la home y de Crear**: por eso cada repintado
+  del panel se anunciaba entero. Se partió en `#pulso-scroll` (scroll + `pulso-showing-create`) con tres
+  hermanos (home, panel, log). Todo lo que hacía `getElementById('pulso-messages').scrollTop` pasó a
+  `pulsoScrollToEnd()`; las tres funciones de Crear que alternaban la clase apuntan ahora a `#pulso-scroll`.
+- **El foco al título de Crear no se puede resolver llamando a `focus()` tras cada render**: tras ocultar la
+  tarjeta pulsada `document.activeElement` aún la apunta y el test «foco perdido» da falso. Por eso al abrir se
+  fuerza y para los repintados posteriores hay un `MutationObserver` de hijos directos del cuerpo (el
+  elemento enfocado ya se ha retirado del DOM). Los repintados parciales (píldora, `#pulso-retos-msg`,
+  galería) no son hijos directos y no lo disparan, que es lo que se quiere.
+- **`renderCreateStatus()` repintaba todo cada 7 s** y el `timemodified` del payload cambia en cada sondeo:
+  la clave de «misma pantalla» tiene que excluirlo (y `posicion`), o el repintado parcial nunca se activa.
+- **«Reintentar» no podía reutilizar `sendMessage()`** (lee el cuadro y pinta la burbuja del usuario): se
+  extrajo `dispatchMessage(message)`. Los siete sitios que hacían `addMessage(pulsoFailureMessage(...))`
+  ya tienen `message` a mano (stream, XHR, `handleChatResponse`), así que el reintento no necesita estado global.
+- **`aria-disabled` y no `disabled` en el botón de enviar**: con `disabled` el foco saltaba al perder el
+  botón en pleno envío. Los botones de Crear usan `pulsoSetDisabled()` (los dos atributos a la vez).
+- **`min-width: 300px` + `right: 32px` era lo que sacaba el chat por la izquierda a 320 px**; a ≤ 480 px las
+  reglas van con `!important` porque `toggleChat()` y el arrastre dejan estilos en línea.
+- **`juego.php`**: un `hidden` que se destapa dentro de la región en vivo no se anuncia; la región tiene que
+  estar siempre en el DOM y visible, y lo que aparece va dentro.
+- Decisiones propias: el contador de caracteres anuncia por umbrales (450/480/490/500) y no en cada tecla;
+  el chat sin conexión conserva la pregunta en el cuadro (no hay burbuja de error ni reintento: el aviso es el
+  banner); `clearConversation()` mantiene su `confirm()` (el encargo solo pedía quitar `alert()`).
+- **Probado** con una batería en jsdom (~60 comprobaciones sobre el HTML/JS real extraído del nowdoc, rol
+  profesor y alumno): estructura y encabezados, historial pintado y escapado, foco al abrir/cerrar y con
+  Escape, Reintentar con el mismo mensaje, Enter con IME, offline, contador, tabla (caption, aria-sort,
+  «N de M»), repintado parcial del estado, pausa/reanudación de sondeos y streaming con `aria-busy`.
+  `php -l` y `node --check` limpios. **NO probado** (jsdom no calcula CSS ni lee en voz alta): contraste y
+  foco visibles reales, móvil a 320 px y zoom 200 %, NVDA, Lighthouse/axe. Pendiente en sanase-test.
+
 ## 2026-10-05 — Auditoría de UX fase 2: funcionar en cualquier plataforma (v1.31.0)
 
 Reglas en `CLAUDE.md` → «Auditoría de UX, fase 2». Toca `db/caches.php` (`chatrate`): Notificaciones. Lo que costó ver:

@@ -9,9 +9,10 @@ Every code change, however small, must bump BOTH values in `version.php`:
 - `$plugin->release` — semver string (`1.1.1` → `1.1.2`). Patch for fixes/tweaks,
   minor for new features.
 
-The release is shown as a badge next to the chat title so the user can verify which
-build is running. `chat_simple_view.php` reads `version.php` directly from disk
-(placeholder `%%PULSO_VERSION%%`), so the badge updates on deploy without running
+The release is shown as a badge next to the chat title (only to users with
+`viewanalytics`, since v1.32.0) so they can verify which build is running.
+`chat_simple_view.php` reads `version.php` directly from disk
+(placeholder `%%PULSO_VERSION_BADGE%%`), so the badge updates on deploy without running
 the Moodle upgrade. A DB upgrade (Site Administration → Notifications) is only
 needed when `db/` files change (install.xml, upgrade.php, caches.php, tasks.php…),
 but the `$plugin->version` bump is still mandatory every time.
@@ -866,8 +867,9 @@ propósito).
   de "tres botones" en el HTML ni en la capability — añadirlos es repetir este mismo
   patrón, no descomentar algo ya puesto.
 - **Es una pantalla, no un mensaje de chat.** `#pulso-create-panel` es hermano de
-  `#pulso-home` dentro de `#pulso-messages` y se alterna con una clase
-  (`pulso-showing-create` en `#pulso-messages`) que oculta todo lo demás — si el
+  `#pulso-home` dentro de `#pulso-scroll` (desde v1.32.0; `#pulso-messages` es solo el
+  registro de mensajes) y se alterna con una clase
+  (`pulso-showing-create` en `#pulso-scroll`) que oculta todo lo demás — si el
   formulario se colara como mensaje, entraría en el historial que viaja a Anthropic en
   cada petición siguiente.
 - **El desplegable tiene DOS filtros obligatorios**, los dos en
@@ -1529,6 +1531,69 @@ Reglas permanentes. Tocan `db/caches.php` (definición nueva `chatrate`): hay qu
 - **Cron parado visible**: `api_create_status` marca `delayed` si un encargo lleva > 10 min en
   `pendiente`; el panel dice «La cola de trabajos de este sitio va con retraso…». (El hueco conocido del
   429 `cuota-del-centro` también deja encargos en `pendiente`: el aviso es neutro a propósito.)
+
+## Auditoría de UX, fase 3 — estados, teclado, lector de pantalla y móvil (v1.32.0)
+
+Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php`. Sin `db/`. Reglas permanentes:
+
+- **La región en vivo es SOLO para mensajes.** `#pulso-scroll` es el contenedor con scroll y envuelve tres
+  hermanos: `#pulso-home`, `#pulso-create-panel` y `#pulso-messages` (`role="log" aria-live="polite"`, la
+  única región en vivo). La clase `pulso-showing-create` vive en `#pulso-scroll` (no en el log) y todo el
+  scroll (`pulsoScrollToEnd()`) también. Lo que se añade al chat va SIEMPRE a `#pulso-messages`; nada de la
+  home ni de Crear puede volver a colgarse de él (cada repintado se anunciaba entero). Durante una petición
+  el log lleva `aria-busy="true"` (`pulsoSetSending()` es el único sitio que toca `pulsoSending`) y la
+  burbuja de streaming va `aria-hidden` hasta la respuesta final: el lector oye la respuesta una vez. Los
+  avisos breves (estado de un encargo, «Quedan N caracteres», conexión) salen por `pulsoAnnounce()` hacia
+  `#pulso-live-status` (`role="status"`, fuera del log, con la clase de texto oculto `.pulso-sr-only`).
+- **El estado de un encargo repinta solo si cambia la pantalla.** `renderCreateStatus()` compara el encargo
+  sin `posicion` ni `timemodified` (`pulsoCreateStatusKey`); si es igual solo actualiza la píldora
+  (`#pulso-create-pill`) y la línea de progreso (`#pulso-create-progress`) y anuncia el cambio. Cualquier
+  campo nuevo del payload que cambie en cada sondeo hay que excluirlo de esa clave, o vuelve el repintado.
+- **Foco al título en cada pantalla de Crear.** El título es un `h3#pulso-create-title` con `tabindex="-1"`.
+  Al abrir (`openCreatePanel`, `openCreateGalleryItem`) se enfoca siempre; en los repintados posteriores un
+  `MutationObserver` sobre `#pulso-create-body` (solo hijos directos) lo lleva al título únicamente si el
+  foco se perdió o estaba dentro del cuerpo (`pulsoCreateScreen()`), así que nunca roba el foco a quien
+  escribe en el chat. Al cerrar, el foco vuelve a la tarjeta que lo abrió (`pulsoCreateOpener`).
+  **Una pantalla nueva de Crear = repintar `#pulso-create-body` con `innerHTML`**; una pantalla que se pinte
+  por otra vía dejaría el foco perdido.
+- **Enviar desde el chat con Crear abierto cierra Crear antes** (`closeCreatePanel({restoreFocus:false})`):
+  si no, el mensaje y su respuesta quedaban ocultos por `.pulso-showing-create` y entraban en el historial.
+  Lo mismo hace `pulsoSystemMessage()` (sustituye a los `alert()`; no hay `alert()` en el cliente).
+- **Errores con reintento.** `addErrorMessage(payload, message)` pinta SVG `aria-hidden` + «Error:» + el texto
+  por `error_code` (sin emoji) y, si el código está en `PULSO_RETRYABLE`, «Reintentar», que llama a
+  `dispatchMessage(message)` con el MISMO mensaje (sin repintar la burbuja del usuario ni tocar el cuadro).
+  Un código nuevo se declara en `PULSO_ERROR_TEXTS` y, si reenviar tiene sentido, en `PULSO_RETRYABLE`.
+- **Todo el texto del cliente va en castellano**, no por `navigator.language`. Si algún día hay multidioma,
+  el idioma sale de Moodle vía `JSINIT`.
+- **El historial de `sessionStorage` se pinta** (`pulsoRenderHistory()`, bajo «Conversación anterior»,
+  con `escapeHtmlText`: son digests de texto). `clearConversation()` también quita ese separador.
+- **Texto ≥ 0.75rem, siempre** (≈12 px): ningún `font-size` en `rem` por debajo de 0.75 ni en `px` por debajo
+  de 12; con `em` hay que contar la cadena de padres (en la tabla: 0.88em × 0.95em de 0.92rem). Botones
+  desactivados: `#72A3C4` + `#27334F` (4,63), nunca `opacity`. El cian vale para el foco
+  (`0 0 0 2px var(--pulso-cyan)`) pero sigue sin valer como color de texto.
+- **Móvil (≤ 480 px) = pantalla completa**: `inset: 0`, sin radio ni `resize`, `100dvh`,
+  `env(safe-area-inset-*)`, burbuja a 16 px del borde y objetivos táctiles de 44 px. El contenedor lleva
+  estilos en línea (px) de `toggleChat()` y del arrastre, por eso esas reglas van con `!important`; en móvil
+  no se arrastra ni se ve «Ampliar». El `min-width` del contenedor es `min(300px, 100vw − 32px)`: con un valor
+  fijo se salía por la izquierda a 320 px.
+- **Los sondeos se pausan con la pestaña oculta** (`pulsoOnVisibilityChange()`): Crear (7 s), Retos (4 s) y el
+  refresco del título del reto. Se guarda el sondeo pendiente (`pulsoCreatePollPending`,
+  `pulsoRetosPollPending`, `pulsoRetosRefreshPending`) y al volver se retoma enseguida. Un sondeo nuevo se
+  programa SIEMPRE por esos helpers (`scheduleNextCreatePoll`, `pulsoRetosSchedulePoll`,
+  `pulsoRetosScheduleRefresh`), nunca con un `setTimeout` suelto.
+- **Sin conexión**: `navigator.onLine` se mira antes de enviar (la pregunta se queda en el cuadro) y
+  `online`/`offline` muestran/ocultan el aviso persistente `#pulso-offline`.
+- **Insignia de versión solo con `viewanalytics`** (`%%PULSO_VERSION_BADGE%%` queda vacío para el alumnado).
+- **Tabla accesible**: `<caption>` (título de la respuesta, oculto), `<th scope="col" aria-sort>` con un
+  `<button class="pulso-sort-btn">` dentro (no `th onclick`) y recuento `role="status"` que dice «N de M».
+  Enlaces que abren pestaña nueva: «↗» con `aria-hidden` y `PULSO_NEWTAB_SR` («se abre en una pestaña nueva»).
+- **Teclado**: Enter con `keydown` y `!e.isComposing` (un IME confirma, no envía); Escape cierra el chat y el
+  foco vuelve a la burbuja (`aria-expanded`/`aria-controls`); «Ampliar/Reducir» (`toggleChatSize()`,
+  640 px ↔ 90 vw). El contenedor es `role="region"` (no `dialog`: no atrapa el foco). Jerarquía: `h2` en la
+  cabecera, `h3` en secciones de la home y del panel.
+- **`juego.php`**: la caja de puntuación va dentro de un `role="status" aria-live="polite"` SIEMPRE presente y
+  visible; un contenedor con `hidden` que se destapa no se anuncia.
+- `console.log` solo tras `window.pulsoDebug` (`pulsoLog()`).
 
 ## Dev notes
 

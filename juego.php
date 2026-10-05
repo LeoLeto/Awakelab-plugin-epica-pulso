@@ -174,8 +174,12 @@ echo $OUTPUT->header();
   </div>
 
   <?php if ($puntua): ?>
-    <div id="pulso-juego-score" class="pulso-juego-score" hidden>
-      Tu puntuación: <span id="pulso-juego-score-value"></span>
+    <?php // Región en vivo SIEMPRE en el DOM y visible: un contenedor con `hidden` que se
+          // destapa no se anuncia. El marcador va dentro y es lo que aparece. ?>
+    <div role="status" aria-live="polite" aria-atomic="true">
+      <div id="pulso-juego-score" class="pulso-juego-score" hidden>
+        Tu puntuación: <span id="pulso-juego-score-value"></span>
+      </div>
     </div>
   <?php endif; ?>
 

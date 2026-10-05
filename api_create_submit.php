@@ -41,22 +41,23 @@ $prompt = trim((string)required_param('prompt', PARAM_RAW));
 header('Content-Type: application/json; charset=utf-8');
 
 try {
+    \block_pulso\pulso_error::require_session();
     $course = get_course($courseid);
     $context = context_course::instance($courseid);
 
     require_login($course);
-    require_sesskey();
+    \block_pulso\pulso_error::require_sesskey();
     require_capability('block/pulso:createactivity', $context);
     chat_pipeline::check_enabled($courseid);
 
     if (!in_array($tool, [creation_quota::TOOL_INFOGRAFIA, creation_quota::TOOL_GAMIFICACION], true)) {
-        throw new \Exception('Herramienta de creación no reconocida.');
+        throw new \block_pulso\pulso_error('bad_request', 'Herramienta de creación no reconocida.');
     }
     if (!$isjuego && !in_array($format, creation_quota::FORMATS, true)) {
-        throw new \Exception('Formato de infografía no reconocido.');
+        throw new \block_pulso\pulso_error('bad_request', 'Formato de infografía no reconocido.');
     }
     if ($prompt === '') {
-        throw new \Exception($isjuego
+        throw new \block_pulso\pulso_error('bad_request', $isjuego
             ? 'Describe qué juego quieres antes de enviarlo.'
             : 'Describe qué infografía quieres antes de enviarla.');
     }
@@ -78,7 +79,7 @@ try {
         }
     }
     if ($resource === null) {
-        throw new \Exception('Ese recurso ya no está disponible para generar contenido con Pulse.');
+        throw new \block_pulso\pulso_error('bad_request', 'Ese recurso ya no está disponible para generar contenido con Pulse.');
     }
 
     // Candado por usuario alrededor de "comprobar cupo + insertar": sin el, dos
@@ -92,7 +93,7 @@ try {
         $lock = null; // Sin factoria de candados: se sigue sin proteccion extra.
     }
     if ($lock === false) {
-        throw new \Exception('Ya tienes un encargo en marcha. Espera un momento antes de enviar otro.');
+        throw new \block_pulso\pulso_error('busy', 'Ya tienes un encargo en marcha. Espera un momento antes de enviar otro.', 409);
     }
     try {
         $quota = creation_quota::check_general_quota($courseid, $userid, $isteacher);
@@ -100,7 +101,8 @@ try {
             $quota = creation_quota::check_section_quota($courseid, $userid, (int)$resource['sectionnum']);
         }
         if (!$quota['allowed']) {
-            throw new \Exception($quota['reason']);
+            // $quota['reason'] es texto escrito por nosotros (creation_quota), apto para la persona.
+            throw new \block_pulso\pulso_error('quota', (string)$quota['reason'], 400);
         }
 
         $encargoid = creation_quota::record_encargo(
@@ -125,9 +127,6 @@ try {
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (\Throwable $e) {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage(),
-    ], JSON_UNESCAPED_UNICODE);
+    // Texto para persona + error_code; el detalle tecnico va solo a error_log.
+    \block_pulso\pulso_error::send_json($e, 'api_create_submit', $courseid);
 }

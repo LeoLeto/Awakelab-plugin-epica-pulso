@@ -33,14 +33,15 @@ header('Content-Type: application/json; charset=utf-8');
 
 try {
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-        throw new \Exception('Método no permitido.');
+        throw new \block_pulso\pulso_error('bad_request', 'Método no permitido.', 405);
     }
 
+    \block_pulso\pulso_error::require_session();
     $course = get_course($courseid);
     $context = context_course::instance($courseid);
 
     require_login($course);
-    require_sesskey();
+    \block_pulso\pulso_error::require_sesskey();
     require_capability('block/pulso:createactivity', $context);
     chat_pipeline::check_enabled($courseid);
 
@@ -56,7 +57,7 @@ try {
         }
     }
     if (!$found) {
-        throw new \Exception('Ese recurso ya no está disponible para ampliar con Pulse.');
+        throw new \block_pulso\pulso_error('bad_request', 'Ese recurso ya no está disponible para ampliar con Pulse.');
     }
 
     // Como el chat: soltar el candado de sesion antes de las llamadas externas
@@ -77,9 +78,6 @@ try {
     ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
 
 } catch (\Throwable $e) {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage(),
-    ], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    // Texto para persona + error_code; el detalle tecnico va solo a error_log.
+    \block_pulso\pulso_error::send_json($e, 'api_ampliacion', $courseid);
 }

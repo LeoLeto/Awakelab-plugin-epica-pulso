@@ -58,6 +58,14 @@ class epica_client {
      */
     const CAPABILITY_ROL = 'block/pulso:viewanalytics';
 
+    /**
+     * Motivos de fallo que ve la persona (panel y notificacion): texto para
+     * persona, sin nombres de plugin, codigos HTTP ni detalle de Epica. El
+     * detalle va a error_log en cada sitio donde se usan.
+     */
+    const MOTIVO_SERVICIO_NO_DISPONIBLE = 'El servicio de generación no está disponible ahora mismo. Avisa a quien administre Moodle.';
+    const MOTIVO_SERVICIO_RECHAZO = 'El servicio de generación no ha podido atender el encargo. Prueba a crear uno nuevo más tarde.';
+
     const RUTA_ENCARGAR_LAMINA = '/api/moodle/laminas/encargar';
     const RUTA_ENCARGO_LAMINA  = '/api/moodle/laminas/encargo';
     const RUTA_ENCARGAR_JUEGO = '/api/moodle/juegos/encargar';
@@ -131,7 +139,8 @@ class epica_client {
         $course = get_course((int)$encargo->courseid);
         $textrow = full_text_store::get_resource_text((int)$encargo->courseid, (int)$encargo->cmid);
         if ($textrow === null) {
-            self::marcar_fallo($encargo, 'El recurso ya no tiene contenido disponible para generar la infografía.');
+            self::marcar_fallo($encargo, 'El recurso ya no tiene contenido disponible para generar '
+                . ((string)$encargo->tool === creation_quota::TOOL_GAMIFICACION ? 'el juego' : 'la infografía') . '.');
             return ['requeue' => false, 'delay' => 0];
         }
 
@@ -162,7 +171,8 @@ class epica_client {
         }
 
         if (!class_exists('\local_awkepica\epica')) {
-            self::marcar_fallo($encargo, 'local_awkepica no está disponible en este sitio.');
+            error_log("Pulso Epica: encargo {$encargo->id}: local_awkepica no esta disponible en este sitio.");
+            self::marcar_fallo($encargo, self::MOTIVO_SERVICIO_NO_DISPONIBLE);
             return ['requeue' => false, 'delay' => 0];
         }
 
@@ -192,7 +202,9 @@ class epica_client {
 
         if ($httpcode === 202) {
             if (empty($data['trabajo'])) {
-                self::marcar_fallo($encargo, 'Épica respondió 202 al encargar sin identificador de trabajo.');
+                // El detalle al log; al alumno, un motivo para persona.
+                error_log("Pulso Epica: encargo {$encargo->id}: 202 al encargar sin identificador de trabajo.");
+                self::marcar_fallo($encargo, self::MOTIVO_SERVICIO_RECHAZO);
                 return ['requeue' => false, 'delay' => 0];
             }
             $posicion = (int)($data['posicion'] ?? 0);
@@ -240,11 +252,13 @@ class epica_client {
      */
     public static function precondiciones_error(?\stdClass $user): ?string {
         if (!\local_awkepica\epica::configurado()) {
-            return 'local_awkepica no tiene configurada la plataforma o el secreto en este sitio.';
+            error_log('Pulso Epica: local_awkepica no tiene configurada la plataforma o el secreto en este sitio.');
+            return self::MOTIVO_SERVICIO_NO_DISPONIBLE;
         }
         $urlerror = self::base_url_error();
         if ($urlerror !== null) {
-            return $urlerror;
+            error_log('Pulso Epica: ' . $urlerror);
+            return self::MOTIVO_SERVICIO_NO_DISPONIBLE;
         }
         if (empty($user) || empty($user->email)) {
             return 'El usuario que hizo el encargo no tiene correo electrónico configurado.';
@@ -277,7 +291,10 @@ class epica_client {
             return ['requeue' => true, 'delay' => $espera];
         }
 
-        self::marcar_fallo($encargo, $motivo !== '' ? $motivo : "Épica devolvió {$httpcode} al encargar.", $data['traza'] ?? null);
+        if ($motivo === '') {
+            error_log("Pulso Epica: encargo {$encargo->id}: Epica devolvio HTTP {$httpcode} al encargar sin motivo.");
+        }
+        self::marcar_fallo($encargo, $motivo !== '' ? $motivo : self::MOTIVO_SERVICIO_RECHAZO, $data['traza'] ?? null);
         return ['requeue' => false, 'delay' => 0];
     }
 
@@ -301,7 +318,8 @@ class epica_client {
         }
 
         if (!class_exists('\local_awkepica\epica')) {
-            self::marcar_fallo($encargo, 'local_awkepica no está disponible en este sitio.');
+            error_log("Pulso Epica: encargo {$encargo->id}: local_awkepica no esta disponible en este sitio.");
+            self::marcar_fallo($encargo, self::MOTIVO_SERVICIO_NO_DISPONIBLE);
             return ['requeue' => false, 'delay' => 0];
         }
 
@@ -403,7 +421,10 @@ class epica_client {
             return ['requeue' => true, 'delay' => $espera];
         }
 
-        self::marcar_fallo($encargo, $motivo !== '' ? $motivo : "Épica devolvió {$httpcode} al sondear.", $data['traza'] ?? null);
+        if ($motivo === '') {
+            error_log("Pulso Epica: encargo {$encargo->id}: Epica devolvio HTTP {$httpcode} al sondear sin motivo.");
+        }
+        self::marcar_fallo($encargo, $motivo !== '' ? $motivo : self::MOTIVO_SERVICIO_RECHAZO, $data['traza'] ?? null);
         return ['requeue' => false, 'delay' => 0];
     }
 

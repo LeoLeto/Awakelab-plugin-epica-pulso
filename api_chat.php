@@ -29,6 +29,7 @@ require_once(__DIR__ . '/classes/chat_pipeline.php');
 use block_pulso\chat_pipeline;
 use block_pulso\anthropic_connector;
 use block_pulso\system_prompt_designer;
+use block_pulso\pulso_error;
 
 $courseid = optional_param('courseid', 0, PARAM_INT);
 // PARAM_RAW no acota longitud: el tope real se aplica en servidor.
@@ -51,31 +52,33 @@ try {
     // VALIDACIONES BÁSICAS
     // ============================================================
 
+    // Una sesion caducada es lo primero que hay que decir, antes de cualquier
+    // otro fallo (curso, pregunta vacia...): el cliente enseña «Tu sesion ha
+    // caducado» y no reintenta.
+    pulso_error::require_session();
+
     if (empty($courseid) || $courseid <= 0) {
-        throw new Exception('Invalid courseid provided');
+        throw new pulso_error('bad_request');
     }
     if (empty($user_query)) {
-        throw new Exception('Empty query provided');
+        throw new pulso_error('bad_request');
     }
 
     $course = get_course($courseid);
-    if (!$course) {
-        throw new Exception('Course not found');
-    }
 
     // Orden obligatorio: autenticar -> validar sesskey -> permisos -> estado del
     // plugin (mismo criterio que api_chat_stream.php). require_sesskey() cierra
     // el CSRF: sin el, una web externa podia disparar consultas —y gasto de
     // tokens— con la sesion del profesor.
     require_login($course);
-    require_sesskey();
+    pulso_error::require_sesskey();
 
     // T2.6.2: Verificar permisos del usuario. El permiso mínimo es 'usechat'
     // (preguntas de contenido, lo tienen los alumnos); la analítica exige
     // 'viewanalytics'.
     $context = context_course::instance($courseid);
     if (!has_capability('block/pulso:usechat', $context)) {
-        throw new Exception('You do not have permission to use this feature');
+        throw new pulso_error('access', '', 403);
     }
     $isteacher = chat_pipeline::user_can_view_analytics($courseid);
 
@@ -176,7 +179,7 @@ try {
     );
 
     if (!$ai_response) {
-        throw new Exception('No response from Anthropic API');
+        throw new \moodle_exception('error_empty_response', 'block_pulso', '', '', 'Empty response from Anthropic connector');
     }
 
     // ============================================================
@@ -243,19 +246,11 @@ try {
     ];
 
 } catch (\Throwable $e) {
-    // Manejo de errores. El detalle técnico (debuginfo) va solo al log del
-    // servidor, no al cliente.
-    http_response_code(500);
-    if ($e instanceof \moodle_exception && !empty($e->debuginfo)) {
-        error_log('block_pulso api_chat error: ' . $e->debuginfo);
-    }
-    $response = [
-        'success' => false,
-        'message' => 'Error: ' . $e->getMessage(),
-        'answer' => null,
-        'tokens_used' => 0,
-        'error_code' => get_class($e)
-    ];
+    // Texto para persona + error_code estable (el cliente elige el texto por el
+    // codigo, nunca por el mensaje). El detalle tecnico va solo a error_log.
+    [$status, $payload] = pulso_error::to_response($e, 'api_chat', (int)$courseid);
+    http_response_code($status);
+    $response = $payload + ['answer' => null, 'tokens_used' => 0];
 }
 
 // Enviar respuesta JSON

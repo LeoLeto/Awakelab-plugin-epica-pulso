@@ -5563,22 +5563,48 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // que en el QA de 1.15.2 mostró "Error: No success flag" — un literal de
         // desarrollador que no le dice nada a nadie.
         //
-        // El detalle del servidor solo se añade cuando es un error de verdad. Con
-        // success:true (respuesta vacía) el 'message' del payload es "Query procesado
-        // exitosamente", que como texto de error no tiene sentido; y el prefijo
-        // "Error:" que ya pone el servidor se quita para no pintar "Error: Error: ...".
+        // El texto se elige por `error_code` (estable, lo manda el servidor), NUNCA por
+        // `message`: el mensaje del servidor es para quien consuma la API y ya no se
+        // pinta nunca — antes se añadía como «Detalle: …» y llegaban a la pantalla
+        // textos crudos de Anthropic/OpenAI. Solo se añade `detail` (causa genérica
+        // escrita por nosotros), y el servidor lo manda únicamente a profesorado/admin.
+        const PULSO_ERROR_TEXTS = {
+            es: {
+                busy: 'Pulse está muy ocupado ahora mismo. Prueba en un minuto.',
+                config: 'Pulse no está disponible ahora mismo. Avisa a tu profesorado.',
+                network: 'Se ha cortado la conexión. Vuelve a intentarlo.',
+                session: 'Tu sesión ha caducado. Recarga la página.',
+                access: 'No tienes acceso a Pulse en este curso.',
+                disabled: 'Pulse está desactivado en este curso.',
+                bad_request: 'No se ha podido entender la petición. Escribe otra pregunta e inténtalo de nuevo.',
+                empty: 'Pulse no ha podido responder esta vez. Vuelve a intentarlo.',
+                refusal: 'Pulse no puede responder a esta petición. Prueba a reformular la pregunta.',
+                encoding: 'No se ha podido preparar la petición. Empieza una conversación nueva («Nueva conversación») e inténtalo de nuevo.',
+                unknown: 'Algo ha fallado. Vuelve a intentarlo en un momento; si sigue igual, pulsa «Nueva conversación».'
+            },
+            en: {
+                busy: 'Pulse is very busy right now. Try again in a minute.',
+                config: 'Pulse is not available right now. Let your teacher know.',
+                network: 'The connection was cut. Please try again.',
+                session: 'Your session has expired. Reload the page.',
+                access: 'You do not have access to Pulse in this course.',
+                disabled: 'Pulse is disabled in this course.',
+                bad_request: 'That request is not valid. Write another question and try again.',
+                empty: 'Pulse could not answer this time. Please try again.',
+                refusal: 'Pulse cannot answer this request. Try rephrasing your question.',
+                encoding: 'The request could not be prepared. Start a new conversation ("Nueva conversación") and try again.',
+                unknown: 'Something went wrong. Try again in a moment; if it keeps happening, press "Nueva conversación".'
+            }
+        };
+
         function pulsoFailureMessage(payload) {
             const lang = navigator.language.startsWith('en') ? 'en' : 'es';
-            const raw = (payload && typeof payload.message === 'string') ? payload.message : '';
-            const detail = raw.replace(/^(?:\s*error\s*:\s*)+/i, '').trim();
-            const useDetail = detail !== '' && !(payload && payload.success === true);
-            let text = lang === 'en'
-                ? '⚠️ I could not complete the answer. Try again in a few seconds; if it happens again, '
-                    + 'press "Nueva conversación" and ask once more.'
-                : '⚠️ No he podido completar la respuesta. Inténtalo de nuevo en unos segundos; si vuelve a '
-                    + 'pasar, pulsa «Nueva conversación» y repite la pregunta.';
-            if (useDetail) {
-                text += (lang === 'en' ? ' Detail: ' : ' Detalle: ') + detail;
+            const texts = PULSO_ERROR_TEXTS[lang];
+            const code = (payload && typeof payload.error_code === 'string') ? payload.error_code : '';
+            let text = '⚠️ ' + (Object.prototype.hasOwnProperty.call(texts, code) ? texts[code] : texts.unknown);
+            const detail = (payload && typeof payload.detail === 'string') ? payload.detail.trim() : '';
+            if (detail !== '') {
+                text += ' ' + detail;
             }
             return text;
         }
@@ -5773,8 +5799,23 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             })
             .then(function(res) {
                 const ct = res.headers.get('content-type') || '';
-                if (!res.ok || !res.body || ct.indexOf('text/event-stream') === -1) {
-                    throw new Error('stream-unavailable');
+                if (ct.indexOf('text/event-stream') === -1) {
+                    // El servidor rechazó la petición ANTES de abrir el stream (sesión
+                    // caducada, sesskey, permiso, curso desactivado...) con un JSON
+                    // {success:false, error_code}. Se lee con CUALQUIER código HTTP y NO se
+                    // reintenta por el endpoint clásico: fallaría igual y duplicaría la
+                    // petición. El fallback queda solo para 404/405 y fallos de red.
+                    if (res.status === 404 || res.status === 405 || !res.body) {
+                        throw new Error('stream-unavailable');
+                    }
+                    return res.text().then(function(body) {
+                        let data = null;
+                        try { data = JSON.parse(body); } catch (err) { data = null; }
+                        gotFinal = true;
+                        showLoading(false);
+                        removeStreamBubble();
+                        handleChatResponse(message, (data && typeof data === 'object') ? data : {success: false});
+                    });
                 }
                 const reader = res.body.getReader();
                 const decoder = new TextDecoder();
@@ -5830,18 +5871,18 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     showLoading(false);
                     console.log('📡 AJAX Status:', xhr.status);
 
-                    if (xhr.status === 200) {
-                        try {
-                            const response = JSON.parse(xhr.responseText);
-                            handleChatResponse(message, response);
-                        } catch (e) {
-                            console.error('❌ JSON Parse Error:', e.message);
-                            console.error('❌ Raw response was:', xhr.responseText);
-                            addMessage('⚠️ Error procesando respuesta: ' + e.message, 'ai');
-                        }
+                    // El cuerpo se lee con cualquier código: el servidor contesta 4xx/5xx
+                    // con {success:false, error_code} y el texto se elige por ese código.
+                    let response = null;
+                    try {
+                        response = JSON.parse(xhr.responseText);
+                    } catch (e) {
+                        console.error('❌ Respuesta no JSON (HTTP ' + xhr.status + '):', xhr.responseText);
+                    }
+                    if (response && typeof response === 'object') {
+                        handleChatResponse(message, response);
                     } else {
-                        console.error('❌ HTTP Error:', xhr.status);
-                        addMessage('⚠️ Error de conexión (HTTP ' + xhr.status + ')', 'ai');
+                        addMessage(pulsoFailureMessage({error_code: xhr.status === 0 ? 'network' : 'unknown'}), 'ai');
                     }
                 }
             };

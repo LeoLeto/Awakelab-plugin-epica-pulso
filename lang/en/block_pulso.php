@@ -53,7 +53,7 @@ $string['coursecontrol_heading'] = 'Course Control';
 $string['coursecontrol_heading_desc'] = 'Control whether Pulse is enabled by default for all courses.';
 $string['enabled_by_default'] = 'Enabled by default';
 $string['enabled_by_default_desc'] = 'If checked, Pulse will be active on all courses unless explicitly disabled per course.';
-$string['plugin_disabled_course'] = 'Pulse AI is not enabled for this course.';
+$string['plugin_disabled_course'] = 'Pulse is disabled in this course.';
 
 // === T2.6.2: Data access permission controls ===
 $string['pulso:viewanalytics'] = 'View Pulse analytics data';
@@ -135,3 +135,22 @@ $string['epica_dry_run_desc'] = 'When enabled, the task builds the full request 
 
 // === Epica cycle: status panel + notification (v1.20.0) ===
 $string['messageprovider:epica_encargo'] = 'A creation request (infographic) is ready or failed';
+
+// === User-facing chat/endpoint errors (v1.30.0) — chosen by a stable error_code, never by API text ===
+$string['err_busy'] = 'Pulse is very busy right now. Try again in a minute.';
+$string['err_config'] = 'Pulse is not available right now. Let your teacher know.';
+$string['err_network'] = 'The connection was cut. Please try again.';
+$string['err_session'] = 'Your session has expired. Reload the page.';
+$string['err_access'] = 'You do not have access to Pulse in this course.';
+$string['err_disabled'] = 'Pulse is disabled in this course.';
+$string['err_bad_request'] = 'That request is not valid. Write another question and try again.';
+$string['err_empty'] = 'Pulse could not answer this time. Please try again.';
+$string['err_refusal'] = 'Pulse cannot answer this request. Try rephrasing your question.';
+$string['err_encoding'] = 'The request could not be prepared. Start a new conversation ("Nueva conversación") and try again.';
+$string['err_unknown'] = 'Something went wrong. Try again in a moment; if it keeps happening, press "Nueva conversación".';
+$string['err_detail_nokey_anthropic'] = 'The Anthropic API key is not configured.';
+$string['err_detail_nokey_openai'] = 'The OpenAI API key is not configured.';
+$string['err_detail_badkey'] = 'The Anthropic API key is not valid or lacks permission.';
+$string['err_detail_nocredit'] = 'The Anthropic account has no credit left.';
+$string['err_detail_badmodel'] = 'The configured model does not exist or is not available.';
+$string['err_detail_rejected'] = 'The AI service rejected the request (configuration or model). Check the server log.';

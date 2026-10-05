@@ -22,6 +22,7 @@ require_once(__DIR__ . '/data_retriever.php');
 require_once(__DIR__ . '/anthropic_connector.php');
 require_once(__DIR__ . '/system_prompt_designer.php');
 require_once(__DIR__ . '/rag_retriever.php');
+require_once(__DIR__ . '/pulso_error.php');
 
 class chat_pipeline {
 
@@ -78,7 +79,7 @@ class chat_pipeline {
             $is_enabled = ($default_enabled === false) ? true : (bool)$default_enabled;
         }
         if (!$is_enabled) {
-            throw new \Exception('Pulso is disabled for this course');
+            throw new pulso_error('disabled', '', 403);
         }
     }
 
@@ -629,7 +630,6 @@ class chat_pipeline {
     }
 
     /**
-    /**
      * Diagnóstico RAG apto para el cliente: solo con `viewanalytics`. Lleva los
      * nombres de los fragmentos recuperados y el estado interno del índice, que un
      * alumno no necesita ni debe ver.
@@ -642,6 +642,7 @@ class chat_pipeline {
         return $isteacher ? $diagnostics : [];
     }
 
+    /**
      * Preparar historial de conversación (T2.5.3): merge cliente/sesión,
      * validación de estructura, truncado y filtro de contradicciones RAG.
      *

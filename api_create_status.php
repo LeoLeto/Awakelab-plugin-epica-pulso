@@ -177,13 +177,14 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
 }
 
 try {
+    // Mismo orden que los demás endpoints del plugin: autenticar -> sesskey
+    // -> permisos -> estado del plugin.
+    \block_pulso\pulso_error::require_session();
     $course = get_course($courseid);
     $context = context_course::instance($courseid);
 
-    // Mismo orden que los demás endpoints del plugin: autenticar -> sesskey
-    // -> permisos -> estado del plugin.
     require_login($course);
-    require_sesskey();
+    \block_pulso\pulso_error::require_sesskey();
     require_capability('block/pulso:createactivity', $context);
     chat_pipeline::check_enabled($courseid);
 
@@ -194,12 +195,12 @@ try {
     if ($encargoid > 0) {
         $encargo = $DB->get_record('block_pulso_encargos', ['id' => $encargoid]);
         if (!$encargo || (int)$encargo->courseid !== $courseid) {
-            throw new \Exception('Ese encargo no existe.');
+            throw new \block_pulso\pulso_error('bad_request', 'Ese encargo no existe.', 404);
         }
 
         $isowner = (int)$encargo->userid === $userid;
         if (!$isowner && !$canviewanalytics) {
-            throw new \Exception('No tienes acceso a ese encargo.');
+            throw new \block_pulso\pulso_error('access', 'No tienes acceso a ese encargo.', 403);
         }
 
         echo json_encode([
@@ -240,9 +241,6 @@ try {
     }
 
 } catch (\Throwable $e) {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage(),
-    ], JSON_UNESCAPED_UNICODE);
+    // Texto para persona + error_code; el detalle tecnico va solo a error_log.
+    \block_pulso\pulso_error::send_json($e, 'api_create_status', $courseid);
 }

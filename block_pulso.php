@@ -34,15 +34,21 @@ class block_pulso extends block_base {
             $is_enabled = ($default_enabled === false) ? true : (bool)$default_enabled;
         }
 
+        // Pulse desactivado: el bloque no aparece, salvo para quien puede editar
+        // el curso, que ve una línea para saber por qué (no es un error para el
+        // resto de personas, y un mensaje en inglés a todo el mundo era ruido).
         if (!$is_enabled) {
-            $this->content->text = get_string('plugin_disabled_course', 'block_pulso');
+            $this->content->text = has_capability('moodle/course:update', $context)
+                ? html_writer::div(get_string('plugin_disabled_course', 'block_pulso'), 'text-muted small')
+                : '';
             return $this->content;
         }
 
         // Permiso mínimo: usar el chat para preguntas de contenido (lo tienen
-        // también los alumnos). Sin él, el chat no se renderiza.
+        // también los alumnos). Sin él, el bloque no aparece y no se explica
+        // nada: quien no puede usarlo no necesita un aviso de permisos.
         if (!has_capability('block/pulso:usechat', $context)) {
-            $this->content->text = get_string('error_no_permission', 'block_pulso');
+            $this->content->text = '';
             return $this->content;
         }
 

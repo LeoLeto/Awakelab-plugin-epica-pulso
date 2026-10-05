@@ -25,6 +25,7 @@ defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/full_text_store.php');
 require_once(__DIR__ . '/anthropic_connector.php');
+require_once(__DIR__ . '/pulso_error.php');
 
 class ampliacion_service {
 
@@ -90,7 +91,7 @@ class ampliacion_service {
     public static function obtener(int $courseid, int $cmid, int $userid): array {
         $res = full_text_store::get_resource_text($courseid, $cmid);
         if ($res === null) {
-            throw new \Exception('Ese recurso ya no tiene texto aprovechable para ampliar.');
+            throw new pulso_error('bad_request', 'Ese recurso ya no tiene texto aprovechable para ampliar.');
         }
         $hash = (string)$res['content_hash'];
 
@@ -101,7 +102,7 @@ class ampliacion_service {
 
         $have = self::configured();
         if (!$have['youtube'] && !$have['openalex']) {
-            throw new \Exception('La ampliación de recursos no está configurada en este sitio.');
+            throw new pulso_error('config', 'La ampliación de recursos no está configurada en este sitio.', 503);
         }
 
         // Un candado por recurso: si dos personas lo piden a la vez, solo la
@@ -114,7 +115,7 @@ class ampliacion_service {
             $lock = null;
         }
         if ($lock === false) {
-            throw new \Exception('Otra persona está generando esta ampliación ahora mismo. Inténtalo de nuevo en unos segundos.');
+            throw new pulso_error('busy', 'Otra persona está generando esta ampliación ahora mismo. Inténtalo de nuevo en unos segundos.', 409);
         }
 
         try {
@@ -164,8 +165,8 @@ class ampliacion_service {
         $sitelimit = (int)self::cfg('ampliacion_max_dia_sitio', 80);
         $siteused = $DB->count_records_select(self::TABLE, 'timecreated >= :since', ['since' => $midnight]);
         if ($siteused >= $sitelimit) {
-            throw new \Exception('Hoy se ha alcanzado el límite de ampliaciones nuevas del sitio. '
-                . 'Las ya generadas siguen disponibles; las nuevas se podrán pedir mañana.');
+            throw new pulso_error('quota', 'Hoy se ha alcanzado el límite de ampliaciones nuevas del sitio. '
+                . 'Las ya generadas siguen disponibles; las nuevas se podrán pedir mañana.', 429);
         }
 
         $userlimit = (int)self::cfg('ampliacion_max_dia_usuario', 5);
@@ -175,8 +176,8 @@ class ampliacion_service {
             ['userid' => $userid, 'since' => $midnight]
         );
         if ($userused >= $userlimit) {
-            throw new \Exception("Has llegado a tu límite de ampliaciones nuevas de hoy ({$userlimit}). "
-                . 'Las ya generadas siguen disponibles; vuelve mañana para pedir otras.');
+            throw new pulso_error('quota', "Has llegado a tu límite de ampliaciones nuevas de hoy ({$userlimit}). "
+                . 'Las ya generadas siguen disponibles; vuelve mañana para pedir otras.', 429);
         }
     }
 
@@ -189,12 +190,16 @@ class ampliacion_service {
         try {
             $topic = self::generate_topic((string)$res['module_name'], $sectionname, (string)$res['texto'], $langcode);
         } catch (\Throwable $e) {
-            $motivo = 'No se pudo identificar el tema del recurso: ' . self::scrub($e->getMessage());
+            // El detalle (puede traer codigos HTTP o texto de la API) va al log;
+            // al usuario y a la fila, un motivo para persona.
+            error_log('block_pulso ampliacion: tema no identificado (curso ' . $courseid . ', cm ' . $cmid . '): '
+                . self::scrub($e->getMessage()));
+            $motivo = 'No hemos podido identificar el tema de este recurso ahora mismo.';
             self::save($courseid, $cmid, $hash, $userid, [
                 'status' => self::STATUS_FALLADO,
                 'motivo' => $motivo,
             ]);
-            throw new \Exception($motivo);
+            throw new pulso_error('busy', $motivo, 503);
         }
 
         // 2. Fuentes externas, independientes: si falla solo una, la otra se guarda.
@@ -211,8 +216,9 @@ class ampliacion_service {
                     $avisos[] = self::NOT_RELATED_VIDEOS;
                 }
             } catch (\Throwable $e) {
-                $errores[] = self::scrub($e->getMessage());
-                $avisos[] = 'No se pudieron obtener vídeos en este momento.';
+                $errores[] = 'youtube';
+                error_log('block_pulso ampliacion: busqueda de videos fallida: ' . self::scrub($e->getMessage()));
+                $avisos[] = 'No hemos podido buscar vídeos ahora mismo.';
             }
         } else {
             $avisos[] = 'Los vídeos no están disponibles: falta configurar YouTube en el sitio.';
@@ -225,8 +231,9 @@ class ampliacion_service {
                     $avisos[] = self::NOT_RELATED_ARTICLES;
                 }
             } catch (\Throwable $e) {
-                $errores[] = self::scrub($e->getMessage());
-                $avisos[] = 'No se pudieron obtener artículos en este momento.';
+                $errores[] = 'openalex';
+                error_log('block_pulso ampliacion: busqueda de articulos fallida: ' . self::scrub($e->getMessage()));
+                $avisos[] = 'No hemos podido buscar artículos ahora mismo.';
             }
         } else {
             $avisos[] = 'Los artículos no están disponibles: falta configurar OpenAlex en el sitio.';
@@ -235,7 +242,8 @@ class ampliacion_service {
         // 3. "fallado" solo si NINGUNA fuente configurada respondio.
         $configured = ($have['youtube'] ? 1 : 0) + ($have['openalex'] ? 1 : 0);
         if (count($errores) >= $configured) {
-            $motivo = 'No se pudieron consultar las fuentes externas: ' . implode('; ', $errores);
+            // $errores solo lleva marcadores ('youtube'/'openalex'); el detalle ya esta en el log.
+            $motivo = 'No hemos podido buscar vídeos ni artículos ahora mismo.';
             self::save($courseid, $cmid, $hash, $userid, [
                 'status' => self::STATUS_FALLADO,
                 'tema' => $topic['tema'],
@@ -243,7 +251,7 @@ class ampliacion_service {
                 'query_articulos' => $topic['query_articulos'],
                 'motivo' => $motivo,
             ]);
-            throw new \Exception($motivo);
+            throw new pulso_error('busy', $motivo, 503);
         }
 
         // Los avisos de un "listo" viajan en "motivo" (una linea por aviso)
@@ -816,8 +824,10 @@ class ampliacion_service {
      */
     private static function from_row(\stdClass $row, bool $cached): array {
         if ($row->status !== self::STATUS_LISTO) {
-            throw new \Exception((string)($row->motivo ?: 'No se pudo generar la ampliación de este recurso.')
-                . ' Se volverá a intentar pasada una hora.');
+            // Texto fijo, NO el motivo guardado: las filas anteriores a v1.30.0 pueden
+            // llevar codigos HTTP y mensajes de las APIs externas.
+            throw new pulso_error('busy', 'No hemos podido generar la ampliación de este recurso ahora mismo. '
+                . 'Se volverá a intentar pasada una hora.', 503);
         }
         $videos = $row->videos_json ? json_decode($row->videos_json, true) : [];
         $articulos = $row->articulos_json ? json_decode($row->articulos_json, true) : [];

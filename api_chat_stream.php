@@ -10,7 +10,7 @@
  *   delta     → {text: '...'}                        fragmento de respuesta
  *   final     → {...}  mismo shape JSON que api_chat.php (respuesta completa)
  *   followups → {questions: [...]}                   sugerencias (diferidas)
- *   error     → {message: '...'}
+ *   error     → {error_code, message, detail?}   (texto para persona; ver pulso_error)
  *
  * @package    block_pulso
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -29,6 +29,7 @@ require_once(__DIR__ . '/classes/chat_pipeline.php');
 use block_pulso\chat_pipeline;
 use block_pulso\anthropic_connector;
 use block_pulso\system_prompt_designer;
+use block_pulso\pulso_error;
 
 $courseid = optional_param('courseid', 0, PARAM_INT);
 // PARAM_RAW no acota longitud: el tope real se aplica en servidor.
@@ -37,21 +38,23 @@ $conversation_history = optional_param('conversation_history', '[]', PARAM_RAW);
 
 // ============================================================
 // FASE 1: Validaciones ANTES de abrir el stream SSE.
-// Si algo falla aquí, respondemos JSON normal — el cliente detecta
-// que no es text/event-stream y hace fallback al endpoint clásico.
+// Si algo falla aquí, respondemos JSON 4xx {success:false, error_code, message}.
+// El cliente lo lee con cualquier código y NO reintenta por el endpoint clásico:
+// el clásico volvería a fallar igual (sesión, sesskey, permiso...) y el fallback
+// duplicaba la petición. Solo cae al clásico ante fallo de red o 404/405.
 // ============================================================
 try {
+    // Una sesion caducada es lo primero que hay que decir.
+    pulso_error::require_session();
+
     if (empty($courseid) || $courseid <= 0) {
-        throw new Exception('Invalid courseid provided');
+        throw new pulso_error('bad_request');
     }
     if (empty($user_query)) {
-        throw new Exception('Empty query provided');
+        throw new pulso_error('bad_request');
     }
 
     $course = get_course($courseid);
-    if (!$course) {
-        throw new Exception('Course not found');
-    }
 
     // Orden obligatorio: autenticar -> validar sesskey -> permisos -> estado del
     // plugin. check_enabled() iba ANTES de require_login(), asi que un anonimo
@@ -59,25 +62,23 @@ try {
     // cualquier web externa podia forzar peticiones (y gasto de tokens) con la
     // sesion del profesor.
     require_login($course);
-    require_sesskey();
+    pulso_error::require_sesskey();
 
     // Permiso mínimo: 'usechat' (contenido, también alumnos). La analítica
     // sigue exigiendo 'viewanalytics'.
     $context = context_course::instance($courseid);
     if (!has_capability('block/pulso:usechat', $context)) {
-        throw new Exception('You do not have permission to use this feature');
+        throw new pulso_error('access', '', 403);
     }
     $isteacher = chat_pipeline::user_can_view_analytics($courseid);
 
     chat_pipeline::check_enabled($courseid);
 } catch (\Throwable $e) {
+    // 4xx con JSON (nunca 5xx en esta fase: son fallos de la peticion, no del servidor).
+    [$status, $payload] = pulso_error::to_response($e, 'api_chat_stream', (int)$courseid);
     header('Content-Type: application/json; charset=utf-8');
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error: ' . $e->getMessage(),
-        'answer' => null
-    ], JSON_UNESCAPED_UNICODE);
+    http_response_code($status >= 500 ? 400 : $status);
+    echo json_encode($payload + ['answer' => null], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -261,14 +262,9 @@ try {
     }
 
 } catch (\Throwable $e) {
-    // El detalle técnico (debuginfo) va solo al log del servidor, no al cliente.
-    if ($e instanceof \moodle_exception && !empty($e->debuginfo)) {
-        error_log('block_pulso api_chat_stream error: ' . $e->debuginfo);
-    }
-    pulso_sse('error', [
-        'message' => 'Error: ' . $e->getMessage(),
-        'error_code' => get_class($e)
-    ]);
+    // Texto para persona + error_code estable; el detalle tecnico va solo a error_log.
+    [, $payload] = pulso_error::to_response($e, 'api_chat_stream', (int)$courseid);
+    pulso_sse('error', $payload);
 }
 
 exit;

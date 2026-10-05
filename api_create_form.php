@@ -23,6 +23,7 @@ require_once(__DIR__ . '/classes/creation_quota.php');
 
 use block_pulso\chat_pipeline;
 use block_pulso\creation_quota;
+use block_pulso\pulso_error;
 
 $courseid = required_param('courseid', PARAM_INT);
 // 'ampliacion' y 'retos' no pasan por los cupos de encargos de Epica (cada una tiene
@@ -32,13 +33,14 @@ $skipquota = in_array(optional_param('tool', '', PARAM_ALPHA), ['ampliacion', 'r
 header('Content-Type: application/json; charset=utf-8');
 
 try {
+    // Mismo orden que los demás endpoints del plugin: autenticar -> sesskey ->
+    // permisos -> estado del plugin.
+    pulso_error::require_session();
     $course = get_course($courseid);
     $context = context_course::instance($courseid);
 
-    // Mismo orden que los demás endpoints del plugin: autenticar -> sesskey ->
-    // permisos -> estado del plugin.
     require_login($course);
-    require_sesskey();
+    pulso_error::require_sesskey();
     require_capability('block/pulso:createactivity', $context);
     chat_pipeline::check_enabled($courseid);
 
@@ -68,9 +70,6 @@ try {
     echo json_encode($response, JSON_UNESCAPED_UNICODE);
 
 } catch (\Throwable $e) {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage(),
-    ], JSON_UNESCAPED_UNICODE);
+    // Texto para persona + error_code; el detalle tecnico va solo a error_log.
+    pulso_error::send_json($e, 'api_create_form', $courseid);
 }

@@ -10,6 +10,7 @@
 define('AJAX_SCRIPT', true);
 
 require_once(__DIR__ . '/../../config.php');
+require_once(__DIR__ . '/classes/pulso_error.php');
 
 $courseid = required_param('courseid', PARAM_INT);
 $enabled = required_param('enabled', PARAM_INT);
@@ -17,13 +18,14 @@ $enabled = required_param('enabled', PARAM_INT);
 header('Content-Type: application/json; charset=utf-8');
 
 try {
+    \block_pulso\pulso_error::require_session();
     $course = get_course($courseid);
     $context = context_course::instance($courseid);
 
     require_login($course);
     // Endpoint de ESCRITURA (set_config): sin sesskey, un CSRF podia activar o
     // desactivar Pulso en cualquier curso donde la victima pudiera editar.
-    require_sesskey();
+    \block_pulso\pulso_error::require_sesskey();
     require_capability('moodle/course:update', $context);
 
     // Sanitize: only 0 or 1
@@ -39,10 +41,6 @@ try {
         'message' => $enabled ? 'Pulso enabled for this course' : 'Pulso disabled for this course',
     ], JSON_UNESCAPED_UNICODE);
 
-} catch (Exception $e) {
-    http_response_code(400);
-    echo json_encode([
-        'success' => false,
-        'message' => $e->getMessage(),
-    ], JSON_UNESCAPED_UNICODE);
+} catch (\Throwable $e) {
+    \block_pulso\pulso_error::send_json($e, 'toggle_course', $courseid);
 }

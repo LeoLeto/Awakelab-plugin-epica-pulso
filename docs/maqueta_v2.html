@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse AI 2.0 — maqueta</title>
+<!--
+  MAQUETA ESTÁTICA de la fase 4 (no es código del plugin).
+  - Sin peticiones a terceros: Poppins se usa si está instalada en el equipo; si no, cae a la fuente del sistema
+    (en el plugin real irá en fonts/ como woff2).
+  - Solo el primer marco (y el selector de rol) son interactivos, para probar pestañas, pila de Crear y filtros.
+  - Paleta del tema claro de CLAUDE.md. Cian solo en iconos, bordes y foco; nunca como color de texto sobre claro.
+-->
+<style>
+:root {
+  --ink: #27334F; --deep: #003670; --slate: #34547A; --muted: #3B6996;
+  --cyan: #0B93AA; --cyan-bright: #19F7F1; --cyan-soft: #D9FBFF;
+  --bg: #FFFFFF; --surface: #F7F9FD; --surface-2: #EDF1FA; --line: #DCE3F2;
+  --ok: #0F7A57; --warn: #8A6100; --danger: #B3261E;
+  --font: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #E2E6F2; font-family: var(--font); color: var(--ink); font-size: 14px; }
+.page { max-width: 1280px; margin: 0 auto; padding: 24px 16px 64px; }
+.page > h1 { font-size: 1.4rem; margin: 0 0 4px; color: var(--deep); }
+.page > p { margin: 0 0 16px; color: var(--slate); max-width: 80ch; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+.toolbar .lbl { font-weight: 600; color: var(--slate); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+.seg button { border: 0; background: transparent; padding: 8px 14px; font: 500 0.85rem var(--font); color: var(--slate); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--deep); color: #fff; }
+.frames { display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start; }
+figure.frame { margin: 0; }
+figure.frame figcaption { font-size: 0.8rem; color: var(--slate); margin: 0 0 8px; max-width: 400px; }
+figure.frame figcaption b { color: var(--deep); }
+
+/* ===== Widget ===== */
+.w { width: 400px; height: 640px; background: var(--bg); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+     display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(1,25,50,.18); font-size: 0.92rem; }
+.w.wide { width: 860px; height: 560px; }
+.w.mobile { width: 360px; height: 640px; border-radius: 0; }
+.w-head { background: var(--deep); color: #fff; padding: 10px 12px 0; flex: none; }
+.w-top { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; }
+.w-logo { width: 28px; height: 28px; border-radius: 50%; background: #012142; border: 1px solid rgba(17,234,234,.4); display: grid; place-items: center; }
+.w-logo svg { width: 16px; height: 16px; color: var(--cyan-bright); }
+.w-top h2 { margin: 0; font-size: 1rem; font-weight: 600; line-height: 1.1; }
+.w-top small { display: block; font-size: 0.75rem; color: var(--cyan-soft); font-weight: 400; }
+.w-top .sp { flex: 1; }
+.ib { width: 34px; height: 34px; border: 0; border-radius: 8px; background: transparent; color: #fff; display: grid; place-items: center; cursor: pointer; }
+.ib:hover { background: rgba(255,255,255,.12); }
+.ib svg { width: 18px; height: 18px; }
+.tabs { display: flex; gap: 4px; }
+.tab { flex: 1; border: 0; background: transparent; color: var(--cyan-soft); font: 500 0.9rem var(--font); padding: 10px 8px 9px;
+       border-bottom: 3px solid transparent; cursor: pointer; display: flex; gap: 8px; justify-content: center; align-items: center; border-radius: 8px 8px 0 0; }
+.tab svg { width: 17px; height: 17px; }
+.tab:hover { background: rgba(255,255,255,.08); }
+.tab[aria-selected="true"] { color: #fff; font-weight: 600; border-bottom-color: var(--cyan-bright); }
+:focus-visible { outline: 0; box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--cyan); }
+.w-head :focus-visible { box-shadow: 0 0 0 2px var(--deep), 0 0 0 4px var(--cyan-bright); }
+
+.w-body { flex: 1; overflow-y: auto; padding: 16px 14px; background: var(--bg); }
+.w-body.surface { background: var(--surface); }
+[hidden] { display: none !important; }
+
+h3.t { margin: 0 0 12px; font-size: 1.05rem; font-weight: 600; color: var(--deep); }
+h4.s { margin: 18px 0 8px; font-size: 0.78rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--slate); }
+.hello { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; }
+.hello .av { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--deep); display: grid; place-items: center; }
+.hello .av svg { width: 18px; height: 18px; color: var(--cyan-bright); }
+.hello p { margin: 0; font-weight: 600; color: var(--deep); font-size: 1rem; line-height: 1.35; }
+.help { width: 100%; display: flex; gap: 10px; align-items: center; text-align: left; border: 1px dashed var(--cyan); background: var(--cyan-soft);
+        color: var(--deep); border-radius: 12px; padding: 10px 12px; font: 600 0.88rem var(--font); cursor: pointer; margin-bottom: 14px; }
+.help svg { width: 20px; height: 20px; color: var(--cyan); flex: none; }
+.help small { display: block; font-weight: 400; color: var(--slate); font-size: 0.78rem; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.card { display: flex; gap: 10px; align-items: center; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 12px;
+        padding: 10px 10px; font: 500 0.85rem var(--font); color: var(--ink); cursor: pointer; min-height: 52px; }
+.card:hover { border-color: var(--cyan); background: #fff; }
+.card svg { width: 18px; height: 18px; color: var(--cyan); flex: none; }
+.more { margin-top: 10px; width: 100%; border: 0; background: transparent; color: var(--deep); font: 600 0.85rem var(--font); padding: 10px; cursor: pointer;
+        display: flex; gap: 6px; justify-content: center; align-items: center; border-radius: 8px; }
+.more:hover { background: var(--surface-2); }
+.more svg { width: 14px; height: 14px; transition: transform .15s; }
+.more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.ideas { margin: 4px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.ideas button { width: 100%; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 9px 12px; font: 400 0.85rem var(--font); color: var(--ink); cursor: pointer; }
+.ideas button:hover { border-color: var(--cyan); }
+.chip { display: inline-block; border: 1px solid var(--line); background: var(--surface-2); color: var(--slate); border-radius: 999px; padding: 2px 10px; font-size: 0.75rem; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+
+/* Composer */
+.composer { flex: none; border-top: 1px solid var(--line); padding: 10px 12px; background: #fff; }
+.composer .row { display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 4px 4px 4px 14px; background: var(--surface); }
+.composer input { flex: 1; border: 0; background: transparent; font: 400 0.9rem var(--font); color: var(--ink); min-width: 0; padding: 8px 0; }
+.composer input:focus { outline: 0; }
+.composer .row:focus-within { box-shadow: 0 0 0 2px var(--cyan); }
+.send { width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--deep); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.send svg { width: 16px; height: 16px; }
+
+/* Conversation */
+.sep { display: flex; align-items: center; gap: 10px; color: var(--slate); font-size: 0.75rem; margin: 4px 0 12px; }
+.sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.msg { max-width: 86%; padding: 9px 12px; border-radius: 14px; margin-bottom: 10px; line-height: 1.45; }
+.msg.user { margin-left: auto; background: var(--deep); color: #fff; border-bottom-right-radius: 4px; }
+.msg.bot { background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.err { border: 1px solid var(--danger); background: #FDF3F2; border-radius: 12px; padding: 12px; color: var(--ink); }
+.err b { color: var(--danger); display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+.err b svg { width: 16px; height: 16px; }
+.err .acts { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.btn { border-radius: 8px; padding: 8px 14px; font: 600 0.85rem var(--font); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.btn svg { width: 15px; height: 15px; }
+.btn.primary { background: var(--deep); color: #fff; border: 1px solid var(--deep); }
+.btn.ghost { background: #fff; color: var(--deep); border: 1px solid var(--deep); }
+.btn[disabled] { background: #72A3C4; border-color: #72A3C4; color: var(--ink); cursor: not-allowed; }
+
+/* Crear */
+.crumb { display: flex; align-items: center; gap: 6px; margin: -4px 0 12px; }
+.back { border: 0; background: transparent; color: var(--deep); font: 600 0.85rem var(--font); display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px 6px 2px; cursor: pointer; border-radius: 8px; }
+.back:hover { background: var(--surface-2); }
+.back svg { width: 16px; height: 16px; }
+.tools { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tool { width: 100%; display: flex; gap: 12px; align-items: center; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 12px; cursor: pointer; font-family: var(--font); color: var(--ink); }
+.tool:hover { border-color: var(--cyan); background: #fff; }
+.tool .ic { flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; color: var(--cyan); }
+.tool .ic svg { width: 22px; height: 22px; }
+.tool .tx { flex: 1; min-width: 0; }
+.tool .tx b { display: block; font-weight: 600; font-size: 0.92rem; color: var(--deep); }
+.tool .tx span { display: block; font-size: 0.8rem; color: var(--slate); line-height: 1.35; }
+.tool .ch { color: var(--slate); width: 16px; height: 16px; flex: none; }
+.mine { margin-top: 14px; display: flex; gap: 10px; align-items: center; width: 100%; border: 1px solid var(--deep); background: #fff; border-radius: 12px; padding: 11px 12px; font: 600 0.9rem var(--font); color: var(--deep); cursor: pointer; }
+.mine svg { width: 18px; height: 18px; color: var(--cyan); }
+.mine .n { margin-left: auto; background: var(--surface-2); border-radius: 999px; padding: 1px 10px; font-size: 0.78rem; color: var(--slate); }
+.hist { display: inline-flex; gap: 6px; margin-top: 10px; color: var(--deep); font: 500 0.85rem var(--font); background: none; border: 0; padding: 8px 2px; cursor: pointer; text-decoration: underline; }
+.filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.filters button { border: 1px solid var(--line); background: #fff; color: var(--slate); border-radius: 999px; padding: 6px 12px; font: 500 0.82rem var(--font); cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--deep); border-color: var(--deep); color: #fff; }
+.items { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+.wide .items { grid-template-columns: repeat(4, 1fr); }
+.mobile .items { grid-template-columns: 1fr 1fr; }
+.item a { display: block; text-decoration: none; color: inherit; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; height: 100%; }
+.item a:hover { border-color: var(--cyan); }
+.item .th { height: 82px; display: grid; place-items: center; background: var(--surface-2); color: var(--cyan); }
+.item .th.img { background: linear-gradient(135deg, #E2E6F2, #D9FBFF); }
+.item .th svg { width: 28px; height: 28px; }
+.item .in { padding: 8px 10px 10px; }
+.item .in b { display: block; font-size: 0.82rem; font-weight: 600; color: var(--deep); line-height: 1.3; margin-bottom: 4px; }
+.item .in span { font-size: 0.75rem; color: var(--slate); display: block; }
+.empty { text-align: center; color: var(--slate); padding: 28px 8px; font-size: 0.88rem; }
+.note { font-size: 0.78rem; color: var(--slate); margin-top: 14px; line-height: 1.4; }
+label.f { display: block; font-weight: 600; font-size: 0.85rem; color: var(--deep); margin: 12px 0 4px; }
+select.f, textarea.f { width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 9px 10px; font: 400 0.88rem var(--font); color: var(--ink); }
+textarea.f { min-height: 84px; resize: vertical; }
+.ej { margin-top: 10px; }
+.ej small { font-weight: 600; color: var(--slate); font-size: 0.78rem; display: block; margin-bottom: 6px; }
+.ej button { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; font: 600 0.82rem var(--font); color: var(--deep); cursor: pointer; }
+.ej button span { display: block; font-weight: 400; font-size: 0.78rem; color: var(--slate); }
+.pill { display: inline-block; border-radius: 999px; padding: 3px 12px; font-size: 0.78rem; font-weight: 600; }
+.pill.warn { background: #FFF4D6; color: var(--warn); }
+.pill.ok { background: #DDF5EC; color: var(--ok); }
+.stat { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 14px; }
+.bar { height: 6px; border-radius: 3px; background: var(--surface-2); margin: 12px 0 8px; overflow: hidden; }
+.bar i { display: block; height: 100%; width: 40%; background: var(--cyan); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* móvil real */
+@media (max-width: 480px) { .w { width: 100%; } .w.wide { width: 100%; } .frames { gap: 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Pulse AI 2.0 — maqueta del rediseño</h1>
+  <p>Maqueta estática de la fase 4. Primer marco interactivo: cambia de pestaña (también con ← → Inicio Fin), entra en una herramienta de Crear, abre «Mis creaciones» y filtra. El selector cambia el rol para ver qué se quita del HTML a cada uno. Los demás marcos son estados fijos para revisar.</p>
+  <div class="toolbar">
+    <span class="lbl">Rol:</span>
+    <div class="seg" role="group" aria-label="Rol de la maqueta">
+      <button type="button" id="role-t" aria-pressed="true">Profesorado</button>
+      <button type="button" id="role-s" aria-pressed="false">Alumnado</button>
+    </div>
+  </div>
+  <div class="frames" id="frames"></div>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-img" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></g></symbol>
+    <symbol id="i-game" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></g></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></g></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></g></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></g></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M3.4 20.4 21.85 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z" fill="currentColor"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></g></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></g></symbol>
+    <symbol id="i-min" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></g></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></g></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></g></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></g></symbol>
+  </defs>
+</svg>
+
+<script>
+(function () {
+  'use strict';
+  var role = 'teacher';
+  var frames = document.getElementById('frames');
+  function ic(id, cls) { return '<svg class="' + (cls || '') + '" aria-hidden="true"><use href="#i-' + id + '"/></svg>'; }
+  function viewBox(el) { return el; }
+
+  /* ---------- Datos de ejemplo ---------- */
+  var IDEAS = {
+    teacher: {
+      feat: [['Panorama del curso','spark'],['Alumnos en riesgo','warn'],['Notas medias','chat'],['Estado de entregas','folder']],
+      more: [
+        ['Analítica', ['¿Cuál es la tasa de completitud?','¿Qué alumnos llevan más de una semana sin acceder?','¿Cuáles son los mejores alumnos del curso?','¿Cuál es el engagement?','Resultados de los cuestionarios del curso']],
+        ['Contenido del curso', ['¿De qué trata este curso?','¿Qué actividades y recursos tiene el curso?','¿Qué secciones tiene el curso?','¿Qué cuestionarios hay en el curso?','¿Qué tareas hay en el curso?']]
+      ],
+      hello: '¡Hola, Marcos! ¿Qué quieres saber de tu curso?'
+    },
+    student: {
+      feat: [['Resumen del curso','spark'],['Explícame un tema','chat'],['Repaso rápido','redo'],['Materiales de estudio','folder']],
+      more: [
+        ['Contenido del curso', ['¿Qué actividades y recursos tiene el curso?','¿Qué secciones tiene el curso?','¿Qué cuestionarios hay en el curso?','¿Qué tareas hay en el curso?']]
+      ],
+      hello: '¡Hola, Marcos! Pregúntame sobre el contenido del curso: pídeme un resumen, una explicación o dudas sobre los materiales.'
+    }
+  };
+  var ITEMS = [
+    ['img','Fases del muestreo estratificado','Infografía · 3 oct'],
+    ['game','Emparejar conceptos: Unidad 2','Juego · 2 oct'],
+    ['target','Caso: diseñar una encuesta','Reto · 1 oct'],
+    ['img','Resumen de la normativa','Infografía · 29 sep'],
+    ['game','Preguntas con pista: Tema 4','Juego · 28 sep']
+  ];
+  var TYPE = { img: 'infografia', game: 'juego', target: 'reto' };
+
+  /* ---------- Piezas ---------- */
+  function head(o) {
+    return '<div class="w-head">'
+      + '<div class="w-top"><div class="w-logo">' + ic('spark') + '</div>'
+      + '<div><h2>Pulse AI</h2><small>Asistente del curso</small></div><span class="sp"></span>'
+      + (o.mobile ? '' : '<button class="ib" type="button" aria-label="' + (o.wide ? 'Reducir el chat' : 'Ampliar el chat') + '" data-act="size">' + ic(o.wide ? 'min' : 'expand') + '</button>')
+      + '<button class="ib" type="button" aria-label="Empezar una conversación nueva">' + ic('new') + '</button>'
+      + '<button class="ib" type="button" aria-label="Minimizar el chat">' + ic('min') + '</button></div>'
+      + '<div class="tabs" role="tablist" aria-label="Secciones de Pulse AI">'
+      + '<button class="tab" role="tab" id="tab-ask-' + o.id + '" aria-controls="p-ask-' + o.id + '" aria-selected="' + (o.tab === 'ask') + '" tabindex="' + (o.tab === 'ask' ? 0 : -1) + '" data-tab="ask">' + ic('chat') + 'Preguntar</button>'
+      + '<button class="tab" role="tab" id="tab-crear-' + o.id + '" aria-controls="p-crear-' + o.id + '" aria-selected="' + (o.tab === 'crear') + '" tabindex="' + (o.tab === 'crear' ? 0 : -1) + '" data-tab="crear">' + ic('spark') + 'Crear</button>'
+      + '</div></div>';
+  }
+  function composer() {
+    return '<div class="composer"><div class="row"><input type="text" aria-label="Escribe tu pregunta sobre el curso" placeholder="Pregunta sobre el curso…"><button class="send" type="button" aria-label="Enviar pregunta">' + ic('send') + '</button></div></div>';
+  }
+  function askHome(r, o) {
+    var d = IDEAS[r];
+    var h = '<div class="hello"><div class="av">' + ic('spark') + '</div><p>' + d.hello + '</p></div>';
+    h += '<button class="help" type="button">' + ic('help') + '<span>¿Qué puede hacer Pulse?<small>Descúbrelo en 10 segundos</small></span></button>';
+    h += '<h4 class="s" style="margin-top:0">Para empezar <span class="chip" style="text-transform:none;letter-spacing:0">Estadística aplicada · 2026</span></h4><div class="grid">';
+    d.feat.forEach(function (f) { h += '<button class="card" type="button">' + ic(f[1]) + '<span>' + f[0] + '</span></button>'; });
+    h += '</div>';
+    h += '<button class="more" type="button" aria-expanded="false" aria-controls="ideas-' + o.id + '" data-act="ideas"><span>Ver más ideas</span>' + ic('down') + '</button>';
+    h += '<div id="ideas-' + o.id + '" hidden>';
+    d.more.forEach(function (g) {
+      h += '<h4 class="s">' + g[0] + '</h4><ul class="ideas">';
+      g[1].forEach(function (q) { h += '<li><button type="button">' + q + '</button></li>'; });
+      h += '</ul>';
+    });
+    h += '</div>';
+    return h;
+  }
+  function crearRoot(r) {
+    var h = '<h3 class="t">¿Qué quieres crear?</h3><ul class="tools">';
+    [['img','Infografía','Resume un recurso del curso en una imagen','form'],
+     ['game','Juego','Practica un recurso con un juego interactivo','form'],
+     ['target','Reto','Un caso práctico que corrige la IA','form'],
+     ['search','Ampliar recurso','Vídeos y artículos para profundizar en un recurso','form']].forEach(function (t) {
+      h += '<li><button class="tool" type="button" data-go="form" data-name="' + t[1] + '"><span class="ic">' + ic(t[0]) + '</span><span class="tx"><b>' + t[1] + '</b><span>' + t[2] + '</span></span>' + ic('chev', 'ch') + '</button></li>';
+    });
+    h += '</ul>';
+    h += '<button class="mine" type="button" data-go="mine">' + ic('folder') + 'Mis creaciones<span class="n">5</span></button>';
+    if (r === 'student') h += '<button class="hist" type="button">Mi historial en Épica <span aria-hidden="true">↗</span><span class="sr"> (se abre en una pestaña nueva)</span></button>';
+    return h;
+  }
+  function backBar(title) {
+    return '<div class="crumb"><button class="back" type="button" data-go="root">' + ic('back') + 'Volver</button></div><h3 class="t" tabindex="-1">' + title + '</h3>';
+  }
+  function mine(o) {
+    var h = backBar('Mis creaciones');
+    h += '<div class="filters" role="group" aria-label="Filtrar por tipo"><button type="button" aria-pressed="true" data-f="all">Todas</button><button type="button" aria-pressed="false" data-f="infografia">Infografías</button><button type="button" aria-pressed="false" data-f="juego">Juegos</button><button type="button" aria-pressed="false" data-f="reto">Retos</button></div>';
+    h += '<p class="sr" role="status" aria-live="polite" id="cnt-' + o.id + '">5 de 5 creaciones</p>';
+    h += '<ul class="items">';
+    ITEMS.forEach(function (it) {
+      h += '<li class="item" data-type="' + TYPE[it[0]] + '"><a href="#" onclick="return false"><div class="th ' + (it[0] === 'img' ? 'img' : '') + '">' + ic(it[0]) + '</div><div class="in"><b>' + it[1] + '</b><span>' + it[2] + '</span></div></a></li>';
+    });
+    h += '</ul><p class="empty" hidden>Todavía no has creado ninguna de este tipo.</p>';
+    h += '<p class="note">Aquí salen las creaciones que has hecho en este curso. Ampliar un recurso no se guarda: es una búsqueda.</p>';
+    if (role === 'student') h += '<p class="note">El historial anterior al 5 de octubre de 2026 solo está en Épica: <b>Mi historial en Épica ↗</b>.</p>';
+    return h;
+  }
+  function form(name) {
+    var game = /Juego/.test(name);
+    var h = backBar('Crear ' + name.toLowerCase().replace('crear ', ''));
+    h += '<label class="f" for="r">Recurso del curso</label><select class="f" id="r"><option>Archivo: Muestreo estratificado</option><option>Archivo: Guía de la unidad 2</option></select>';
+    h += '<label class="f" for="p">' + (game ? '¿Qué juego quieres?' : '¿Qué quieres?') + '</label><textarea class="f" id="p" placeholder="Ej: Un juego de emparejar términos con su definición, diez pares."></textarea>';
+    if (game) h += '<div class="ej"><small>Prueba con:</small><button type="button">Preguntas con pista<span>Un test de opción múltiple sobre Muestreo estratificado</span></button><button type="button">Emparejar conceptos<span>Une cada concepto con su definición</span></button></div>';
+    h += '<p class="note">Hoy te quedan 2 creaciones para esta sección.</p>';
+    h += '<p style="margin-top:14px"><button class="btn primary" type="button" data-go="status">Crear ' + (game ? 'juego' : name.toLowerCase()) + '</button></p>';
+    return h;
+  }
+  function status() {
+    var h = backBar('Tu creación');
+    h += '<div class="stat"><span class="pill warn" id="pill">En cola</span><div class="bar" role="presentation"><i></i></div><p style="margin:0;color:var(--slate);font-size:.85rem">Tienes 1 por delante · unos 35 segundos</p></div>';
+    h += '<p class="note">Puedes cambiar de pestaña: seguimos con ello. Te avisaremos cuando esté listo.</p>';
+    return h;
+  }
+  function errorChat() {
+    return '<div class="sep">Conversación anterior</div>'
+      + '<div class="msg user">¿Cuántos alumnos han entregado la tarea 2?</div>'
+      + '<div class="msg bot">Han entregado 18 de 24 alumnos.</div>'
+      + '<div class="msg user">¿Y la tarea 3?</div>'
+      + '<div class="err" role="alert"><b>' + ic('warn') + 'Error</b>El servicio de IA está muy ocupado ahora mismo. Inténtalo de nuevo en unos segundos.'
+      + '<div class="acts"><button class="btn primary" type="button">' + ic('redo') + 'Reintentar</button><button class="btn ghost" type="button">' + ic('copy') + 'Copiar pregunta</button></div></div>';
+  }
+
+  /* ---------- Widget ---------- */
+  var uid = 0;
+  function widget(opts) {
+    var o = { id: ++uid, tab: opts.tab || 'ask', wide: !!opts.wide, mobile: !!opts.mobile, screen: opts.screen || 'root', ask: opts.ask || 'home', role: opts.role };
+    var el = document.createElement('div');
+    el.className = 'w' + (o.wide ? ' wide' : '') + (o.mobile ? ' mobile' : '');
+    el.setAttribute('role', 'region'); el.setAttribute('aria-label', 'Pulse AI');
+    el.__o = o;
+    paint(el);
+    wire(el);
+    return el;
+  }
+  function paint(el) {
+    var o = el.__o, r = o.role || role;
+    var askBody = o.ask === 'error' ? errorChat() : askHome(r, o);
+    var crear = o.screen === 'root' ? crearRoot(r) : o.screen === 'mine' ? mine(o) : o.screen === 'status' ? status() : form(o.name || 'Infografía');
+    el.innerHTML = head(o)
+      + '<div class="w-body" role="tabpanel" id="p-ask-' + o.id + '" aria-labelledby="tab-ask-' + o.id + '" ' + (o.tab === 'ask' ? '' : 'hidden') + ' tabindex="0">' + askBody + '</div>'
+      + '<div class="w-body surface" role="tabpanel" id="p-crear-' + o.id + '" aria-labelledby="tab-crear-' + o.id + '" ' + (o.tab === 'crear' ? '' : 'hidden') + ' tabindex="0">' + crear + '</div>'
+      + (o.tab === 'ask' ? composer() : '');
+  }
+  function wire(el) {
+    var o = el.__o;
+    el.addEventListener('click', function (e) {
+      var t = e.target.closest('[data-tab],[data-go],[data-act],[data-f]');
+      if (!t || !el.contains(t)) return;
+      if (t.dataset.tab) { o.tab = t.dataset.tab; paint(el); var tb = el.querySelector('#tab-' + o.tab + '-' + o.id); tb && tb.focus(); }
+      else if (t.dataset.go) { o.screen = t.dataset.go; if (t.dataset.name) o.name = t.dataset.name; paint(el); var h = el.querySelector('#p-crear-' + o.id + ' h3'); h && h.focus(); }
+      else if (t.dataset.act === 'ideas') {
+        var open = t.getAttribute('aria-expanded') === 'true';
+        t.setAttribute('aria-expanded', String(!open));
+        el.querySelector('#' + t.getAttribute('aria-controls')).hidden = open;
+        t.firstElementChild.textContent = open ? 'Ver más ideas' : 'Ver menos';
+      }
+      else if (t.dataset.act === 'size') { o.wide = !o.wide; el.classList.toggle('wide', o.wide); paint(el); }
+      else if (t.dataset.f) {
+        var f = t.dataset.f, n = 0;
+        el.querySelectorAll('.filters button').forEach(function (b) { b.setAttribute('aria-pressed', String(b === t)); });
+        el.querySelectorAll('.item').forEach(function (li) { var show = f === 'all' || li.dataset.type === f; li.hidden = !show; if (show) n++; });
+        el.querySelector('.empty').hidden = n !== 0;
+        var c = el.querySelector('#cnt-' + o.id); if (c) c.textContent = n + ' de 5 creaciones';
+      }
+    });
+    el.addEventListener('keydown', function (e) {
+      var tab = e.target.closest && e.target.closest('[role=tab]');
+      if (!tab) return;
+      var order = ['ask', 'crear'], i = order.indexOf(tab.dataset.tab), n = i;
+      if (e.key === 'ArrowRight') n = (i + 1) % 2; else if (e.key === 'ArrowLeft') n = (i + 1) % 2;
+      else if (e.key === 'Home') n = 0; else if (e.key === 'End') n = 1; else return;
+      e.preventDefault(); o.tab = order[n]; paint(el); el.querySelector('#tab-' + o.tab + '-' + o.id).focus();
+    });
+  }
+  function add(caption, el) {
+    var f = document.createElement('figure'); f.className = 'frame';
+    f.innerHTML = '<figcaption>' + caption + '</figcaption>';
+    f.appendChild(el); frames.appendChild(f); return f;
+  }
+  var live = [];
+  function build() {
+    frames.innerHTML = ''; live = [];
+    var a = widget({ tab: 'ask' }); live.push(a);
+    add('<b>1 · En vivo.</b> Pestañas «Preguntar» / «Crear» con <code>role="tablist"</code>. El cuadro de texto solo existe en Preguntar. Crear tiene su propia pila: herramientas → formulario → estado, con «Volver».', a);
+    add('<b>2 · Crear: lista de herramientas</b> (4 filas con icono, nombre y una línea) + «Mis creaciones». Alumnado: «Mi historial en Épica» aquí, no en la home.', widget({ tab: 'crear', screen: 'root' }));
+    add('<b>3 · Mis creaciones</b> con filtros por tipo (<code>aria-pressed</code>) y recuento anunciado. Sustituye a la galería repetida bajo cada formulario.', widget({ tab: 'crear', screen: 'mine' }));
+    add('<b>4 · Formulario</b> (Crear juego) con «Prueba con:». Mismo formulario parametrizado por herramienta.', widget({ tab: 'crear', screen: 'form', name: 'Juego' }));
+    add('<b>5 · Estado de una creación.</b> Se puede cambiar de pestaña: el sondeo no se pierde (ver plan, decisión 2).', widget({ tab: 'crear', screen: 'status' }));
+    add('<b>6 · Preguntar tras recargar y con error.</b> Separador «Conversación anterior»; el error trae «Reintentar» y «Copiar pregunta».', widget({ tab: 'ask', ask: 'error' }));
+    add('<b>7 · «Ampliar» (escritorio)</b>: panel ancho. Mis creaciones pasa a 4 columnas.', widget({ tab: 'crear', screen: 'mine', wide: true }));
+    add('<b>8 · Móvil (≤ 480 px)</b>: pantalla completa, sin «Ampliar», objetivos táctiles de 44 px (ya hecho en fase 3).', widget({ tab: 'crear', screen: 'root', mobile: true }));
+  }
+  function setRole(r) {
+    role = r;
+    document.getElementById('role-t').setAttribute('aria-pressed', String(r === 'teacher'));
+    document.getElementById('role-s').setAttribute('aria-pressed', String(r === 'student'));
+    build();
+  }
+  document.getElementById('role-t').onclick = function () { setRole('teacher'); };
+  document.getElementById('role-s').onclick = function () { setRole('student'); };
+  build();
+})();
+</script>
+</body>
+</html>

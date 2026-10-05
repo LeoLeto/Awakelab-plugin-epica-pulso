@@ -936,10 +936,15 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
   llamadas del ciclo, no solo en el sondeo que se espera que sea el último: el `listo` cae
   en el que cae y trae el PNG de ~1,7 MB dentro; con una espera corta ahí se ve un error de
   cURL donde había una lámina terminada.
-- **El rol se firma con la capability en contexto de CURSO**
-  (`block/pulso:createactivity` vía `epica::rol_de()`/`firmar_por()`), nunca con
+- **El rol se firma con `block/pulso:viewanalytics` en contexto de CURSO**
+  (`epica_client::CAPABILITY_ROL` vía `epica::rol_de()`/`firmar_por()`), nunca con
   `is_siteadmin()` ni un rol de sitio — un profesor de un curso no debe firmar como
-  docente en otro, y el alumnado sí puede encargar.
+  docente en otro. **NO con `createactivity` (corregido en v1.29.0, no revertir):**
+  `rol_de()` devuelve `docente` si el usuario TIENE la capability, y `createactivity`
+  tiene `CAP_ALLOW` para `student` (es el permiso de CREAR, no de ser docente), así que
+  todo el alumnado salía firmado como `docente`: Épica nunca aplicó los ritmos de alumno
+  y la puerta `/api/auth/alumno` (carta 10) habría dado 403 `rol-sin-permiso`.
+  `createactivity` sigue siendo solo el permiso para encargar (endpoints y UI).
 - **`caracteres` y `extraido_por` del material salen TAL CUAL de
   `block_pulso_full_text`** (el tamaño ORIGINAL, no el recortado): es la referencia que
   hace honesto el flag `truncado`. Solo `texto` se recorta, con `mb_substr` (nunca
@@ -1227,7 +1232,8 @@ sobre la 7**. Reglas que deben persistir:
   (literal, recorte por párrafo a ~100.000, `truncado`, `extraido_por`) afecta a las tres
   herramientas a la vez — es lo que se quiere.
 - **Token nuevo en CADA llamada, también en cada sondeo**, firmado con `(string)$course->id` y la
-  capability `createactivity` en contexto de curso. Un fallo transitorio (`errno ≠ 0 || http === 0
+  capability `epica_client::CAPABILITY_ROL` (`viewanalytics`, NO `createactivity`: ver la regla
+  del rol en «Integración con Épica — paso 3») en contexto de curso. Un fallo transitorio (`errno ≠ 0 || http === 0
   || http >= 500`, o una excepción al firmar/pedir) se devuelve como error recuperable
   (`epica-no-disponible`, 503, `reintentable: true`) **sin cambiar el estado guardado**: reintentar
   es firmar otro token, no hay contador de errores seguidos como en la tarea adhoc (aquí reintenta

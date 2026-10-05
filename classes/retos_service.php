@@ -504,7 +504,7 @@ class retos_service {
         try {
             $context = \context_course::instance((int)$course->id);
             // Token nuevo en CADA llamada; (string) del id, nunca el objeto del curso.
-            $token = \local_awkepica\epica::firmar_por($user, $context, epica_client::CAPABILITY, (string)$course->id);
+            $token = \local_awkepica\epica::firmar_por($user, $context, epica_client::CAPABILITY_ROL, (string)$course->id);
             $respuesta = \local_awkepica\epica::pedir(
                 epica_client::endpoint($ruta),
                 array_merge(['token' => $token], $cuerpo),

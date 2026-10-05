@@ -50,8 +50,13 @@ class epica_client {
     const HERRAMIENTA_INFOGRAFIA = 'infografias';
     const HERRAMIENTA_GAMIFICACION = 'gamificacion';
 
-    /** @var string Capacidad usada para resolver el rol firmado (rol_de/firmar_por). Misma para las dos herramientas. */
-    const CAPABILITY = 'block/pulso:createactivity';
+    /**
+     * @var string Capacidad de la que sale el ROL firmado (rol_de/firmar_por): docente o estudiante.
+     * NO es createactivity: esa tiene CAP_ALLOW para student (es el permiso de CREAR) y haria
+     * firmar a todo el mundo como docente. viewanalytics solo la tiene el profesorado.
+     * Usar siempre esta constante para firmar; no revertir a createactivity.
+     */
+    const CAPABILITY_ROL = 'block/pulso:viewanalytics';
 
     const RUTA_ENCARGAR_LAMINA = '/api/moodle/laminas/encargar';
     const RUTA_ENCARGO_LAMINA  = '/api/moodle/laminas/encargo';
@@ -168,7 +173,7 @@ class epica_client {
 
         try {
             $context = \context_course::instance((int)$encargo->courseid);
-            $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY, (string)$course->id);
+            $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY_ROL, (string)$course->id);
             $body = array_merge(['token' => $token], $envelope);
             $respuesta = \local_awkepica\epica::pedir(
                 self::endpoint(self::ruta_encargar((string)$encargo->tool)),
@@ -309,7 +314,7 @@ class epica_client {
             $context = \context_course::instance((int)$encargo->courseid);
             // Token NUEVO en cada sondeo: el jti se gasta al recibirlo, así
             // que reenviar el mismo token da 401 "reusado".
-            $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY, (string)$course->id);
+            $token = \local_awkepica\epica::firmar_por($user, $context, self::CAPABILITY_ROL, (string)$course->id);
             $tool = (string)$encargo->tool;
             $body = ['token' => $token, 'trabajo' => $encargo->epica_job_id];
             if ($tool === creation_quota::TOOL_GAMIFICACION) {

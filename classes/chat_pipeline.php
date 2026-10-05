@@ -629,6 +629,19 @@ class chat_pipeline {
     }
 
     /**
+    /**
+     * Diagnóstico RAG apto para el cliente: solo con `viewanalytics`. Lleva los
+     * nombres de los fragmentos recuperados y el estado interno del índice, que un
+     * alumno no necesita ni debe ver.
+     *
+     * @param array $diagnostics
+     * @param bool $isteacher
+     * @return array
+     */
+    public static function client_rag_diagnostics(array $diagnostics, bool $isteacher): array {
+        return $isteacher ? $diagnostics : [];
+    }
+
      * Preparar historial de conversación (T2.5.3): merge cliente/sesión,
      * validación de estructura, truncado y filtro de contradicciones RAG.
      *

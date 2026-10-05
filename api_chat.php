@@ -112,7 +112,9 @@ try {
 
     $rag = chat_pipeline::get_rag($courseid, $user_query);
     $rag_context = $rag['context'];
-    $rag_diagnostics = $rag['diagnostics'];
+    // Solo viaja al cliente con viewanalytics (lleva nombres de fragmentos y el
+    // estado interno del indice).
+    $rag_diagnostics = chat_pipeline::client_rag_diagnostics($rag['diagnostics'], $isteacher);
 
     $history = chat_pipeline::prepare_history($courseid, $conversation_history, $rag_context);
 

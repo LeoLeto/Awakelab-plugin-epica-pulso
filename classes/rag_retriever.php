@@ -2547,7 +2547,8 @@ class rag_retriever {
             // Never break the chat if RAG fails.
             error_log('Pulso RAG retrieval failed: ' . $e->getMessage());
             $diagnostics['status'] = 'error';
-            $diagnostics['message'] = 'Error en recuperación RAG: ' . $e->getMessage();
+            // El texto de la excepcion va solo al log (arriba), nunca al cliente.
+            $diagnostics['message'] = 'Error en la recuperación RAG (detalle en el log del servidor).';
             return ['context' => '', 'diagnostics' => $diagnostics];
         }
 
@@ -2698,10 +2699,10 @@ class rag_retriever {
             if ((int)$section->section === 0) {
                 continue;
             }
-            $realSections[] = $section;
             if (!course_visibility::section_visible($courseid, (int)$section->section)) {
                 continue;
             }
+            $realSections[] = $section;
         }
         $lines[] = 'Total de secciones: ' . count($realSections);
 
@@ -2919,10 +2920,10 @@ class rag_retriever {
                     continue;
                 }
                 $cm = $modinfo->cms[$cmid];
-                $name = trim((string)$cm->name);
                 if (empty($cm->uservisible)) {
                     continue;
                 }
+                $name = trim((string)$cm->name);
                 if ($name === '') {
                     $name = 'actividad sin nombre';
                 }
@@ -2943,10 +2944,10 @@ class rag_retriever {
         );
 
         foreach ($cms as $cm) {
-            $activities[] = '[' . $cm->modname . '] cmid=' . $cm->id;
             if (!course_visibility::cm_visible($courseid, (int)$cm->id)) {
                 continue;
             }
+            $activities[] = '[' . $cm->modname . '] cmid=' . $cm->id;
         }
 
         return $activities;
@@ -2993,10 +2994,10 @@ class rag_retriever {
 
         $full = '';
         foreach ($rows as $r) {
-            $full .= "\n" . $r->chunk_text;
             if (!course_visibility::chunk_visible($courseid, (int)$r->cmid)) {
                 continue;
             }
+            $full .= "\n" . $r->chunk_text;
         }
 
         // Normalize and attempt to repair OCR-like letter spacing.

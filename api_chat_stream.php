@@ -25,8 +25,10 @@ require_once(__DIR__ . '/classes/anthropic_connector.php');
 require_once(__DIR__ . '/classes/system_prompt_designer.php');
 require_once(__DIR__ . '/classes/rag_retriever.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
+require_once(__DIR__ . '/classes/chat_rate_limiter.php');
 
 use block_pulso\chat_pipeline;
+use block_pulso\chat_rate_limiter;
 use block_pulso\anthropic_connector;
 use block_pulso\system_prompt_designer;
 use block_pulso\pulso_error;
@@ -73,6 +75,9 @@ try {
     $isteacher = chat_pipeline::user_can_view_analytics($courseid);
 
     chat_pipeline::check_enabled($courseid);
+
+    // Tope por persona (minuto y día), ANTES de contexto, RAG y Anthropic: 429 JSON.
+    chat_rate_limiter::check((int)$USER->id);
 } catch (\Throwable $e) {
     // 4xx con JSON (nunca 5xx en esta fase: son fallos de la peticion, no del servidor).
     [$status, $payload] = pulso_error::to_response($e, 'api_chat_stream', (int)$courseid);
@@ -88,10 +93,17 @@ try {
 header('Content-Type: text/event-stream; charset=utf-8');
 header('Cache-Control: no-cache');
 header('X-Accel-Buffering: no'); // nginx: no bufferizar esta respuesta.
+header('Content-Encoding: identity'); // Proxies/Apache con compresión: que no agrupen el stream.
 @ini_set('zlib.output_compression', '0');
+if (function_exists('apache_setenv')) {
+    @apache_setenv('no-gzip', '1');
+}
 while (ob_get_level() > 0) {
     @ob_end_flush();
 }
+
+// Respuesta + RAG + Anthropic pueden pasar de max_execution_time (30 s por defecto).
+core_php_time_limit::raise(180);
 
 /**
  * Emitir un evento SSE y forzar el envío inmediato al navegador.
@@ -102,6 +114,18 @@ while (ob_get_level() > 0) {
 function pulso_sse(string $event, $data): void {
     echo 'event: ' . $event . "\n";
     echo 'data: ' . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
+    if (ob_get_level() > 0) {
+        @ob_flush();
+    }
+    flush();
+}
+
+/**
+ * Comentario SSE `: ping`: lo ignora el cliente, pero evita que un proxy corte una
+ * conexión inactiva mientras se prepara el contexto/RAG o se espera un reintento.
+ */
+function pulso_sse_ping(): void {
+    echo ": ping\n\n";
     if (ob_get_level() > 0) {
         @ob_flush();
     }
@@ -143,23 +167,31 @@ try {
     // Primer byte inmediato: el cliente sabe que el stream está vivo.
     pulso_sse('status', ['stage' => 'retrieving']);
 
-    // 1. Contexto de analítica del curso (con cache corta).
+    // 1. Historial: es lo único que lee $SESSION, así que va PRIMERO. Aún sin filtro de
+    //    contradicciones RAG (necesita el contexto): se aplica después del RAG.
+    $history = chat_pipeline::prepare_history($courseid, $conversation_history, '');
+
+    // 2. Liberar el lock de sesión de Moodle ANTES de contexto, RAG y Anthropic. El RAG
+    //    llama a OpenAI (embedding de la consulta) y la IA tarda segundos: sin esto, todas
+    //    las demás páginas/pestañas del usuario quedan congeladas mientras tanto.
+    \core\session\manager::write_close();
+
+    pulso_sse_ping();
+
+    // 3. Contexto de analítica del curso (con cache corta).
     $course_context = chat_pipeline::get_course_context($courseid);
 
-    // 2. RAG: fragmentos relevantes del contenido del curso.
+    pulso_sse_ping();
+
+    // 4. RAG: fragmentos relevantes del contenido del curso.
     $rag = chat_pipeline::get_rag($courseid, $user_query);
     $rag_context = $rag['context'];
     // Solo viaja al cliente con viewanalytics (lleva nombres de fragmentos y el
     // estado interno del indice).
     $rag_diagnostics = chat_pipeline::client_rag_diagnostics($rag['diagnostics'], $isteacher);
+    $history = chat_pipeline::drop_no_access_replies($history, $rag_context);
 
-    // 3. Historial (lee $SESSION, por eso va antes de cerrar la sesión).
-    $history = chat_pipeline::prepare_history($courseid, $conversation_history, $rag_context);
-
-    // 4. Liberar el lock de sesión de Moodle ANTES de llamar a Anthropic.
-    //    Sin esto, todas las demás páginas/pestañas del usuario quedan
-    //    congeladas mientras la IA genera la respuesta.
-    \core\session\manager::write_close();
+    pulso_sse_ping();
 
     $ondelta = function(string $text): void {
         pulso_sse('delta', ['text' => $text]);
@@ -208,8 +240,12 @@ try {
         $system_prompt,
         $history,
         3000, // Con 800/2000, rankings/listas largas en JSON se truncaban a mitad → JSON inválido.
-        $ondelta
+        $ondelta,
+        'pulso_sse_ping'
     );
+    // max_tokens: la respuesta se cortó. Se avisa al cliente y NO entra en el historial
+    // (un turno cortado, reenviado al modelo, hacía que lo continuara).
+    $truncated = !empty($ai_response['truncated']);
 
     // Respuesta CRUDA del modelo antes de limpiarla (ver la nota en api_chat.php).
     // error_log obligatorio aquí: cualquier salida en el cuerpo rompería el SSE.
@@ -220,10 +256,13 @@ try {
     $answer = chat_pipeline::clean_answer($ai_response['answer']);
     $schema_data = system_prompt_designer::validate_response($answer);
 
-    $history = chat_pipeline::save_history($courseid, $history, $user_query, $answer);
+    if (!$truncated) {
+        $history = chat_pipeline::save_history($courseid, $history, $user_query, $answer);
+    }
 
     pulso_sse('final', [
         'success' => true,
+        'truncated' => $truncated,
         'message' => 'Query procesado exitosamente',
         'answer' => $answer,
         'tokens_used' => $ai_response['tokens_used'] ?? 0,
@@ -244,7 +283,11 @@ try {
 
     // 7. Preguntas de seguimiento FUERA de la ruta crítica: la respuesta ya
     //    se mostró; las sugerencias llegan unos segundos después como evento.
+    //    Con la respuesta cortada no se ofrecen (sugerirían sobre algo a medias).
     try {
+        if ($truncated) {
+            exit;
+        }
         $followup_questions = $connector->generate_followup_questions(
             $user_query,
             $answer,

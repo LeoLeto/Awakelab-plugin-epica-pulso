@@ -28,6 +28,9 @@ class embedding_manager {
     /** How many chunks to embed per batch (OpenAI allows up to 2048 inputs). */
     const BATCH_SIZE = 20;
 
+    /** Timeout (s) del embedding de la CONSULTA del chat; el de indexación sigue siendo 60. */
+    const QUERY_TIMEOUT = 8;
+
     /** Minimum cosine similarity to include a chunk as context. */
     const MIN_SIMILARITY = 0.30;
 
@@ -203,7 +206,9 @@ class embedding_manager {
             if (isset($querycache[$cachekey])) {
                 $query_vectors = $querycache[$cachekey];
             } else {
-                $query_vectors = $this->generate_embeddings([$query]);
+                // Timeout corto: es la consulta del chat (el usuario espera) y ya hay
+                // fallback léxico; el de 60 s es solo para la indexación en cron.
+                $query_vectors = $this->generate_embeddings([$query], self::QUERY_TIMEOUT);
                 $querycache[$cachekey] = $query_vectors;
             }
         } catch (\Throwable $e) {
@@ -409,10 +414,11 @@ class embedding_manager {
      * Generate embeddings for an array of text strings.
      *
      * @param  string[] $texts
+     * @param  int $timeout Segundos (60 en indexación; QUERY_TIMEOUT en la consulta del chat).
      * @return float[][]  Array of embedding vectors (one per input text).
      * @throws \moodle_exception on API error.
      */
-    public function generate_embeddings(array $texts): array {
+    public function generate_embeddings(array $texts, int $timeout = 60): array {
         global $CFG;
         require_once($CFG->libdir . '/filelib.php');
 
@@ -428,7 +434,7 @@ class embedding_manager {
         $curl = new \curl();
         // Sin timeout explícito, una llamada colgada a OpenAI cuelga con ella la
         // petición completa (indexación o consulta de chat) sin límite.
-        $curl->setopt(['CURLOPT_TIMEOUT' => 60, 'CURLOPT_CONNECTTIMEOUT' => 10]);
+        $curl->setopt(['CURLOPT_TIMEOUT' => $timeout, 'CURLOPT_CONNECTTIMEOUT' => min(10, $timeout)]);
         $curl->setHeader([
             'Content-Type: application/json',
             'Authorization: Bearer ' . $this->apikey,

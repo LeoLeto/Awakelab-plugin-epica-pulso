@@ -29,6 +29,22 @@ class anthropic_connector {
      */
     const RETRYABLE_STATUSES = [429, 500, 502, 503, 504, 529];
 
+    /** Tipos de `event: error` del stream que merecen reintento (si aún no se emitió ningún token). */
+    const RETRYABLE_ERROR_TYPES = ['overloaded_error', 'api_error', 'rate_limit_error'];
+
+    /**
+     * Errores de cURL de CONEXIÓN que se reintentan UNA vez si no se emitió nada:
+     * 6 no resuelve host, 7 no conecta, 35 SSL, 52 respuesta vacía, 55 envío, 56 recepción.
+     * NO el 28 (timeout): repetir una petición que ya agotó el tiempo duplica la espera.
+     */
+    const CONNECTION_ERRNOS = [6, 7, 35, 52, 55, 56];
+
+    /** Tope (s) de la espera por la cabecera retry-after de Anthropic: el usuario está esperando. */
+    const RETRY_AFTER_CAP = 10;
+
+    /** Timeout (s) de la llamada no-stream de la respuesta principal (antes 55). */
+    const MAIN_TIMEOUT = 110;
+
     private $apikey;
     private $model;
     private $apiurl = 'https://api.anthropic.com/v1/messages';
@@ -96,10 +112,51 @@ class anthropic_connector {
      * propósito: el usuario está esperando la respuesta del chat.
      *
      * @param int $attempt Número de reintento (1-based).
+     * @param int|null $retryafter Cabecera retry-after de Anthropic (s), si llegó: se
+     *                 respeta, con tope RETRY_AFTER_CAP.
      * @return int segundos
      */
-    private function retry_delay(int $attempt): int {
+    private function retry_delay(int $attempt, ?int $retryafter = null): int {
+        if ($retryafter !== null && $retryafter > 0) {
+            return min(self::RETRY_AFTER_CAP, $retryafter);
+        }
         return min(4, (int)pow(2, $attempt - 1));
+    }
+
+    /** ¿Es un error de cURL de conexión que se puede reintentar una vez? */
+    private function is_connection_errno(int $errno): bool {
+        return in_array($errno, self::CONNECTION_ERRNOS, true);
+    }
+
+    /**
+     * Espera entre reintentos. Con $onping (stream SSE) emite un comentario `: ping`
+     * cada ~5 s para que un proxy no corte la conexión por inactividad.
+     */
+    private function wait(int $seconds, ?callable $onping = null): void {
+        if ($onping !== null) {
+            $onping();
+        }
+        for ($i = 1; $i <= $seconds; $i++) {
+            sleep(1);
+            if ($onping !== null && $i % 5 === 0) {
+                $onping();
+            }
+        }
+    }
+
+    /**
+     * Valor de la cabecera retry-after de una respuesta del wrapper \curl de Moodle.
+     *
+     * @param \curl $curl
+     * @return int|null
+     */
+    private function retry_after_from_curl(\curl $curl): ?int {
+        foreach ((array)$curl->get_raw_response() as $line) {
+            if (is_string($line) && stripos($line, 'retry-after:') === 0) {
+                return (int)trim(substr($line, 12));
+            }
+        }
+        return null;
     }
 
     /**
@@ -255,15 +312,23 @@ class anthropic_connector {
         // (429 rate limit, 529 overloaded, 5xx). Sin esto, un pico de carga en
         // Anthropic llegaba al profesor como un error seco.
         $attempt = 0;
+        $connretries = 0;
         while (true) {
             $curl = new \curl();
-            $curl->setopt(['CURLOPT_TIMEOUT' => 55]);
+            $curl->setopt(['CURLOPT_TIMEOUT' => self::MAIN_TIMEOUT]);
             $curl->setHeader($this->headers());
 
             $response_raw = $curl->post($this->apiurl, $json_payload);
             $http_status = (int)($curl->info['http_code'] ?? 0);
 
             if ($curl->errno) {
+                // Error de conexión: un único reintento (no se ha recibido nada).
+                if ($connretries < 1 && $this->is_connection_errno((int)$curl->errno)) {
+                    $connretries++;
+                    error_log("Pulso: Anthropic cURL {$curl->errno}, reintento de conexión.");
+                    sleep(1);
+                    continue;
+                }
                 throw new \moodle_exception(
                     'error_api_connection',
                     'block_pulso',
@@ -278,7 +343,7 @@ class anthropic_connector {
 
             $attempt++;
             error_log("Pulso: Anthropic HTTP {$http_status}, reintento {$attempt} de " . self::MAX_RETRIES);
-            sleep($this->retry_delay($attempt));
+            sleep($this->retry_delay($attempt, $this->retry_after_from_curl($curl)));
         }
 
         $response = json_decode($response_raw, true);
@@ -319,6 +384,8 @@ class anthropic_connector {
             'answer' => $text,
             'model' => $this->model,
             'finish_reason' => $stop_reason,
+            // max_tokens: respuesta cortada (el endpoint avisa y no la guarda en el historial).
+            'truncated' => $stop_reason === 'max_tokens',
         ], $usage);
     }
 
@@ -337,7 +404,12 @@ class anthropic_connector {
      * @return string Texto de la respuesta.
      * @throws \moodle_exception
      */
-    public function send_fast_query(string $system_prompt, string $user_message, int $max_tokens = 300): string {
+    public function send_fast_query(
+        string $system_prompt,
+        string $user_message,
+        int $max_tokens = 300,
+        ?float $deadline = null
+    ): string {
         global $CFG;
 
         $payload = [
@@ -352,22 +424,43 @@ class anthropic_connector {
         $json_payload = $this->encode_payload($payload);
 
         $attempt = 0;
+        $connretries = 0;
         while (true) {
+            // Con $deadline (presupuesto de tiempo de la ampliación) cada intento se acota
+            // a lo que queda, y sin margen para una llamada útil no se empieza otra.
+            $timeout = 25;
+            if ($deadline !== null) {
+                $left = $deadline - microtime(true);
+                if ($left < 3) {
+                    throw new \moodle_exception('error_api_connection', 'block_pulso', '', 'presupuesto de tiempo agotado');
+                }
+                $timeout = (int)max(3, min(25, floor($left)));
+            }
+
             $curl = new \curl();
-            $curl->setopt(['CURLOPT_TIMEOUT' => 25]);
+            $curl->setopt(['CURLOPT_TIMEOUT' => $timeout]);
             $curl->setHeader($this->headers());
 
             $response_raw = $curl->post($this->apiurl, $json_payload);
             $http_status = (int)($curl->info['http_code'] ?? 0);
 
             if ($curl->errno) {
+                if ($connretries < 1 && $this->is_connection_errno((int)$curl->errno)) {
+                    $connretries++;
+                    sleep(1);
+                    continue;
+                }
                 throw new \moodle_exception('error_api_connection', 'block_pulso', '', 'cURL error: ' . $curl->error);
             }
             if (!$this->should_retry($http_status, $attempt)) {
                 break;
             }
             $attempt++;
-            sleep($this->retry_delay($attempt));
+            $delay = $this->retry_delay($attempt, $this->retry_after_from_curl($curl));
+            if ($deadline !== null && ($deadline - microtime(true)) < $delay + 3) {
+                break; // Sin tiempo para otro intento: se devuelve el error de este.
+            }
+            sleep($delay);
         }
 
         $response = json_decode($response_raw, true);
@@ -401,7 +494,9 @@ class anthropic_connector {
      * @param array $conversation_history
      * @param int $max_tokens
      * @param callable $ondelta fn(string $textdelta): void
-     * @return array ['answer', 'tokens_used', 'model', 'finish_reason']
+     * @param callable|null $onping fn(): void — se llama en los `ping` de Anthropic y durante las
+     *                      esperas de reintento, para emitir un comentario SSE `: ping` al navegador.
+     * @return array ['answer', 'tokens_used', 'model', 'finish_reason', 'truncated']
      * @throws \moodle_exception
      */
     public function stream_query_with_context(
@@ -409,7 +504,8 @@ class anthropic_connector {
         $system_prompt,
         array $conversation_history,
         int $max_tokens,
-        callable $ondelta
+        callable $ondelta,
+        ?callable $onping = null
     ): array {
         // NOTA: sin prefill de "assistant" — ver comentario en send_query_with_context().
         $payload = [
@@ -429,6 +525,7 @@ class anthropic_connector {
         // pantalla, repetir la petición duplicaría la respuesta. Los acumuladores se
         // reinician en cada intento para no mezclar estado entre ellos.
         $attempt = 0;
+        $connretries = 0;
         while (true) {
         $model_text = '';
         $tokens_in = 0;
@@ -436,6 +533,9 @@ class anthropic_connector {
         $cache_write = 0;
         $cache_read = 0;
         $finish_reason = 'unknown';
+        $stopped = false;       // ¿llegó message_stop? Sin él la respuesta no terminó.
+        $stream_error = null;   // `event: error` recibido en mitad del stream.
+        $retry_after = null;
         $sse_buffer = '';
         $error_body = '';
         $error_http_status = null;
@@ -448,9 +548,17 @@ class anthropic_connector {
             CURLOPT_HTTPHEADER => array_merge($this->headers(), ['Accept: text/event-stream']),
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_TIMEOUT => 120,
+            // Cabecera retry-after (429/529): se respeta, con tope, en la espera del reintento.
+            CURLOPT_HEADERFUNCTION => function($ch, $header) use (&$retry_after) {
+                if (stripos($header, 'retry-after:') === 0) {
+                    $retry_after = (int)trim(substr($header, 12));
+                }
+                return strlen($header);
+            },
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (
                 &$sse_buffer, &$model_text, &$tokens_in, &$tokens_out, &$cache_write, &$cache_read,
-                &$finish_reason, &$error_body, &$error_http_status, $ondelta
+                &$finish_reason, &$stopped, &$stream_error, &$error_body, &$error_http_status,
+                $ondelta, $onping
             ) {
                 // Con error HTTP, Anthropic devuelve un body JSON normal: acumularlo.
                 $httpcode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
@@ -499,6 +607,23 @@ class anthropic_connector {
                                 $finish_reason = (string)$event['delta']['stop_reason'];
                             }
                             break;
+                        case 'message_stop':
+                            $stopped = true;
+                            break;
+                        case 'ping':
+                            // Se reenvía al navegador: mantiene viva la conexión tras proxies.
+                            if ($onping !== null) {
+                                $onping();
+                            }
+                            break;
+                        case 'error':
+                            // Anthropic puede abrir el stream con HTTP 200 y fallar después
+                            // (p. ej. overloaded_error): llega como evento, no como código HTTP.
+                            $stream_error = [
+                                'type' => (string)($event['error']['type'] ?? ''),
+                                'message' => (string)($event['error']['message'] ?? ''),
+                            ];
+                            break;
                     }
                 }
                 return strlen($data);
@@ -512,22 +637,52 @@ class anthropic_connector {
         $curl_error = curl_error($curl);
         curl_close($curl);
 
-            if ($model_text === '' && $error_http_status !== null
-                    && $this->should_retry((int)$error_http_status, $attempt)) {
-                $attempt++;
-                error_log("Pulso: Anthropic stream HTTP {$error_http_status}, reintento {$attempt} de "
-                    . self::MAX_RETRIES);
-                sleep($this->retry_delay($attempt));
-                continue;
+            // Reintentos: SOLO si no se ha emitido ni un token.
+            if ($model_text === '') {
+                if ($error_http_status !== null && $this->should_retry((int)$error_http_status, $attempt)) {
+                    $attempt++;
+                    error_log("Pulso: Anthropic stream HTTP {$error_http_status}, reintento {$attempt} de "
+                        . self::MAX_RETRIES);
+                    $this->wait($this->retry_delay($attempt, $retry_after), $onping);
+                    continue;
+                }
+                if ($stream_error !== null && in_array($stream_error['type'], self::RETRYABLE_ERROR_TYPES, true)
+                        && $attempt < self::MAX_RETRIES) {
+                    $attempt++;
+                    error_log("Pulso: Anthropic stream error '{$stream_error['type']}', reintento {$attempt} de "
+                        . self::MAX_RETRIES);
+                    $this->wait($this->retry_delay($attempt, $retry_after), $onping);
+                    continue;
+                }
+                if ($curl_errno && $connretries < 1 && $this->is_connection_errno((int)$curl_errno)) {
+                    $connretries++;
+                    error_log("Pulso: Anthropic stream cURL {$curl_errno}, reintento de conexión.");
+                    $this->wait(1, $onping);
+                    continue;
+                }
             }
             break;
         }
 
-        if ($curl_errno) {
-            // Si ya llegó parte de la respuesta, devolver lo acumulado en vez de fallar.
-            if ($model_text === '') {
-                throw new \moodle_exception('error_api_connection', 'block_pulso', '', 'cURL error: ' . $curl_error);
-            }
+        // Error a mitad de stream (o sin tokens y sin reintentos): se trata como un 529 de la
+        // API — recuperable para el cliente (pulso_error lo clasifica «busy»). Si ya se emitió
+        // texto no se reintenta (duplicaría la respuesta) ni se da por buena la parte recibida.
+        if ($stream_error !== null) {
+            $err_type = $stream_error['type'] !== '' ? $stream_error['type'] : 'api_error';
+            throw new \moodle_exception(
+                'error_api_response',
+                'block_pulso',
+                '',
+                $stream_error['message'],
+                'HTTP 529 (' . $err_type . '): ' . $stream_error['message']
+            );
+        }
+
+        // Corte de red a mitad de respuesta: antes se devolvía lo acumulado como si fuera
+        // completo (un JSON a medias reparado a la fuerza). Sin message_stop la respuesta no
+        // terminó: error recuperable de red.
+        if ($curl_errno && !$stopped) {
+            throw new \moodle_exception('error_api_connection', 'block_pulso', '', 'cURL error: ' . $curl_error);
         }
 
         if ($error_body !== '') {
@@ -560,6 +715,8 @@ class anthropic_connector {
             'uncached_input_tokens' => $tokens_in,
             'model' => $this->model,
             'finish_reason' => $finish_reason,
+            // max_tokens: la respuesta se cortó. El endpoint avisa al cliente y NO la guarda en el historial.
+            'truncated' => $finish_reason === 'max_tokens',
         ];
     }
 
@@ -607,7 +764,8 @@ class anthropic_connector {
             'model' => $response['model'],
             'schema_valid' => $is_valid ? true : false,
             'schema_data' => $is_valid,
-            'finish_reason' => $response['finish_reason']
+            'finish_reason' => $response['finish_reason'],
+            'truncated' => !empty($response['truncated']),
         ];
     }
 

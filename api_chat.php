@@ -25,8 +25,10 @@ require_once(__DIR__ . '/classes/anthropic_connector.php');
 require_once(__DIR__ . '/classes/system_prompt_designer.php');
 require_once(__DIR__ . '/classes/rag_retriever.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
+require_once(__DIR__ . '/classes/chat_rate_limiter.php');
 
 use block_pulso\chat_pipeline;
+use block_pulso\chat_rate_limiter;
 use block_pulso\anthropic_connector;
 use block_pulso\system_prompt_designer;
 use block_pulso\pulso_error;
@@ -85,6 +87,12 @@ try {
     // T2.6.1: Verificar si Pulso está habilitado para este curso.
     chat_pipeline::check_enabled($courseid);
 
+    // Tope por persona (minuto y día), ANTES de contexto, RAG y Anthropic.
+    chat_rate_limiter::check((int)$USER->id);
+
+    // Respuesta + RAG + Anthropic pueden pasar de max_execution_time (30 s por defecto).
+    core_php_time_limit::raise(180);
+
     // Modo alumno: las preguntas de analítica se cortan AQUÍ, antes de leer
     // contexto, RAG o llamar a Anthropic. Ni un dato ni un token.
     if (!$isteacher && chat_pipeline::is_teacher_only_query($user_query)) {
@@ -111,6 +119,15 @@ try {
     // 1. CONTEXTO DEL CURSO (con cache corta) + RAG + HISTORIAL
     // ============================================================
 
+    // Historial primero: es lo único que lee $SESSION (el filtro de contradicciones RAG
+    // se aplica después, con el contexto ya calculado).
+    $history = chat_pipeline::prepare_history($courseid, $conversation_history, '');
+
+    // Liberar el lock de sesión de Moodle ANTES de contexto, RAG y Anthropic: el RAG
+    // llama a OpenAI y la IA tarda segundos; sin esto el resto de páginas/pestañas del
+    // usuario quedan bloqueadas mientras tanto.
+    \core\session\manager::write_close();
+
     $course_context = chat_pipeline::get_course_context($courseid);
 
     $rag = chat_pipeline::get_rag($courseid, $user_query);
@@ -118,13 +135,7 @@ try {
     // Solo viaja al cliente con viewanalytics (lleva nombres de fragmentos y el
     // estado interno del indice).
     $rag_diagnostics = chat_pipeline::client_rag_diagnostics($rag['diagnostics'], $isteacher);
-
-    $history = chat_pipeline::prepare_history($courseid, $conversation_history, $rag_context);
-
-    // Liberar el lock de sesión de Moodle ANTES de las llamadas a Anthropic:
-    // sin esto, el resto de páginas/pestañas del usuario quedan bloqueadas
-    // mientras se genera la respuesta.
-    \core\session\manager::write_close();
+    $history = chat_pipeline::drop_no_access_replies($history, $rag_context);
 
     // ============================================================
     // 2. RUTA DIRECTA (respuestas resueltas desde Moodle)
@@ -204,8 +215,15 @@ try {
     // 5. GENERAR PREGUNTAS DE SEGUIMIENTO (T2.4.12)
     // ============================================================
 
+    // max_tokens: respuesta cortada. Se avisa al cliente, no se guarda en el historial
+    // y no se piden sugerencias (sugerirían sobre algo a medias).
+    $truncated = !empty($ai_response['truncated']);
+
     $followup_questions = [];
     try {
+        if ($truncated) {
+            throw new \RuntimeException('truncated');
+        }
         $followup_questions = $connector->generate_followup_questions(
             $user_query,
             $answer,
@@ -217,17 +235,22 @@ try {
         }
     } catch (Exception $e) {
         // Si falla la generación de preguntas, continuar sin ellas.
-        error_log('Follow-up questions generation failed: ' . $e->getMessage());
+        if ($e->getMessage() !== 'truncated') {
+            error_log('Follow-up questions generation failed: ' . $e->getMessage());
+        }
     }
 
     // ============================================================
     // 6. GUARDAR HISTORIAL Y RETORNAR RESPUESTA
     // ============================================================
 
-    $history = chat_pipeline::save_history($courseid, $history, $user_query, $answer);
+    if (!$truncated) {
+        $history = chat_pipeline::save_history($courseid, $history, $user_query, $answer);
+    }
 
     $response = [
         'success' => true,
+        'truncated' => $truncated,
         'message' => 'Query procesado exitosamente',
         'answer' => $answer,
         'tokens_used' => $ai_response['tokens_used'] ?? 0,

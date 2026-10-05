@@ -650,7 +650,7 @@ class chat_pipeline {
      *
      * @param int $courseid
      * @param string $conversation_history JSON enviado por el cliente
-     * @param string $rag_context
+     * @param string $rag_context Contexto RAG ya calculado, o '' si aún no (ver drop_no_access_replies()).
      * @return array
      */
     public static function prepare_history(int $courseid, string $conversation_history, string $rag_context): array {
@@ -717,23 +717,38 @@ class chat_pipeline {
             return trim((string)($msg['content'] ?? '')) !== '';
         }));
 
-        // Evitar contradicciones: si hay contexto RAG actual, no reutilizar
-        // respuestas antiguas del asistente que decían que no tenía acceso.
-        if (!empty($rag_context)) {
-            $history = array_values(array_filter($history, function($msg) {
-                if (($msg['role'] ?? '') !== 'assistant') {
-                    return true;
-                }
-                $c = mb_strtolower((string)($msg['content'] ?? ''), 'UTF-8');
-                if (strpos($c, 'no tengo acceso') !== false) return false;
-                if (strpos($c, 'no dispongo de acceso') !== false) return false;
-                if (strpos($c, 'no hay acceso') !== false) return false;
-                if (strpos($c, 'falta de acceso') !== false) return false;
-                return true;
-            }));
-        }
+        // Con $rag_context vacío (los endpoints lo piden así: el RAG aún no se ha
+        // calculado porque la sesión se cierra ANTES) no filtra nada; después del RAG
+        // se llama a drop_no_access_replies() con el contexto real.
+        return self::drop_no_access_replies($history, $rag_context);
+    }
 
-        return $history;
+    /**
+     * Evitar contradicciones: si hay contexto RAG actual, no reutilizar respuestas
+     * antiguas del asistente que decían que no tenía acceso.
+     *
+     * Separada de prepare_history() (v1.31.0) para poder leer $SESSION y cerrar la
+     * sesión ANTES del RAG, que llama a OpenAI (embedding de la consulta).
+     *
+     * @param array $history Salida de prepare_history().
+     * @param string $rag_context
+     * @return array
+     */
+    public static function drop_no_access_replies(array $history, string $rag_context): array {
+        if (empty($rag_context)) {
+            return $history;
+        }
+        return array_values(array_filter($history, function($msg) {
+            if (($msg['role'] ?? '') !== 'assistant') {
+                return true;
+            }
+            $c = mb_strtolower((string)($msg['content'] ?? ''), 'UTF-8');
+            if (strpos($c, 'no tengo acceso') !== false) return false;
+            if (strpos($c, 'no dispongo de acceso') !== false) return false;
+            if (strpos($c, 'no hay acceso') !== false) return false;
+            if (strpos($c, 'falta de acceso') !== false) return false;
+            return true;
+        }));
     }
 
     /**

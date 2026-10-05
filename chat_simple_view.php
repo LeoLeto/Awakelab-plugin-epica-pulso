@@ -58,6 +58,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     // Rol para la UI (capacidades y sugerencias). No es un control de acceso.
     $pulso_isteacher = !empty($isteacher) ? 'true' : 'false';
 
+    // ¿Hay Épica en este sitio? Solo presentación: los endpoints api_create_submit,
+    // api_retos y epica_historial lo vuelven a comprobar.
+    require_once(__DIR__ . '/classes/epica_client.php');
+    $epicaavailable = \block_pulso\epica_client::disponible();
+    $pulso_epica = $epicaavailable ? 'true' : 'false';
+
     // Inyectar variables globales JavaScript
     $js_init = <<<JSINIT
     <script>
@@ -74,6 +80,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         window.pulsoSesskey = '{$pulso_sesskey}';
         // Solo para adaptar la UI: el servidor decide qué datos se devuelven.
         window.pulsoIsTeacher = {$pulso_isteacher};
+        // Épica disponible en este sitio (solo para la UI; el servidor lo exige igualmente).
+        window.pulsoEpicaAvailable = {$pulso_epica};
 
         // T2.5.3: Recuperar historial de sessionStorage (persiste entre recargas)
         try {
@@ -2451,9 +2459,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 <div class="pulso-home-section create">
                     <div class="pulso-home-section-head">
                         <span class="pulso-home-section-title">Crear</span>
-                        <!--PULSO_STUDENT_ONLY_START--><button type="button" class="pulso-historial-link head" onclick="pulsoAbrirHistorial()">Mi historial ↗</button><!--PULSO_STUDENT_ONLY_END-->
+                        <!--PULSO_STUDENT_ONLY_START--><!--PULSO_EPICA_ONLY_START--><button type="button" class="pulso-historial-link head" onclick="pulsoAbrirHistorial()">Mi historial ↗</button><!--PULSO_EPICA_ONLY_END--><!--PULSO_STUDENT_ONLY_END-->
                     </div>
                     <div class="pulso-create-cta-row">
+                        <!--PULSO_EPICA_ONLY_START-->
                         <button type="button" class="pulso-create-cta" onclick="openCreatePanel('infografia')">
                             <span class="pulso-create-cta-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
@@ -2472,6 +2481,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                                 <span class="pulso-create-cta-sub">A partir de un recurso del curso</span>
                             </span>
                         </button>
+                        <!--PULSO_EPICA_ONLY_END-->
                         <button type="button" class="pulso-create-cta" onclick="openCreatePanel('ampliacion')">
                             <span class="pulso-create-cta-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
@@ -2481,6 +2491,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                                 <span class="pulso-create-cta-sub">Vídeos y artículos sobre un recurso del curso</span>
                             </span>
                         </button>
+                        <!--PULSO_EPICA_ONLY_START-->
                         <button type="button" class="pulso-create-cta" onclick="openCreatePanel('retos')">
                             <span class="pulso-create-cta-icon" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
@@ -2490,6 +2501,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                                 <span class="pulso-create-cta-sub">Un caso práctico que corrige la IA</span>
                             </span>
                         </button>
+                        <!--PULSO_EPICA_ONLY_END-->
                     </div>
                 </div>
                 <!--PULSO_CREATE_ONLY_END-->
@@ -4058,7 +4070,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         function renderCreateNoResources(reason) {
             const labels = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool];
             const messages = {
-                'not_indexed': 'Este curso todavía no se ha indexado. La indexación es nocturna: si el curso es nuevo, vuelve a intentarlo mañana.',
+                'not_indexed': 'El curso aún no se ha procesado. Espera a la próxima pasada (es nocturna) o pide a quien administre el sitio que ejecute la tarea «Indexar el contenido del curso».',
                 'no_usable': labels.noUsableReason,
                 'no_visible': 'No tienes acceso a ningún recurso indexado de este curso.'
             };
@@ -5111,6 +5123,13 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 html += '<p class="pulso-create-hint">' + escapeHtmlText(progressLine) + '</p>';
             }
 
+            // El servidor marca `delayed` si el encargo lleva más de 10 minutos en
+            // «pendiente»: el cron de Moodle no lo está recogiendo (parado o atrasado).
+            if (encargo.status === 'pendiente' && encargo.delayed) {
+                html += '<div class="pulso-create-notice-inline warn">La cola de trabajos de este sitio va con retraso. '
+                    + 'Te avisaremos cuando esté ' + (esjuego ? 'listo' : 'lista') + '.</div>';
+            }
+
             // Pasados 2 minutos sin terminar, deja claro que no hace falta
             // seguir mirando: el aviso de mensajería ya lo manda
             // notify_completion() en servidor cuando el encargo termine.
@@ -5208,8 +5227,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 .then(function(r) { return r.json(); })
                 .then(function(data) { return data.success ? (data.encargos || []) : null; })
                 .catch(function() { return null; });
-            const retosP = pulsoRetosCall('mis_retos')
-                .then(function(d) { return d.ok && Array.isArray(d.retos) ? d.retos : []; });
+            // Sin Épica, api_retos.php contesta «no disponible» a todo: ni se pide.
+            const retosP = (window.pulsoEpicaAvailable === false)
+                ? Promise.resolve([])
+                : pulsoRetosCall('mis_retos')
+                    .then(function(d) { return d.ok && Array.isArray(d.retos) ? d.retos : []; });
 
             Promise.all([encargosP, retosP]).then(function(res) {
                 if (seq !== pulsoGallerySeq) return;
@@ -5288,7 +5310,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // crea un <form> POST con courseid + sesskey hacia nuestro endpoint, en
         // pestaña nueva y en el propio clic (sin bloqueo de ventanas emergentes).
         function pulsoHistorialFooter() {
-            if (window.pulsoIsTeacher !== false) return '';
+            if (window.pulsoIsTeacher !== false || window.pulsoEpicaAvailable === false) return '';
             return '<p class="pulso-create-hint"><button type="button" class="pulso-historial-link" onclick="pulsoAbrirHistorial()">Ver todo mi historial en Épica ↗</button><br>'
                 + 'Se abre en una pestaña nueva. Solo aparece lo creado desde el 5 de octubre de 2026.</p>';
         }
@@ -5464,6 +5486,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // ========== ENVÍO DE MENSAJES (streaming SSE + fallback XHR) ==========
 
         let pulsoSending = false;
+        // Topes de tiempo del cliente (v1.31.0): el servidor llama a Anthropic con 120 s
+        // (stream) / 110 s (XHR) y tiene 180 s de límite de ejecución.
+        const PULSO_STREAM_TIMEOUT_MS = 150000;
+        const PULSO_XHR_TIMEOUT_MS = 110000;
         let streamBubble = null;
         let typingBubble = null;
 
@@ -5580,6 +5606,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 empty: 'Pulse no ha podido responder esta vez. Vuelve a intentarlo.',
                 refusal: 'Pulse no puede responder a esta petición. Prueba a reformular la pregunta.',
                 encoding: 'No se ha podido preparar la petición. Empieza una conversación nueva («Nueva conversación») e inténtalo de nuevo.',
+                rate_limited: 'Has enviado muchas preguntas seguidas. Espera un minuto.',
+                rate_limited_day: 'Has llegado al límite de preguntas de hoy. Podrás seguir mañana.',
+                unavailable: 'La creación de contenidos no está disponible en este sitio.',
+                timeout: 'La respuesta está tardando demasiado. Vuelve a intentarlo.',
+                truncated: 'La respuesta se ha cortado. Pídeme que la continúe o haz una pregunta más concreta.',
                 unknown: 'Algo ha fallado. Vuelve a intentarlo en un momento; si sigue igual, pulsa «Nueva conversación».'
             },
             en: {
@@ -5593,6 +5624,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 empty: 'Pulse could not answer this time. Please try again.',
                 refusal: 'Pulse cannot answer this request. Try rephrasing your question.',
                 encoding: 'The request could not be prepared. Start a new conversation ("Nueva conversación") and try again.',
+                rate_limited: 'You have sent a lot of questions in a row. Wait a minute.',
+                rate_limited_day: 'You have reached today\'s question limit. You can continue tomorrow.',
+                unavailable: 'Content creation is not available on this site.',
+                timeout: 'The answer is taking too long. Please try again.',
+                truncated: 'The answer was cut off. Ask me to continue or ask a more specific question.',
                 unknown: 'Something went wrong. Try again in a moment; if it keeps happening, press "Nueva conversación".'
             }
         };
@@ -5631,6 +5667,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 }
                 const formattedAnswer = formatAIResponse(response.answer, showAnalysisSections);
                 addMessage(formattedAnswer, 'ai', true);
+
+                // La respuesta se cortó por max_tokens (v1.31.0): se avisa y NO entra en
+                // el historial (un turno cortado, reenviado al modelo, hacía que lo
+                // continuara en vez de contestar la pregunta nueva). Sin sugerencias.
+                if (response.truncated) {
+                    addMessage(pulsoFailureMessage({error_code: 'truncated'}), 'ai');
+                    return;
+                }
 
                 // Mostrar preguntas sugeridas (T2.4.12) — en streaming pueden
                 // llegar después como evento 'followups'.
@@ -5746,6 +5790,19 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             let gotFinal = false;
             let receivedAny = false;
 
+            // Tope de ~150 s para todo el stream (el servidor tiene 180 s de límite y la
+            // llamada a Anthropic 120 s): si salta, aviso claro y se libera el envío.
+            // Sin esto, una conexión colgada dejaba la interfaz bloqueada para siempre.
+            let timedOut = false;
+            const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const timeoutTimer = ctrl ? setTimeout(function() {
+                timedOut = true;
+                ctrl.abort();
+            }, PULSO_STREAM_TIMEOUT_MS) : null;
+            function clearStreamTimer() {
+                if (timeoutTimer) clearTimeout(timeoutTimer);
+            }
+
             function handleSseEvent(raw) {
                 let eventName = 'message';
                 const dataLines = [];
@@ -5795,7 +5852,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             fetch(window.streamApiUrl, {
                 method: 'POST',
                 body: buildChatFormData(message),
-                credentials: 'same-origin'
+                credentials: 'same-origin',
+                signal: ctrl ? ctrl.signal : undefined
             })
             .then(function(res) {
                 const ct = res.headers.get('content-type') || '';
@@ -5835,6 +5893,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 return pump();
             })
             .then(function() {
+                clearStreamTimer();
                 pulsoSending = false;
                 if (!gotFinal) {
                     removeStreamBubble();
@@ -5848,14 +5907,21 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 }
             })
             .catch(function(err) {
+                clearStreamTimer();
                 pulsoSending = false;
                 removeStreamBubble();
-                if (!gotFinal && !receivedAny) {
+                if (gotFinal) return;
+                if (timedOut) {
+                    // Nunca al endpoint clásico: repetiría la petición que ya agotó el tiempo.
+                    showLoading(false);
+                    addMessage(pulsoFailureMessage({error_code: 'timeout'}), 'ai');
+                } else if (!receivedAny) {
                     console.warn('⚠️ Streaming no disponible, usando endpoint clásico:', err.message);
                     sendMessageXHR(message);
-                } else if (!gotFinal) {
+                } else {
+                    // Corte de red a mitad de respuesta: aviso y el envío queda libre.
                     showLoading(false);
-                    addMessage('⚠️ Error de conexión durante el streaming', 'ai');
+                    addMessage(pulsoFailureMessage({error_code: 'network'}), 'ai');
                 }
             });
         }
@@ -5863,28 +5929,51 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // ---------- Fallback XHR clásico (api_chat.php) ----------
 
         function sendMessageXHR(message) {
+            // También bloquea el envío (antes solo lo hacía el stream: con el fallback se
+            // podían lanzar dos preguntas a la vez).
+            pulsoSending = true;
             showLoading(true);
             const xhr = new XMLHttpRequest();
+            let finished = false;
 
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    showLoading(false);
-                    console.log('📡 AJAX Status:', xhr.status);
+            // Cierra la petición UNA vez (load/timeout/error/abort son excluyentes pero
+            // conviene no depender de ello): libera el envío y quita el «escribiendo».
+            function finish() {
+                if (finished) return false;
+                finished = true;
+                pulsoSending = false;
+                showLoading(false);
+                return true;
+            }
 
-                    // El cuerpo se lee con cualquier código: el servidor contesta 4xx/5xx
-                    // con {success:false, error_code} y el texto se elige por ese código.
-                    let response = null;
-                    try {
-                        response = JSON.parse(xhr.responseText);
-                    } catch (e) {
-                        console.error('❌ Respuesta no JSON (HTTP ' + xhr.status + '):', xhr.responseText);
-                    }
-                    if (response && typeof response === 'object') {
-                        handleChatResponse(message, response);
-                    } else {
-                        addMessage(pulsoFailureMessage({error_code: xhr.status === 0 ? 'network' : 'unknown'}), 'ai');
-                    }
+            // Tope de 110 s (el servidor llama a Anthropic con 110 s y tiene 180 s de límite).
+            xhr.timeout = PULSO_XHR_TIMEOUT_MS;
+
+            xhr.onload = function() {
+                if (!finish()) return;
+                console.log('📡 AJAX Status:', xhr.status);
+
+                // El cuerpo se lee con cualquier código: el servidor contesta 4xx/5xx
+                // con {success:false, error_code} y el texto se elige por ese código.
+                let response = null;
+                try {
+                    response = JSON.parse(xhr.responseText);
+                } catch (e) {
+                    console.error('❌ Respuesta no JSON (HTTP ' + xhr.status + '):', xhr.responseText);
                 }
+                if (response && typeof response === 'object') {
+                    handleChatResponse(message, response);
+                } else {
+                    addMessage(pulsoFailureMessage({error_code: 'unknown'}), 'ai');
+                }
+            };
+            xhr.ontimeout = function() {
+                if (!finish()) return;
+                addMessage(pulsoFailureMessage({error_code: 'timeout'}), 'ai');
+            };
+            xhr.onerror = xhr.onabort = function() {
+                if (!finish()) return;
+                addMessage(pulsoFailureMessage({error_code: 'network'}), 'ai');
             };
 
             xhr.open('POST', window.apiUrl, true);
@@ -6294,6 +6383,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         $html = preg_replace('/<!--PULSO_CREATE_ONLY_START-->.*?<!--PULSO_CREATE_ONLY_END-->/s', '', $html);
     }
     $html = preg_replace('/<!--PULSO_CREATE_ONLY_(START|END)-->/', '', $html);
+
+    // Herramientas de Épica (infografía, juego, retos, «Mi historial»): solo si Épica está
+    // disponible en este sitio (v1.31.0). Sin ella se quitan del HTML —no se ocultan con
+    // CSS— y queda solo «Ampliar recurso». Los endpoints lo vuelven a exigir.
+    if (!$epicaavailable) {
+        $html = preg_replace('/<!--PULSO_EPICA_ONLY_START-->.*?<!--PULSO_EPICA_ONLY_END-->/s', '', $html);
+    }
+    $html = preg_replace('/<!--PULSO_EPICA_ONLY_(START|END)-->/', '', $html);
 
     // Inyectar versión, nombre y curso (el bloque HTML es un nowdoc sin interpolación).
     $html = str_replace('%%PULSO_VERSION%%', s($pulso_release), $html);

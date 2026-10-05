@@ -74,8 +74,11 @@ but the `$plugin->version` bump is still mandatory every time.
 - `classes/embedding_manager.php` — still uses OpenAI (`block_pulso/openai_key`,
   `text-embedding-3-small`) exclusively for RAG embeddings. This is the ONLY
   remaining use of the OpenAI key in the plugin — do not repurpose it for chat.
-- Both endpoints call `\core\session\manager::write_close()` before calling the
-  AI so the Moodle session lock doesn't freeze the user's other tabs.
+- Both endpoints call `\core\session\manager::write_close()` **antes de contexto, RAG
+  y Anthropic** (v1.31.0; hasta v1.30 iba después de `get_rag()`, que llama a OpenAI con
+  hasta 60 s de timeout y congelaba las demás pestañas): primero `prepare_history()` (lo
+  único que lee `$SESSION`), luego `write_close()`, luego contexto + RAG y por último
+  `drop_no_access_replies()` (el filtro de contradicciones RAG, que necesita el contexto).
   Server-side `$SESSION` history writes after that point don't persist — the
   client's sessionStorage copy is the source of truth.
 
@@ -1462,6 +1465,70 @@ Reglas permanentes salidas de la auditoría; las tres primeras son de seguridad/
   quien tiene `moodle/course:update` ve «Pulse está desactivado en este curso».
 - **`lang/es/block_pulso.php` es obligatorio**: toda cadena nueva de `lang/en` lleva aquí su
   traducción (mismas claves; comprobable con un diff de claves).
+
+## Auditoría de UX, fase 2 — funcionar (o decir por qué no) en cualquier plataforma (v1.31.0)
+
+Reglas permanentes. Tocan `db/caches.php` (definición nueva `chatrate`): hay que pasar por Notificaciones.
+
+- **Épica es OPCIONAL.** `version.php` ya no declara `local_awkepica` en `dependencies`: Pulse se
+  instala en una plataforma sin Épica. `epica_client::disponible()` = `class_exists('\local_awkepica\epica')`
+  + `configurado()` + `base_url_error() === null` (memoizado por petición) es la ÚNICA puerta:
+  **ninguna referencia a `\local_awkepica\...` fuera de código que ya haya pasado por `disponible()` o
+  `class_exists()`** (`precondiciones_error()` ya lo comprueba por sí mismo; la espera larga sale de
+  `epica_client::espera_larga()`, que cae a 180 s si el plugin no está). Sin Épica: `render_chat_simple()`
+  quita del HTML (marcadores `PULSO_EPICA_ONLY_START/END`, no CSS) los CTA de infografía, juego, retos y
+  «Mi historial» —«Ampliar recurso» sigue— y expone `window.pulsoEpicaAvailable` (el cliente salta
+  `mis_retos`); `api_create_form` (todo menos `tool=ampliacion`), `api_create_submit`, `api_retos` y
+  `epica_historial` contestan «La creación de contenidos no está disponible en este sitio» **sin
+  insertar nada** (antes el encargo se guardaba, gastaba cupo y fallaba en el cron). `epica_base_url`
+  ya NO tiene valor por defecto (antes apuntaba al QA: una producción mal configurada habría mandado
+  material al QA); vacío = no disponible; solo `https://` o vacío (validado al guardar).
+- **El texto completo NO depende de OpenAI ni del RAG.** `rag_retriever::index_course()` guarda
+  `block_pulso_full_text` SIEMPRE y en su propio try; los fragmentos + embeddings solo si
+  `embeddings_wanted()` (RAG activado Y clave de OpenAI) y en otro try (un fallo de embeddings no pierde
+  el texto: antes `new embedding_manager()` lanzaba sin clave ANTES de guardarlo y en una instalación nueva
+  Crear decía siempre «no hay recursos»). Las dos tareas de cron se saltan solo si
+  `text_extraction_wanted()` es falso: RAG apagado Y sin Épica Y sin claves de Ampliación. El aviso de lista
+  vacía `not_indexed` del panel dice «el curso aún no se ha procesado…» (esperar a la pasada nocturna o
+  que el administrador ejecute la tarea). `request_background_index()` sigue siendo solo del camino RAG.
+- **Tope del chat por persona** (`classes/chat_rate_limiter.php`): `chat_max_por_minuto_usuario` (6,
+  ventana móvil) y `chat_max_por_dia_usuario` (150), 0 = sin límite; contador en MUC (definición
+  `chatrate`, TTL 1 día). Se comprueba tras `check_enabled()` y ANTES de contexto, RAG y Anthropic en los
+  dos endpoints; error `rate_limited` / `rate_limited_day` (HTTP 429, texto en `err_rate_limited*`). **Falla
+  ABIERTO** (caché sin registrar o caída): un limitador no puede tumbar lo que protege. Cuenta también
+  rutas directas y denegaciones por rol. MUC no es atómico entre procesos: candado corto por usuario.
+- **Streaming (`anthropic_connector`)**: `event: error` (p. ej. `overloaded_error` con HTTP 200) se trata
+  como un 529 — reintento si aún no se emitió ningún token; con texto ya emitido, `moodle_exception`
+  `error_api_response` con debuginfo `HTTP 529 (tipo)` que `pulso_error` clasifica «busy». **Sin
+  `message_stop` + error de cURL = error de red**, no se devuelve lo acumulado como si fuera completo
+  (antes se reparaba un JSON a medias). `stop_reason = max_tokens` → `truncated: true` en el payload
+  (`final`/JSON): el cliente avisa «La respuesta se ha cortado», NO la guarda en el historial (ni servidor
+  ni `conversationHistory`) y no pide sugerencias. Reintentos: respeta `retry-after` (tope 10 s,
+  cabecera por `CURLOPT_HEADERFUNCTION`/`get_raw_response()`), y UN reintento de errores de cURL de
+  conexión (6, 7, 35, 52, 55, 56; no el 28) si no se emitió nada. Timeout de la llamada no-stream 110 s.
+- **Timeouts y proxies**: servidor `core_php_time_limit::raise(180)` en los endpoints de chat; cliente
+  `AbortController` de 150 s en el stream (al saltar: «La respuesta está tardando demasiado…», NUNCA
+  cae al XHR: repetiría la petición) y `xhr.timeout = 110000`; `sendMessageXHR` también pone
+  `pulsoSending`. SSE: además de `X-Accel-Buffering: no`, `Content-Encoding: identity` y
+  `apache_setenv('no-gzip')`, y `: ping` (comentario SSE que el cliente ignora) entre las fases
+  contexto/RAG, en las esperas de reintento y reenviando los `ping` de Anthropic (`$onping`). El
+  embedding de la CONSULTA del chat tiene timeout de 8 s (`embedding_manager::QUERY_TIMEOUT`; hay
+  fallback léxico); el de indexación sigue en 60 s.
+- **Ampliación con presupuesto de tiempo** (`TIME_BUDGET_S` = 45): `send_fast_query(..., $deadline)` y
+  `http_get_json` acotan cada llamada a lo que queda; con < 10 s se salta el juez (selección sin juez) y
+  se responde con lo que haya. Un fallo TRANSITORIO (red, 429/5xx/529, presupuesto agotado:
+  `is_transient()`) se guarda con la marca `[transitorio] ` al inicio de `motivo` (sin columna nueva) y se
+  cachea 5 minutos (`TRANSIENT_FAILURE_TTL`) en vez de 1 h. El código de la `RuntimeException` de
+  `http_get_json` es el HTTP (0 = red/presupuesto): no cambiarlo sin tocar `is_transient()`.
+- **Diagnóstico para administración** (`diagnostico.php`, `require_admin()`, enlazada desde los ajustes;
+  lógica en `classes/diagnostics.php`): Anthropic, OpenAI, YouTube (`videos.list`, 1 unidad), OpenAlex,
+  Épica, cron (`MAX(lastruntime)` de `task_scheduled`), tarea de indexación, tareas adhoc de
+  `block_pulso`, y cursos con el bloque sin texto completo. Todo por el `\curl` de Moodle (proxy);
+  `check_api_key.php` / `check_anthropic_key.php` ahora son envoltorios de la misma clase. **Nunca
+  muestra claves** (`diagnostics::scrub()`). Los ajustes numéricos validan `>= 0` (`set_validate_function`).
+- **Cron parado visible**: `api_create_status` marca `delayed` si un encargo lleva > 10 min en
+  `pendiente`; el panel dice «La cola de trabajos de este sitio va con retraso…». (El hueco conocido del
+  429 `cuota-del-centro` también deja encargos en `pendiente`: el aviso es neutro a propósito.)
 
 ## Dev notes
 

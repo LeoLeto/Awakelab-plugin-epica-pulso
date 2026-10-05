@@ -2,10 +2,10 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026100504; // RAG filtra uservisible, errores por error_code, lang/es
-$plugin->release   = '1.30.0';    // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026100505; // Fase 2 UX: Épica opcional, tope del chat, timeouts, diagnóstico
+$plugin->release   = '1.31.0';    // Semver visible en el header del chat — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;
-$plugin->dependencies = [
-    'local_awkepica' => 2026090902, // 1.1.0 — expone epica::rol_de()/firmar_por()/pedir()/ESPERA_LARGA_S
-];
+// Sin $plugin->dependencies: local_awkepica es OPCIONAL (v1.31.0). Pulse se instala en una
+// plataforma sin Épica; las herramientas de Épica solo se ofrecen si
+// epica_client::disponible() — ver CLAUDE.md.

@@ -1,5 +1,29 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-05 — Auditoría de UX fase 2: funcionar en cualquier plataforma (v1.31.0)
+
+Reglas en `CLAUDE.md` → «Auditoría de UX, fase 2». Toca `db/caches.php` (`chatrate`): Notificaciones. Lo que costó ver:
+- **El texto completo dependía de OpenAI sin decirlo**: `index_course()` hacía `new embedding_manager()`
+  (lanza sin clave) ANTES de `store_course_texts()`, y las dos tareas de cron salían con `rag_enabled`=0
+  (valor por defecto). Resultado: instalación nueva → `block_pulso_full_text` vacía → Crear «sin recursos».
+- **La regla de CLAUDE.md sobre `write_close()` estaba desactualizada**: daba por resuelto el bloqueo de
+  sesión, pero `write_close()` iba DESPUÉS de `get_rag()` (OpenAI, 60 s). `prepare_history()` mezclaba la
+  lectura de `$SESSION` con el filtro de contradicciones RAG (que necesita el contexto): se partió en
+  `prepare_history()` + `drop_no_access_replies()`.
+- **Antes se devolvía como completa una respuesta cortada por la red**: con error de cURL y texto parcial,
+  el conector devolvía lo acumulado y `clean_answer()` reparaba el JSON a la fuerza. Ahora, sin
+  `message_stop`, es error de red.
+- **`readystatechange(4)` salta antes que `timeout` en XHR**: se reescribió con `onload`/`ontimeout`/
+  `onerror` en vez de intentar deducir el timeout.
+- **`$plugin->dependencies` obligaba a instalar `local_awkepica`**; ahora es opcional con `disponible()`.
+  Decisiones: `api_create_form` también se cierra sin Épica (no estaba en el encargo); `mis_retos` también
+  (lee solo nuestra tabla, pero la herramienta no existe); limitador con definición MUC propia y falla
+  abierto; sin columna nueva para marcar fallos transitorios de Ampliación (prefijo en `motivo`).
+- **NO probado** (sin Moodle ni navegador): solo `php -l` de todo lo tocado (PHP 8.3 portátil) y
+  `node --check` del `<script>`. Pendiente en sanase-test / un Moodle sin `local_awkepica`: instalar sin
+  Épica (solo «Ampliar»), 7 mensajes en un minuto, `diagnostico.php` en verde, red cortada a mitad de
+  respuesta, Crear sin clave de OpenAI tras ejecutar la tarea, `overloaded_error` simulado en el stream.
+
 ## 2026-10-05 — Auditoría de UX fase 1 (v1.30.0)
 
 Reglas en `CLAUDE.md` → «Auditoría de UX, fase 1». Lo que costó ver:

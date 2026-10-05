@@ -3196,17 +3196,64 @@ class rag_retriever {
         $extractor = new content_extractor();
         $chunks    = $extractor->extract_course_content($courseid);
 
-        $manager = new embedding_manager();
-        $stats = $manager->index_course_chunks($courseid, $chunks);
+        $stats = [
+            'indexed' => 0, 'skipped' => 0, 'deleted' => 0, 'embedded' => 0, 'embed_errors' => 0,
+            'fulltext_stored' => 0, 'fulltext_skipped' => 0, 'fulltext_deleted' => 0,
+        ];
 
-        // Texto completo (Epica), capturado por el extractor durante la misma
-        // pasada — no hace falta releer ni reextraer nada.
-        $fulltextstats = full_text_store::store_course_texts($courseid, $extractor->get_extracted_full_texts());
-        $stats['fulltext_stored']  = $fulltextstats['stored'];
-        $stats['fulltext_skipped'] = $fulltextstats['skipped'];
-        $stats['fulltext_deleted'] = $fulltextstats['deleted'];
+        // 1. Texto completo (Crear: Épica, Ampliación). SIEMPRE y en su propio try
+        //    (v1.31.0): no depende de OpenAI ni de rag_enabled. Antes iba detrás de
+        //    `new embedding_manager()`, que lanza sin clave de OpenAI, así que en una
+        //    instalación nueva block_pulso_full_text quedaba vacía y Crear decía
+        //    siempre «no hay recursos». Lo captura el extractor en la misma pasada.
+        try {
+            $fulltextstats = full_text_store::store_course_texts($courseid, $extractor->get_extracted_full_texts());
+            $stats['fulltext_stored']  = $fulltextstats['stored'];
+            $stats['fulltext_skipped'] = $fulltextstats['skipped'];
+            $stats['fulltext_deleted'] = $fulltextstats['deleted'];
+        } catch (\Throwable $e) {
+            error_log('Pulso: texto completo del curso ' . $courseid . ' no guardado: ' . $e->getMessage());
+            $stats['fulltext_error'] = 1;
+        }
+
+        // 2. Fragmentos + embeddings: solo con el RAG activado Y clave de OpenAI.
+        if (self::embeddings_wanted()) {
+            try {
+                $manager = new embedding_manager();
+                $stats = array_merge($stats, $manager->index_course_chunks($courseid, $chunks));
+            } catch (\Throwable $e) {
+                // El texto completo ya está guardado: un fallo de embeddings no lo pierde.
+                error_log('Pulso RAG: embeddings del curso ' . $courseid . ' no generados: ' . $e->getMessage());
+                $stats['rag_error'] = 1;
+            }
+        }
 
         return $stats;
+    }
+
+    /** ¿Se generan fragmentos y embeddings? Requiere RAG activado y clave de OpenAI. */
+    public static function embeddings_wanted(): bool {
+        return (bool)get_config('block_pulso', 'rag_enabled')
+            && trim((string)get_config('block_pulso', 'openai_key')) !== '';
+    }
+
+    /**
+     * ¿Hay que extraer el texto de los cursos en el cron? Sí si el RAG está activado o si
+     * hay alguna herramienta de Crear disponible: Épica (infografía/juego/retos) o
+     * Ampliación (clave de YouTube u OpenAlex). Si nada de eso, extraer PDFs cada noche
+     * sería trabajo y coste sin consumidor.
+     */
+    public static function text_extraction_wanted(): bool {
+        if (get_config('block_pulso', 'rag_enabled')) {
+            return true;
+        }
+        require_once(__DIR__ . '/epica_client.php');
+        require_once(__DIR__ . '/ampliacion_service.php');
+        if (epica_client::disponible()) {
+            return true;
+        }
+        $amp = ampliacion_service::configured();
+        return $amp['youtube'] || $amp['openalex'];
     }
 
     /**

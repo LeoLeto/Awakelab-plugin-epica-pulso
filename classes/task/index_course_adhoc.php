@@ -45,8 +45,8 @@ class index_course_adhoc extends \core\task\adhoc_task {
             return;
         }
 
-        if (!get_config('block_pulso', 'rag_enabled')) {
-            mtrace('Pulso RAG (adhoc): skipped — rag_enabled is off.');
+        if (!\block_pulso\rag_retriever::text_extraction_wanted()) {
+            mtrace('Pulso RAG (adhoc): skipped — RAG off and no Crear tool available.');
             return;
         }
 

@@ -25,10 +25,16 @@ class index_course_content extends \core\task\scheduled_task {
     public function execute(): void {
         global $DB;
 
-        // Skip entirely if RAG is disabled in settings.
-        if (!get_config('block_pulso', 'rag_enabled')) {
-            mtrace('Pulso RAG: indexing skipped — rag_enabled is off.');
+        // El texto completo lo necesitan las herramientas de Crear aunque el RAG esté
+        // apagado (v1.31.0): se salta solo si NADA lo consume (RAG apagado y sin Épica
+        // ni Ampliación). Los embeddings dependen además de rag_enabled y de la clave
+        // de OpenAI (rag_retriever::embeddings_wanted()).
+        if (!\block_pulso\rag_retriever::text_extraction_wanted()) {
+            mtrace('Pulso RAG: indexing skipped — RAG off and no Crear tool available.');
             return;
+        }
+        if (!\block_pulso\rag_retriever::embeddings_wanted()) {
+            mtrace('Pulso: solo texto completo (sin embeddings: RAG apagado o falta la clave de OpenAI).');
         }
 
         $default_enabled = get_config('block_pulso', 'enabled_by_default');
@@ -81,6 +87,10 @@ class index_course_content extends \core\task\scheduled_task {
                 $total_deleted += $stats['deleted'];
                 $total_fulltext_stored += $stats['fulltext_stored'] ?? 0;
                 $courses_done++;
+                if (!empty($stats['rag_error']) || !empty($stats['fulltext_error'])) {
+                    mtrace('    AVISO: fallo parcial (ver error_log) — rag_error=' . (int)($stats['rag_error'] ?? 0)
+                        . ' fulltext_error=' . (int)($stats['fulltext_error'] ?? 0));
+                }
                 mtrace("    indexed={$stats['indexed']} skipped={$stats['skipped']} deleted={$stats['deleted']} " .
                     "| texto completo: nuevo/actualizado={$stats['fulltext_stored']} " .
                     "sin cambios={$stats['fulltext_skipped']} borrados={$stats['fulltext_deleted']}");

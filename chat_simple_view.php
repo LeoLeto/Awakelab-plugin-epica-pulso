@@ -43,6 +43,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $create_status_url = $CFG->wwwroot . '/blocks/pulso/api_create_status.php';
     $ampliacion_url = $CFG->wwwroot . '/blocks/pulso/api_ampliacion.php';
     $retos_url = $CFG->wwwroot . '/blocks/pulso/api_retos.php';
+    $historial_url = $CFG->wwwroot . '/blocks/pulso/epica_historial.php';
 
     // Leer la versión directamente de version.php (no de la BD) para que el
     // badge del header refleje siempre el código desplegado, incluso antes
@@ -69,6 +70,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         window.apiCreateStatusUrl = '{$create_status_url}';
         window.apiAmpliacionUrl = '{$ampliacion_url}';
         window.apiRetosUrl = '{$retos_url}';
+        window.apiHistorialUrl = '{$historial_url}';
         window.pulsoSesskey = '{$pulso_sesskey}';
         // Solo para adaptar la UI: el servidor decide qué datos se devuelven.
         window.pulsoIsTeacher = {$pulso_isteacher};
@@ -938,6 +940,28 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             font-weight: 600;
             color: var(--pulso-slate);
             margin: 18px 0 8px;
+        }
+
+        /* «Mi historial» (carta 10): enlace discreto, texto slate (nunca cian). */
+        .pulso-historial-link {
+            background: none;
+            border: 0;
+            padding: 2px 4px;
+            font: inherit;
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: var(--pulso-slate);
+            text-decoration: underline;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .pulso-historial-link.head {
+            margin-left: auto;
+        }
+
+        .pulso-historial-link:hover {
+            color: var(--pulso-navy);
         }
 
         .pulso-create-gallery-grid {
@@ -2427,6 +2451,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 <div class="pulso-home-section create">
                     <div class="pulso-home-section-head">
                         <span class="pulso-home-section-title">Crear</span>
+                        <!--PULSO_STUDENT_ONLY_START--><button type="button" class="pulso-historial-link head" onclick="pulsoAbrirHistorial()">Mi historial ↗</button><!--PULSO_STUDENT_ONLY_END-->
                     </div>
                     <div class="pulso-create-cta-row">
                         <button type="button" class="pulso-create-cta" onclick="openCreatePanel('infografia')">
@@ -5210,7 +5235,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             if (!container) return;
             retos = (retos || []).filter(function(r) { return pulsoAmpIsHttps(r.enlace); }).slice(0, 8);
             if (!encargos.length && !retos.length) {
-                container.innerHTML = '<p class="pulso-create-hint">Aún no has creado nada en este curso.</p>';
+                container.innerHTML = '<p class="pulso-create-hint">Aún no has creado nada en este curso.</p>' + pulsoHistorialFooter();
                 return;
             }
 
@@ -5254,8 +5279,37 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     + '<span class="pulso-create-gallery-date">' + escapeHtmlText(dateLabel) + '</span>'
                     + '</button>';
             });
-            html += '</div>';
+            html += '</div>' + pulsoHistorialFooter();
             container.innerHTML = html;
+        }
+
+        // «Mi historial» (carta 10): solo alumnado (la UI no es control de acceso;
+        // epica_historial.php ya lo exige). El token nunca pasa por este JS: se
+        // crea un <form> POST con courseid + sesskey hacia nuestro endpoint, en
+        // pestaña nueva y en el propio clic (sin bloqueo de ventanas emergentes).
+        function pulsoHistorialFooter() {
+            if (window.pulsoIsTeacher !== false) return '';
+            return '<p class="pulso-create-hint"><button type="button" class="pulso-historial-link" onclick="pulsoAbrirHistorial()">Ver todo mi historial en Épica ↗</button><br>'
+                + 'Se abre en una pestaña nueva. Solo aparece lo creado desde el 5 de octubre de 2026.</p>';
+        }
+
+        function pulsoAbrirHistorial() {
+            if (window.pulsoIsTeacher !== false || !window.apiHistorialUrl) return;
+            const form = document.createElement('form');
+            form.method = 'post';
+            form.action = window.apiHistorialUrl;
+            form.target = '_blank';
+            form.style.display = 'none';
+            [['courseid', window.courseid], ['sesskey', window.pulsoSesskey || (window.M && M.cfg && M.cfg.sesskey) || '']].forEach(function(p) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = p[0];
+                input.value = String(p[1]);
+                form.appendChild(input);
+            });
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
         }
 
         function openCreateGalleryItem(encargoid, tool) {

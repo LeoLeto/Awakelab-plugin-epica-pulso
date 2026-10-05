@@ -1386,6 +1386,31 @@ persistir:
 - **Retos**: `enlace_epica()` compara también el puerto; `consultar_propuesta()` marca la
   fila `desconocido` ante un 4xx `propuesta-desconocida` (igual que `elegir`).
 
+## Historial del alumno en Épica (carta 10) (v1.29.0)
+
+Botón «Mi historial»: lleva al ALUMNO a `/mis-recursos` de Épica (sus láminas, juegos y retos
+pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reglas:
+
+- **Puerta `/api/auth/alumno`, solo alumnado.** Un token de docente ahí es 403 `rol-sin-permiso`,
+  así que `epica_historial.php` NO firma nada si el usuario tiene `viewanalytics` (ni si
+  `rol_de()` no sale `estudiante`): pinta «El historial de Épica es para el alumnado…». El
+  botón solo se pinta con `window.pulsoIsTeacher === false` (la UI no es control de acceso; lo es
+  el endpoint) y la home lo mete en `PULSO_STUDENT_ONLY_*` anidado dentro de `PULSO_CREATE_ONLY_*`
+  (los `preg_replace` de marcadores no se pisan: el de rol se aplica antes y los quita enteros).
+- **Token NUEVO por POST y nunca en una URL ni en un log.** Se firma en `epica_historial.php`
+  justo antes de pintar (vale 120 s, un solo uso) y viaja en el CUERPO de un `<form method=post>`
+  autoenviado hacia `epica_client::endpoint('/api/auth/alumno')`, con `Cache-Control: no-store`
+  y `Referrer-Policy: no-referrer`. No se usa `epica::autoenviar()` (no verificado su código). Un
+  fallo al firmar loguea clase+mensaje y al navegador solo le da un texto genérico.
+- **Pestaña nueva abierta en el clic**: el JS (`pulsoAbrirHistorial()`) crea un `<form>` POST
+  `target=_blank` hacia NUESTRO endpoint con `courseid` + `sesskey`, lo envía y lo quita. Así no hay
+  bloqueo de ventanas y el token nunca pasa por JS. Sin iframes ni historial dentro de Pulse.
+- **Lo anterior al 05-10-2026 no aparece** (Épica no guardaba de quién era): el panel de Crear lo
+  avisa bajo la galería. El `sub` (id de Moodle) y el `iss` deben seguir estables o el historial
+  sale vacío. La sesión de Épica dura 2 h; se vuelve a pulsar el botón.
+- **El rol firmado sale de `viewanalytics`, no de `createactivity`** (hallazgo de esta versión;
+  ver la regla en «Integración con Épica — paso 3»).
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

@@ -1,5 +1,17 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-05 — Rol firmado mal + «Mi historial» (v1.29.0)
+
+Carta 10; reglas en `CLAUDE.md` → «Historial del alumno en Épica». Lo que costó ver:
+- **Todo el alumnado se firmaba como `docente`** desde v1.19.0: pasábamos `createactivity` a
+  `rol_de()`, que devuelve `docente` a quien TIENE la capability, y esa tiene `CAP_ALLOW` para
+  `student`. Consecuencias: Épica nunca aplicó los ritmos de alumno (p. ej. 3/10 min en Retos) y
+  `/api/auth/alumno` habría dado 403. Ahora `epica_client::CAPABILITY_ROL` = `viewanalytics`
+  (3 llamadas a `firmar_por()`). Efecto aceptado: el alumnado empieza a ver 429 `cuota-agotada`.
+- `epica_historial.php` pinta el formulario a mano (no `epica::autoenviar()`, sin comprobar).
+- **NO probado**: sin PHP local (`php -l` pendiente) ni navegador. Pendiente en sanase-test →
+  entorno-qa-2 con cuenta de alumno y de profesor (ver verificación en la carta 10).
+
 ## 2026-10-02 — Crear juego: tres tipos de partida (v1.28.0)
 
 Carta 9 de Épica; reglas en `CLAUDE.md` → «Gamificación — paso 4». Solo cliente. Lo que costó ver:

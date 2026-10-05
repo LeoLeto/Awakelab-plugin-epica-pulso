@@ -1411,6 +1411,58 @@ pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reg
 - **El rol firmado sale de `viewanalytics`, no de `createactivity`** (hallazgo de esta versión;
   ver la regla en «Integración con Épica — paso 3»).
 
+## Auditoría de UX, fase 1 — visibilidad, diagnóstico y errores (v1.30.0)
+
+Reglas permanentes salidas de la auditoría; las tres primeras son de seguridad/privacidad.
+
+- **El RAG filtra por visibilidad AL RECUPERAR, nunca al indexar.** El índice sigue teniendo
+  todos los módulos (el profesorado con acceso ve lo oculto). `classes/course_visibility.php`
+  es la única fuente: `cm_visible()` / `section_visible()` / `chunk_visible()` (mismo criterio
+  que `build_activity_link()`: `get_fast_modinfo()->uservisible`, falla CERRADO si no se puede
+  comprobar) y `filter_instances()` para registros de tablas de módulo. En
+  `embedding_manager::find_relevant_chunks()` y su variante léxica se filtra **después de
+  puntuar y antes de recortar al top-K** (si no, un recurso oculto muy relevante se come
+  huecos). Fragmentos sintéticos: `course_meta` siempre visible; `course_section` según la
+  sección, y además `scrub_section_text()` quita del texto de una sección visible las líneas
+  `- [tipo] nombre` de actividades ocultas (el indexador las metió todas). La **ruta directa**
+  filtra igual: `resolve_direct_resource_query` (todas las colecciones), los 4 resolutores
+  por sección, `list_section_activities`, las secciones ocultas (`$realSections`),
+  `query_mentions_any_activity_name` (una actividad oculta «no existe» para quien no la ve) y los
+  lectores de `block_pulso_content_chunks` / `get_live_resource_text`. **Cualquier lector nuevo
+  de chunks o de `block_pulso_full_text` para un usuario final debe pasar por
+  `course_visibility`.** Limitación conocida: la línea «Actividades en esta seccion: N» del
+  fragmento de sección sigue contando las ocultas.
+- **`rag_diagnostics` solo viaja con `viewanalytics`** (`chat_pipeline::client_rag_diagnostics()`
+  en los dos endpoints; al alumno, `[]`). Lleva nombres de fragmentos y estado del índice. Su
+  `message` nunca lleva el texto de una excepción (va a `error_log`).
+- **Errores: por `error_code`, nunca texto técnico al usuario.** `classes/pulso_error.php` es el
+  patrón único de todos los endpoints AJAX (`api_chat`, `api_chat_stream`, `api_ampliacion`,
+  `api_create_form/submit/status`, `toggle_course`): respuesta `{success:false, error_code,
+  message, detail?}`. `message` y `detail` son SIEMPRE texto escrito por nosotros; `detail` (causa
+  genérica) solo para `viewanalytics`/`moodle/site:config`. Cualquier otro Throwable → `unknown`
+  + `error_log`; **prohibido `getMessage()` de un Throwable cualquiera al cliente**. Códigos:
+  `busy` (429/529/5xx), `config` (clave/saldo/modelo/configuración), `network`, `session`,
+  `access`, `disabled`, `bad_request`, `empty`, `refusal`, `encoding`, `unknown`, más
+  `quota` (con mensaje propio). Un servicio nuevo lanza `pulso_error` con texto para persona; no
+  `\Exception` (se vería como `unknown`). `require_session()` va ANTES de `get_course()` y se usa
+  `pulso_error::require_sesskey()` en vez de `require_sesskey()` (código `session`, no
+  `invalidsesskey`). El cliente elige el texto por `error_code` en `pulsoFailureMessage()`
+  (`PULSO_ERROR_TEXTS`); si se añade un código, va en `pulso_error`, `lang/{en,es}` (`err_*`) y ahí.
+- **Stream: el cliente NO cae al XHR ante un JSON `success:false`.** La fase 1 de
+  `api_chat_stream.php` (sesión, sesskey, permiso, desactivado) contesta 4xx con JSON; el cliente lo
+  lee con cualquier código y lo pinta. El fallback a `api_chat.php` queda solo para fallo de red,
+  404 y 405. `api_chat.php` ya no devuelve 500 genérico por esas causas.
+- **`ampliacion_service` y `epica_client`**: los avisos/motivos que ve la persona son genéricos
+  («No hemos podido buscar vídeos ahora mismo»; `MOTIVO_SERVICIO_NO_DISPONIBLE` /
+  `MOTIVO_SERVICIO_RECHAZO`); el detalle (HTTP, `quotaExceeded`, `local_awkepica…`) va a `error_log`. El
+  mensaje «sin contenido disponible» usa «el juego»/«la infografía» según `tool`. Una fila
+  `fallado` de ampliación ya NO devuelve su `motivo` guardado (las anteriores a 1.30.0 pueden
+  llevar códigos HTTP): texto fijo.
+- **`block_pulso.php`**: con Pulse desactivado o sin `usechat` el bloque no pinta nada; solo
+  quien tiene `moodle/course:update` ve «Pulse está desactivado en este curso».
+- **`lang/es/block_pulso.php` es obligatorio**: toda cadena nueva de `lang/en` lleva aquí su
+  traducción (mismas claves; comprobable con un diff de claves).
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad

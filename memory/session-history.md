@@ -1,5 +1,28 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-05 — Auditoría de UX fase 1 (v1.30.0)
+
+Reglas en `CLAUDE.md` → «Auditoría de UX, fase 1». Lo que costó ver:
+- **La fuga de visibilidad era más ancha que el RAG semántico**: la ruta directa leía
+  `resource/quiz/assign/...` por nombre y las secciones desde `course_sections` sin mirar
+  `uservisible`; el retriever léxico y los lectores de chunks por nombre (`get_resource_joined_chunks`)
+  también. Y el fragmento `course_section` (visible) lleva dentro los nombres de las actividades
+  OCULTAS. Se centralizó en `course_visibility` en vez de parchear cada sitio.
+- **Los chunks no traían `cmid` en el SELECT** (ni `find_relevant_chunks` ni el catálogo de
+  problemas): sin añadirlo no había forma de filtrar. Los `cmid` sintéticos se decodifican con el
+  mismo esquema que `content_extractor` (`-(C*1000 + S + 1)`).
+- **`new embedding_manager()` lanza `error_no_apikey`** (sin clave de OpenAI) y esa excepción acababa
+  en `rag_diagnostics.message` hacia el cliente: otra fuga que el punto 2 no mencionaba.
+- **`require_login()` en AJAX no distingue «sesión caducada» de «sin acceso al curso»**, así que la
+  comprobación de sesión es explícita (`pulso_error::require_session()`/`require_sesskey()` con
+  `confirm_sesskey()`) y va antes de `get_course()`.
+- **Un `\Exception` con texto para persona ya no basta**: el catch común lo clasifica como `unknown`.
+  Por eso `ampliacion_service`, `check_enabled` y los `throw` de los endpoints pasaron a `pulso_error`.
+- **NO probado** (sin Moodle ni navegador): solo `php -l` de todo lo tocado y `node --check` de los dos
+  `<script>`. Pendiente en sanase-test: recurso oculto con texto distintivo (alumno no lo ve, profesor sí),
+  `rag_diagnostics` ausente para alumno, clave de Anthropic vacía, cookie borrada (una sola petición en
+  red), UI en castellano con idioma `es`.
+
 ## 2026-10-05 — Rol firmado mal + «Mi historial» (v1.29.0)
 
 Carta 10; reglas en `CLAUDE.md` → «Historial del alumno en Épica». Lo que costó ver:

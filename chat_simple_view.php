@@ -180,7 +180,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             right: 32px;
             width: min(640px, calc(100vw - 48px));
             height: min(600px, calc(100vh - 130px));
-            min-width: 300px;
+            min-width: min(300px, calc(100vw - 32px));
             min-height: min(300px, calc(100vh - 112px));
             max-width: calc(100vw - 48px);
             max-height: calc(100vh - 112px);
@@ -256,7 +256,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             flex-shrink: 0;
         }
 
-        .pulso-chat-header h4 {
+        .pulso-chat-header h2 {
             margin: 0;
             font-size: 0.98rem;
             font-weight: 600;
@@ -271,7 +271,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             display: flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             font-weight: 500;
             color: #D9FBFF;
             opacity: 0.85;
@@ -289,7 +289,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         .pulso-version-badge {
             display: inline-block;
-            font-size: 0.64rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--pulso-cyan-soft);
             background: rgba(17, 234, 234, 0.14);
@@ -381,7 +381,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             border: 1px solid rgba(11, 147, 170, 0.4);
         }
 
-        .pulso-home-hello h5 {
+        .pulso-home-hello h3 {
             margin: 0;
             font-size: 1.02rem;
             font-weight: 600;
@@ -476,13 +476,16 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-home-section-title {
+            margin: 0;
+            font-family: var(--pulso-font);
             font-size: 0.85rem;
             font-weight: 600;
+            line-height: 1.4;
             color: var(--pulso-ink);
         }
 
         .pulso-home-context-chip {
-            font-size: 0.66rem;
+            font-size: 0.75rem;
             font-weight: 500;
             padding: 3px 10px;
             border-radius: 999px;
@@ -652,24 +655,24 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-create-cta-sub {
-            font-size: 0.74rem;
+            font-size: 0.75rem;
             font-weight: 400;
             color: rgba(255, 255, 255, 0.78);
         }
 
         /* Pantalla de "Crear infografía": NO es un mensaje de chat, es una
            pantalla propia que sustituye a la home/mensajes mientras está
-           abierta (misma capa, se alternan con una clase en #pulso-messages
+           abierta (misma capa, se alternan con una clase en #pulso-scroll
            para no duplicar el scroll). */
         .pulso-create-panel {
             display: none;
         }
 
-        #pulso-messages.pulso-showing-create > *:not(.pulso-create-panel) {
+        #pulso-scroll.pulso-showing-create > *:not(.pulso-create-panel) {
             display: none;
         }
 
-        #pulso-messages.pulso-showing-create .pulso-create-panel {
+        #pulso-scroll.pulso-showing-create .pulso-create-panel {
             display: block;
         }
 
@@ -699,7 +702,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             height: 16px;
         }
 
-        .pulso-create-head h4 {
+        .pulso-create-head h3 {
             margin: 0;
             font-size: 0.98rem;
             font-weight: 600;
@@ -740,9 +743,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         .pulso-create-field select:focus,
         .pulso-create-field textarea:focus {
-            outline: none;
+            outline: 2px solid transparent; /* visible en modo de alto contraste */
             border-color: var(--pulso-cyan);
-            box-shadow: 0 0 0 2px rgba(11, 147, 170, 0.2);
+            box-shadow: 0 0 0 2px var(--pulso-cyan);
         }
 
         .pulso-create-field textarea {
@@ -751,7 +754,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-create-hint {
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             color: var(--pulso-muted);
             margin-top: 4px;
             min-height: 1em;
@@ -767,7 +770,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-create-ejemplos-label {
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--pulso-slate);
             margin-bottom: 6px;
@@ -810,7 +813,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-create-ejemplo-desc {
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             color: var(--pulso-slate);
         }
 
@@ -827,8 +830,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             cursor: pointer;
         }
 
-        .pulso-create-submit:disabled {
-            opacity: 0.55;
+        .pulso-create-submit:disabled,
+        .pulso-create-submit[aria-disabled="true"] {
+            background: #72A3C4;   /* #27334F encima: 4,63 */
+            color: #27334F;
             cursor: not-allowed;
         }
 
@@ -935,7 +940,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             padding: 10px;
             border-radius: 10px;
             background: var(--pulso-surface-2);
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             line-height: 1.4;
             overflow-x: auto;
             white-space: pre-wrap;
@@ -956,7 +961,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             border: 0;
             padding: 2px 4px;
             font: inherit;
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             font-weight: 500;
             color: var(--pulso-slate);
             text-decoration: underline;
@@ -1015,7 +1020,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-create-gallery-item-title {
-            font-size: 0.68rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--pulso-ink);
             padding: 0 4px;
@@ -1027,14 +1032,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         /* "Juego" / "Infografía" — nunca cian como color de texto. */
         .pulso-create-gallery-tag {
-            font-size: 0.62rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--pulso-slate);
             padding: 0 4px;
         }
 
         .pulso-create-gallery-date {
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             color: var(--pulso-muted);
             padding: 0 4px 4px;
         }
@@ -1135,14 +1140,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-amp-card-meta {
-            font-size: 0.74rem;
+            font-size: 0.75rem;
             color: var(--pulso-slate);
             line-height: 1.4;
         }
 
         .pulso-amp-tag {
             align-self: flex-start;
-            font-size: 0.68rem;
+            font-size: 0.75rem;
             font-weight: 600;
             padding: 1px 8px;
             border-radius: 999px;
@@ -1156,7 +1161,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-amp-footnote {
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             color: var(--pulso-muted);
         }
 
@@ -1190,7 +1195,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-retos-chip {
-            font-size: 0.68rem;
+            font-size: 0.75rem;
             padding: 1px 8px;
             border-radius: 999px;
             color: #34547A;
@@ -1220,8 +1225,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             box-shadow: 0 2px 8px rgba(1, 25, 50, 0.12);
         }
 
-        .pulso-reto-card:disabled {
-            opacity: 0.55;
+        .pulso-reto-card:disabled,
+        .pulso-reto-card[aria-disabled="true"] {
+            background: #E2E6F2;
+            border-color: #72A3C4;
+            color: #27334F;
             cursor: not-allowed;
         }
 
@@ -1270,7 +1278,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-reto-diff {
-            font-size: 0.68rem;
+            font-size: 0.75rem;
             font-weight: 600;
             padding: 1px 8px;
             border-radius: 999px;
@@ -1283,7 +1291,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         .pulso-reto-diff.danger { color: #B3261E; background: rgba(179, 38, 30, 0.12); }
 
         .pulso-reto-min {
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             color: var(--pulso-slate);
         }
 
@@ -1310,8 +1318,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             display: block;
         }
 
-        .pulso-create-secondary:disabled {
-            opacity: 0.55;
+        .pulso-create-secondary:disabled,
+        .pulso-create-secondary[aria-disabled="true"] {
+            background: #E2E6F2;
+            border-color: #72A3C4;
+            color: #34547A;        /* 6,2 sobre #E2E6F2 */
             cursor: not-allowed;
         }
 
@@ -1339,6 +1350,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             display: none;
         }
 
+        .pulso-retos-own textarea:focus {
+            outline: 2px solid transparent;
+            border-color: var(--pulso-cyan);
+            box-shadow: 0 0 0 2px var(--pulso-cyan);
+        }
+
         .pulso-retos-own textarea {
             width: 100%;
             box-sizing: border-box;
@@ -1355,7 +1372,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         .pulso-retos-own-count {
             align-self: flex-end;
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             color: var(--pulso-muted);
         }
 
@@ -1565,7 +1582,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             border-radius: 999px;
             background: var(--pulso-navy);
             color: var(--pulso-cyan-soft);
-            font-size: 0.72rem;
+            font-size: 0.75rem;
             font-weight: 600;
             letter-spacing: 0.04em;
         }
@@ -1680,7 +1697,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             min-width: 74px;
             padding: 3px 10px;
             border-radius: 999px;
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -1743,7 +1760,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         /* ===== Secciones de análisis (Insights / Recomendaciones) ===== */
         .pulso-section-label {
-            font-size: 0.68rem;
+            font-size: 0.75rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -1914,9 +1931,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-table-search:focus {
-            outline: none;
+            outline: 2px solid transparent;
             border-color: var(--pulso-teal);
-            box-shadow: 0 0 0 3px rgba(11, 147, 170, 0.25);
+            box-shadow: 0 0 0 2px var(--pulso-cyan);
         }
 
         .pulso-table-search::placeholder {
@@ -1943,13 +1960,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         .pulso-table th {
             background: var(--pulso-deep);
-            padding: 11px 14px;
+            padding: 0;
             text-align: left;
             color: #ffffff;
             font-weight: 600;
-            font-size: 0.82em;
+            font-size: 0.95em;
             letter-spacing: 0.02em;
-            cursor: pointer;
             user-select: none;
             white-space: nowrap;
             border-bottom: 2px solid transparent;
@@ -1965,8 +1981,28 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             border-bottom-color: var(--pulso-cyan);
         }
 
+        /* La ordenación es un <button> dentro del <th> (alcanzable con teclado). */
+        .pulso-table .pulso-sort-btn {
+            all: unset;
+            box-sizing: border-box;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            width: 100%;
+            cursor: pointer;
+            color: inherit;
+            font: inherit;
+            letter-spacing: inherit;
+            padding: 11px 14px;
+        }
+
+        .pulso-table .pulso-sort-btn:focus-visible {
+            outline: 3px solid var(--pulso-cyan-soft);
+            outline-offset: -3px;
+        }
+
         .pulso-table th .pulso-sort-mark {
-            font-size: 0.75em;
+            font-size: 0.9em;
             margin-left: 4px;
             opacity: 0.6;
         }
@@ -2024,7 +2060,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             border: 1px solid var(--pulso-line);
             border-radius: 8px;
             cursor: pointer;
-            font-size: 0.8em;
+            font-size: 0.84em;
             font-weight: 500;
             font-family: var(--pulso-font);
             transition: border-color 0.2s, background 0.2s;
@@ -2195,10 +2231,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-input-group input:focus {
-            outline: none;
-            border-color: rgba(11, 147, 170, 0.6);
+            outline: 2px solid transparent;
+            border-color: var(--pulso-cyan);
             background: var(--pulso-surface-2);
-            box-shadow: 0 0 0 3px rgba(11, 147, 170, 0.22);
+            box-shadow: 0 0 0 2px var(--pulso-cyan);
         }
 
         .pulso-send-btn {
@@ -2230,6 +2266,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         .pulso-send-btn:active {
             transform: scale(0.94);
+        }
+
+        /* Campo vacío o petición en vuelo: sigue enfocable (aria-disabled, no disabled). */
+        .pulso-send-btn[aria-disabled="true"],
+        .pulso-send-btn[aria-disabled="true"]:hover {
+            background: #72A3C4;
+            color: #27334F;
+            box-shadow: none;
+            cursor: not-allowed;
         }
 
         .pulso-mic-btn {
@@ -2277,25 +2322,39 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         .pulso-char-count {
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             color: var(--pulso-muted);
             margin-top: 6px;
             text-align: right;
             padding-right: 6px;
         }
 
+        .pulso-char-count[hidden] {
+            display: none;
+        }
+
+        .pulso-char-count.is-near {
+            color: #8A6100;
+        }
+
         /* ========== ACCESIBILIDAD: movimiento reducido ========== */
         @media (prefers-reduced-motion: reduce) {
             .pulso-chat-bubble,
-            .pulso-chat-bubble.has-chat,
+            .pulso-chat-bubble *,
             .pulso-chat-container,
-            .pulso-message,
-            .pulso-message.ai .pulso-rich-answer > *,
-            .pulso-stream-cursor,
-            .pulso-mic-btn.pulso-mic-recording,
-            .pulso-action-card {
+            .pulso-chat-container *,
+            .pulso-chat-container *::before,
+            .pulso-chat-container *::after {
                 animation: none !important;
                 transition: none !important;
+                scroll-behavior: auto !important;
+            }
+
+            .pulso-chat-bubble:hover,
+            .pulso-chat-bubble:active,
+            .pulso-create-cta:hover,
+            .pulso-followup-chip:hover {
+                transform: none !important;
             }
 
             .pulso-message.ai .pulso-rich-answer > * {
@@ -2310,19 +2369,222 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             }
         }
 
+        /* ========== FASE 3 UX (v1.32.0) ========== */
+
+        /* Texto solo para lectores de pantalla. */
+        .pulso-sr-only {
+            position: absolute !important;
+            width: 1px;
+            height: 1px;
+            margin: -1px;
+            padding: 0;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* El registro (log) solo contiene mensajes; la home y el panel Crear viven fuera. */
+        .pulso-log {
+            display: block;
+        }
+
+        /* Foco sobre la cabecera azul: el cian de marca no contrasta ahí, el cian claro sí. */
+        .pulso-chat-header :focus-visible {
+            outline-color: var(--pulso-cyan-soft);
+        }
+
+        .pulso-create-head h3:focus {
+            outline: none;
+        }
+
+        .pulso-create-head h3:focus-visible {
+            outline: 2px solid var(--pulso-cyan);
+            outline-offset: 3px;
+            border-radius: 4px;
+        }
+
+        .pulso-home-hello h3 {
+            margin: 0;
+        }
+
+        /* Turnos guardados de la sesión anterior (digests de texto, no respuestas formateadas). */
+        .pulso-history-divider {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 2px 0 14px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--pulso-slate);
+        }
+
+        .pulso-history-divider::before,
+        .pulso-history-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--pulso-line);
+        }
+
+        .pulso-message-history .pulso-message-content {
+            white-space: pre-line;
+        }
+
+        /* Burbuja de error con reintento. */
+        .pulso-error-head {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            color: #B3261E;
+        }
+
+        .pulso-error-head svg {
+            flex-shrink: 0;
+            width: 18px;
+            height: 18px;
+            margin-top: 2px;
+        }
+
+        .pulso-error-head span {
+            color: var(--pulso-ink);
+        }
+
+        .pulso-error-head strong {
+            color: #B3261E;
+        }
+
+        .pulso-error-retry {
+            margin-top: 10px;
+            min-height: 36px;
+            padding: 6px 16px;
+            border: 1px solid var(--pulso-navy);
+            border-radius: 999px;
+            background: transparent;
+            color: var(--pulso-navy);
+            font-family: var(--pulso-font);
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .pulso-error-retry:hover {
+            background: var(--pulso-surface-2);
+        }
+
+        .pulso-error-retry[aria-disabled="true"] {
+            background: #E2E6F2;
+            border-color: #72A3C4;
+            color: #34547A;
+            cursor: not-allowed;
+        }
+
+        /* Aviso persistente de falta de conexión (entre los mensajes y el cuadro de texto). */
+        .pulso-offline {
+            flex-shrink: 0;
+            padding: 8px 14px;
+            background: #FFF8E8;
+            border-top: 1px solid #8A6100;
+            color: #8A6100;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .pulso-offline[hidden] {
+            display: none;
+        }
+
+        /* ========== MÓVIL: pantalla completa ========== */
+        @media (max-width: 480px) {
+            .pulso-chat-bubble,
+            .pulso-chat-bubble.drawer-collapsed {
+                right: 16px;
+                bottom: 16px;
+            }
+
+            /* !important: toggleChat() y el arrastre dejan estilos en línea (px) en el contenedor. */
+            .pulso-chat-container,
+            .pulso-chat-container.drawer-collapsed {
+                top: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100vh !important;
+                height: 100dvh !important;
+                max-width: none !important;
+                max-height: none !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                border: 0;
+                border-radius: 0;
+                resize: none;
+                padding-left: env(safe-area-inset-left);
+                padding-right: env(safe-area-inset-right);
+            }
+
+            .pulso-chat-header {
+                cursor: default;
+                padding-top: calc(12px + env(safe-area-inset-top));
+            }
+
+            .pulso-chat-input-area {
+                padding-bottom: calc(12px + env(safe-area-inset-bottom));
+            }
+
+            #pulso-expand-btn {
+                display: none;
+            }
+
+            /* Objetivos táctiles de 44 px */
+            .header-btn,
+            .pulso-create-back,
+            .pulso-mic-btn,
+            .pulso-send-btn {
+                width: 44px;
+                height: 44px;
+            }
+
+            .pulso-create-back-link,
+            .pulso-historial-link {
+                min-height: 44px;
+            }
+
+            /* 16 px evita el zoom automático de iOS al enfocar el campo */
+            .pulso-input-group input {
+                font-size: 1rem;
+            }
+
+            .pulso-chat-messages {
+                padding: 16px 12px;
+            }
+
+            .pulso-followup-container {
+                padding-left: 0;
+            }
+
+            .pulso-create-gallery-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .pulso-home-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
     </style>
     
     <!-- Botón circular flotante -->
-    <button class="pulso-chat-bubble" id="pulso-chat-bubble" onclick="toggleChat()" title="Pulse AI — Asistente del curso" aria-label="Abrir el asistente Pulse AI">
+    <button class="pulso-chat-bubble" id="pulso-chat-bubble" onclick="toggleChat()" title="Pulse AI — Asistente del curso" aria-label="Abrir el asistente Pulse AI" aria-expanded="false" aria-controls="pulso-chat-container">
         <img src="https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png" alt="" aria-hidden="true">
     </button>
 
-    <div class="pulso-chat-container" id="pulso-chat-container" role="dialog" aria-label="Pulse AI, asistente del curso">
+    <div class="pulso-chat-container" id="pulso-chat-container" role="region" aria-label="Pulse AI">
         <div class="pulso-chat-header" id="pulso-chat-header">
             <div class="pulso-header-brand">
                 <img class="pulso-header-logo" src="https://media.awakelab.world/MARCA_AWK26/awakelab_isotipo_fondo-oscuro_transparente.png" alt="" aria-hidden="true">
                 <div>
-                    <h4>Pulse AI <span class="pulso-version-badge">%%PULSO_VERSION%%</span></h4>
+                    <h2>Pulse AI%%PULSO_VERSION_BADGE%%</h2>
                     <span class="pulso-header-sub"><span class="pulso-status-dot" aria-hidden="true"></span>Asistente del curso</span>
                 </div>
             </div>
@@ -2330,17 +2592,20 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 <button class="header-btn" id="pulso-clear-btn" title="Nueva conversación" aria-label="Empezar una conversación nueva" onclick="clearConversation()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg>
                 </button>
+                <button type="button" class="header-btn" id="pulso-expand-btn" title="Ampliar" aria-label="Ampliar el chat" onclick="toggleChatSize()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                </button>
                 <button class="header-btn" id="pulso-minimize-btn" title="Minimizar" aria-label="Minimizar el chat" onclick="toggleChat()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
             </div>
         </div>
 
-        <div class="pulso-chat-messages" id="pulso-messages" role="log" aria-live="polite" aria-label="Conversación con Pulse AI">
+        <div class="pulso-chat-messages" id="pulso-scroll">
             <div class="pulso-home" id="pulso-home">
                 <div class="pulso-home-hello">
                     <div class="pulso-home-avatar" aria-hidden="true"></div>
-                    <h5>%%PULSO_GREETING%%</h5>
+                    <h3>%%PULSO_GREETING%%</h3>
                 </div>
 
                 <button type="button" class="pulso-home-help-btn" onclick="showCapabilities()" aria-label="Descubre qué puede hacer Pulse">
@@ -2351,7 +2616,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 <!--PULSO_TEACHER_ONLY_START-->
                 <div class="pulso-home-section">
                     <div class="pulso-home-section-head">
-                        <span class="pulso-home-section-title">Analítica del curso</span>
+                        <h3 class="pulso-home-section-title">Analítica del curso</h3>
                         <span class="pulso-home-context-chip">%%PULSO_COURSENAME%%</span>
                     </div>
                     <div class="pulso-home-grid">
@@ -2406,7 +2671,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
                 <div class="pulso-home-section course">
                     <div class="pulso-home-section-head">
-                        <span class="pulso-home-section-title">Contenido del curso</span>
+                        <h3 class="pulso-home-section-title">Contenido del curso</h3>
                         <!--PULSO_STUDENT_ONLY_START--><span class="pulso-home-context-chip">%%PULSO_COURSENAME%%</span><!--PULSO_STUDENT_ONLY_END-->
                     </div>
                     <div class="pulso-home-grid">
@@ -2458,8 +2723,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 <!--PULSO_CREATE_ONLY_START-->
                 <div class="pulso-home-section create">
                     <div class="pulso-home-section-head">
-                        <span class="pulso-home-section-title">Crear</span>
-                        <!--PULSO_STUDENT_ONLY_START--><!--PULSO_EPICA_ONLY_START--><button type="button" class="pulso-historial-link head" onclick="pulsoAbrirHistorial()">Mi historial ↗</button><!--PULSO_EPICA_ONLY_END--><!--PULSO_STUDENT_ONLY_END-->
+                        <h3 class="pulso-home-section-title">Crear</h3>
+                        <!--PULSO_STUDENT_ONLY_START--><!--PULSO_EPICA_ONLY_START--><button type="button" class="pulso-historial-link head" onclick="pulsoAbrirHistorial()">Mi historial<span aria-hidden="true"> ↗</span><span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></button><!--PULSO_EPICA_ONLY_END--><!--PULSO_STUDENT_ONLY_END-->
                     </div>
                     <div class="pulso-create-cta-row">
                         <!--PULSO_EPICA_ONLY_START-->
@@ -2513,14 +2778,21 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     <button type="button" class="pulso-create-back" onclick="closeCreatePanel()" aria-label="Volver a la pantalla de inicio">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
                     </button>
-                    <h4 id="pulso-create-title">Crear infografía</h4>
+                    <h3 id="pulso-create-title" tabindex="-1">Crear infografía</h3>
                 </div>
                 <div class="pulso-create-body" id="pulso-create-body">
                     <p class="pulso-create-hint">Cargando…</p>
                 </div>
             </div>
             <!--PULSO_CREATE_ONLY_END-->
+
+            <!-- Región en vivo SOLO para mensajes: la home y el panel Crear quedan fuera. -->
+            <div class="pulso-log" id="pulso-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversación con Pulse AI"></div>
         </div>
+
+        <div class="pulso-offline" id="pulso-offline" hidden>Sin conexión. Tus preguntas se enviarán cuando vuelva internet.</div>
+        <!-- Avisos breves para lector de pantalla (estado de un encargo, conexión, límite de caracteres). -->
+        <div class="pulso-sr-only" id="pulso-live-status" role="status" aria-live="polite" aria-atomic="true"></div>
 
         <div class="pulso-chat-input-area">
             <form id="pulso-chat-form" onsubmit="sendMessage(event)">
@@ -2536,18 +2808,51 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     <button type="button" id="pulso-mic-btn" class="pulso-mic-btn" style="display:none;" aria-label="Dictar pregunta por voz" aria-pressed="false" title="Dictar por voz" onclick="toggleMic()">
                         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
                     </button>
-                    <button type="submit" class="pulso-send-btn" aria-label="Enviar pregunta">
+                    <button type="submit" class="pulso-send-btn" id="pulso-send-btn" aria-label="Enviar pregunta" aria-disabled="true">
                         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.85 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z"/></svg>
                     </button>
                 </div>
             </form>
-            <div class="pulso-char-count">
+            <div class="pulso-char-count" id="pulso-char-count-box" aria-hidden="true" hidden>
                 <span id="pulso-char-count">0</span>/500
             </div>
         </div>
     </div>
     
     <script>
+        // ========== HELPERS DE FASE 3 (UX, v1.32.0) ==========
+
+        // Los console.log de depuración solo salen con window.pulsoDebug = true.
+        function pulsoLog() {
+            if (window.pulsoDebug && window.console) console.log.apply(console, arguments);
+        }
+
+        // Texto oculto para enlaces que abren pestaña nueva (la «↗» va con aria-hidden).
+        const PULSO_NEWTAB_SR = '<span class="pulso-sr-only"> (se abre en una pestaña nueva)</span>';
+
+        // El desplazamiento vive en #pulso-scroll: envuelve la home, el panel Crear y el
+        // registro de mensajes (#pulso-messages, la única región en vivo).
+        function pulsoScrollToEnd() {
+            const scroller = document.getElementById('pulso-scroll');
+            if (scroller) scroller.scrollTop = scroller.scrollHeight;
+        }
+
+        // Aviso breve para lector de pantalla: región role="status" propia, FUERA del registro.
+        // Se vacía y se rellena después para que repetir el mismo texto vuelva a anunciarse.
+        function pulsoAnnounce(text) {
+            const el = document.getElementById('pulso-live-status');
+            if (!el) return;
+            el.textContent = '';
+            setTimeout(function() { el.textContent = text; }, 60);
+        }
+
+        // disabled + aria-disabled siempre juntos.
+        function pulsoSetDisabled(el, flag) {
+            if (!el) return;
+            el.disabled = !!flag;
+            el.setAttribute('aria-disabled', flag ? 'true' : 'false');
+        }
+
         function formatAIResponse(answer, showAnalysisSections = true) {
             try {
                 let jsonStr = answer.trim();
@@ -2556,14 +2861,14 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 if (/^\s*```/.test(jsonStr)) {
                     // Remover markdown code block — handle any whitespace/newlines around fences
                     jsonStr = jsonStr.replace(/^\s*```[a-z]*\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-                    console.log('📌 Limpiado markdown code block');
+                    pulsoLog('📌 Limpiado markdown code block');
                 }
                 
                 // Si está envuelto en comillas extra, removerlas
                 if ((jsonStr.startsWith('"') && jsonStr.endsWith('"')) ||
                     (jsonStr.startsWith("'") && jsonStr.endsWith("'"))) {
                     jsonStr = jsonStr.slice(1, -1);
-                    console.log('📌 Limpiado comillas extra');
+                    pulsoLog('📌 Limpiado comillas extra');
                 }
 
                 // Si viene texto extra antes/despues del JSON, extraer solo el bloque {...}
@@ -2575,7 +2880,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 
                 // Intentar parsear como JSON
                 const data = JSON.parse(jsonStr);
-                console.log('✅ JSON parseado:', data);
+                pulsoLog('✅ JSON parseado:', data);
                 
                 // ========== MANEJO DE ERRORES ==========
                 if (data.status === 'insufficient_data' || data.status === 'error') {
@@ -2628,7 +2933,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 
                 // Datos según tipo
                 if (data.type === 'table' && data.data && Array.isArray(data.data)) {
-                    html += formatAsTable(data.data);
+                    html += formatAsTable(data.data, data.title);
                 } else if (data.type === 'list' && data.data && Array.isArray(data.data)) {
                     html += formatAsList(data.data);
                 } else if (data.type === 'text') {
@@ -2737,7 +3042,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
                 html += '</div>';
                 
-                console.log('✅ HTML generado correctamente');
+                pulsoLog('✅ HTML generado correctamente');
                 return html;
             } catch (e) {
                 console.warn('⚠️ Error al parsear JSON:', e.message);
@@ -3222,7 +3527,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 .replace(/(respuesta final|resultado final|por lo tanto|en conclusion|en conclusión|distancia total|hect[oó]metros)/gi, '<strong>$1</strong>');
         }
         
-        function formatAsTable(data) {
+        function formatAsTable(data, caption) {
             if (!data || data.length === 0) {
                 return '<p class="pulso-empty">No hay datos disponibles para mostrar.</p>';
             }
@@ -3245,12 +3550,16 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             // Contenedor con scroll horizontal responsivo
             html += '<div class="pulso-table-scroll">';
             html += '<table id="' + tableId + '" class="pulso-table">';
+            // Título de la respuesta como <caption> (oculto a la vista, leído por el lector de pantalla).
+            html += '<caption class="pulso-sr-only">' + escapeHtml(caption ? String(caption) : 'Tabla de resultados') + '</caption>';
 
             html += '<thead><tr>';
+            // Cada cabecera ordenable es un <button> dentro del <th>, con aria-sort="none" desde el principio.
             Object.keys(firstRow).forEach((key, idx) => {
                 const label = pulsoFieldLabel(key);
-                html += '<th onclick="sortTable(\'' + tableId + '\', ' + idx + ')" title="Ordenar por ' + escapeHtml(label) + '">';
-                html += escapeHtml(label) + '<span class="pulso-sort-mark" aria-hidden="true">⇅</span></th>';
+                html += '<th scope="col" aria-sort="none">'
+                    + '<button type="button" class="pulso-sort-btn" onclick="sortTable(\'' + tableId + '\', ' + idx + ')" title="Ordenar por ' + escapeHtml(label) + '">'
+                    + escapeHtml(label) + '<span class="pulso-sort-mark" aria-hidden="true">⇅</span></button></th>';
             });
             html += '</tr></thead>';
 
@@ -3281,7 +3590,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
             // Footer con recuento y exportación
             html += '<div class="pulso-table-footer">';
-            html += '<span class="pulso-table-count">' + data.length + ' registros</span>';
+            html += '<span class="pulso-table-count" id="count-' + tableId + '" role="status" data-total="' + data.length + '">' + data.length + ' registros</span>';
             html += '<div class="pulso-table-actions">';
             html += '<button class="pulso-export-btn" onclick="exportTableAsExcel(\'' + tableId + '\')">Exportar Excel</button>';
             html += '<button class="pulso-export-btn" onclick="exportTableAsCSV(\'' + tableId + '\')">Exportar CSV</button>';
@@ -3308,6 +3617,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             if (!table) return;
             
             const rows = Array.from(table.querySelectorAll('tbody tr'));
+            if (!window.tableState) window.tableState = {};
             const state = window.tableState[tableId] || {};
             
             // Toggle sort direction
@@ -3327,7 +3637,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     th.setAttribute('aria-sort', state.sortAsc ? 'ascending' : 'descending');
                 } else {
                     th.classList.remove('is-sorted');
-                    th.removeAttribute('aria-sort');
+                    th.setAttribute('aria-sort', 'none');
                 }
             });
             
@@ -3379,6 +3689,13 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 }
             });
             
+            // El recuento es role="status": al filtrar anuncia «N de M registros».
+            const countEl = document.getElementById('count-' + tableId);
+            if (countEl) {
+                const total = parseInt(countEl.getAttribute('data-total'), 10) || rows.length;
+                countEl.textContent = filterText ? (visibleCount + ' de ' + total + ' registros') : (total + ' registros');
+            }
+
             // Mostrar mensaje si no hay resultados
             if (visibleCount === 0) {
                 let msg = table.querySelector('.filter-no-results');
@@ -3506,7 +3823,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             link.click();
             document.body.removeChild(link);
             
-            console.log('✅ Excel export completado: ' + rows.length + ' filas exportadas');
+            pulsoLog('✅ Excel export completado: ' + rows.length + ' filas exportadas');
         }
         
         // Escapar caracteres especiales XML
@@ -3567,7 +3884,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             link.click();
             document.body.removeChild(link);
             
-            console.log('✅ CSV export completado: ' + rows.length + ' filas exportadas');
+            pulsoLog('✅ CSV export completado: ' + rows.length + ' filas exportadas');
         }
         
         // Escape comillas y comas en campos CSV
@@ -3776,6 +4093,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             input.value = question;
             updateCharCount();
             sendMessage(new Event('submit'));
+            input.focus(); // la tarjeta desaparece al enviar: el foco no se pierde
         }
 
         // Botón "¿Qué puede hacer Pulso?": explicación instantánea (sin LLM),
@@ -3833,6 +4151,32 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             showFollowupQuestions(examples);
         }
 
+        // Historial de sessionStorage: se reenvía al modelo en cada petición, así que tiene que
+        // verse. Son digests de TEXTO (nunca JSON), por eso se pintan escapados (escapeHtmlText) y
+        // sin formato de respuesta, bajo un separador.
+        function pulsoRenderHistory() {
+            const log = document.getElementById('pulso-messages');
+            const hist = window.conversationHistory;
+            if (!log || !Array.isArray(hist) || !hist.length || log.querySelector('.pulso-message')) return;
+
+            const divider = document.createElement('div');
+            divider.className = 'pulso-history-divider';
+            divider.textContent = 'Conversación anterior';
+            log.appendChild(divider);
+
+            hist.forEach(function(turn) {
+                if (!turn || typeof turn.content !== 'string' || turn.content.trim() === '') return;
+                const el = document.createElement('div');
+                el.className = 'pulso-message ' + (turn.role === 'user' ? 'user' : 'ai') + ' pulso-message-history';
+                const content = document.createElement('div');
+                content.className = 'pulso-message-content';
+                content.innerHTML = escapeHtmlText(turn.content);
+                el.appendChild(content);
+                log.appendChild(el);
+            });
+            setHomeVisible(false);
+        }
+
         // La pantalla de inicio (saludo + tarjetas) solo se muestra sin conversación.
         function setHomeVisible(visible) {
             const home = document.getElementById('pulso-home');
@@ -3856,6 +4200,27 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // envía submitCreate() — el desplegable de recursos y los cupos son
         // iguales para las dos (contador conjunto, CLAUDE.md paso 3).
         let pulsoCreateTool = 'infografia';
+
+        // Tarjeta que abrió el panel: recibe el foco al cerrarlo.
+        let pulsoCreateOpener = null;
+
+        function pulsoCreateIsOpen() {
+            const scroller = document.getElementById('pulso-scroll');
+            return !!(scroller && scroller.classList.contains('pulso-showing-create'));
+        }
+
+        // Foco al título (h3 con tabindex="-1") de la pantalla nueva. Con `force` siempre (al abrir);
+        // si no, solo cuando el foco se ha perdido (el elemento enfocado se repintó) o seguía dentro
+        // del cuerpo del panel: nunca le quita el foco a quien está escribiendo en el chat.
+        function pulsoCreateScreen(force) {
+            const title = document.getElementById('pulso-create-title');
+            if (!title || !pulsoCreateIsOpen()) return;
+            const active = document.activeElement;
+            const body = document.getElementById('pulso-create-body');
+            if (force || !active || active === document.body || (body && body.contains(active))) {
+                title.focus();
+            }
+        }
 
         const PULSO_CREATE_TOOL_LABELS = {
             infografia: {
@@ -4007,15 +4372,22 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         function openCreatePanel(tool) {
-            const messagesDiv = document.getElementById('pulso-messages');
+            const messagesDiv = document.getElementById('pulso-scroll');
             const body = document.getElementById('pulso-create-body');
             if (!messagesDiv || !body) return;
+
+            // Solo la primera vez: «Crear otro» y «Volver al formulario» se llaman desde dentro.
+            if (!messagesDiv.classList.contains('pulso-showing-create')) {
+                const active = document.activeElement;
+                pulsoCreateOpener = (active && active !== document.body) ? active : null;
+            }
 
             pulsoCreateSetTool(tool || pulsoCreateTool);
             stopCreatePolling();
             pulsoAmpToken++;
             messagesDiv.classList.add('pulso-showing-create');
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
+            pulsoCreateScreen(true);
 
             const params = new URLSearchParams();
             params.set('courseid', window.courseid);
@@ -4046,13 +4418,25 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 });
         }
 
-        function closeCreatePanel() {
+        // opts.restoreFocus === false: al enviar un mensaje del chat el foco se queda en el campo de texto.
+        function closeCreatePanel(opts) {
             stopCreatePolling();
             pulsoAmpToken++;
-            const messagesDiv = document.getElementById('pulso-messages');
+            const messagesDiv = document.getElementById('pulso-scroll');
+            const wasOpen = pulsoCreateIsOpen();
             if (messagesDiv) {
                 messagesDiv.classList.remove('pulso-showing-create');
             }
+            if (wasOpen && !(opts && opts.restoreFocus === false)) {
+                // Al cerrar, el foco vuelve a la tarjeta que lo abrió (o al campo de texto si ya no está).
+                const opener = pulsoCreateOpener;
+                if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus();
+                if (!opener || document.activeElement !== opener) {
+                    const input = document.getElementById('pulso-input');
+                    if (input) input.focus();
+                }
+            }
+            pulsoCreateOpener = null;
         }
 
         // La galería de "últimas infografías" se enseña siempre debajo,
@@ -4180,11 +4564,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 hint.textContent = 'Ya has llegado al límite de encargos de hoy para la sección de este recurso ('
                     + resource.sectionlimit + '). Elige otro recurso.';
                 hint.classList.add('warn');
-                if (btn) btn.disabled = true;
+                if (btn) pulsoSetDisabled(btn, true);
             } else {
                 hint.textContent = '';
                 hint.classList.remove('warn');
-                if (btn) btn.disabled = false;
+                if (btn) pulsoSetDisabled(btn, false);
             }
         }
 
@@ -4205,7 +4589,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             }
 
             if (btn) {
-                btn.disabled = true;
+                pulsoSetDisabled(btn, true);
                 btn.textContent = 'Guardando…';
             }
 
@@ -4229,7 +4613,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     } else {
                         renderCreateNotice(data.message || 'No se ha podido guardar el encargo. Inténtalo de nuevo.');
                         if (btn) {
-                            btn.disabled = false;
+                            pulsoSetDisabled(btn, false);
                             btn.textContent = labels.submitLabel;
                         }
                     }
@@ -4237,7 +4621,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 .catch(function() {
                     renderCreateNotice('No se ha podido conectar para guardar el encargo. Inténtalo de nuevo.');
                     if (btn) {
-                        btn.disabled = false;
+                        pulsoSetDisabled(btn, false);
                         btn.textContent = labels.submitLabel;
                     }
                 });
@@ -4280,7 +4664,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
         function pulsoAmpCard(url, inner) {
             if (pulsoAmpIsHttps(url)) {
-                return '<a class="pulso-amp-card" href="' + pulsoEscapeAttr(url) + '" target="_blank" rel="noopener noreferrer">' + inner + '</a>';
+                return '<a class="pulso-amp-card" href="' + pulsoEscapeAttr(url) + '" target="_blank" rel="noopener noreferrer">' + inner + PULSO_NEWTAB_SR + '</a>';
             }
             return '<div class="pulso-amp-card">' + inner + '</div>';
         }
@@ -4382,7 +4766,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const btn = document.getElementById('pulso-create-submit-btn');
             const body = document.getElementById('pulso-create-body');
             if (!select || !body || (btn && btn.disabled)) return;
-            if (btn) btn.disabled = true;
+            if (btn) pulsoSetDisabled(btn, true);
 
             const cmid = parseInt(select.value, 10);
             const resource = pulsoCreateResources.find(function(r) { return r.cmid === cmid; });
@@ -4438,6 +4822,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         let pulsoRetosLastSeen = 0;
         let pulsoRetosLastParams = null;       // para «Volver a intentarlo» (propuesta nueva)
         let pulsoRetosRetryFn = null;          // «Reintentar» repite la MISMA acción
+        let pulsoRetosPollPending = null;      // token del sondeo pendiente (pestaña oculta)
+        let pulsoRetosRefreshPending = null;   // {token, codigo, started} del refresco de título pendiente
 
         // Los doce nombres fijos de icono de Épica; uno desconocido cae en 'flag'.
         const PULSO_RETOS_ICONS = {
@@ -4500,6 +4886,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         function pulsoRetosReset() {
             if (pulsoRetosPollTimer) { clearTimeout(pulsoRetosPollTimer); pulsoRetosPollTimer = null; }
             if (pulsoRetosRefreshTimer) { clearTimeout(pulsoRetosRefreshTimer); pulsoRetosRefreshTimer = null; }
+            pulsoRetosPollPending = null;
+            pulsoRetosRefreshPending = null;
             pulsoRetosBusy = false;
             pulsoRetosCourseBusy = false;
             pulsoRetosRetryFn = null;
@@ -4509,7 +4897,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // Antidoble clic: con una acción en vuelo se desactivan TODAS las de la pantalla.
         function pulsoRetosSetBusy(busy) {
             pulsoRetosBusy = busy;
-            document.querySelectorAll('#pulso-create-body [data-retos-action]').forEach(function(el) { el.disabled = busy; });
+            document.querySelectorAll('#pulso-create-body [data-retos-action]').forEach(function(el) { pulsoSetDisabled(el, busy); });
         }
 
         const PULSO_RETOS_BANNER_ACTIONS = {
@@ -4591,7 +4979,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '</div>'
                 + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
                 + '<button type="button" class="pulso-create-submit" id="pulso-retos-propose-btn" data-retos-action onclick="pulsoRetosProponer()">Proponer retos</button>'
-                + '<button type="button" class="pulso-create-back-link" onclick="pulsoRetosVerCurso()">Ver todos los retos del curso</button>'
+                + '<button type="button" class="pulso-create-back-link" onclick="pulsoRetosVerCurso()">Ver todos los retos del curso' + PULSO_NEWTAB_SR + '</button>'
                 + '<div id="pulso-create-gallery"></div>';
             loadCreateGallery();
         }
@@ -4680,7 +5068,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         function pulsoRetosSchedulePoll(token) {
-            pulsoRetosPollTimer = setTimeout(function() { pulsoRetosPoll(token); }, PULSO_RETOS_POLL_MS);
+            // Con la pestaña oculta no se programa nada; pulsoOnVisibilityChange() lo retoma.
+            pulsoRetosPollPending = token;
+            if (document.hidden) return;
+            pulsoRetosPollTimer = setTimeout(function() {
+                pulsoRetosPollTimer = null;
+                if (document.hidden) return;
+                pulsoRetosPollPending = null;
+                pulsoRetosPoll(token);
+            }, PULSO_RETOS_POLL_MS);
         }
 
         // NO se corta mientras esté `en-cola` (carta 8 §1: cortar y volver a pulsar
@@ -4866,10 +5262,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 + '<div class="pulso-reto-title" id="pulso-retos-done-title">' + escapeHtmlText(d.titulo || 'Reto') + '</div>'
                 + '<div id="pulso-retos-done-stats" class="pulso-retos-note"></div>'
                 + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
-                + '<a class="pulso-create-submit pulso-retos-open" href="' + pulsoEscapeAttr(d.enlace) + '" target="_blank" rel="noopener noreferrer">Abrir reto</a>'
+                + '<a class="pulso-create-submit pulso-retos-open" href="' + pulsoEscapeAttr(d.enlace) + '" target="_blank" rel="noopener noreferrer">Abrir reto' + PULSO_NEWTAB_SR + '</a>'
                 + '<div class="pulso-retos-note">Se abre en una pestaña nueva. Si lo abres enseguida verás "Creando tu reto": tarda menos de un minuto.</div>'
                 + (pulsoAmpIsHttps(d.enlace_curso)
-                    ? '<a class="pulso-create-secondary" href="' + pulsoEscapeAttr(d.enlace_curso) + '" target="_blank" rel="noopener noreferrer">Ver retos del curso</a>'
+                    ? '<a class="pulso-create-secondary" href="' + pulsoEscapeAttr(d.enlace_curso) + '" target="_blank" rel="noopener noreferrer">Ver retos del curso' + PULSO_NEWTAB_SR + '</a>'
                     : '')
                 + '<button type="button" class="pulso-create-secondary" onclick="openCreatePanel(\'retos\')">Crear otro reto</button>'
                 + '</div><div id="pulso-create-gallery"></div>';
@@ -4879,8 +5275,21 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const codigo = String(d.codigo || '');
             if (codigo) {
                 const started = Date.now();
-                pulsoRetosRefreshTimer = setTimeout(function() { pulsoRetosRefrescar(token, codigo, started); }, PULSO_RETOS_REFRESH_MS);
+                pulsoRetosScheduleRefresh(token, codigo, started, PULSO_RETOS_REFRESH_MS);
             }
+        }
+
+        // El refresco del título final también llama a Épica: se pausa con la pestaña oculta.
+        function pulsoRetosScheduleRefresh(token, codigo, started, ms) {
+            pulsoRetosRefreshPending = { token: token, codigo: codigo, started: started };
+            if (document.hidden) return;
+            pulsoRetosRefreshTimer = setTimeout(function() {
+                pulsoRetosRefreshTimer = null;
+                if (document.hidden) return;
+                const p = pulsoRetosRefreshPending;
+                pulsoRetosRefreshPending = null;
+                if (p) pulsoRetosRefrescar(p.token, p.codigo, p.started);
+            }, ms);
         }
 
         function pulsoRetosRefrescar(token, codigo, started) {
@@ -4891,7 +5300,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 // Aún en cola/trabajando: otra vuelta a los 20 s si cabe en los 3 min totales.
                 if (d.estado !== 'listo' && d.estado !== 'fallado' && d.estado !== 'desconocido'
                         && Date.now() - started + PULSO_RETOS_REFRESH_RETRY_MS <= PULSO_RETOS_REFRESH_MAX_MS) {
-                    pulsoRetosRefreshTimer = setTimeout(function() { pulsoRetosRefrescar(token, codigo, started); }, PULSO_RETOS_REFRESH_RETRY_MS);
+                    pulsoRetosScheduleRefresh(token, codigo, started, PULSO_RETOS_REFRESH_RETRY_MS);
                     return;
                 }
                 const title = document.getElementById('pulso-retos-done-title');
@@ -4930,7 +5339,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     } else {
                         const el = document.getElementById('pulso-retos-msg');
                         if (el) el.innerHTML = '<a class="pulso-create-secondary" href="' + pulsoEscapeAttr(d.enlace)
-                            + '" target="_blank" rel="noopener noreferrer">Abrir los retos del curso</a>';
+                            + '" target="_blank" rel="noopener noreferrer">Abrir los retos del curso' + PULSO_NEWTAB_SR + '</a>';
                     }
                     return;
                 }
@@ -4952,6 +5361,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // cortesía de 30 minutos que aplica la tarea (CLAUDE.md).
         let pulsoCreatePollTimer = null;
         let pulsoCreatePollStart = 0;
+        let pulsoCreatePollPending = null;   // encargo cuyo próximo sondeo está pendiente (timer o pestaña oculta)
+        let pulsoCreateStatusKey = '';       // «pantalla» pintada: si no cambia, solo se actualiza la píldora
+        let pulsoCreateAnnounced = '';       // último estado anunciado al lector de pantalla
         const PULSO_CREATE_POLL_MS = 7000;
         const PULSO_CREATE_POLL_WINDOW_MS = 30 * 60 * 1000;
 
@@ -4960,12 +5372,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 clearTimeout(pulsoCreatePollTimer);
                 pulsoCreatePollTimer = null;
             }
+            pulsoCreatePollPending = null;
             pulsoRetosReset(); // sondeo y refresco de Retos, antidoble clic
         }
 
         function startCreatePolling(encargoid) {
             stopCreatePolling();
             pulsoCreatePollStart = Date.now();
+            pulsoCreateStatusKey = '';
+            pulsoCreateAnnounced = '';
             pollCreateStatusOnce(encargoid);
         }
 
@@ -5012,7 +5427,42 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 );
                 return;
             }
-            pulsoCreatePollTimer = setTimeout(function() { pollCreateStatusOnce(encargoid); }, PULSO_CREATE_POLL_MS);
+            // Pestaña en segundo plano: no se programa nada; se reanuda en visibilitychange.
+            pulsoCreatePollPending = encargoid;
+            if (document.hidden) return;
+            pulsoCreatePollTimer = setTimeout(pulsoCreatePollTick, PULSO_CREATE_POLL_MS);
+        }
+
+        function pulsoCreatePollTick() {
+            pulsoCreatePollTimer = null;
+            if (document.hidden || pulsoCreatePollPending === null) return;
+            const id = pulsoCreatePollPending;
+            pulsoCreatePollPending = null;
+            pollCreateStatusOnce(id);
+        }
+
+        // Una sola escucha para los dos sondeos (Crear cada 7 s, Retos cada 4 s): con la pestaña
+        // oculta se paran los temporizadores y al volver se retoma enseguida lo que estaba pendiente.
+        function pulsoOnVisibilityChange() {
+            if (document.hidden) {
+                if (pulsoCreatePollTimer) { clearTimeout(pulsoCreatePollTimer); pulsoCreatePollTimer = null; }
+                if (pulsoRetosPollTimer) { clearTimeout(pulsoRetosPollTimer); pulsoRetosPollTimer = null; }
+                if (pulsoRetosRefreshTimer) { clearTimeout(pulsoRetosRefreshTimer); pulsoRetosRefreshTimer = null; }
+                return;
+            }
+            if (pulsoCreatePollPending !== null && !pulsoCreatePollTimer) {
+                pulsoCreatePollTick();
+            }
+            if (pulsoRetosPollPending !== null && !pulsoRetosPollTimer) {
+                const token = pulsoRetosPollPending;
+                pulsoRetosPollPending = null;
+                pulsoRetosPoll(token);
+            }
+            if (pulsoRetosRefreshPending && !pulsoRetosRefreshTimer) {
+                const p = pulsoRetosRefreshPending;
+                pulsoRetosRefreshPending = null;
+                pulsoRetosRefrescar(p.token, p.codigo, p.started);
+            }
         }
 
         function appendCreateStatusNotice(text, kind) {
@@ -5114,13 +5564,45 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 progressLine = esjuego ? 'Generando tu juego…' : 'Generando tu infografía…';
             }
 
+            // El sondeo llega cada 7 s: repintar todo hacía perder el foco al usuario de teclado y
+            // obligaba al lector a releer la pantalla. La «pantalla» es el encargo sin la posición
+            // en cola ni la marca de modificación; si no cambia, solo se actualizan la píldora y la
+            // línea de progreso, que son lo único que se mueve (posición en cola, etc.).
+            const slow = !encargo.terminal && (Date.now() - pulsoCreatePollStart) >= 120000;
+            const keyObj = Object.assign({}, encargo);
+            delete keyObj.posicion;
+            delete keyObj.timemodified;
+            const screenKey = JSON.stringify(keyObj) + '|' + (slow ? 1 : 0);
+            // Lo que oye el lector de pantalla: solo el cambio («En cola. Tienes 2 por delante», «Lista»).
+            const announceText = pillLabel + (progressLine ? '. ' + progressLine : '');
+
+            if (screenKey === pulsoCreateStatusKey && body.querySelector('.pulso-create-status')) {
+                const pill = document.getElementById('pulso-create-pill');
+                if (pill) {
+                    pill.className = 'pulso-status-pill ' + pillClass;
+                    pill.textContent = pillLabel;
+                }
+                const prog = document.getElementById('pulso-create-progress');
+                if (prog && progressLine) prog.textContent = progressLine;
+                if (announceText !== pulsoCreateAnnounced) {
+                    pulsoCreateAnnounced = announceText;
+                    pulsoAnnounce(announceText);
+                }
+                return;
+            }
+            pulsoCreateStatusKey = screenKey;
+            if (announceText !== pulsoCreateAnnounced) {
+                pulsoCreateAnnounced = announceText;
+                pulsoAnnounce(announceText);
+            }
+
             let html = '<div class="pulso-create-status">'
                 + '<div class="pulso-create-status-head">'
-                + '<span class="pulso-status-pill ' + pillClass + '">' + escapeHtmlText(pillLabel) + '</span>'
+                + '<span class="pulso-status-pill ' + pillClass + '" id="pulso-create-pill">' + escapeHtmlText(pillLabel) + '</span>'
                 + '</div>';
 
             if (progressLine) {
-                html += '<p class="pulso-create-hint">' + escapeHtmlText(progressLine) + '</p>';
+                html += '<p class="pulso-create-hint" id="pulso-create-progress">' + escapeHtmlText(progressLine) + '</p>';
             }
 
             // El servidor marca `delayed` si el encargo lleva más de 10 minutos en
@@ -5171,7 +5653,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     if (encargo.titulo) html += '<div class="pulso-create-image-title">' + escapeHtmlText(encargo.titulo) + '</div>';
                     if (encargo.tema) html += '<div class="pulso-create-image-tema">' + escapeHtmlText(encargo.tema) + '</div>';
                     html += '<div class="pulso-create-image-actions">'
-                        + '<a href="' + pulsoEscapeAttr(encargo.playurl) + '" target="_blank" rel="noopener">Jugar</a>'
+                        + '<a href="' + pulsoEscapeAttr(encargo.playurl) + '" target="_blank" rel="noopener">Jugar' + PULSO_NEWTAB_SR + '</a>'
                         + '</div>';
                 } else {
                     html += '<img class="pulso-create-image" src="' + pulsoEscapeAttr(encargo.imageurl) + '" alt="'
@@ -5179,7 +5661,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     if (encargo.titulo) html += '<div class="pulso-create-image-title">' + escapeHtmlText(encargo.titulo) + '</div>';
                     if (encargo.tema) html += '<div class="pulso-create-image-tema">' + escapeHtmlText(encargo.tema) + '</div>';
                     html += '<div class="pulso-create-image-actions">'
-                        + '<a href="' + pulsoEscapeAttr(encargo.imageurl) + '" target="_blank" rel="noopener">Abrir a tamaño completo</a>'
+                        + '<a href="' + pulsoEscapeAttr(encargo.imageurl) + '" target="_blank" rel="noopener">Abrir a tamaño completo' + PULSO_NEWTAB_SR + '</a>'
                         + '<a href="' + pulsoEscapeAttr(encargo.downloadurl) + '">Descargar</a>'
                         + '</div>';
                 }
@@ -5276,7 +5758,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(it.r.titulo || 'Reto') + '</span>'
                         + '<span class="pulso-create-gallery-tag">Reto</span>'
                         + '<span class="pulso-create-gallery-date">' + escapeHtmlText(new Date(it.r.creado * 1000).toLocaleDateString()) + '</span>'
-                        + '</a>';
+                        + PULSO_NEWTAB_SR + '</a>';
                     return;
                 }
                 const e = it.e;
@@ -5311,7 +5793,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // pestaña nueva y en el propio clic (sin bloqueo de ventanas emergentes).
         function pulsoHistorialFooter() {
             if (window.pulsoIsTeacher !== false || window.pulsoEpicaAvailable === false) return '';
-            return '<p class="pulso-create-hint"><button type="button" class="pulso-historial-link" onclick="pulsoAbrirHistorial()">Ver todo mi historial en Épica ↗</button><br>'
+            return '<p class="pulso-create-hint"><button type="button" class="pulso-historial-link" onclick="pulsoAbrirHistorial()">Ver todo mi historial en Épica<span aria-hidden="true"> ↗</span>' + PULSO_NEWTAB_SR + '</button><br>'
                 + 'Se abre en una pestaña nueva. Solo aparece lo creado desde el 5 de octubre de 2026.</p>';
         }
 
@@ -5335,12 +5817,17 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         }
 
         function openCreateGalleryItem(encargoid, tool) {
-            const messagesDiv = document.getElementById('pulso-messages');
+            const messagesDiv = document.getElementById('pulso-scroll');
             const body = document.getElementById('pulso-create-body');
             if (!messagesDiv || !body) return;
+            if (!messagesDiv.classList.contains('pulso-showing-create')) {
+                const active = document.activeElement;
+                pulsoCreateOpener = (active && active !== document.body) ? active : null;
+            }
             pulsoCreateSetTool(tool);
             messagesDiv.classList.add('pulso-showing-create');
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
+            pulsoCreateScreen(true);
             // Si sigue en curso, se sondea igual que un encargo recién creado.
             startCreatePolling(encargoid);
         }
@@ -5351,15 +5838,33 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             return div.innerHTML;
         }
         
+        // El contador solo aparece cerca del tope (desde 400 de 500) y el lector de pantalla oye
+        // «Quedan N caracteres» en unos umbrales (no en cada tecla). maxlength ya corta lo tecleado.
+        const PULSO_CHAR_MAX = 500;
+        const PULSO_CHAR_SHOW_AT = 400;
+        const PULSO_CHAR_ANNOUNCE_AT = [450, 480, 490, 500];
+        let pulsoCharAnnounced = 0;
+
         function updateCharCount() {
             const input = document.getElementById('pulso-input');
+            if (!input) return;
             const count = input.value.length;
-            document.getElementById('pulso-char-count').textContent = count;
-            
-            if (count > 500) {
-                input.value = input.value.substring(0, 500);
-                document.getElementById('pulso-char-count').textContent = '500';
+            const box = document.getElementById('pulso-char-count-box');
+            const num = document.getElementById('pulso-char-count');
+            if (num) num.textContent = count;
+            if (box) {
+                box.hidden = count < PULSO_CHAR_SHOW_AT;
+                box.classList.toggle('is-near', count >= 480);
             }
+            if (count < PULSO_CHAR_SHOW_AT) pulsoCharAnnounced = 0;
+            PULSO_CHAR_ANNOUNCE_AT.forEach(function(threshold) {
+                if (count >= threshold && pulsoCharAnnounced < threshold) {
+                    pulsoCharAnnounced = threshold;
+                    const left = PULSO_CHAR_MAX - count;
+                    pulsoAnnounce(left > 0 ? 'Quedan ' + left + ' caracteres' : 'Has llegado al límite de ' + PULSO_CHAR_MAX + ' caracteres');
+                }
+            });
+            pulsoUpdateSendState();
         }
 
         // ========== DICTADO POR VOZ (Web Speech API, transcripción en cliente) ==========
@@ -5398,10 +5903,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
             pulsoRecognition.onerror = function(event) {
                 if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                    const lang = navigator.language.startsWith('en') ? 'en' : 'es';
-                    alert(lang === 'en'
-                        ? 'Microphone access is blocked. Allow it in your browser to dictate.'
-                        : 'El micrófono está bloqueado. Permite el acceso en tu navegador para dictar.');
+                    pulsoSystemMessage('El micrófono está bloqueado. Permite el acceso en tu navegador para dictar.');
                 }
                 // 'no-speech' / 'aborted' se ignoran silenciosamente.
                 stopPulsoMic();
@@ -5493,27 +5995,63 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         let streamBubble = null;
         let typingBubble = null;
 
+        // Estado del envío en UN sitio: la bandera, el botón (aria-disabled: sigue enfocable) y
+        // aria-busy del registro (el lector no anuncia a trozos mientras llega la respuesta).
+        function pulsoSetSending(flag) {
+            pulsoSending = !!flag;
+            const log = document.getElementById('pulso-messages');
+            if (log) log.setAttribute('aria-busy', pulsoSending ? 'true' : 'false');
+            pulsoUpdateSendState();
+        }
+
+        function pulsoUpdateSendState() {
+            const btn = document.getElementById('pulso-send-btn');
+            const input = document.getElementById('pulso-input');
+            if (!btn || !input) return;
+            const empty = input.value.trim() === '';
+            btn.setAttribute('aria-disabled', (pulsoSending || empty) ? 'true' : 'false');
+        }
+
+        function pulsoSetOffline(show) {
+            const banner = document.getElementById('pulso-offline');
+            if (!banner) return;
+            const wasHidden = banner.hidden;
+            banner.hidden = !show;
+            if (show && wasHidden) pulsoAnnounce(banner.textContent);
+        }
+
         function sendMessage(e) {
-            e.preventDefault();
+            if (e && e.preventDefault) e.preventDefault();
             if (pulsoSending) return;
             if (pulsoMicRecording && pulsoRecognition) pulsoRecognition.stop();
             const input = document.getElementById('pulso-input');
             const message = input.value.trim();
 
-            if (!message) {
-                const lang = navigator.language.startsWith('en') ? 'en' : 'es';
-                const alertMsg = lang === 'en' ? 'Please enter a message' : 'Por favor escribe un mensaje';
-                alert(alertMsg);
+            // Campo vacío: el botón ya se ve desactivado; sin aviso emergente.
+            if (!message) return;
+
+            // Sin conexión: la pregunta se queda en el cuadro y el aviso persistente lo explica.
+            if (navigator.onLine === false) {
+                pulsoSetOffline(true);
                 return;
             }
 
-            // Agregar mensaje del usuario
+            // Con el panel Crear abierto, el mensaje y su respuesta quedarían ocultos (y entrarían
+            // en el historial sin verse): se vuelve al chat ANTES de enviar.
+            if (pulsoCreateIsOpen()) closeCreatePanel({ restoreFocus: false });
+
             setHomeVisible(false);
             addMessage(message, 'user');
             input.value = '';
             updateCharCount();
 
-            // Mostrar loading
+            dispatchMessage(message);
+        }
+
+        // Lanza la petición (stream o XHR). La usa también «Reintentar», que reenvía el MISMO
+        // mensaje sin volver a pintarlo ni tocar lo que haya en el cuadro de texto.
+        function dispatchMessage(message) {
+            pulsoAnnounce('Pulse está preparando la respuesta');
             showLoading(true);
 
             // Streaming (estilo ChatGPT) cuando el navegador lo soporta;
@@ -5595,54 +6133,94 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // textos crudos de Anthropic/OpenAI. Solo se añade `detail` (causa genérica
         // escrita por nosotros), y el servidor lo manda únicamente a profesorado/admin.
         const PULSO_ERROR_TEXTS = {
-            es: {
-                busy: 'Pulse está muy ocupado ahora mismo. Prueba en un minuto.',
-                config: 'Pulse no está disponible ahora mismo. Avisa a tu profesorado.',
-                network: 'Se ha cortado la conexión. Vuelve a intentarlo.',
-                session: 'Tu sesión ha caducado. Recarga la página.',
-                access: 'No tienes acceso a Pulse en este curso.',
-                disabled: 'Pulse está desactivado en este curso.',
-                bad_request: 'No se ha podido entender la petición. Escribe otra pregunta e inténtalo de nuevo.',
-                empty: 'Pulse no ha podido responder esta vez. Vuelve a intentarlo.',
-                refusal: 'Pulse no puede responder a esta petición. Prueba a reformular la pregunta.',
-                encoding: 'No se ha podido preparar la petición. Empieza una conversación nueva («Nueva conversación») e inténtalo de nuevo.',
-                rate_limited: 'Has enviado muchas preguntas seguidas. Espera un minuto.',
-                rate_limited_day: 'Has llegado al límite de preguntas de hoy. Podrás seguir mañana.',
-                unavailable: 'La creación de contenidos no está disponible en este sitio.',
-                timeout: 'La respuesta está tardando demasiado. Vuelve a intentarlo.',
-                truncated: 'La respuesta se ha cortado. Pídeme que la continúe o haz una pregunta más concreta.',
-                unknown: 'Algo ha fallado. Vuelve a intentarlo en un momento; si sigue igual, pulsa «Nueva conversación».'
-            },
-            en: {
-                busy: 'Pulse is very busy right now. Try again in a minute.',
-                config: 'Pulse is not available right now. Let your teacher know.',
-                network: 'The connection was cut. Please try again.',
-                session: 'Your session has expired. Reload the page.',
-                access: 'You do not have access to Pulse in this course.',
-                disabled: 'Pulse is disabled in this course.',
-                bad_request: 'That request is not valid. Write another question and try again.',
-                empty: 'Pulse could not answer this time. Please try again.',
-                refusal: 'Pulse cannot answer this request. Try rephrasing your question.',
-                encoding: 'The request could not be prepared. Start a new conversation ("Nueva conversación") and try again.',
-                rate_limited: 'You have sent a lot of questions in a row. Wait a minute.',
-                rate_limited_day: 'You have reached today\'s question limit. You can continue tomorrow.',
-                unavailable: 'Content creation is not available on this site.',
-                timeout: 'The answer is taking too long. Please try again.',
-                truncated: 'The answer was cut off. Ask me to continue or ask a more specific question.',
-                unknown: 'Something went wrong. Try again in a moment; if it keeps happening, press "Nueva conversación".'
-            }
+            busy: 'Pulse está muy ocupado ahora mismo. Prueba en un minuto.',
+            config: 'Pulse no está disponible ahora mismo. Avisa a tu profesorado.',
+            network: 'Se ha cortado la conexión. Vuelve a intentarlo.',
+            session: 'Tu sesión ha caducado. Recarga la página.',
+            access: 'No tienes acceso a Pulse en este curso.',
+            disabled: 'Pulse está desactivado en este curso.',
+            bad_request: 'No se ha podido entender la petición. Escribe otra pregunta e inténtalo de nuevo.',
+            empty: 'Pulse no ha podido responder esta vez. Vuelve a intentarlo.',
+            refusal: 'Pulse no puede responder a esta petición. Prueba a reformular la pregunta.',
+            encoding: 'No se ha podido preparar la petición. Empieza una conversación nueva («Nueva conversación») e inténtalo de nuevo.',
+            rate_limited: 'Has enviado muchas preguntas seguidas. Espera un minuto.',
+            rate_limited_day: 'Has llegado al límite de preguntas de hoy. Podrás seguir mañana.',
+            unavailable: 'La creación de contenidos no está disponible en este sitio.',
+            timeout: 'La respuesta está tardando demasiado. Vuelve a intentarlo.',
+            truncated: 'La respuesta se ha cortado. Pídeme que la continúe o haz una pregunta más concreta.',
+            interrupted: 'La respuesta se interrumpió. Inténtalo de nuevo.',
+            unknown: 'Algo ha fallado. Vuelve a intentarlo en un momento; si sigue igual, pulsa «Nueva conversación».'
         };
 
+        // Códigos en los que reenviar el mismo mensaje tiene sentido; el resto pide otra acción
+        // (recargar, reformular, empezar de nuevo, esperar a mañana).
+        const PULSO_RETRYABLE = ['busy', 'network', 'timeout', 'empty', 'unknown', 'rate_limited', 'interrupted'];
+
+        // Todos los textos del cliente van en castellano (antes algunos cambiaban a inglés por
+        // navigator.language). Si algún día hay multidioma, el idioma saldrá de Moodle vía JSINIT.
         function pulsoFailureMessage(payload) {
-            const lang = navigator.language.startsWith('en') ? 'en' : 'es';
-            const texts = PULSO_ERROR_TEXTS[lang];
             const code = (payload && typeof payload.error_code === 'string') ? payload.error_code : '';
-            let text = '⚠️ ' + (Object.prototype.hasOwnProperty.call(texts, code) ? texts[code] : texts.unknown);
+            let text = Object.prototype.hasOwnProperty.call(PULSO_ERROR_TEXTS, code) ? PULSO_ERROR_TEXTS[code] : PULSO_ERROR_TEXTS.unknown;
             const detail = (payload && typeof payload.detail === 'string') ? payload.detail.trim() : '';
             if (detail !== '') {
                 text += ' ' + detail;
             }
             return text;
+        }
+
+        // Burbuja de error: SVG decorativo (aria-hidden) + «Error:» + el texto del código. Si
+        // procede, lleva «Reintentar», que reenvía el MISMO mensaje (la pregunta ya no se pierde
+        // aunque el campo se haya vaciado al enviar). textOverride sustituye al texto por código.
+        function addErrorMessage(payload, message, textOverride) {
+            const log = document.getElementById('pulso-messages');
+            if (!log) return;
+            const code = (payload && typeof payload.error_code === 'string') ? payload.error_code : 'unknown';
+
+            const el = document.createElement('div');
+            el.className = 'pulso-message ai pulso-error-bubble';
+            const content = document.createElement('div');
+            content.className = 'pulso-message-content';
+
+            const head = document.createElement('div');
+            head.className = 'pulso-error-head';
+            head.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+            const txt = document.createElement('span');
+            const strong = document.createElement('strong');
+            strong.textContent = 'Error:';
+            txt.appendChild(strong);
+            txt.appendChild(document.createTextNode(' ' + (textOverride || pulsoFailureMessage(payload))));
+            head.appendChild(txt);
+            content.appendChild(head);
+
+            if (message && PULSO_RETRYABLE.indexOf(code) !== -1) {
+                const retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'pulso-error-retry';
+                retry.textContent = 'Reintentar';
+                retry.addEventListener('click', function() {
+                    if (pulsoSending) return;
+                    if (navigator.onLine === false) {
+                        pulsoSetOffline(true);
+                        return;
+                    }
+                    el.remove();
+                    dispatchMessage(message);
+                    const input = document.getElementById('pulso-input');
+                    if (input) input.focus();
+                });
+                content.appendChild(retry);
+            }
+
+            el.appendChild(content);
+            log.appendChild(el);
+            pulsoScrollToEnd();
+        }
+
+        // Aviso del sistema dentro del chat (sustituye a los alert()). Si el panel Crear está
+        // abierto se vuelve al chat: el mensaje quedaría oculto detrás.
+        function pulsoSystemMessage(text) {
+            if (pulsoCreateIsOpen()) closeCreatePanel({ restoreFocus: false });
+            addErrorMessage({ error_code: 'custom' }, null, text);
         }
 
         // Procesamiento compartido de la respuesta completa (stream final / XHR).
@@ -5658,8 +6236,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 if (window.pulsoDebug) {
                     let parsed = null;
                     try { parsed = JSON.parse(response.answer); } catch (e) { parsed = null; }
-                    console.log('[pulso] JSON final:', response.answer);
-                    console.log('[pulso] campos:', parsed ? Object.keys(parsed) : '(no es JSON)',
+                    pulsoLog('[pulso] JSON final:', response.answer);
+                    pulsoLog('[pulso] campos:', parsed ? Object.keys(parsed) : '(no es JSON)',
                         '| type:', parsed && parsed.type,
                         '| showAnalysisSections:', showAnalysisSections,
                         '| se pinta content:', !!(parsed && parsed.content && parsed.type === 'text'),
@@ -5672,7 +6250,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 // el historial (un turno cortado, reenviado al modelo, hacía que lo
                 // continuara en vez de contestar la pregunta nueva). Sin sugerencias.
                 if (response.truncated) {
-                    addMessage(pulsoFailureMessage({error_code: 'truncated'}), 'ai');
+                    addErrorMessage({error_code: 'truncated'});
                     return;
                 }
 
@@ -5715,7 +6293,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 // fallido en el historial se le reenvía al modelo en la pregunta
                 // siguiente.
                 console.error('❌ Respuesta no utilizable:', response);
-                addMessage(pulsoFailureMessage(response), 'ai');
+                addErrorMessage(response, message);
             }
         }
 
@@ -5728,6 +6306,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const messagesDiv = document.getElementById('pulso-messages');
             const messageEl = document.createElement('div');
             messageEl.className = 'pulso-message ai';
+            // Los trozos del stream NO se anuncian: el lector oye la respuesta final una sola vez.
+            messageEl.setAttribute('aria-hidden', 'true');
             const contentEl = document.createElement('div');
             contentEl.className = 'pulso-message-content';
             const textEl = document.createElement('span');
@@ -5748,7 +6328,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const textEl = bubble.querySelector('.pulso-stream-text');
             if (textEl) textEl.textContent = text;
             const messagesDiv = document.getElementById('pulso-messages');
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            pulsoScrollToEnd();
         }
 
         function removeStreamBubble() {
@@ -5785,7 +6365,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // ---------- Streaming SSE ----------
 
         function sendMessageStream(message) {
-            pulsoSending = true;
+            pulsoSetSending(true);
             let accum = '';
             let gotFinal = false;
             let receivedAny = false;
@@ -5845,7 +6425,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     showLoading(false);
                     removeStreamBubble();
                     console.error('❌ Evento error del stream:', data);
-                    addMessage(pulsoFailureMessage(data), 'ai');
+                    addErrorMessage(data, message);
                 }
             }
 
@@ -5894,7 +6474,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             })
             .then(function() {
                 clearStreamTimer();
-                pulsoSending = false;
+                pulsoSetSending(false);
                 if (!gotFinal) {
                     removeStreamBubble();
                     if (!receivedAny) {
@@ -5902,26 +6482,26 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         sendMessageXHR(message);
                     } else {
                         showLoading(false);
-                        addMessage('⚠️ La respuesta se interrumpió. Inténtalo de nuevo.', 'ai');
+                        addErrorMessage({error_code: 'interrupted'}, message);
                     }
                 }
             })
             .catch(function(err) {
                 clearStreamTimer();
-                pulsoSending = false;
+                pulsoSetSending(false);
                 removeStreamBubble();
                 if (gotFinal) return;
                 if (timedOut) {
                     // Nunca al endpoint clásico: repetiría la petición que ya agotó el tiempo.
                     showLoading(false);
-                    addMessage(pulsoFailureMessage({error_code: 'timeout'}), 'ai');
+                    addErrorMessage({error_code: 'timeout'}, message);
                 } else if (!receivedAny) {
                     console.warn('⚠️ Streaming no disponible, usando endpoint clásico:', err.message);
                     sendMessageXHR(message);
                 } else {
                     // Corte de red a mitad de respuesta: aviso y el envío queda libre.
                     showLoading(false);
-                    addMessage(pulsoFailureMessage({error_code: 'network'}), 'ai');
+                    addErrorMessage({error_code: 'network'}, message);
                 }
             });
         }
@@ -5931,7 +6511,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         function sendMessageXHR(message) {
             // También bloquea el envío (antes solo lo hacía el stream: con el fallback se
             // podían lanzar dos preguntas a la vez).
-            pulsoSending = true;
+            pulsoSetSending(true);
             showLoading(true);
             const xhr = new XMLHttpRequest();
             let finished = false;
@@ -5941,7 +6521,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             function finish() {
                 if (finished) return false;
                 finished = true;
-                pulsoSending = false;
+                pulsoSetSending(false);
                 showLoading(false);
                 return true;
             }
@@ -5951,7 +6531,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
             xhr.onload = function() {
                 if (!finish()) return;
-                console.log('📡 AJAX Status:', xhr.status);
+                pulsoLog('📡 AJAX Status:', xhr.status);
 
                 // El cuerpo se lee con cualquier código: el servidor contesta 4xx/5xx
                 // con {success:false, error_code} y el texto se elige por ese código.
@@ -5964,16 +6544,16 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 if (response && typeof response === 'object') {
                     handleChatResponse(message, response);
                 } else {
-                    addMessage(pulsoFailureMessage({error_code: 'unknown'}), 'ai');
+                    addErrorMessage({error_code: 'unknown'}, message);
                 }
             };
             xhr.ontimeout = function() {
                 if (!finish()) return;
-                addMessage(pulsoFailureMessage({error_code: 'timeout'}), 'ai');
+                addErrorMessage({error_code: 'timeout'}, message);
             };
             xhr.onerror = xhr.onabort = function() {
                 if (!finish()) return;
-                addMessage(pulsoFailureMessage({error_code: 'network'}), 'ai');
+                addErrorMessage({error_code: 'network'}, message);
             };
 
             xhr.open('POST', window.apiUrl, true);
@@ -5998,7 +6578,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             messagesDiv.appendChild(messageEl);
             
             // Auto scroll
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            pulsoScrollToEnd();
         }
         
         // Burbuja "escribiendo" estilo WhatsApp: se muestra mientras el bot
@@ -6009,8 +6589,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             if (!messagesDiv) return;
             const messageEl = document.createElement('div');
             messageEl.className = 'pulso-message ai pulso-typing';
-            messageEl.setAttribute('role', 'status');
-            messageEl.setAttribute('aria-label', 'Pulse está escribiendo');
+            // Decorativa: el aviso al lector sale de pulsoAnnounce() al enviar.
+            messageEl.setAttribute('aria-hidden', 'true');
             const contentEl = document.createElement('div');
             contentEl.className = 'pulso-message-content';
             const dots = document.createElement('span');
@@ -6021,7 +6601,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             messageEl.appendChild(contentEl);
             messagesDiv.appendChild(messageEl);
             typingBubble = messageEl;
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            pulsoScrollToEnd();
         }
 
         function hideTyping() {
@@ -6075,6 +6655,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                     // Enviar automáticamente
                     const form = document.getElementById('pulso-chat-form');
                     form.dispatchEvent(new Event('submit'));
+                    input.focus();
                 });
                 
                 containerEl.appendChild(chip);
@@ -6084,7 +6665,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             messagesDiv.appendChild(containerEl);
             
             // Auto scroll
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            pulsoScrollToEnd();
         }
         
         // ========== FLOATING WINDOW LOGIC ==========
@@ -6096,16 +6677,19 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             dragOffsetY: 0
         };
         
+        let pulsoChatWide = false;
+
         function toggleChat() {
             const container = document.getElementById('pulso-chat-container');
             const bubble = document.getElementById('pulso-chat-bubble');
             const header = document.getElementById('pulso-chat-header');
-            
+
             if (!floatingState.isOpen) {
                 // Abrir chat
                 floatingState.isOpen = true;
                 container.classList.add('is-open');
                 bubble.style.display = 'none';
+                bubble.setAttribute('aria-expanded', 'true');
 
                 // Convert auto height (from top+bottom pins) to explicit px so CSS resize works.
                 container.style.height = container.offsetHeight + 'px';
@@ -6124,35 +6708,73 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
 
                 // Hacer draggable
                 header.addEventListener('mousedown', startDrag);
-                
-                // Focus en input
+
+                // Al abrir, foco al campo de texto
                 setTimeout(function() {
                     var input = document.getElementById('pulso-input');
-                    if (input) input.focus();
+                    if (input && floatingState.isOpen) input.focus();
                 }, 100);
-                
+
                 // Scroll al final de los mensajes
-                var msgs = document.getElementById('pulso-messages');
-                if (msgs) msgs.scrollTop = msgs.scrollHeight;
-                
-                console.log('✅ Chat abierto');
+                pulsoScrollToEnd();
+
+                pulsoLog('✅ Chat abierto');
             } else {
                 // Minimizar a burbuja
                 floatingState.isOpen = false;
+                if (pulsoMicRecording && pulsoRecognition) pulsoRecognition.stop();
                 container.classList.remove('is-open');
                 container.style.cssText = '';
+                pulsoChatWide = false;
+                pulsoSyncSizeButton();
                 bubble.style.display = 'flex';
-                
+                bubble.setAttribute('aria-expanded', 'false');
+
                 // Si hay mensajes de conversación, marcar burbuja
                 if (window.conversationHistory && window.conversationHistory.length > 0) {
                     bubble.classList.add('has-chat');
                 }
-                
+
                 header.removeEventListener('mousedown', startDrag);
-                console.log('✅ Chat minimizado a burbuja');
+
+                // Al minimizar/cerrar, el foco vuelve a la burbuja (si no, se pierde en el vacío).
+                bubble.focus();
+                pulsoLog('✅ Chat minimizado a burbuja');
             }
         }
-        
+
+        // Ampliar / Reducir (640 px ↔ 90 vw): hasta ahora solo se redimensionaba con el ratón
+        // (resize: both). Al ampliar se suelta la posición arrastrada para que no se salga de la pantalla.
+        function toggleChatSize() {
+            const container = document.getElementById('pulso-chat-container');
+            if (!container || !floatingState.isOpen) return;
+            pulsoChatWide = !pulsoChatWide;
+            const spare = container.classList.contains('drawer-collapsed') ? 180 : 130;
+            container.style.left = '';
+            container.style.top = '';
+            container.style.right = '';
+            container.style.bottom = '';
+            if (pulsoChatWide) {
+                container.style.width = Math.round(window.innerWidth * 0.9) + 'px';
+                container.style.height = Math.max(300, window.innerHeight - spare) + 'px';
+            } else {
+                container.style.width = Math.min(640, window.innerWidth - 48) + 'px';
+                container.style.height = Math.min(600, window.innerHeight - spare) + 'px';
+            }
+            pulsoSyncSizeButton();
+        }
+
+        function pulsoSyncSizeButton() {
+            const btn = document.getElementById('pulso-expand-btn');
+            if (!btn) return;
+            const label = pulsoChatWide ? 'Reducir el chat' : 'Ampliar el chat';
+            btn.setAttribute('aria-label', label);
+            btn.title = pulsoChatWide ? 'Reducir' : 'Ampliar';
+            btn.innerHTML = pulsoChatWide
+                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
+                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+        }
+
         function clearConversation() {
             const hasHistory = window.conversationHistory && window.conversationHistory.length > 0;
             if (hasHistory && !confirm('¿Empezar una conversación nueva? Se borrará el historial de este chat.')) {
@@ -6166,11 +6788,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                 // sessionStorage no disponible — no pasa nada, el estado en memoria ya está limpio.
             }
 
-            // Quitar solo los mensajes y sugerencias; el panel de inicio
-            // (#pulso-home) vive dentro del contenedor y debe conservarse.
+            // Quitar solo los mensajes, el separador del historial y las sugerencias del registro
+            // (#pulso-messages). La home y el panel Crear viven fuera de él y se conservan.
             const messagesDiv = document.getElementById('pulso-messages');
             if (messagesDiv) {
-                messagesDiv.querySelectorAll('.pulso-message, .pulso-followup-container').forEach(function(el) {
+                messagesDiv.querySelectorAll('.pulso-message, .pulso-followup-container, .pulso-history-divider').forEach(function(el) {
                     el.remove();
                 });
             }
@@ -6192,6 +6814,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         function startDrag(e) {
             if (e.button !== 0) return;
             if (!floatingState.isOpen) return;
+            // A pantalla completa (móvil) no se arrastra.
+            if (window.matchMedia && window.matchMedia('(max-width: 480px)').matches) return;
             
             e.preventDefault();
             
@@ -6353,13 +6977,48 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             const inputElement = document.getElementById('pulso-input');
             if (inputElement) {
                 inputElement.addEventListener('input', updateCharCount);
-                inputElement.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                // keydown (keypress está obsoleto) y sin enviar mientras se compone con un IME
+                // (japonés, chino, acentos muertos): Enter confirma la composición, no envía.
+                inputElement.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
                         e.preventDefault();
                         sendMessage(new Event('submit'));
                     }
                 });
             }
+            updateCharCount();
+
+            // Escape dentro del chat lo cierra y devuelve el foco a la burbuja.
+            if (container) {
+                container.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape' && floatingState.isOpen && !e.defaultPrevented) {
+                        e.preventDefault();
+                        toggleChat();
+                    }
+                });
+            }
+
+            // Tras repintar el panel Crear (innerHTML) el elemento enfocado desaparece y el foco se
+            // pierde: se lleva al título de la nueva pantalla. Un repintado parcial (la píldora de
+            // estado) no toca los hijos directos, así que no mueve el foco.
+            const createBodyEl = document.getElementById('pulso-create-body');
+            if (createBodyEl && window.MutationObserver) {
+                new MutationObserver(function() { pulsoCreateScreen(); }).observe(createBodyEl, { childList: true });
+            }
+
+            // Historial de la sesión: se pinta, no solo se reenvía al modelo.
+            pulsoRenderHistory();
+
+            // Sin conexión: aviso persistente en el chat.
+            if (navigator.onLine === false) pulsoSetOffline(true);
+            window.addEventListener('offline', function() { pulsoSetOffline(true); });
+            window.addEventListener('online', function() {
+                pulsoSetOffline(false);
+                pulsoAnnounce('Conexión recuperada');
+            });
+
+            // Los sondeos (Crear 7 s, Retos 4 s) se pausan con la pestaña en segundo plano.
+            document.addEventListener('visibilitychange', pulsoOnVisibilityChange);
         });
     </script>
     HTML;
@@ -6393,7 +7052,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $html = preg_replace('/<!--PULSO_EPICA_ONLY_(START|END)-->/', '', $html);
 
     // Inyectar versión, nombre y curso (el bloque HTML es un nowdoc sin interpolación).
-    $html = str_replace('%%PULSO_VERSION%%', s($pulso_release), $html);
+    // La insignia de versión es para quien administra el curso (viewanalytics): sirve para
+    // comprobar qué build corre. El alumnado no la ve (a él no le dice nada).
+    $versionbadge = $isteacher
+        ? ' <span class="pulso-version-badge">' . s($pulso_release) . '</span>'
+        : '';
+    $html = str_replace('%%PULSO_VERSION_BADGE%%', $versionbadge, $html);
 
     // El nombre ya solo se usa dentro del saludo (%%PULSO_GREETING%%).
     $firstname = trim((string)($USER->firstname ?? ''));

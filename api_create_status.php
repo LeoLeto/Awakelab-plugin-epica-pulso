@@ -161,6 +161,10 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         'imageurl' => $imageurl,
         'downloadurl' => $downloadurl,
         'sobre' => $sobre,
+        // «pendiente» más de 10 minutos = la tarea adhoc no se ejecuta (cron parado o
+        // atrasado): el panel lo dice en vez de dejar un «En preparación» eterno.
+        'delayed' => $encargo->status === 'pendiente'
+            && (time() - (int)$encargo->timecreated) > 10 * MINSECS,
         'timecreated' => (int)$encargo->timecreated,
         'timemodified' => (int)$encargo->timemodified,
     ];

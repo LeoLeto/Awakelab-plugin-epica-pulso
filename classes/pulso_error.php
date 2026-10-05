@@ -57,6 +57,9 @@ class pulso_error extends \Exception {
         'empty' => 502,
         'refusal' => 422,
         'encoding' => 400,
+        'rate_limited' => 429,
+        'rate_limited_day' => 429,
+        'unavailable' => 503,
         'unknown' => 500,
     ];
 

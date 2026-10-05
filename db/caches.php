@@ -18,4 +18,13 @@ $definitions = [
         'simplekeys' => true,
         'simpledata' => false,
     ],
+    // Contador de preguntas del chat por usuario (classes/chat_rate_limiter.php, v1.31.0).
+    // TTL de un día: el contador diario se reinicia solo y no se acumulan claves de
+    // usuarios que ya no usan el chat.
+    'chatrate' => [
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
+        'simpledata' => false,
+        'ttl' => 86400,
+    ],
 ];

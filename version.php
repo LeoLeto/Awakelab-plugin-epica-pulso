@@ -2,8 +2,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026100201; // Crear juego: tres tipos de juego de partida (carta 9)
-$plugin->release   = '1.28.0';     // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026100501; // Avisos de infografía: normalizados a strings al leer
+$plugin->release   = '1.28.1';     // Semver visible en el header del chat — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;
 $plugin->dependencies = [

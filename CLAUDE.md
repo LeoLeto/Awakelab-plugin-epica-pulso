@@ -516,6 +516,14 @@ infografía, en vez del «Encargo guardado» estático del paso 1. Vive en
   hacerlo a los 30 minutos (`PULSO_CREATE_POLL_WINDOW_MS`), la misma cortesía
   que ya aplica `epica_client::FOREGROUND_WINDOW_S` en el servidor: pasada esa
   ventana, el aviso pasa a depender solo de la notificación de mensajería.
+- **`avisos` llega de Épica como array de OBJETOS, no de strings** (visto en producción:
+  «[object Object]» en el panel). `recoger_lamina()` lo sigue guardando CRUDO en JSON (fuente
+  de verdad) y la normalización es al LEER, en `api_create_status.php`
+  (`pulso_normalize_avisos()`): string → trim; objeto → primer valor string no vacío de
+  `texto`, `mensaje`, `message`, `detalle`, `descripcion`, `aviso`, `motivo`; sin ninguna →
+  se descarta (nunca el JSON del objeto); 300 caracteres (`mb_substr`), máx. 5, `[]` si no
+  queda ninguno. Así vale también para filas ya guardadas. El cliente pinta solo strings
+  (segunda red). Si Épica usa otra clave, añadirla a esa lista, no tocar `recoger_lamina()`.
 - **Nunca se devuelve el base64 de la imagen.** El endpoint solo da la URL de
   `pluginfile.php` (vista y descarga, generadas con
   `moodle_url::make_pluginfile_url(..., $forcedownload)`), que revalida el

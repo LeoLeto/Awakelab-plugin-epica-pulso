@@ -36,6 +36,41 @@ $encargoid = optional_param('encargoid', 0, PARAM_INT);
 header('Content-Type: application/json; charset=utf-8');
 
 /**
+ * Normaliza "avisos" a una lista de strings. Epica manda lamina.avisos como
+ * array de OBJETOS y recoger_lamina() lo guarda crudo; se normaliza al LEER
+ * para que valga también para las filas ya guardadas. Un objeto sin ninguna
+ * de las claves conocidas se descarta (nunca se devuelve su JSON).
+ *
+ * @param array $raw avisos decodificados
+ * @return string[] máx. 5 textos de hasta 300 caracteres
+ */
+function pulso_normalize_avisos(array $raw): array {
+    $keys = ['texto', 'mensaje', 'message', 'detalle', 'descripcion', 'aviso', 'motivo'];
+    $out = [];
+    foreach ($raw as $item) {
+        $text = '';
+        if (is_string($item)) {
+            $text = trim($item);
+        } else if (is_array($item)) {
+            foreach ($keys as $key) {
+                if (isset($item[$key]) && is_string($item[$key]) && trim($item[$key]) !== '') {
+                    $text = trim($item[$key]);
+                    break;
+                }
+            }
+        }
+        if ($text === '') {
+            continue;
+        }
+        $out[] = mb_substr($text, 0, 300);
+        if (count($out) >= 5) {
+            break;
+        }
+    }
+    return $out;
+}
+
+/**
  * Payload de UN encargo para el cliente. "sobre" (el envelope del modo de
  * ensayo) solo viaja a quien tiene viewanalytics: es la señal de
  * verificación contra el contrato de Epica, no algo que un alumno necesite
@@ -66,10 +101,10 @@ function pulso_status_encargo_payload(stdClass $encargo, context_course $context
         }
     }
 
-    $avisos = null;
+    $avisos = [];
     if (!empty($encargo->avisos)) {
         $decoded = json_decode($encargo->avisos, true);
-        $avisos = is_array($decoded) ? $decoded : null;
+        $avisos = is_array($decoded) ? pulso_normalize_avisos($decoded) : [];
     }
 
     // Título de respaldo SOLO para juegos sin título propio, mismo criterio

@@ -5112,9 +5112,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
                         + (esjuego ? 'este juego' : 'esta infografía') + ' trate de '
                         + (encargo.tema ? escapeHtmlText(encargo.tema) : 'el tema pedido') + '.</div>';
                 }
-                if (encargo.avisos && encargo.avisos.length) {
+                const avisosTxt = Array.isArray(encargo.avisos)
+                    ? encargo.avisos.filter(function(a) { return typeof a === 'string' && a.trim() !== ''; })
+                    : [];
+                if (avisosTxt.length) {
                     html += '<div class="pulso-create-notice-inline warn">'
-                        + encargo.avisos.map(function(a) { return escapeHtmlText(String(a)); }).join('; ') + '</div>';
+                        + avisosTxt.map(function(a) { return escapeHtmlText(a); }).join('; ') + '</div>';
                 }
 
                 if (esjuego) {

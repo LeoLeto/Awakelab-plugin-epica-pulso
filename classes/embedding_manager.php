@@ -15,6 +15,8 @@ namespace block_pulso;
 
 defined('MOODLE_INTERNAL') || die();
 
+require_once(__DIR__ . '/course_visibility.php');
+
 class embedding_manager {
 
     /** OpenAI embeddings endpoint. */
@@ -183,7 +185,7 @@ class embedding_manager {
             'courseid = :courseid AND embedding_json IS NOT NULL',
             ['courseid' => $courseid],
             '',
-            'id, module_type, module_name, chunk_index, chunk_text, embedding_json'
+            'id, cmid, module_type, module_name, chunk_index, chunk_text, embedding_json'
         );
 
         if (empty($all_chunks)) {
@@ -232,6 +234,11 @@ class embedding_manager {
 
         // Sort by similarity descending.
         usort($scored, fn($a, $b) => $b['similarity'] <=> $a['similarity']);
+
+        // Visibilidad DESPUES de puntuar y ANTES de recortar al top-K: si se
+        // filtrara despues, un recurso oculto muy relevante se comeria huecos y el
+        // usuario recibiria menos fragmentos de los que tocan.
+        $scored = $this->filter_visible($courseid, $scored);
 
         // Return top-K chunk records.
         return array_map(
@@ -288,7 +295,7 @@ class embedding_manager {
             'courseid = :courseid',
             ['courseid' => $courseid],
             '',
-            'id, module_type, module_name, chunk_index, chunk_text'
+            'id, cmid, module_type, module_name, chunk_index, chunk_text'
         );
 
         if (empty($chunks)) {
@@ -323,7 +330,37 @@ class embedding_manager {
             return [$b['distinct'], $b['occurrences']] <=> [$a['distinct'], $a['occurrences']];
         });
 
+        $scored = $this->filter_visible($courseid, $scored);
+
         return array_map(fn($s) => $s['record'], array_slice($scored, 0, $top_k));
+    }
+
+    /**
+     * Descarta los fragmentos que el usuario ACTUAL no puede ver (modulo oculto o
+     * restringido, seccion oculta) y limpia de los de seccion los nombres de
+     * actividades ocultas. El indice sigue conteniendo todo: el profesorado con
+     * acceso si lo ve.
+     *
+     * @param int $courseid
+     * @param array $scored Entradas ['record' => chunk, ...] ya ordenadas.
+     * @return array Mismas entradas, solo las visibles, orden conservado.
+     */
+    private function filter_visible(int $courseid, array $scored): array {
+        $out = [];
+        foreach ($scored as $entry) {
+            $record = $entry['record'];
+            $cmid = (int)$record->cmid;
+            if (!course_visibility::chunk_visible($courseid, $cmid)) {
+                continue;
+            }
+            $sectionnum = course_visibility::synthetic_section($courseid, $cmid);
+            if ($sectionnum !== null) {
+                $record->chunk_text = course_visibility::scrub_section_text(
+                    $courseid, $sectionnum, (string)$record->chunk_text);
+            }
+            $out[] = $entry;
+        }
+        return $out;
     }
 
     /**

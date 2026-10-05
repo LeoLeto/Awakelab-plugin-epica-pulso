@@ -23,6 +23,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/content_extractor.php');
 require_once(__DIR__ . '/embedding_manager.php');
 require_once(__DIR__ . '/full_text_store.php');
+require_once(__DIR__ . '/course_visibility.php');
 
 class rag_retriever {
 
@@ -113,6 +114,10 @@ class rag_retriever {
         $realSections = [];
         foreach ($sections as $section) {
             if ((int)$section->section === 0) {
+                continue;
+            }
+            // Una seccion oculta/restringida no existe para este usuario (ni su nombre).
+            if (!course_visibility::section_visible($courseid, (int)$section->section)) {
                 continue;
             }
             $realSections[] = $section;
@@ -440,6 +445,12 @@ class rag_retriever {
         // no eclipse al quiz/tarea/foro real (bug: "nota media" -> "NOTA INFORMATIVA").
         $collections = ['quiz' => $quizzes, 'assign' => $assigns] + $otherTypes + ['resource' => $resources];
 
+        // Solo lo que el usuario actual puede ver: una actividad oculta o
+        // restringida no se empareja ni se responde (su nombre ya es informacion).
+        foreach ($collections as $typeName => $records) {
+            $collections[$typeName] = course_visibility::filter_instances($courseid, $typeName, $records);
+        }
+
         // Fase 1: match EXACTO (nombre completo e inequivoco) en todos los tipos.
         $matched = null;
         $matchedType = null;
@@ -637,6 +648,10 @@ class rag_retriever {
         }
 
         foreach ($modinfo->get_cms() as $cm) {
+            // Una actividad oculta no existe para este usuario.
+            if (empty($cm->uservisible)) {
+                continue;
+            }
             $name = mb_strtolower(trim((string)$cm->name), 'UTF-8');
             if ($name === '') {
                 continue;
@@ -1461,6 +1476,7 @@ class rag_retriever {
             ['courseid' => $courseid, 'sectionid' => $section->id, 'modname' => 'label']
         );
 
+        $labels = course_visibility::filter_instances($courseid, 'label', $labels);
         if (empty($labels)) {
             return null;
         }
@@ -1541,6 +1557,7 @@ class rag_retriever {
             ['courseid' => $courseid, 'sectionid' => $section->id, 'modname' => 'quiz']
         );
 
+        $quizzes = course_visibility::filter_instances($courseid, 'quiz', $quizzes);
         if (empty($quizzes)) {
             return null;
         }
@@ -1576,6 +1593,7 @@ class rag_retriever {
             ['courseid' => $courseid, 'sectionid' => $section->id, 'modname' => 'assign']
         );
 
+        $assigns = course_visibility::filter_instances($courseid, 'assign', $assigns);
         if (empty($assigns)) {
             return null;
         }
@@ -1613,6 +1631,7 @@ class rag_retriever {
             } catch (\Throwable $e) {
                 continue;
             }
+            $records = course_visibility::filter_instances($courseid, $modType, $records);
             if (empty($records)) {
                 continue;
             }
@@ -1655,6 +1674,7 @@ class rag_retriever {
             ['courseid' => $courseid, 'sectionid' => $section->id, 'modname' => 'resource']
         );
 
+        $resources = course_visibility::filter_instances($courseid, 'resource', $resources);
         if (empty($resources)) {
             return null;
         }
@@ -1807,11 +1827,15 @@ class rag_retriever {
             'courseid = :courseid AND module_type = :modtype AND module_name = :name',
             ['courseid' => $courseid, 'modtype' => 'resource', 'name' => $modulename],
             'chunk_index ASC, id ASC',
-            'chunk_text'
+            'cmid, chunk_text'
         );
 
         $joined = '';
         foreach ($rows as $row) {
+            // Dos recursos pueden compartir nombre: nunca leer el oculto.
+            if (!course_visibility::chunk_visible($courseid, (int)$row->cmid)) {
+                continue;
+            }
             $joined .= "\n" . $row->chunk_text;
         }
 
@@ -1825,6 +1849,10 @@ class rag_retriever {
      */
     private static function get_resource_joined_chunks_by_cmid(int $courseid, int $cmid): string {
         global $DB;
+
+        if (!course_visibility::cm_visible($courseid, $cmid)) {
+            return '';
+        }
 
         $rows = $DB->get_records_select(
             'block_pulso_content_chunks',
@@ -1848,6 +1876,10 @@ class rag_retriever {
      */
     private static function get_resource_chunks_extended(int $courseid, int $cmid, int $resourceid, string $resourcename, int $charlimit = 7000): string {
         global $DB;
+
+        if (!course_visibility::cm_visible($courseid, $cmid)) {
+            return '';
+        }
 
         $rows = $DB->get_records_select(
             'block_pulso_content_chunks',
@@ -1888,6 +1920,11 @@ class rag_retriever {
      * @return string
      */
     private static function get_live_resource_text(int $cmid, int $resourceid, string $resourcename = ''): string {
+        // Extraccion en vivo: tampoco se lee un modulo que el usuario no ve.
+        $cm = get_coursemodule_from_id('', $cmid, 0, false, IGNORE_MISSING);
+        if (!$cm || !course_visibility::cm_visible((int)$cm->course, $cmid)) {
+            return '';
+        }
         try {
             $extractor = new content_extractor();
             $chunks = $extractor->extract_module($cmid, 'resource', $resourceid);
@@ -2662,6 +2699,9 @@ class rag_retriever {
                 continue;
             }
             $realSections[] = $section;
+            if (!course_visibility::section_visible($courseid, (int)$section->section)) {
+                continue;
+            }
         }
         $lines[] = 'Total de secciones: ' . count($realSections);
 
@@ -2880,6 +2920,9 @@ class rag_retriever {
                 }
                 $cm = $modinfo->cms[$cmid];
                 $name = trim((string)$cm->name);
+                if (empty($cm->uservisible)) {
+                    continue;
+                }
                 if ($name === '') {
                     $name = 'actividad sin nombre';
                 }
@@ -2901,6 +2944,9 @@ class rag_retriever {
 
         foreach ($cms as $cm) {
             $activities[] = '[' . $cm->modname . '] cmid=' . $cm->id;
+            if (!course_visibility::cm_visible($courseid, (int)$cm->id)) {
+                continue;
+            }
         }
 
         return $activities;
@@ -2936,7 +2982,7 @@ class rag_retriever {
             'courseid = :courseid AND module_type = :mod',
             ['courseid' => $courseid, 'mod' => 'resource'],
             'chunk_index ASC, id ASC',
-            'chunk_text',
+            'cmid, chunk_text',
             0,
             self::PROBLEM_CATALOG_MAX_CHUNKS
         );
@@ -2948,6 +2994,9 @@ class rag_retriever {
         $full = '';
         foreach ($rows as $r) {
             $full .= "\n" . $r->chunk_text;
+            if (!course_visibility::chunk_visible($courseid, (int)$r->cmid)) {
+                continue;
+            }
         }
 
         // Normalize and attempt to repair OCR-like letter spacing.

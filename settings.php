@@ -200,6 +200,40 @@ if ($ADMIN->fulltree) {
         0   // Disabled by default until the admin runs the first index.
     ));
 
+
+    // ============================================================
+    // Validación de los ajustes numéricos y de URL (v1.31.0).
+    // ============================================================
+    // Un cupo negativo o con texto dejaba la herramienta bloqueada (o sin tope) sin
+    // avisar. admin_setting_configtext::validate() acepta true o un texto de error.
+    $pulsonum = function (string $name, $default, string $paramtype = PARAM_INT) use ($settings) {
+        $setting = new admin_setting_configtext(
+            'block_pulso/' . $name,
+            get_string($name, 'block_pulso'),
+            get_string($name . '_desc', 'block_pulso'),
+            $default,
+            $paramtype
+        );
+        if (method_exists($setting, 'set_validate_function')) {
+            $setting->set_validate_function(function ($value) {
+                $value = trim((string)$value);
+                return (is_numeric($value) && (float)$value >= 0) ? true : get_string('err_setting_nonneg', 'block_pulso');
+            });
+        }
+        $settings->add($setting);
+    };
+
+    // ============================================================
+    // Límite de uso del chat por persona (v1.31.0)
+    // ============================================================
+    $settings->add(new admin_setting_heading(
+        'block_pulso/chatlimit_heading',
+        get_string('chatlimit_heading', 'block_pulso'),
+        get_string('chatlimit_heading_desc', 'block_pulso')
+    ));
+    $pulsonum('chat_max_por_minuto_usuario', 6);
+    $pulsonum('chat_max_por_dia_usuario', 150);
+
     // ============================================================
     // Encargos de creacion (Epica): cupos anti-abuso (v1.18.0)
     // ============================================================
@@ -208,54 +242,12 @@ if ($ADMIN->fulltree) {
         get_string('creationquota_heading', 'block_pulso'),
         get_string('creationquota_heading_desc', 'block_pulso')
     ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/quota_user_section_day',
-        get_string('quota_user_section_day', 'block_pulso'),
-        get_string('quota_user_section_day_desc', 'block_pulso'),
-        2,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/quota_user_course_day',
-        get_string('quota_user_course_day', 'block_pulso'),
-        get_string('quota_user_course_day_desc', 'block_pulso'),
-        5,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/quota_course_hour',
-        get_string('quota_course_hour', 'block_pulso'),
-        get_string('quota_course_hour_desc', 'block_pulso'),
-        15,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/quota_course_day_floor',
-        get_string('quota_course_day_floor', 'block_pulso'),
-        get_string('quota_course_day_floor_desc', 'block_pulso'),
-        40,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/quota_course_day_multiplier',
-        get_string('quota_course_day_multiplier', 'block_pulso'),
-        get_string('quota_course_day_multiplier_desc', 'block_pulso'),
-        '1.5',
-        PARAM_RAW
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/quota_teacher_day',
-        get_string('quota_teacher_day', 'block_pulso'),
-        get_string('quota_teacher_day_desc', 'block_pulso'),
-        10,
-        PARAM_INT
-    ));
+    $pulsonum('quota_user_section_day', 2);
+    $pulsonum('quota_user_course_day', 5);
+    $pulsonum('quota_course_hour', 15);
+    $pulsonum('quota_course_day_floor', 40);
+    $pulsonum('quota_course_day_multiplier', '1.5', PARAM_RAW);
+    $pulsonum('quota_teacher_day', 10);
 
     // ============================================================
     // Ampliacion de recursos: YouTube + OpenAlex (v1.24.0)
@@ -280,29 +272,9 @@ if ($ADMIN->fulltree) {
         ''
     ));
 
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/ampliacion_max_dia_sitio',
-        get_string('ampliacion_max_dia_sitio', 'block_pulso'),
-        get_string('ampliacion_max_dia_sitio_desc', 'block_pulso'),
-        80,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/ampliacion_max_dia_usuario',
-        get_string('ampliacion_max_dia_usuario', 'block_pulso'),
-        get_string('ampliacion_max_dia_usuario_desc', 'block_pulso'),
-        5,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/ampliacion_ttl_dias',
-        get_string('ampliacion_ttl_dias', 'block_pulso'),
-        get_string('ampliacion_ttl_dias_desc', 'block_pulso'),
-        30,
-        PARAM_INT
-    ));
+    $pulsonum('ampliacion_max_dia_sitio', 80);
+    $pulsonum('ampliacion_max_dia_usuario', 5);
+    $pulsonum('ampliacion_ttl_dias', 30);
 
     // ============================================================
     // Retos de Epica: topes propios (v1.26.0)
@@ -312,30 +284,9 @@ if ($ADMIN->fulltree) {
         get_string('retos_heading', 'block_pulso'),
         get_string('retos_heading_desc', 'block_pulso')
     ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/retos_max_propuestas_usuario_dia',
-        get_string('retos_max_propuestas_usuario_dia', 'block_pulso'),
-        get_string('retos_max_propuestas_usuario_dia_desc', 'block_pulso'),
-        6,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/retos_max_elegidos_usuario_dia',
-        get_string('retos_max_elegidos_usuario_dia', 'block_pulso'),
-        get_string('retos_max_elegidos_usuario_dia_desc', 'block_pulso'),
-        3,
-        PARAM_INT
-    ));
-
-    $settings->add(new admin_setting_configtext(
-        'block_pulso/retos_max_elegidos_curso_dia',
-        get_string('retos_max_elegidos_curso_dia', 'block_pulso'),
-        get_string('retos_max_elegidos_curso_dia_desc', 'block_pulso'),
-        40,
-        PARAM_INT
-    ));
+    $pulsonum('retos_max_propuestas_usuario_dia', 6);
+    $pulsonum('retos_max_elegidos_usuario_dia', 3);
+    $pulsonum('retos_max_elegidos_curso_dia', 40);
 
     // ============================================================
     // Ciclo con Epica: dónde apuntar y modo de ensayo (v1.19.0)
@@ -346,18 +297,39 @@ if ($ADMIN->fulltree) {
         get_string('epica_heading_desc', 'block_pulso')
     ));
 
-    $settings->add(new admin_setting_configtext(
+    // Sin valor por defecto a propósito (v1.31.0): antes apuntaba al QA y una producción mal
+    // configurada habría mandado material al QA. Vacío = Épica no disponible.
+    $epicaurl = new admin_setting_configtext(
         'block_pulso/epica_base_url',
         get_string('epica_base_url', 'block_pulso'),
         get_string('epica_base_url_desc', 'block_pulso'),
-        'https://entorno-qa-2.awakelab.world',
+        '',
         PARAM_URL
-    ));
+    );
+    if (method_exists($epicaurl, 'set_validate_function')) {
+        $epicaurl->set_validate_function(function ($value) {
+            $value = trim((string)$value);
+            return ($value === '' || stripos($value, 'https://') === 0) ? true : get_string('err_setting_https', 'block_pulso');
+        });
+    }
+    $settings->add($epicaurl);
 
     $settings->add(new admin_setting_configcheckbox(
         'block_pulso/epica_dry_run',
         get_string('epica_dry_run', 'block_pulso'),
         get_string('epica_dry_run_desc', 'block_pulso'),
         0
+    ));
+
+    // ============================================================
+    // Diagnóstico para quien administra el sitio (v1.31.0)
+    // ============================================================
+    $settings->add(new admin_setting_heading(
+        'block_pulso/diagnostico_heading',
+        get_string('diagnostico_heading', 'block_pulso'),
+        html_writer::link(
+            new moodle_url('/blocks/pulso/diagnostico.php'),
+            get_string('diagnostico_link', 'block_pulso')
+        ) . '<br>' . get_string('diagnostico_heading_desc', 'block_pulso')
     ));
 }

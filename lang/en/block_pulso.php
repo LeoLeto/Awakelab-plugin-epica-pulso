@@ -129,7 +129,7 @@ $string['task_epica_ciclo_adhoc'] = 'One step of the Epica creation cycle (Pulse
 $string['epica_heading'] = 'Epica integration — creation cycle';
 $string['epica_heading_desc'] = 'Where Pulse sends creation requests (infographics) and how the background task talks to Epica. The whole cycle (sign, order, poll, collect) runs in an adhoc task — it never happens inside a web request.';
 $string['epica_base_url'] = 'Epica base URL';
-$string['epica_base_url_desc'] = 'Base URL of the Epica environment to send creation requests to (e.g. the QA environment while piloting, production once cleared). The task appends the fixed API paths to this.';
+$string['epica_base_url_desc'] = 'Base URL of the Epica environment to send creation requests to (e.g. the QA environment while piloting, production once cleared). The task appends the fixed API paths to this. Must start with https://. EMPTY = Epica unavailable: no infographics, games, challenges or history are offered (Expand resource keeps working).';
 $string['epica_dry_run'] = 'Dry-run mode (build the envelope, never send it)';
 $string['epica_dry_run_desc'] = 'When enabled, the task builds the full request envelope for each pending creation request and stores it, but never signs a token or calls Epica — the request is left in its own terminal state ("ensayo"). Use this to verify the payload shape before local_awkepica has a production secret configured, or to test the cycle without spending Epica quota. Off by default.';
 
@@ -154,3 +154,18 @@ $string['err_detail_badkey'] = 'The Anthropic API key is not valid or lacks perm
 $string['err_detail_nocredit'] = 'The Anthropic account has no credit left.';
 $string['err_detail_badmodel'] = 'The configured model does not exist or is not available.';
 $string['err_detail_rejected'] = 'The AI service rejected the request (configuration or model). Check the server log.';
+$string['err_rate_limited'] = 'You have sent a lot of questions in a row. Wait a minute.';
+$string['err_rate_limited_day'] = 'You have reached today\'s question limit. You can continue tomorrow.';
+$string['err_unavailable'] = 'Content creation is not available on this site.';
+$string['err_setting_nonneg'] = 'Must be a number greater than or equal to 0.';
+$string['err_setting_https'] = 'Must be an address starting with https:// (or left empty).';
+$string['cachedef_chatrate'] = 'Per-user chat question counter (rate limit)';
+$string['chatlimit_heading'] = 'Chat usage limit';
+$string['chatlimit_heading_desc'] = 'Per-person question cap, so a whole class or a script cannot exhaust the organisation\'s Anthropic limit for every course. 0 = no limit.';
+$string['chat_max_por_minuto_usuario'] = 'Questions per minute and user';
+$string['chat_max_por_minuto_usuario_desc'] = 'Maximum questions one person can send to the chat in a rolling one-minute window. 0 = no limit.';
+$string['chat_max_por_dia_usuario'] = 'Questions per day and user';
+$string['chat_max_por_dia_usuario_desc'] = 'Maximum questions one person can send to the chat per day. 0 = no limit.';
+$string['diagnostico_heading'] = 'Diagnostics';
+$string['diagnostico_heading_desc'] = 'Checks keys, external services, cron and courses without indexed text.';
+$string['diagnostico_link'] = 'Open the diagnostics page';

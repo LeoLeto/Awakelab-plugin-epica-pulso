@@ -130,7 +130,7 @@ $string['task_epica_ciclo_adhoc'] = 'Un paso del ciclo de creación con Épica (
 $string['epica_heading'] = 'Integración con Épica — ciclo de creación';
 $string['epica_heading_desc'] = 'Adónde envía Pulse los encargos de creación (infografías) y cómo habla con Épica la tarea en segundo plano. Todo el ciclo (firmar, encargar, sondear, recoger) se ejecuta en una tarea adhoc: nunca ocurre dentro de una petición web.';
 $string['epica_base_url'] = 'URL base de Épica';
-$string['epica_base_url_desc'] = 'URL base del entorno de Épica al que se envían los encargos (p. ej. el entorno de QA durante el piloto y producción cuando esté autorizado). La tarea le añade las rutas fijas de la API.';
+$string['epica_base_url_desc'] = 'URL base del entorno de Épica al que se envían los encargos (p. ej. el entorno de QA durante el piloto y producción cuando esté autorizado). La tarea le añade las rutas fijas de la API. Debe empezar por https://. VACÍA = Épica no disponible: no se ofrecen infografías, juegos, retos ni historial (Ampliar recurso sigue funcionando).';
 $string['epica_dry_run'] = 'Modo de ensayo (construir el sobre, no enviarlo)';
 $string['epica_dry_run_desc'] = 'Si se activa, la tarea construye el sobre completo de cada encargo pendiente y lo guarda, pero nunca firma un token ni llama a Épica: el encargo queda en su propio estado terminal («ensayo»). Sirve para verificar la forma del contenido antes de que local_awkepica tenga un secreto de producción configurado, o para probar el ciclo sin gastar cupo de Épica. Desactivado por defecto.';
 
@@ -155,3 +155,18 @@ $string['err_detail_badkey'] = 'La clave de Anthropic no es válida o no tiene p
 $string['err_detail_nocredit'] = 'La cuenta de Anthropic no tiene saldo.';
 $string['err_detail_badmodel'] = 'El modelo configurado no existe o no está disponible.';
 $string['err_detail_rejected'] = 'El servicio de IA ha rechazado la petición (configuración o modelo). Revisa el log del servidor.';
+$string['err_rate_limited'] = 'Has enviado muchas preguntas seguidas. Espera un minuto.';
+$string['err_rate_limited_day'] = 'Has llegado al límite de preguntas de hoy. Podrás seguir mañana.';
+$string['err_unavailable'] = 'La creación de contenidos no está disponible en este sitio.';
+$string['err_setting_nonneg'] = 'Debe ser un número mayor o igual que 0.';
+$string['err_setting_https'] = 'Debe ser una dirección que empiece por https:// (o dejarse vacía).';
+$string['cachedef_chatrate'] = 'Contador de preguntas del chat por usuario (límite de ritmo)';
+$string['chatlimit_heading'] = 'Límite de uso del chat';
+$string['chatlimit_heading_desc'] = 'Tope de preguntas por persona, para que una clase entera o un script no agoten el límite de la organización en Anthropic para todos los cursos. 0 = sin límite.';
+$string['chat_max_por_minuto_usuario'] = 'Preguntas por minuto y usuario';
+$string['chat_max_por_minuto_usuario_desc'] = 'Máximo de preguntas que una misma persona puede enviar al chat en una ventana móvil de un minuto. 0 = sin límite.';
+$string['chat_max_por_dia_usuario'] = 'Preguntas por día y usuario';
+$string['chat_max_por_dia_usuario_desc'] = 'Máximo de preguntas que una misma persona puede enviar al chat en un día. 0 = sin límite.';
+$string['diagnostico_heading'] = 'Diagnóstico';
+$string['diagnostico_heading_desc'] = 'Comprueba claves, servicios externos, cron y cursos sin texto indexado.';
+$string['diagnostico_link'] = 'Abrir la página de diagnóstico';

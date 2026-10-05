@@ -114,7 +114,7 @@ class retos_service {
                 $cuerpo['tema'] = $tema; // Con material, el tema acota dentro de él.
             }
             $cmidfila = $cmid;
-            $espera = \local_awkepica\epica::ESPERA_LARGA_S; // Lleva material.
+            $espera = epica_client::espera_larga(); // Lleva material.
         } else {
             if ($tema === '' || !preg_match('/[\p{L}\p{N}]/u', $tema)) {
                 throw new reto_error('encargo-sin-tema', 'Elige un recurso o escribe un tema para los retos.');

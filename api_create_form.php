@@ -20,6 +20,7 @@ define('AJAX_SCRIPT', true);
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
 require_once(__DIR__ . '/classes/creation_quota.php');
+require_once(__DIR__ . '/classes/epica_client.php');
 
 use block_pulso\chat_pipeline;
 use block_pulso\creation_quota;
@@ -43,6 +44,11 @@ try {
     pulso_error::require_sesskey();
     require_capability('block/pulso:createactivity', $context);
     chat_pipeline::check_enabled($courseid);
+
+    // Todo menos «Ampliar recurso» necesita Épica (v1.31.0): sin ella, el formulario no se abre.
+    if (optional_param('tool', '', PARAM_ALPHA) !== 'ampliacion' && !\block_pulso\epica_client::disponible()) {
+        throw new pulso_error('unavailable', \block_pulso\epica_client::MENSAJE_NO_DISPONIBLE, 503);
+    }
 
     global $USER;
     $userid = (int)$USER->id;

@@ -66,6 +66,9 @@ class epica_client {
     const MOTIVO_SERVICIO_NO_DISPONIBLE = 'El servicio de generación no está disponible ahora mismo. Avisa a quien administre Moodle.';
     const MOTIVO_SERVICIO_RECHAZO = 'El servicio de generación no ha podido atender el encargo. Prueba a crear uno nuevo más tarde.';
 
+    /** Espera larga de respaldo (s) si local_awkepica no está o no la expone: la de epica::ESPERA_LARGA_S. */
+    const ESPERA_LARGA_RESPALDO_S = 180;
+
     const RUTA_ENCARGAR_LAMINA = '/api/moodle/laminas/encargar';
     const RUTA_ENCARGO_LAMINA  = '/api/moodle/laminas/encargo';
     const RUTA_ENCARGAR_JUEGO = '/api/moodle/juegos/encargar';
@@ -107,6 +110,33 @@ class epica_client {
      * el contador a 0 (columna "error_count").
      */
     const CONSECUTIVE_ERROR_THRESHOLD = 10;
+
+    /**
+     * ¿Se pueden usar las herramientas de Épica (infografía, juego, retos, historial)
+     * en este sitio? local_awkepica es OPCIONAL (v1.31.0): Pulse se instala sin él.
+     * Requiere el plugin, su plataforma/secreto configurados y una URL de Épica https://.
+     * Ninguna referencia a \local_awkepica\... fuera de código que ya haya pasado por aquí
+     * (o por class_exists()).
+     */
+    public static function disponible(): bool {
+        static $memo = null;
+        if ($memo === null) {
+            $memo = class_exists('\local_awkepica\epica')
+                && \local_awkepica\epica::configurado()
+                && self::base_url_error() === null;
+        }
+        return $memo;
+    }
+
+    /** Mensaje para la persona cuando se pide algo de Épica y no está disponible. */
+    const MENSAJE_NO_DISPONIBLE = 'La creación de contenidos no está disponible en este sitio.';
+
+    /** Espera larga de epica::pedir(): la del plugin si existe, y 180 s si no. */
+    public static function espera_larga(): int {
+        return class_exists('\local_awkepica\epica') && defined('local_awkepica\epica::ESPERA_LARGA_S')
+            ? (int)\local_awkepica\epica::ESPERA_LARGA_S
+            : self::ESPERA_LARGA_RESPALDO_S;
+    }
 
     /**
      * Punto de entrada de la tarea adhoc: hace UN paso segun el estado actual
@@ -188,7 +218,7 @@ class epica_client {
             $respuesta = \local_awkepica\epica::pedir(
                 self::endpoint(self::ruta_encargar((string)$encargo->tool)),
                 $body,
-                \local_awkepica\epica::ESPERA_LARGA_S
+                self::espera_larga()
             );
         } catch (\Throwable $e) {
             return self::reintentar_o_fallar_transitorio($encargo, 'encargar', get_class($e), $e->getMessage());
@@ -251,6 +281,10 @@ class epica_client {
      * que local_awkepica exista (quien llama lo comprueba antes).
      */
     public static function precondiciones_error(?\stdClass $user): ?string {
+        if (!class_exists('\local_awkepica\epica')) {
+            error_log('Pulso Epica: local_awkepica no esta instalado en este sitio.');
+            return self::MOTIVO_SERVICIO_NO_DISPONIBLE;
+        }
         if (!\local_awkepica\epica::configurado()) {
             error_log('Pulso Epica: local_awkepica no tiene configurada la plataforma o el secreto en este sitio.');
             return self::MOTIVO_SERVICIO_NO_DISPONIBLE;
@@ -344,7 +378,7 @@ class epica_client {
             $respuesta = \local_awkepica\epica::pedir(
                 self::endpoint(self::ruta_encargo($tool)),
                 $body,
-                \local_awkepica\epica::ESPERA_LARGA_S
+                self::espera_larga()
             );
         } catch (\Throwable $e) {
             return self::reintentar_o_fallar_transitorio($encargo, 'sondear', get_class($e), $e->getMessage());
@@ -1085,6 +1119,10 @@ class epica_client {
     /** Motivo por el que epica_base_url no es usable (solo https://), o null si lo es. */
     public static function base_url_error(): ?string {
         $base = trim((string)get_config('block_pulso', 'epica_base_url'));
+        if ($base === '') {
+            // Sin valor por defecto a propósito (v1.31.0): una producción sin configurar no debe mandar nada al QA.
+            return 'No hay URL de Épica configurada en el plugin, así que no se envía nada.';
+        }
         if (stripos($base, 'https://') !== 0 || !parse_url($base, PHP_URL_HOST)) {
             return 'La URL de Épica configurada en el plugin no es https://, así que no se envía nada (el token y el material no pueden viajar sin cifrar).';
         }

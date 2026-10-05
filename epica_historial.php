@@ -71,8 +71,8 @@ if (chat_pipeline::user_can_view_analytics($courseid)) {
         '<p>El historial de Épica es para el alumnado. El profesorado entra en Épica por su acceso habitual.</p>');
 }
 
-if (!class_exists('\local_awkepica\epica')) {
-    pulso_historial_page('Mi historial', '<p>El servicio de Épica no está disponible en este sitio.</p>', 503);
+if (!epica_client::disponible()) {
+    pulso_historial_page('Mi historial', '<p>' . s(epica_client::MENSAJE_NO_DISPONIBLE) . '</p>', 503);
 }
 
 global $USER;

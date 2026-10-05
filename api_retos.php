@@ -52,6 +52,12 @@ try {
         throw new reto_error('pulso-desactivado', 'Pulso está desactivado en este curso.', 403);
     }
 
+    // Sin Épica (plugin ausente, sin configurar o URL no https) no se hace nada, ni se inserta
+    // una fila. «mis_retos» solo lee nuestra tabla y tampoco tiene sentido sin la herramienta.
+    if (!\block_pulso\epica_client::disponible()) {
+        throw new reto_error('creacion-no-disponible', \block_pulso\epica_client::MENSAJE_NO_DISPONIBLE, 503);
+    }
+
     // Registro completo (con email) para firmar el token, como hace la tarea adhoc.
     global $USER;
     $user = \core_user::get_user((int)$USER->id, '*', MUST_EXIST);

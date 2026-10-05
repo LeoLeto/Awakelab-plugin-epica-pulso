@@ -21,6 +21,7 @@ define('AJAX_SCRIPT', true);
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
 require_once(__DIR__ . '/classes/creation_quota.php');
+require_once(__DIR__ . '/classes/epica_client.php');
 
 use block_pulso\chat_pipeline;
 use block_pulso\creation_quota;
@@ -52,6 +53,10 @@ try {
 
     if (!in_array($tool, [creation_quota::TOOL_INFOGRAFIA, creation_quota::TOOL_GAMIFICACION], true)) {
         throw new \block_pulso\pulso_error('bad_request', 'Herramienta de creación no reconocida.');
+    }
+    // Sin Épica el encargo se guardaba, gastaba cupo y fallaba en el cron: ahora no se inserta nada.
+    if (!\block_pulso\epica_client::disponible()) {
+        throw new \block_pulso\pulso_error('unavailable', \block_pulso\epica_client::MENSAJE_NO_DISPONIBLE, 503);
     }
     if (!$isjuego && !in_array($format, creation_quota::FORMATS, true)) {
         throw new \block_pulso\pulso_error('bad_request', 'Formato de infografía no reconocido.');

@@ -1,5 +1,13 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-05 — Fase 4 UX: plan y maqueta (sin código)
+
+Entregados `docs/plan_fase4.md` y `docs/maqueta_v2.html`; a la espera del visto bueno. Hallazgos que condicionan el plan:
+- `epica_historial.php` NO importa Google Fonts (solo `juego.php` lo hace); el CSS pesa ~72 KB y el JS ~222 KB en línea.
+- `styles.css` de un bloque se carga en TODAS las páginas del sitio (va al CSS del tema): hay que prefijar todo y purgar cachés al desplegar. `[[font:]]`/`[[pix:]]` solo funcionan en `styles.css`, no en CSS en línea.
+- No hay Moodle/grunt local: `amd/build` hay que generarlo con script propio (terser) o grunt en otro entorno y commitearlo.
+- Con pestañas, `closeCreatePanel()` (que invalida `pulsoAmpToken`) ya no puede usarse al cambiar de pestaña: pausar el sondeo, no cancelarlo.
+
 ## 2026-10-05 — Auditoría de UX fase 3: estados, teclado, lector de pantalla y móvil (v1.32.0)
 
 Reglas en `CLAUDE.md` → «Auditoría de UX, fase 3». Sin `db/`. Lo que costó ver:

@@ -12,15 +12,15 @@ Every code change, however small, must bump BOTH values in `version.php`:
 The release is shown as a badge next to the chat title (only to users with
 `viewanalytics`, since v1.32.0) so they can verify which build is running.
 `chat_simple_view.php` reads `version.php` directly from disk
-(placeholder `%%PULSO_VERSION_BADGE%%`), so the badge updates on deploy without running
-the Moodle upgrade. A DB upgrade (Site Administration → Notifications) is only
+(variable `release` de `templates/chat.mustache`), so the badge updates on deploy without running
+the Moodle upgrade. (Una plantilla Mustache nueva o cambiada exige purgar cachés al desplegar.) A DB upgrade (Site Administration → Notifications) is only
 needed when `db/` files change (install.xml, upgrade.php, caches.php, tasks.php…),
 but the `$plugin->version` bump is still mandatory every time.
 
 ## Architecture (chat request path)
 
-- `chat_simple_view.php` — floating chat UI (HTML estático; CSS en `styles.css`, JS en `amd/src/*.js`; rendered by
-  `block_pulso.php`). Sends messages to `api_chat_stream.php` via fetch + SSE
+- `chat_simple_view.php` — floating chat UI (shell en `templates/chat.mustache` + parcial `chat_create_cta`; CSS en
+  `styles.css`, JS en `amd/src/*.js`; rendered by `block_pulso.php`). Cabecera con pestañas «Preguntar» / «Crear» (v1.36.0). Sends messages to `api_chat_stream.php` via fetch + SSE
   (ChatGPT-style token streaming, progressive preview of partial JSON) and falls
   back automatically to `api_chat.php` (XHR/JSON) if streaming is unavailable.
   Design (v1.4+): DARK theme with Awakelab 2026 brand (deep blues bg, vivid cyan
@@ -215,11 +215,11 @@ Desde v1.10.0 un ALUMNO puede usar el chat, pero solo para CONTENIDO. Las reglas
   rol con `chat_pipeline::user_can_view_analytics()` (memoizada por petición); no
   volver a comprobar `viewanalytics` a mano en sitios nuevos.
 - **La UI no es un control de acceso.** `render_chat_simple($courseid, $context,
-  $isteacher)` elimina del HTML el bloque del otro rol (marcadores
-  `<!--PULSO_TEACHER_ONLY_START/END-->` y `<!--PULSO_STUDENT_ONLY_*-->`, borrados con
-  `preg_replace`) y pasa `isTeacher` al módulo AMD (config de `js_call_amd`) solo para adaptar textos. El
+  $isteacher)` no RENDERIZA el bloque del otro rol (desde v1.36.0, secciones Mustache `{{#isteacher}}…{{/isteacher}}`
+  y `{{^isteacher}}…{{/isteacher}}` de `templates/chat.mustache`; antes marcadores `<!--PULSO_…-->` y `preg_replace`)
+  y pasa `isTeacher` al módulo AMD (config de `js_call_amd`) solo para adaptar textos. El
   bloqueo real está en las tres capas de servidor de abajo. Si añades un bloque
-  para un rol, envuélvelo en esos marcadores; si añades un texto de capacidades en
+  para un rol, envuélvelo en esas secciones; si añades un texto de capacidades en
   el JS, recuerda que el del otro rol SÍ viaja en el fuente (es copy estático, sin
   dato de curso: aceptado a propósito).
 - **Capa 1 — el gate.** `chat_pipeline::is_teacher_only_query()` corta la pregunta
@@ -853,9 +853,9 @@ punto de entrada ya queda marcado (`creation_quota::dispatch_to_epica()`, no-op 
 propósito).
 
 - **Alumnado y profesorado, los dos.** Decisión de producto: la puerta de Épica acepta
-  encargos de alumno. Por eso el bloque «Crear» vive FUERA de los marcadores
-  `<!--PULSO_TEACHER_ONLY_*-->`/`<!--PULSO_STUDENT_ONLY_*-->`, en sus propios
-  `<!--PULSO_CREATE_ONLY_START/END-->`, con la capability nueva
+  encargos de alumno. Por eso el bloque «Crear» vive FUERA de las secciones
+  `{{#isteacher}}`/`{{^isteacher}}` (antes marcadores `PULSO_TEACHER_ONLY_*`/`PULSO_STUDENT_ONLY_*`), en su propia
+  `{{#cancreate}}` (antes `PULSO_CREATE_ONLY_*`), con la capability nueva
   `block/pulso:createactivity` (contexto de curso, `CAP_ALLOW` para
   student/teacher/editingteacher/manager — hace lo mismo que hoy haría no tener
   capability, y existe solo para que un centro se la pueda quitar al alumnado desde la
@@ -866,12 +866,10 @@ propósito).
 - **v1 tiene UN botón** (infografías). Retos/presentaciones son v2+; no se ha dejado hueco
   de "tres botones" en el HTML ni en la capability — añadirlos es repetir este mismo
   patrón, no descomentar algo ya puesto.
-- **Es una pantalla, no un mensaje de chat.** `#pulso-create-panel` es hermano de
-  `#pulso-home` dentro de `#pulso-scroll` (desde v1.32.0; `#pulso-messages` es solo el
-  registro de mensajes) y se alterna con una clase
-  (`pulso-showing-create` en `#pulso-scroll`) que oculta todo lo demás — si el
-  formulario se colara como mensaje, entraría en el historial que viaja a Anthropic en
-  cada petición siguiente.
+- **Es una pestaña, no un mensaje de chat.** Desde v1.36.0 Crear es el tabpanel `#pulso-panel-crear`, hermano de
+  `#pulso-panel-ask` (ver «Fase 4 — paso 4»); la clase `pulso-showing-create` y el panel dentro de `#pulso-scroll`
+  (v1.32.0) ya NO existen. Si el formulario se colara como mensaje, entraría en el historial que viaja a
+  Anthropic en cada petición siguiente.
 - **El desplegable tiene DOS filtros obligatorios**, los dos en
   `creation_quota::get_resources_context()`/`filter_visible()`: `usable=1` de
   `full_text_store::get_available_resources()` (un recurso sin texto da un encargo vacío)
@@ -1186,7 +1184,7 @@ Casi todo cliente (`chat_simple_view.php`); en servidor solo `api_create_form.ph
 - **Mismo panel y mismo desplegable, no uno nuevo.** `pulsoCreateTool = 'ampliacion'`
   reutiliza `#pulso-create-panel`, `openCreatePanel()` y `api_create_form.php`. El
   formulario es solo recurso + «Ampliar» (sin texto libre ni formato). Misma capability
-  (`createactivity`) y mismos marcadores `PULSO_CREATE_ONLY_*`. La fila de CTA pasó de
+  (`createactivity`) y misma sección `{{#cancreate}}`. La fila de CTA pasó de
   `flex` a rejilla de 2 columnas (con el cuarto CTA de Retos, v1.27, es 2×2; 1 columna a ≤420px).
 - **Los cupos de Épica no aplican, tampoco en servidor.** No se pinta el aviso de cupo por
   sección ni se bloquea por él. `api_create_form.php` acepta `tool=ampliacion` (el cliente lo
@@ -1400,8 +1398,8 @@ pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reg
   así que `epica_historial.php` NO firma nada si el usuario tiene `viewanalytics` (ni si
   `rol_de()` no sale `estudiante`): pinta «El historial de Épica es para el alumnado…». El
   botón solo se pinta con `cfg.isTeacher === false` (la UI no es control de acceso; lo es
-  el endpoint) y la home lo mete en `PULSO_STUDENT_ONLY_*` anidado dentro de `PULSO_CREATE_ONLY_*`
-  (los `preg_replace` de marcadores no se pisan: el de rol se aplica antes y los quita enteros).
+  el endpoint) y la home lo mete en `{{^isteacher}}` anidado dentro de `{{#cancreate}}` (y de `{{#epica}}`): lo que no le toca
+  al usuario no se renderiza.
 - **Token NUEVO por POST y nunca en una URL ni en un log.** Se firma en `epica_historial.php`
   justo antes de pintar (vale 120 s, un solo uso) y viaja en el CUERPO de un `<form method=post>`
   autoenviado hacia `epica_client::endpoint('/api/auth/alumno')`, con `Cache-Control: no-store`
@@ -1478,7 +1476,7 @@ Reglas permanentes. Tocan `db/caches.php` (definición nueva `chatrate`): hay qu
   **ninguna referencia a `\local_awkepica\...` fuera de código que ya haya pasado por `disponible()` o
   `class_exists()`** (`precondiciones_error()` ya lo comprueba por sí mismo; la espera larga sale de
   `epica_client::espera_larga()`, que cae a 180 s si el plugin no está). Sin Épica: `render_chat_simple()`
-  quita del HTML (marcadores `PULSO_EPICA_ONLY_START/END`, no CSS) los CTA de infografía, juego, retos y
+  no renderiza (sección `{{#epica}}` del Mustache, no CSS) los CTA de infografía, juego, retos y
   «Mi historial» —«Ampliar recurso» sigue— y pasa `epicaAvailable` en la config del módulo AMD (el cliente salta
   `mis_retos`); `api_create_form` (todo menos `tool=ampliacion`), `api_create_submit`, `api_retos` y
   `epica_historial` contestan «La creación de contenidos no está disponible en este sitio» **sin
@@ -1536,10 +1534,11 @@ Reglas permanentes. Tocan `db/caches.php` (definición nueva `chatrate`): hay qu
 
 Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php`. Sin `db/`. Reglas permanentes:
 
-- **La región en vivo es SOLO para mensajes.** `#pulso-scroll` es el contenedor con scroll y envuelve tres
-  hermanos: `#pulso-home`, `#pulso-create-panel` y `#pulso-messages` (`role="log" aria-live="polite"`, la
-  única región en vivo). La clase `pulso-showing-create` vive en `#pulso-scroll` (no en el log) y todo el
-  scroll (`pulsoScrollToEnd()`) también. Lo que se añade al chat va SIEMPRE a `#pulso-messages`; nada de la
+- **La región en vivo es SOLO para mensajes.** `#pulso-scroll` es el contenedor con scroll de Preguntar y envuelve
+  dos hermanos: `#pulso-home` y `#pulso-messages` (`role="log" aria-live="polite"`, la
+  única región en vivo; desde v1.36.0 el panel Crear ya no está dentro: es otro tabpanel y los tabpanel NO son
+  regiones en vivo). El scroll (`pulsoScrollToEnd()`) es el de `#pulso-scroll`; con Crear delante solo anota
+  `data-pulso-stick` y se hace al volver a Preguntar. Lo que se añade al chat va SIEMPRE a `#pulso-messages`; nada de la
   home ni de Crear puede volver a colgarse de él (cada repintado se anunciaba entero). Durante una petición
   el log lleva `aria-busy="true"` (`pulsoSetSending()` es el único sitio que toca `pulsoSending`) y la
   burbuja de streaming va `aria-hidden` hasta la respuesta final: el lector oye la respuesta una vez. Los
@@ -1553,12 +1552,14 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   Al abrir (`openCreatePanel`, `openCreateGalleryItem`) se enfoca siempre; en los repintados posteriores un
   `MutationObserver` sobre `#pulso-create-body` (solo hijos directos) lo lleva al título únicamente si el
   foco se perdió o estaba dentro del cuerpo (`pulsoCreateScreen()`), así que nunca roba el foco a quien
-  escribe en el chat. Al cerrar, el foco vuelve a la tarjeta que lo abrió (`pulsoCreateOpener`).
+  escribe en el chat, y solo con la pestaña Crear activa. «Volver» lleva a la lista de herramientas de Crear
+  (`#pulso-create-root`) y enfoca `#pulso-create-root-title` (ya no hay `pulsoCreateOpener`).
   **Una pantalla nueva de Crear = repintar `#pulso-create-body` con `innerHTML`**; una pantalla que se pinte
   por otra vía dejaría el foco perdido.
-- **Enviar desde el chat con Crear abierto cierra Crear antes** (`closeCreatePanel({restoreFocus:false})`):
-  si no, el mensaje y su respuesta quedaban ocultos por `.pulso-showing-create` y entraban en el historial.
-  Lo mismo hace `pulsoSystemMessage()` (sustituye a los `alert()`; no hay `alert()` en el cliente).
+- **Una pregunta lanzada desde cualquier sitio cambia a Preguntar antes de enviar** (`sendMessage()` y
+  `pulsoSystemMessage()` llaman a `pulsoSelectTab('ask')`; antes «enviar con Crear abierto cierra Crear»). El cuadro
+  de texto solo existe en Preguntar, así que lo habitual es que ya se esté en ella; `askPreset`, las sugerencias y
+  «Reintentar» pasan por ahí. `pulsoSystemMessage()` sustituye a los `alert()` (no hay `alert()` en el cliente).
 - **Errores con reintento.** `addErrorMessage(payload, message)` pinta SVG `aria-hidden` + «Error:» + el texto
   por `error_code` (sin emoji) y, si el código está en `PULSO_RETRYABLE`, «Reintentar», que llama a
   `dispatchMessage(message)` con el MISMO mensaje (sin repintar la burbuja del usuario ni tocar el cuadro).
@@ -1576,18 +1577,20 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   estilos en línea (px) de `toggleChat()` y del arrastre, por eso esas reglas van con `!important`; en móvil
   no se arrastra ni se ve «Ampliar». El `min-width` del contenedor es `min(300px, 100vw − 32px)`: con un valor
   fijo se salía por la izquierda a 320 px.
-- **Los sondeos se pausan con la pestaña oculta** (`pulsoOnVisibilityChange()`): Crear (7 s), Retos (4 s) y el
+- **Los sondeos se pausan con la pestaña oculta O con una pestaña de Pulse distinta de Crear**
+  (`C.pollsPaused()` = `document.hidden || S.pulsoTab !== 'crear'`; `pulsoSyncPolling()` la llaman
+  `visibilitychange` y `pulsoSelectTab()`): Crear (7 s), Retos (4 s) y el
   refresco del título del reto. Se guarda el sondeo pendiente (`pulsoCreatePollPending`,
   `pulsoRetosPollPending`, `pulsoRetosRefreshPending`) y al volver se retoma enseguida. Un sondeo nuevo se
   programa SIEMPRE por esos helpers (`scheduleNextCreatePoll`, `pulsoRetosSchedulePoll`,
   `pulsoRetosScheduleRefresh`), nunca con un `setTimeout` suelto.
 - **Sin conexión**: `navigator.onLine` se mira antes de enviar (la pregunta se queda en el cuadro) y
   `online`/`offline` muestran/ocultan el aviso persistente `#pulso-offline`.
-- **Insignia de versión solo con `viewanalytics`** (`%%PULSO_VERSION_BADGE%%` queda vacío para el alumnado).
+- **Insignia de versión solo con `viewanalytics`** (sección `{{#showversion}}` del Mustache; no se renderiza para el alumnado).
 - **Tabla accesible**: `<caption>` (título de la respuesta, oculto), `<th scope="col" aria-sort>` con un
   `<button class="pulso-sort-btn">` dentro (no `th onclick`) y recuento `role="status"` que dice «N de M».
   Enlaces que abren pestaña nueva: «↗» con `aria-hidden` y `PULSO_NEWTAB_SR` («se abre en una pestaña nueva»).
-- **Teclado**: Enter con `keydown` y `!e.isComposing` (un IME confirma, no envía); Escape cierra el chat y el
+- **Teclado** (el tablist se describe en «Fase 4 — paso 4»): Enter con `keydown` y `!e.isComposing` (un IME confirma, no envía); Escape cierra el chat y el
   foco vuelve a la burbuja (`aria-expanded`/`aria-controls`); «Ampliar/Reducir» (`toggleChatSize()`,
   640 px ↔ 90 vw). El contenedor es `role="region"` (no `dialog`: no atrapa el foco). Jerarquía: `h2` en la
   cabecera, `h3` en secciones de la home y del panel.
@@ -1606,7 +1609,7 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
   se resuelven dentro de `styles.css`, no en CSS en línea (`juego.php` lleva su `<style>` propio y toma
   Poppins del `@font-face` de `styles.css`).
 - **Sin terceros en la carga de la página.** Poppins 400/500/600/700 (subconjunto latino, woff2) en `fonts/` con
-  `OFL.txt`; isotipos en `pix/` (96×98 px; en HTML por `%%PULSO_ISOTIPO%%` → `$OUTPUT->image_url()`).
+  `OFL.txt`; isotipos en `pix/` (96×98 px; en HTML por `{{isotipo}}` → `$OUTPUT->image_url()`).
   La familia del `@font-face` es **`Pulso Poppins`** (no `Poppins`: styles.css va a todo el sitio y se
   mezclaría con la del tema); el 700 existe para `<strong>`/`h2`/`h3` (sin él, negrita sintética).
   Prohibido volver a `@import` de Google Fonts o a `media.awakelab.world`. Si se añade un tercero, va a
@@ -1637,6 +1640,34 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
 - El script de partición y la prueba de paridad (jsdom, 28 pasos × profesor/alumno × con/sin Épica, comparando DOM,
   peticiones y errores contra el monolito de v1.33.0) no se guardan en el repo: eran de un solo uso.
 
+- **Pestañas «Preguntar» / «Crear» + plantilla Mustache (v1.36.0).** Cabecera = fila marca/controles +
+  `#pulso-tablist` (`role="tablist"`, dos `role="tab"` con `aria-selected`/`aria-controls`, roving `tabindex`).
+  Dos `role="tabpanel"` HERMANOS (`#pulso-panel-ask`, `#pulso-panel-crear`, con `aria-labelledby`) que se alternan
+  con `hidden` — nunca se destruye el DOM: la conversación y el estado de Crear sobreviven al cambio.
+  **Preguntar** = home + `#pulso-messages` + cuadro de texto (+ aviso offline). **Crear** = lista de herramientas
+  (`#pulso-create-root`, el mismo parcial de CTA que la home) o la herramienta abierta (`#pulso-create-panel`,
+  `hidden` mientras no hay ninguna). Si el usuario no tiene `createactivity`, la plantilla no pinta ni tablist ni
+  panel Crear (y el panel Preguntar deja de ser `tabpanel`).
+  - **Teclado:** activación automática; ←/→ (con vuelta), Inicio y Fin cambian y activan (`pulsoTabsKeydown`);
+    Tab entra al panel activo por el orden natural (la pestaña activa es la única con `tabindex=0`); Escape sigue
+    cerrando el chat y el foco vuelve a la burbuja; al reabrir con Crear activa el foco va a su pestaña (no hay cuadro
+    de texto). Las pestañas no son asa de arrastre (`startDrag` las ignora).
+  - **Cambiar de pestaña PAUSA los sondeos, no los cancela.** `pulsoSelectTab()` (chat.js, cruzada por
+    `C.fn.pulsoSelectTab`) no toca `pulsoAmpToken`: este solo se invalida al cambiar de pantalla DENTRO de Crear
+    (`openCreatePanel`, `closeCreatePanel` = «Volver», `stopCreatePolling`). Los sondeos arman SIEMPRE su pendiente
+    antes de mirar `C.pollsPaused()` y `pulsoSyncPolling()` lo retoma al volver. Una respuesta en vuelo al cambiar de
+    pestaña se pinta en el DOM oculto (sin robar el foco: `pulsoCreateScreen` exige pestaña Crear). Retos `en-cola` sigue
+    sin cortarse; el reloj de 2 min cuenta desde `trabajando_desde` (tiempo REAL del servidor, también con la pestaña
+    oculta): si se vuelve a Crear tras más de 2 min en `trabajando` sale «Seguir esperando», que reanuda la MISMA
+    propuesta. Minimizar el chat NO pausa ni cancela nada (como antes).
+  - **`S.pulsoTab`** ('ask' | 'crear') es el estado de la vista (módulo `common`). Un panel oculto pierde su
+    `scrollTop`: `pulsoSelectTab` lo guarda en `data-pulso-scrolltop` y lo restaura.
+  - **El shell es Mustache** (`templates/chat.mustache` + parcial `chat_create_cta.mustache`): variables `isotipo`,
+    `isteacher`, `cancreate`, `epica`, `showversion`, `release`, `greeting`, `coursename`. Las secciones
+    `{{#isteacher}}`/`{{^isteacher}}`/`{{#cancreate}}`/`{{#epica}}` NO renderizan lo que no le toca al usuario (no se oculta con
+    CSS). Sustituye a los marcadores `<!--PULSO_…-->` y a los `%%PULSO_…%%`: **no volver a ponerlos**. Moodle cachea las
+    plantillas: **purgar cachés** al desplegar un cambio de `templates/`.
+    Verificado con el motor PHP de Mustache (bobthecow/mustache.php, el de Moodle) y con mustache.js: mismo DOM.
 - **Terminología única (v1.35.0), solo en lo que VE una persona.** «Pulse AI» en la cabecera y el nombre del bloque,
   «Pulse» en los textos (nunca «Pulso»); «creación» y nunca «encargo» (ni «pedido»); «infografía» y nunca «lámina»;
   «el servicio de generación» / «el servicio de retos» en vez de «Épica» salvo donde la persona SALE a Épica («Mi
@@ -1653,7 +1684,7 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
   (download `php-8.3-nts` zip from windows.php.net) or Docker (`php:8.2-cli`)
   if the daemon is running.
 - The chat JS lives in `amd/src/*.js` (AMD modules; see "Fase 4 — arquitectura cacheable"). Edit `src`, then
-  regenerate `amd/build` with `tools/build-amd.mjs` and commit both. `chat_simple_view.php` holds only the
-  static HTML (a nowdoc: no interpolation) and the `js_call_amd` config.
+  regenerate `amd/build` with `tools/build-amd.mjs` and commit both. `chat_simple_view.php` only builds the
+  template context (`templates/chat.mustache`) and the `js_call_amd` config.
 - Language: UI and answers are Spanish-first; keep new user-facing strings in
   Spanish and add lang strings to `lang/en/block_pulso.php`.

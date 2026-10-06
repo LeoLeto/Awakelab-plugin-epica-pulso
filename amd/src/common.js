@@ -33,8 +33,17 @@ define([], function() {
     S.pulsoRetosRefreshTimer = null;
     S.pulsoRetosPollPending = null;
     S.pulsoRetosRefreshPending = null;
+    // Pestaña activa de la cabecera: 'ask' (Preguntar) o 'crear'. Sin pestañas (sin createactivity) siempre 'ask'.
+    S.pulsoTab = 'ask';
 
         // ========== HELPERS DE FASE 3 (UX, v1.32.0) ==========
+
+        // Los sondeos de Crear y Retos solo corren con la pestaña del navegador visible Y la
+        // pestaña «Crear» de Pulse activa. Si no, se PAUSAN (el pendiente se guarda), no se cancelan.
+        function pollsPaused() {
+            return document.hidden || S.pulsoTab !== 'crear';
+        }
+
 
         // Los console.log de depuración solo salen con window.pulsoDebug = true.
         function pulsoLog() {
@@ -46,11 +55,17 @@ define([], function() {
         const PULSO_NEWTAB_SR = '<span class="pulso-sr-only"> (se abre en una pestaña nueva)</span>';
 
 
-        // El desplazamiento vive en #pulso-scroll: envuelve la home, el panel Crear y el
-        // registro de mensajes (#pulso-messages, la única región en vivo).
+        // El desplazamiento del chat vive en #pulso-scroll: envuelve la home y el registro de
+        // mensajes (#pulso-messages, la única región en vivo). Con otra pestaña activa su panel
+        // está oculto y no hay dónde desplazar: se anota y se hace al volver a Preguntar.
         function pulsoScrollToEnd() {
             const scroller = document.getElementById('pulso-scroll');
-            if (scroller) scroller.scrollTop = scroller.scrollHeight;
+            if (!scroller) return;
+            if (S.pulsoTab !== 'ask') {
+                scroller.setAttribute('data-pulso-stick', '1');
+                return;
+            }
+            scroller.scrollTop = scroller.scrollHeight;
         }
 
 
@@ -124,6 +139,7 @@ define([], function() {
         fn: fn,
         bindActions: bindActions,
         pulsoLog: pulsoLog,
+        pollsPaused: pollsPaused,
         PULSO_NEWTAB_SR: PULSO_NEWTAB_SR,
         pulsoScrollToEnd: pulsoScrollToEnd,
         pulsoAnnounce: pulsoAnnounce,

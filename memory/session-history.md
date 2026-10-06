@@ -1,5 +1,32 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-06 — Fase 4 UX, paso 4: pestañas «Preguntar» y «Crear» + Mustache (v1.36.0)
+
+Reglas en `CLAUDE.md` → «Fase 4 — paso 4» (y las secciones R/A que el plan marcaba, ya reescritas). Sin `db/`. Lo que costó ver:
+- **Pausar ≠ cancelar exige que cada sondeo ARME su pendiente antes de mirar si está pausado.** Los cuatro
+  sitios (`scheduleNextCreatePoll`, `pulsoRetosSchedulePoll`, `pulsoRetosScheduleRefresh` y sus timers) ya lo hacían
+  para `document.hidden`; bastó cambiar la condición por `C.pollsPaused()` (visible Y pestaña Crear). Lo delicado es
+  `pulsoAmpToken`: `closeCreatePanel` («Volver») lo sigue invalidando porque es cambio de pantalla DENTRO de Crear;
+  cambiar de pestaña no lo toca. Mutación comprobada: con `pollsPaused()` = solo `document.hidden` fallan 9 pruebas.
+- **«Volver» ya no puede «cerrar» Crear** (no hay home debajo): Crear tiene una lista de herramientas propia
+  (`#pulso-create-root`, mismo parcial Mustache de CTA que la home) a la que vuelve. Es un adelanto mínimo de la
+  lista del paso 6, no su rediseño. La home de Preguntar conserva su sección «Crear» hasta el paso 5.
+- **Un elemento con `display:none` pierde su `scrollTop`**: la conversación volvía arriba al cambiar de pestaña. Se guarda
+  al ocultar y se restaura; si llegaron mensajes con Crear delante (`pulsoScrollToEnd` anota `data-pulso-stick`), al final.
+- **El drag de la cabecera (`mousedown` + `preventDefault`) se tragaba el foco de las pestañas**: `startDrag` las ignora.
+- **Mustache**: el motor PHP de Moodle (bobthecow/mustache.php 2.14.2) y mustache.js dan el mismo DOM para las 5 combinaciones
+  rol/createactivity/Épica; los parciales se resuelven como `block_pulso/<nombre>`. Moodle cachea plantillas → purgar al desplegar.
+  El `<h3>` inicial del panel de la herramienta ya no dice «Crear infografía» (se pisa al abrir; con Épica ausente seguía
+  filtrando el nombre de una herramienta que no existe).
+- **Prueba** (jsdom, fuera del repo: carga `amd/src` con un `define` mínimo + temporizadores falsos): paridad contra el
+  monolito v1.35.0 (HEAD) con el mismo guion de las 4 herramientas × profesor/alumno × con/sin Épica — mismas peticiones y
+  mismo DOM de Crear/chat — más 92 comprobaciones nuevas (ARIA, teclado, infografía y Retos en cola cruzando pestañas,
+  pregunta con Crear vivo, HTML de alumno sin analítica, sin Épica, sin `createactivity`). `php -l` limpio.
+- **NO probado** (sin Moodle ni navegador): aspecto real (pestañas en la cabecera, contraste del borde cian, 320 px,
+  zoom 200 %), foco con lector (NVDA), `render_from_template` dentro de Moodle, scroll restaurado de verdad (jsdom no
+  calcula layout). Pendiente en sanase-test: purgar cachés, abrir las dos pestañas con teclado, lanzar una infografía y
+  cambiar a Preguntar durante la cola, Retos en cola, móvil ≤ 480 px, `.drawer-collapsed`.
+
 ## 2026-10-06 — Fase 4 UX, pasos 1–3: styles.css, AMD y terminología (v1.33.0–1.35.0)
 
 Reglas en `CLAUDE.md` → «Fase 4 — arquitectura cacheable y rediseño». Lo que costó ver:

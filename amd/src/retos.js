@@ -338,12 +338,13 @@ define(['block_pulso/common'], function(C) {
 
 
         function pulsoRetosSchedulePoll(token) {
-            // Con la pestaña oculta no se programa nada; pulsoOnVisibilityChange() lo retoma.
+            // Con la pestaña del navegador oculta o la de Pulse en otra que no sea Crear no se
+            // programa nada; pulsoSyncPolling() lo retoma al volver.
             S.pulsoRetosPollPending = token;
-            if (document.hidden) return;
+            if (C.pollsPaused()) return;
             S.pulsoRetosPollTimer = setTimeout(function() {
                 S.pulsoRetosPollTimer = null;
-                if (document.hidden) return;
+                if (C.pollsPaused()) return;
                 S.pulsoRetosPollPending = null;
                 pulsoRetosPoll(token);
             }, PULSO_RETOS_POLL_MS);
@@ -562,13 +563,13 @@ define(['block_pulso/common'], function(C) {
         }
 
 
-        // El refresco del título final también llama a Épica: se pausa con la pestaña oculta.
+        // El refresco del título final también llama a Épica: se pausa igual que el sondeo.
         function pulsoRetosScheduleRefresh(token, codigo, started, ms) {
             S.pulsoRetosRefreshPending = { token: token, codigo: codigo, started: started };
-            if (document.hidden) return;
+            if (C.pollsPaused()) return;
             S.pulsoRetosRefreshTimer = setTimeout(function() {
                 S.pulsoRetosRefreshTimer = null;
-                if (document.hidden) return;
+                if (C.pollsPaused()) return;
                 const p = S.pulsoRetosRefreshPending;
                 S.pulsoRetosRefreshPending = null;
                 if (p) pulsoRetosRefrescar(p.token, p.codigo, p.started);

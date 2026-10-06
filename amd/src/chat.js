@@ -105,6 +105,85 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         }
 
 
+        // ========== PESTAÑAS «PREGUNTAR» / «CREAR» (fase 4, paso 4) ==========
+        // Dos tabpanel hermanos con activación automática. Cambiar de pestaña NO destruye nada: el
+        // DOM de la conversación y el de Crear se conservan (solo `hidden`), y los sondeos de Crear/
+        // Retos se PAUSAN (C.fn.pulsoSyncPolling), no se cancelan. Si el usuario no tiene
+        // createactivity, la plantilla no pinta ni la lista de pestañas ni el panel Crear.
+        const PULSO_TABS = ['ask', 'crear'];
+
+        // opts.focus: mover el foco a la pestaña (teclado). Con false (clic, o cambio programático
+        // desde openCreatePanel/sendMessage) quien llama decide dónde va el foco.
+        function pulsoSelectTab(tab, opts) {
+            opts = opts || {};
+            if (PULSO_TABS.indexOf(tab) < 0) return;
+            const target = document.getElementById('pulso-panel-' + tab);
+            if (!target) return; // esa pestaña no existe para este usuario
+
+            if (S.pulsoTab !== tab || target.hidden) {
+                PULSO_TABS.forEach(function(t) {
+                    const panel = document.getElementById('pulso-panel-' + t);
+                    if (!panel) return;
+                    const selected = t === tab;
+                    const scroller = panel.querySelector('.pulso-chat-messages');
+                    // Un elemento con display:none pierde su scrollTop: se guarda antes de ocultar.
+                    if (!selected && !panel.hidden && scroller) {
+                        scroller.setAttribute('data-pulso-scrolltop', String(scroller.scrollTop));
+                    }
+                    panel.hidden = !selected;
+                    const tabEl = document.getElementById('pulso-tab-' + t);
+                    if (tabEl) {
+                        tabEl.setAttribute('aria-selected', selected ? 'true' : 'false');
+                        tabEl.tabIndex = selected ? 0 : -1;
+                    }
+                });
+                S.pulsoTab = tab;
+
+                const shown = target.querySelector('.pulso-chat-messages');
+                if (shown) {
+                    if (shown.getAttribute('data-pulso-stick')) {
+                        // Llegaron mensajes con la otra pestaña delante: al final.
+                        shown.removeAttribute('data-pulso-stick');
+                        shown.scrollTop = shown.scrollHeight;
+                    } else {
+                        shown.scrollTop = parseInt(shown.getAttribute('data-pulso-scrolltop'), 10) || 0;
+                    }
+                }
+                C.fn.pulsoSyncPolling();
+            }
+
+            if (opts.focus) {
+                const tabEl = document.getElementById('pulso-tab-' + tab);
+                if (tabEl) tabEl.focus();
+            }
+        }
+
+
+        // Teclado del tablist (patrón ARIA «tabs con activación automática»): ←/→ (con vuelta),
+        // Inicio y Fin cambian y activan la pestaña. Tab entra en el panel por el orden natural.
+        function pulsoTabsKeydown(e) {
+            const current = e.target && e.target.closest ? e.target.closest('[role="tab"]') : null;
+            if (!current) return;
+            const tabs = Array.prototype.slice.call(document.querySelectorAll('#pulso-tablist [role="tab"]'));
+            const i = tabs.indexOf(current);
+            if (i < 0) return;
+            let next = i;
+            if (e.key === 'ArrowRight') next = (i + 1) % tabs.length;
+            else if (e.key === 'ArrowLeft') next = (i - 1 + tabs.length) % tabs.length;
+            else if (e.key === 'Home') next = 0;
+            else if (e.key === 'End') next = tabs.length - 1;
+            else return;
+            e.preventDefault();
+            pulsoSelectTab(tabs[next].getAttribute('data-pulso-tab'), { focus: true });
+        }
+
+
+        // Clic en una pestaña (data-pulso-action="selectTab" data-pulso-arg="ask|crear").
+        function selectTab(tab) {
+            pulsoSelectTab(tab, { focus: false });
+        }
+
+
         // Historial de sessionStorage: se reenvía al modelo en cada petición, así que tiene que
         // verse. Son digests de TEXTO (nunca JSON), por eso se pintan escapados (escapeHtmlText) y
         // sin formato de respuesta, bajo un separador.
@@ -360,9 +439,10 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                 return;
             }
 
-            // Con el panel Crear abierto, el mensaje y su respuesta quedarían ocultos (y entrarían
-            // en el historial sin verse): se vuelve al chat ANTES de enviar.
-            if (C.fn.pulsoCreateIsOpen()) C.fn.closeCreatePanel({ restoreFocus: false });
+            // Una pregunta lanzada desde cualquier sitio (tarjeta de la home, sugerencia, reintento)
+            // se ve y se contesta en Preguntar: se cambia a esa pestaña ANTES de pintar nada. (El
+            // cuadro de texto solo existe ahí, así que lo habitual es que ya estemos en ella.)
+            pulsoSelectTab('ask', { focus: false });
 
             setHomeVisible(false);
             addMessage(message, 'user');
@@ -549,10 +629,10 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         }
 
 
-        // Aviso del sistema dentro del chat (sustituye a los alert()). Si el panel Crear está
-        // abierto se vuelve al chat: el mensaje quedaría oculto detrás.
+        // Aviso del sistema dentro del chat (sustituye a los alert()). Si la pestaña Crear está
+        // delante se vuelve a Preguntar: el mensaje quedaría oculto detrás.
         function pulsoSystemMessage(text) {
-            if (C.fn.pulsoCreateIsOpen()) C.fn.closeCreatePanel({ restoreFocus: false });
+            pulsoSelectTab('ask', { focus: false });
             addErrorMessage({ error_code: 'custom' }, null, text);
         }
 
@@ -1057,10 +1137,14 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                 // Hacer draggable
                 header.addEventListener('mousedown', startDrag);
 
-                // Al abrir, foco al campo de texto
+                // Al abrir, foco al campo de texto (Preguntar) o a la pestaña activa (Crear: el
+                // cuadro de texto no existe en esa pestaña).
                 setTimeout(function() {
+                    if (!floatingState.isOpen) return;
                     var input = document.getElementById('pulso-input');
-                    if (input && floatingState.isOpen) input.focus();
+                    var activeTab = document.getElementById('pulso-tab-' + S.pulsoTab);
+                    if (S.pulsoTab === 'ask' && input) input.focus();
+                    else if (activeTab) activeTab.focus();
                 }, 100);
 
                 // Scroll al final de los mensajes
@@ -1150,6 +1234,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             removeStreamBubble();
             showLoading(false);
             setHomeVisible(true);
+            pulsoSelectTab('ask', { focus: false }); // el botón de la cabecera también se ve desde Crear
 
             const bubble = document.getElementById('pulso-chat-bubble');
             if (bubble) {
@@ -1166,6 +1251,8 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         function startDrag(e) {
             if (e.button !== 0) return;
             if (!floatingState.isOpen) return;
+            // Las pestañas son controles (con foco y clic), no asa de arrastre.
+            if (e.target && e.target.closest && e.target.closest('#pulso-tablist')) return;
             // A pantalla completa (móvil) no se arrastra.
             if (window.matchMedia && window.matchMedia('(max-width: 480px)').matches) return;
             
@@ -1351,6 +1438,10 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             }
             updateCharCount();
 
+            // Teclado de las pestañas (solo existe el tablist si el usuario puede crear).
+            const tablist = document.getElementById('pulso-tablist');
+            if (tablist) tablist.addEventListener('keydown', pulsoTabsKeydown);
+
             // Escape dentro del chat lo cierra y devuelve el foco a la burbuja.
             if (container) {
                 container.addEventListener('keydown', function(e) {
@@ -1380,8 +1471,9 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                 pulsoAnnounce('Conexión recuperada');
             });
 
-            // Los sondeos (Crear 7 s, Retos 4 s) se pausan con la pestaña en segundo plano.
-            document.addEventListener('visibilitychange', C.fn.pulsoOnVisibilityChange);
+            // Los sondeos (Crear 7 s, Retos 4 s) se pausan con la pestaña del navegador en segundo plano
+            // (y con la pestaña de Pulse distinta de Crear: ver pulsoSelectTab).
+            document.addEventListener('visibilitychange', C.fn.pulsoSyncPolling);
         }
 
     /**
@@ -1407,6 +1499,8 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             pulsoBoot();
         }
     };
+    C.fn.pulsoSelectTab = pulsoSelectTab;
+    C.fn.selectTab = selectTab;
     C.fn.toggleChat = toggleChat;
     C.fn.clearConversation = clearConversation;
     C.fn.toggleChatSize = toggleChatSize;

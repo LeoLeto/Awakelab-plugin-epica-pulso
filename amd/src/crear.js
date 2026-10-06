@@ -35,11 +35,11 @@ define(['block_pulso/common'], function(C) {
 
 
 
-        // ========== CREAR INFOGRAFÍA (encargo a Epica) ==========
-        // Es una PANTALLA propia, no un mensaje del chat: si se colara como
-        // mensaje acabaría en el historial que viaja a Anthropic en cada
-        // petición. #pulso-create-panel sustituye a la home/mensajes
-        // alternando la clase 'pulso-showing-create' en #pulso-messages.
+        // ========== PESTAÑA CREAR (infografía, juego, retos, ampliación) ==========
+        // Es una PESTAÑA propia (#pulso-panel-crear), no un mensaje del chat: si se colara como
+        // mensaje acabaría en el historial que viaja a Anthropic en cada petición. Dentro tiene
+        // dos pantallas hermanas que se alternan con `hidden`: #pulso-create-root (las
+        // herramientas) y #pulso-create-panel (la herramienta abierta: formulario, estado…).
         // De momento no manda nada a Epica (eso es el paso 4): solo valida,
         // comprueba cupo y guarda el encargo como "pendiente".
 
@@ -53,22 +53,21 @@ define(['block_pulso/common'], function(C) {
         let pulsoCreateTool = 'infografia';
 
 
-        // Tarjeta que abrió el panel: recibe el foco al cerrarlo.
-        let pulsoCreateOpener = null;
-
-
+        // ¿Hay una herramienta abierta (pantalla de la herramienta, no la lista)?
         function pulsoCreateIsOpen() {
-            const scroller = document.getElementById('pulso-scroll');
-            return !!(scroller && scroller.classList.contains('pulso-showing-create'));
+            const panel = document.getElementById('pulso-create-panel');
+            return !!(panel && !panel.hidden);
         }
 
 
         // Foco al título (h3 con tabindex="-1") de la pantalla nueva. Con `force` siempre (al abrir);
         // si no, solo cuando el foco se ha perdido (el elemento enfocado se repintó) o seguía dentro
         // del cuerpo del panel: nunca le quita el foco a quien está escribiendo en el chat.
+        // Solo con la pestaña Crear activa: un repintado por un sondeo con otra pestaña delante no
+        // mueve el foco (y el panel oculto no podría recibirlo).
         function pulsoCreateScreen(force) {
             const title = document.getElementById('pulso-create-title');
-            if (!title || !pulsoCreateIsOpen()) return;
+            if (!title || !pulsoCreateIsOpen() || S.pulsoTab !== 'crear') return;
             const active = document.activeElement;
             const body = document.getElementById('pulso-create-body');
             if (force || !active || active === document.body || (body && body.contains(active))) {
@@ -235,21 +234,25 @@ define(['block_pulso/common'], function(C) {
         }
 
 
-        function openCreatePanel(tool) {
-            const messagesDiv = document.getElementById('pulso-scroll');
-            const body = document.getElementById('pulso-create-body');
-            if (!messagesDiv || !body) return;
+        // Muestra la pantalla de una herramienta (y oculta la lista) y cambia a la pestaña Crear.
+        // Cambiar de pantalla DENTRO de Crear invalida los sondeos (token); cambiar de pestaña no.
+        function pulsoCreateShowTool() {
+            const root = document.getElementById('pulso-create-root');
+            const panel = document.getElementById('pulso-create-panel');
+            if (root) root.hidden = true;
+            if (panel) panel.hidden = false;
+            C.fn.pulsoSelectTab('crear', { focus: false });
+        }
 
-            // Solo la primera vez: «Crear otro» y «Volver al formulario» se llaman desde dentro.
-            if (!messagesDiv.classList.contains('pulso-showing-create')) {
-                const active = document.activeElement;
-                pulsoCreateOpener = (active && active !== document.body) ? active : null;
-            }
+
+        function openCreatePanel(tool) {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
 
             pulsoCreateSetTool(tool || pulsoCreateTool);
             stopCreatePolling();
             S.pulsoAmpToken++;
-            messagesDiv.classList.add('pulso-showing-create');
+            pulsoCreateShowTool();
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
             pulsoCreateScreen(true);
 
@@ -283,25 +286,18 @@ define(['block_pulso/common'], function(C) {
         }
 
 
-        // opts.restoreFocus === false: al enviar un mensaje del chat el foco se queda en el campo de texto.
-        function closeCreatePanel(opts) {
+        // «Volver»: de la herramienta abierta a la lista de herramientas de la pestaña Crear
+        // (no sale de la pestaña). Es un cambio de pantalla dentro de Crear: para y descarta los
+        // sondeos. El foco va al título de la lista.
+        function closeCreatePanel() {
             stopCreatePolling();
             S.pulsoAmpToken++;
-            const messagesDiv = document.getElementById('pulso-scroll');
-            const wasOpen = pulsoCreateIsOpen();
-            if (messagesDiv) {
-                messagesDiv.classList.remove('pulso-showing-create');
-            }
-            if (wasOpen && !(opts && opts.restoreFocus === false)) {
-                // Al cerrar, el foco vuelve a la tarjeta que lo abrió (o al campo de texto si ya no está).
-                const opener = pulsoCreateOpener;
-                if (opener && opener.isConnected && typeof opener.focus === 'function') opener.focus();
-                if (!opener || document.activeElement !== opener) {
-                    const input = document.getElementById('pulso-input');
-                    if (input) input.focus();
-                }
-            }
-            pulsoCreateOpener = null;
+            const root = document.getElementById('pulso-create-root');
+            const panel = document.getElementById('pulso-create-panel');
+            if (panel) panel.hidden = true;
+            if (root) root.hidden = false;
+            const title = document.getElementById('pulso-create-root-title');
+            if (title && S.pulsoTab === 'crear') title.focus();
         }
 
 
@@ -583,26 +579,29 @@ define(['block_pulso/common'], function(C) {
                 );
                 return;
             }
-            // Pestaña en segundo plano: no se programa nada; se reanuda en visibilitychange.
+            // Pestaña del navegador o de Pulse en segundo plano: no se programa nada; se reanuda
+            // en pulsoSyncPolling() al volver (visibilitychange o cambio de pestaña).
             pulsoCreatePollPending = encargoid;
-            if (document.hidden) return;
+            if (C.pollsPaused()) return;
             pulsoCreatePollTimer = setTimeout(pulsoCreatePollTick, PULSO_CREATE_POLL_MS);
         }
 
 
         function pulsoCreatePollTick() {
             pulsoCreatePollTimer = null;
-            if (document.hidden || pulsoCreatePollPending === null) return;
+            if (C.pollsPaused() || pulsoCreatePollPending === null) return;
             const id = pulsoCreatePollPending;
             pulsoCreatePollPending = null;
             pollCreateStatusOnce(id);
         }
 
 
-        // Una sola escucha para los dos sondeos (Crear cada 7 s, Retos cada 4 s): con la pestaña
-        // oculta se paran los temporizadores y al volver se retoma enseguida lo que estaba pendiente.
-        function pulsoOnVisibilityChange() {
-            if (document.hidden) {
+        // Una sola función para los sondeos (Crear cada 7 s, Retos cada 4 s y el refresco del título
+        // del reto): con la pestaña del navegador oculta O con la pestaña de Pulse distinta de Crear se
+        // paran los temporizadores (el pendiente queda guardado) y al volver se retoma enseguida lo
+        // que estaba pendiente. La llaman visibilitychange y pulsoSelectTab().
+        function pulsoSyncPolling() {
+            if (C.pollsPaused()) {
                 if (pulsoCreatePollTimer) { clearTimeout(pulsoCreatePollTimer); pulsoCreatePollTimer = null; }
                 if (S.pulsoRetosPollTimer) { clearTimeout(S.pulsoRetosPollTimer); S.pulsoRetosPollTimer = null; }
                 if (S.pulsoRetosRefreshTimer) { clearTimeout(S.pulsoRetosRefreshTimer); S.pulsoRetosRefreshTimer = null; }
@@ -989,15 +988,10 @@ define(['block_pulso/common'], function(C) {
 
         function openCreateGalleryItem(encargoid, tool) {
             encargoid = parseInt(encargoid, 10) || 0;
-            const messagesDiv = document.getElementById('pulso-scroll');
             const body = document.getElementById('pulso-create-body');
-            if (!messagesDiv || !body) return;
-            if (!messagesDiv.classList.contains('pulso-showing-create')) {
-                const active = document.activeElement;
-                pulsoCreateOpener = (active && active !== document.body) ? active : null;
-            }
+            if (!body) return;
             pulsoCreateSetTool(tool);
-            messagesDiv.classList.add('pulso-showing-create');
+            pulsoCreateShowTool();
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
             pulsoCreateScreen(true);
             // Si sigue en curso, se sondea igual que un encargo recién creado.
@@ -1007,7 +1001,7 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoCreateScreen = pulsoCreateScreen;
     C.fn.openCreatePanel = openCreatePanel;
     C.fn.closeCreatePanel = closeCreatePanel;
-    C.fn.pulsoOnVisibilityChange = pulsoOnVisibilityChange;
+    C.fn.pulsoSyncPolling = pulsoSyncPolling;
     C.fn.loadCreateGallery = loadCreateGallery;
     C.fn.pulsoAbrirHistorial = pulsoAbrirHistorial;
     C.fn.submitCreate = submitCreate;

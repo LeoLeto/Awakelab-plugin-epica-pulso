@@ -2,8 +2,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026100509; // Paso 3 fase 4: terminologia unica (creacion, infografia, Pulse)
-$plugin->release   = '1.35.0';    // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026100601; // Paso 4 fase 4: pestañas Preguntar y Crear + plantilla Mustache (templates/ nuevo: purgar cachés)
+$plugin->release   = '1.36.0';    // Semver visible en el header del chat — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;
 // Sin $plugin->dependencies: local_awkepica es OPCIONAL (v1.31.0). Pulse se instala en una

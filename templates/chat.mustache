@@ -1,0 +1,275 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template block_pulso/chat
+
+    Shell estatico de Pulse AI (burbuja, cabecera con pestanas «Preguntar» y «Crear», home y paneles).
+
+    Lo que no le toca a un usuario NO se renderiza (no se oculta con CSS): la UI no es control de
+    acceso, pero el HTML de analitica no tiene por que llegar al navegador de un alumno.
+
+    Context variables required for this template:
+    * isotipo - URL del isotipo (pix/isotipo-oscuro)
+    * isteacher - true con block/pulso:viewanalytics (profesorado); false = version de alumno
+    * cancreate - true con block/pulso:createactivity: hay pestana «Crear»
+    * epica - true si local_awkepica esta disponible: infografia, juego, retos e historial
+    * showversion - true solo con viewanalytics: insignia de version
+    * release - texto de la insignia (p. ej. v1.36.0)
+    * greeting - saludo de la home
+    * coursename - nombre del curso (chip de contexto)
+
+    Example context (json):
+    {
+        "isotipo": "https://example.com/blocks/pulso/pix/isotipo-oscuro.png",
+        "isteacher": true,
+        "cancreate": true,
+        "epica": true,
+        "showversion": true,
+        "release": "v1.36.0",
+        "greeting": "¡Hola, Ana! ¿Qué quieres saber de tu curso?",
+        "coursename": "Estadística aplicada"
+    }
+}}
+
+<!-- Botón circular flotante -->
+<button class="pulso-chat-bubble" id="pulso-chat-bubble" data-pulso-action="toggleChat" title="Pulse AI — Asistente del curso" aria-label="Abrir el asistente Pulse AI" aria-expanded="false" aria-controls="pulso-chat-container">
+    <img src="{{isotipo}}" alt="" aria-hidden="true">
+</button>
+
+<div class="pulso-chat-container" id="pulso-chat-container" role="region" aria-label="Pulse AI">
+    <div class="pulso-chat-header" id="pulso-chat-header">
+        <div class="pulso-header-top">
+            <div class="pulso-header-brand">
+                <img class="pulso-header-logo" src="{{isotipo}}" alt="" aria-hidden="true">
+                <div>
+                    <h2>Pulse AI{{#showversion}} <span class="pulso-version-badge">{{release}}</span>{{/showversion}}</h2>
+                    <span class="pulso-header-sub"><span class="pulso-status-dot" aria-hidden="true"></span>Asistente del curso</span>
+                </div>
+            </div>
+            <div class="header-controls">
+                <button class="header-btn" id="pulso-clear-btn" title="Nueva conversación" aria-label="Empezar una conversación nueva" data-pulso-action="clearConversation">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg>
+                </button>
+                <button type="button" class="header-btn" id="pulso-expand-btn" title="Ampliar" aria-label="Ampliar el chat" data-pulso-action="toggleChatSize">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                </button>
+                <button class="header-btn" id="pulso-minimize-btn" title="Minimizar" aria-label="Minimizar el chat" data-pulso-action="toggleChat">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+            </div>
+        </div>
+        {{#cancreate}}
+        <div class="pulso-tabs" id="pulso-tablist" role="tablist" aria-label="Secciones de Pulse AI">
+            <button type="button" class="pulso-tab" role="tab" id="pulso-tab-ask" aria-controls="pulso-panel-ask" aria-selected="true" tabindex="0" data-pulso-tab="ask" data-pulso-action="selectTab" data-pulso-arg="ask">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>Preguntar</span>
+            </button>
+            <button type="button" class="pulso-tab" role="tab" id="pulso-tab-crear" aria-controls="pulso-panel-crear" aria-selected="false" tabindex="-1" data-pulso-tab="crear" data-pulso-action="selectTab" data-pulso-arg="crear">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>
+                <span>Crear</span>
+            </button>
+        </div>
+        {{/cancreate}}
+    </div>
+
+    <div class="pulso-tabpanel" id="pulso-panel-ask" {{#cancreate}}role="tabpanel" aria-labelledby="pulso-tab-ask"{{/cancreate}}>
+        <div class="pulso-chat-messages" id="pulso-scroll">
+            <div class="pulso-home" id="pulso-home">
+                <div class="pulso-home-hello">
+                    <div class="pulso-home-avatar" aria-hidden="true"></div>
+                    <h3>{{greeting}}</h3>
+                </div>
+
+                <button type="button" class="pulso-home-help-btn" data-pulso-action="showCapabilities" aria-label="Descubre qué puede hacer Pulse">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <span>¿Qué puede hacer Pulse?<span class="pulso-home-help-sub">Descúbrelo en 10 segundos</span></span>
+                </button>
+
+                {{#isteacher}}
+                <div class="pulso-home-section">
+                    <div class="pulso-home-section-head">
+                        <h3 class="pulso-home-section-title">Analítica del curso</h3>
+                        <span class="pulso-home-context-chip">{{coursename}}</span>
+                    </div>
+                    <div class="pulso-home-grid">
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuál es la tasa de completitud?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                            <span class="pulso-action-label">Completitud</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son las notas promedio?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>
+                            <span class="pulso-action-label">Notas medias</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué estudiantes están en riesgo?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span class="pulso-action-label">Alumnos en riesgo</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuál es el engagement?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span class="pulso-action-label">Participación</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son los mejores alumnos del curso?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <span class="pulso-action-label">Mejores alumnos</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué alumnos llevan más de una semana sin acceder?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span class="pulso-action-label">Alumnos inactivos</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="Dame un panorama general del curso: tasa de completitud, nota media y cuántos alumnos están en riesgo.">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+                            <span class="pulso-action-label">Panorama del curso</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son los resultados de los cuestionarios del curso: nota media, número de intentos y cuántos alumnos aprobaron?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+                            <span class="pulso-action-label">Resultados de cuestionarios</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuál es el estado de las entregas de las tareas: cuántas entregadas, cuántas pendientes y cuántas sin calificar?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+                            <span class="pulso-action-label">Estado de entregas</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                    </div>
+                </div>
+                {{/isteacher}}
+
+                <div class="pulso-home-section course">
+                    <div class="pulso-home-section-head">
+                        <h3 class="pulso-home-section-title">Contenido del curso</h3>
+                        {{^isteacher}}<span class="pulso-home-context-chip">{{coursename}}</span>{{/isteacher}}
+                    </div>
+                    <div class="pulso-home-grid">
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿De qué trata este curso?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            <span class="pulso-action-label">Resumen del curso</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué actividades y recursos tiene el curso?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                            <span class="pulso-action-label">Actividades y recursos</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué secciones tiene el curso?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            <span class="pulso-action-label">Secciones</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué cuestionarios hay en el curso?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span class="pulso-action-label">Cuestionarios</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué tareas hay en el curso?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
+                            <span class="pulso-action-label">Tareas del curso</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        {{^isteacher}}
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué materiales y documentos hay disponibles en el curso para estudiar?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            <span class="pulso-action-label">Materiales de estudio</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="Explícame de qué trata la sección 1 del curso y qué contenidos incluye.">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                            <span class="pulso-action-label">Explícame un tema</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="Resume los conceptos principales del material del curso para repasar.">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11H5a2 2 0 0 0-2 2v7h18v-7a2 2 0 0 0-2-2h-4"/><path d="M9 11V5a3 3 0 0 1 6 0v6"/></svg>
+                            <span class="pulso-action-label">Repaso rápido</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                        {{/isteacher}}
+                    </div>
+                </div>
+                {{#cancreate}}
+                <div class="pulso-home-section create">
+                    <div class="pulso-home-section-head">
+                        <h3 class="pulso-home-section-title">Crear</h3>
+                        {{^isteacher}}{{#epica}}<button type="button" class="pulso-historial-link head" data-pulso-action="pulsoAbrirHistorial">Mi historial<span aria-hidden="true"> ↗</span><span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></button>{{/epica}}{{/isteacher}}
+                    </div>
+                    {{> block_pulso/chat_create_cta}}
+                </div>
+                {{/cancreate}}
+            </div>
+
+            <!-- Región en vivo SOLO para mensajes: la home y los paneles de pestaña quedan fuera. -->
+            <div class="pulso-log" id="pulso-messages" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversación con Pulse AI"></div>
+        </div>
+
+        <div class="pulso-offline" id="pulso-offline" hidden>Sin conexión. Tus preguntas se enviarán cuando vuelva internet.</div>
+
+        <div class="pulso-chat-input-area">
+            <form id="pulso-chat-form">
+                <div class="pulso-input-group">
+                    <input
+                        type="text"
+                        id="pulso-input"
+                        placeholder="Pregunta sobre el curso..."
+                        maxlength="500"
+                        autocomplete="off"
+                        aria-label="Escribe tu pregunta sobre el curso"
+                    />
+                    <button type="button" id="pulso-mic-btn" class="pulso-mic-btn" style="display:none;" aria-label="Dictar pregunta por voz" aria-pressed="false" title="Dictar por voz" data-pulso-action="toggleMic">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+                    </button>
+                    <button type="submit" class="pulso-send-btn" id="pulso-send-btn" aria-label="Enviar pregunta" aria-disabled="true">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3.4 20.4 21.85 12 3.4 3.6l-.01 6.53L15 12 3.39 13.87z"/></svg>
+                    </button>
+                </div>
+            </form>
+            <div class="pulso-char-count" id="pulso-char-count-box" aria-hidden="true" hidden>
+                <span id="pulso-char-count">0</span>/500
+            </div>
+        </div>
+    </div>
+
+    {{#cancreate}}
+    <div class="pulso-tabpanel" id="pulso-panel-crear" role="tabpanel" aria-labelledby="pulso-tab-crear" hidden>
+        <div class="pulso-chat-messages" id="pulso-crear-scroll">
+            <div class="pulso-create-root" id="pulso-create-root">
+                <h3 class="pulso-create-root-title" id="pulso-create-root-title" tabindex="-1">¿Qué quieres crear?</h3>
+                {{> block_pulso/chat_create_cta}}
+            </div>
+
+            <div class="pulso-create-panel" id="pulso-create-panel" hidden>
+                <div class="pulso-create-head">
+                    <button type="button" class="pulso-create-back" data-pulso-action="closeCreatePanel" aria-label="Volver a la lista de herramientas de creación">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <h3 id="pulso-create-title" tabindex="-1">Crear</h3>
+                </div>
+                <div class="pulso-create-body" id="pulso-create-body">
+                    <p class="pulso-create-hint">Cargando…</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {{/cancreate}}
+
+    <!-- Avisos breves para lector de pantalla (estado de una creación, conexión, límite de caracteres). Fuera de los paneles. -->
+    <div class="pulso-sr-only" id="pulso-live-status" role="status" aria-live="polite" aria-atomic="true"></div>
+</div>

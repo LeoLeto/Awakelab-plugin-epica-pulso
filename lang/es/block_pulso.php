@@ -84,22 +84,22 @@ $string['task_index_course_adhoc'] = 'Indexar un curso bajo demanda para RAG (Pu
 // === CACHÉS ===
 $string['cachedef_coursecontext'] = 'Contexto unificado de analítica del curso que usa el chat de Pulse';
 
-// === Encargos de creación a Épica (infografías; v1.18.0) ===
+// === Creaciones con Épica (infografías y juegos; v1.18.0) ===
 $string['pulso:createactivity'] = 'Pedir una creación (infografía) a Pulse';
-$string['creationquota_heading'] = 'Encargos de creación (Épica) — cupos';
-$string['creationquota_heading_desc'] = 'Límites antiabuso de los encargos de creación enviados desde Pulse (hoy infografías; retos y presentaciones en versiones futuras). Cuentan ENCARGOS, no creaciones terminadas: Épica comparte su cola entre herramientas.';
+$string['creationquota_heading'] = 'Creaciones (Épica) — cupos';
+$string['creationquota_heading_desc'] = 'Límites antiabuso de las creaciones enviadas desde Pulse (hoy infografías y juegos). Cuentan las CREACIONES pedidas, no las terminadas: Épica comparte su cola entre herramientas.';
 $string['quota_user_section_day'] = 'Por usuario, sección y día';
-$string['quota_user_section_day_desc'] = 'Máximo de encargos de creación que un mismo usuario puede enviar al día para recursos de una misma sección del curso.';
+$string['quota_user_section_day_desc'] = 'Máximo de creaciones que un mismo usuario puede enviar al día para recursos de una misma sección del curso.';
 $string['quota_user_course_day'] = 'Por usuario y día, en un curso';
-$string['quota_user_course_day_desc'] = 'Máximo de encargos de creación que un mismo usuario puede enviar al día dentro de un curso.';
+$string['quota_user_course_day_desc'] = 'Máximo de creaciones que un mismo usuario puede enviar al día dentro de un curso.';
 $string['quota_course_hour'] = 'Por curso y hora';
-$string['quota_course_hour_desc'] = 'Máximo de encargos de creación que un mismo curso puede generar en una hora móvil.';
+$string['quota_course_hour_desc'] = 'Máximo de creaciones que un mismo curso puede generar en una hora móvil.';
 $string['quota_course_day_floor'] = 'Por curso y día — mínimo';
-$string['quota_course_day_floor_desc'] = 'Mínimo de encargos diarios permitidos por curso, sea cual sea su número de matriculados (la fórmula real es el mayor entre este mínimo y los matriculados × el multiplicador del ajuste siguiente).';
+$string['quota_course_day_floor_desc'] = 'Mínimo de creaciones diarias permitidas por curso, sea cual sea su número de matriculados (la fórmula real es el mayor entre este mínimo y los matriculados × el multiplicador del ajuste siguiente).';
 $string['quota_course_day_multiplier'] = 'Por curso y día — multiplicador por matriculado';
-$string['quota_course_day_multiplier_desc'] = 'Se multiplica por los usuarios matriculados en el curso para obtener el tope diario (p. ej. 1,5 con 150 matriculados permite hasta 225 encargos al día). El límite efectivo es el mayor entre este valor y el mínimo anterior.';
+$string['quota_course_day_multiplier_desc'] = 'Se multiplica por los usuarios matriculados en el curso para obtener el tope diario (p. ej. 1,5 con 150 matriculados permite hasta 225 creaciones al día). El límite efectivo es el mayor entre este valor y el mínimo anterior.';
 $string['quota_teacher_day'] = 'Por docente y día (todos los cursos)';
-$string['quota_teacher_day_desc'] = 'Máximo de encargos de creación que un mismo miembro del profesorado puede enviar al día, sumando TODOS sus cursos.';
+$string['quota_teacher_day_desc'] = 'Máximo de creaciones que un mismo miembro del profesorado puede enviar al día, sumando TODOS sus cursos.';
 
 // === Ampliación de recursos: YouTube + OpenAlex (v1.24.0) ===
 $string['ampliacion_heading'] = 'Ampliación de recursos — vídeos y artículos';
@@ -128,14 +128,14 @@ $string['retos_max_elegidos_curso_dia_desc'] = 'Máximo de retos elegidos en un 
 // === Ciclo con Épica: firmar, encargar, sondear, recoger (v1.19.0) ===
 $string['task_epica_ciclo_adhoc'] = 'Un paso del ciclo de creación con Épica (Pulse AI)';
 $string['epica_heading'] = 'Integración con Épica — ciclo de creación';
-$string['epica_heading_desc'] = 'Adónde envía Pulse los encargos de creación (infografías) y cómo habla con Épica la tarea en segundo plano. Todo el ciclo (firmar, encargar, sondear, recoger) se ejecuta en una tarea adhoc: nunca ocurre dentro de una petición web.';
+$string['epica_heading_desc'] = 'Adónde envía Pulse las creaciones (infografías y juegos) y cómo habla con Épica la tarea en segundo plano. Todo el ciclo (firmar, encargar, sondear, recoger) se ejecuta en una tarea adhoc: nunca ocurre dentro de una petición web.';
 $string['epica_base_url'] = 'URL base de Épica';
-$string['epica_base_url_desc'] = 'URL base del entorno de Épica al que se envían los encargos (p. ej. el entorno de QA durante el piloto y producción cuando esté autorizado). La tarea le añade las rutas fijas de la API. Debe empezar por https://. VACÍA = Épica no disponible: no se ofrecen infografías, juegos, retos ni historial (Ampliar recurso sigue funcionando).';
+$string['epica_base_url_desc'] = 'URL base del entorno de Épica al que se envían las creaciones (p. ej. el entorno de QA durante el piloto y producción cuando esté autorizado). La tarea le añade las rutas fijas de la API. Debe empezar por https://. VACÍA = Épica no disponible: no se ofrecen infografías, juegos, retos ni historial (Ampliar recurso sigue funcionando).';
 $string['epica_dry_run'] = 'Modo de ensayo (construir el sobre, no enviarlo)';
-$string['epica_dry_run_desc'] = 'Si se activa, la tarea construye el sobre completo de cada encargo pendiente y lo guarda, pero nunca firma un token ni llama a Épica: el encargo queda en su propio estado terminal («ensayo»). Sirve para verificar la forma del contenido antes de que local_awkepica tenga un secreto de producción configurado, o para probar el ciclo sin gastar cupo de Épica. Desactivado por defecto.';
+$string['epica_dry_run_desc'] = 'Si se activa, la tarea construye el sobre completo de cada creación pendiente y lo guarda, pero nunca firma un token ni llama a Épica: la creación queda en su propio estado terminal («ensayo»). Sirve para verificar la forma del contenido antes de que local_awkepica tenga un secreto de producción configurado, o para probar el ciclo sin gastar cupo de Épica. Desactivado por defecto.';
 
 // === Ciclo con Épica: panel de estado + aviso (v1.20.0) ===
-$string['messageprovider:epica_encargo'] = 'Un encargo de creación (infografía) está listo o ha fallado';
+$string['messageprovider:epica_encargo'] = 'Una creación (infografía o juego) está lista o ha fallado';
 
 // === Errores de chat y endpoints para la persona (v1.30.0) — se eligen por error_code estable, nunca por texto de una API ===
 $string['err_busy'] = 'Pulse está muy ocupado ahora mismo. Prueba en un minuto.';

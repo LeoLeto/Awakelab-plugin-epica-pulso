@@ -199,12 +199,12 @@ try {
     if ($encargoid > 0) {
         $encargo = $DB->get_record('block_pulso_encargos', ['id' => $encargoid]);
         if (!$encargo || (int)$encargo->courseid !== $courseid) {
-            throw new \block_pulso\pulso_error('bad_request', 'Ese encargo no existe.', 404);
+            throw new \block_pulso\pulso_error('bad_request', 'Esa creación no existe.', 404);
         }
 
         $isowner = (int)$encargo->userid === $userid;
         if (!$isowner && !$canviewanalytics) {
-            throw new \block_pulso\pulso_error('access', 'No tienes acceso a ese encargo.', 403);
+            throw new \block_pulso\pulso_error('access', 'No tienes acceso a esa creación.', 403);
         }
 
         echo json_encode([

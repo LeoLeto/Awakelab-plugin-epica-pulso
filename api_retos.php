@@ -49,7 +49,7 @@ try {
     try {
         chat_pipeline::check_enabled($courseid);
     } catch (\Exception $e) {
-        throw new reto_error('pulso-desactivado', 'Pulso está desactivado en este curso.', 403);
+        throw new reto_error('pulso-desactivado', 'Pulse está desactivado en este curso.', 403);
     }
 
     // Sin Épica (plugin ausente, sin configurar o URL no https) no se hace nada, ni se inserta

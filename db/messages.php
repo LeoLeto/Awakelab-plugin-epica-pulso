@@ -2,7 +2,7 @@
 /**
  * Message provider definitions for block_pulso.
  *
- * Un solo proveedor: el aviso de que un encargo de creación (Epica) terminó
+ * Un solo proveedor: el aviso de que una creación (Epica) terminó
  * -listo o fallado-, mandado por classes/epica_client.php al llegar a un
  * estado terminal real. Nunca en 'ensayo' (no es una generación real) ni en
  * cada sondeo: un aviso por encargo, solo al acabar.

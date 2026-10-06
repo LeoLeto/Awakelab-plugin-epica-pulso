@@ -62,7 +62,7 @@ require_capability('block/pulso:createactivity', $context);
 try {
     chat_pipeline::check_enabled($courseid);
 } catch (\Exception $e) {
-    pulso_historial_page('Mi historial', '<p>Pulso está desactivado en este curso.</p>', 403);
+    pulso_historial_page('Mi historial', '<p>Pulse está desactivado en este curso.</p>', 403);
 }
 
 // Profesorado: la puerta de alumno de Épica contesta 403 a un token de docente.

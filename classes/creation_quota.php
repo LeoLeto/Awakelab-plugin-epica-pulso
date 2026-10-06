@@ -182,7 +182,7 @@ class creation_quota {
         );
         if ($usercourseused >= $usercourselimit) {
             return ['allowed' => false, 'reason' =>
-                "Has llegado a tu límite de encargos de hoy en este curso ({$usercourselimit}). Vuelve mañana."];
+                "Has llegado a tu límite de creaciones de hoy en este curso ({$usercourselimit}). Vuelve mañana."];
         }
 
         // Cupo adicional del docente, SIN filtrar por curso: cuenta sus
@@ -196,7 +196,7 @@ class creation_quota {
             );
             if ($teacherused >= $teacherlimit) {
                 return ['allowed' => false, 'reason' =>
-                    "Has llegado a tu límite diario de encargos como docente ({$teacherlimit}), contando todos tus cursos. Vuelve mañana."];
+                    "Has llegado a tu límite diario de creaciones como docente ({$teacherlimit}), contando todos tus cursos. Vuelve mañana."];
             }
         }
 
@@ -207,7 +207,7 @@ class creation_quota {
         );
         if ($hourused >= $hourlimit) {
             return ['allowed' => false, 'reason' =>
-                "Este curso ha llegado al límite de encargos de la última hora ({$hourlimit}). Inténtalo más tarde."];
+                "Este curso ha llegado al límite de creaciones de la última hora ({$hourlimit}). Inténtalo más tarde."];
         }
 
         $daylimit = self::course_day_limit($courseid);
@@ -217,7 +217,7 @@ class creation_quota {
         );
         if ($dayused >= $daylimit) {
             return ['allowed' => false, 'reason' =>
-                "Este curso ha llegado a su límite de encargos de hoy ({$daylimit}). Vuelve mañana."];
+                "Este curso ha llegado a su límite de creaciones de hoy ({$daylimit}). Vuelve mañana."];
         }
 
         return ['allowed' => true, 'reason' => null];
@@ -239,7 +239,7 @@ class creation_quota {
         );
         if ($used >= $limit) {
             return ['allowed' => false, 'reason' =>
-                "Has llegado a tu límite de encargos de hoy para esta sección ({$limit}). Prueba con otro recurso o mañana."];
+                "Has llegado a tu límite de creaciones de hoy para esta sección ({$limit}). Prueba con otro recurso o mañana."];
         }
         return ['allowed' => true, 'reason' => null];
     }
@@ -302,7 +302,7 @@ class creation_quota {
         global $DB;
 
         if (!self::table_exists()) {
-            throw new \Exception('La tabla de encargos no existe todavía — pendiente de ejecutar la actualización de Moodle.');
+            throw new \Exception('La tabla de creaciones no existe todavía — pendiente de ejecutar la actualización de Moodle.');
         }
 
         $now = time();
@@ -347,7 +347,7 @@ class creation_quota {
             $DB->update_record('block_pulso_encargos', (object)[
                 'id' => $encargo->id,
                 'status' => 'fallado',
-                'motivo' => 'No hemos podido poner tu encargo en cola. Prueba a crear uno nuevo más tarde.',
+                'motivo' => 'No hemos podido poner tu creación en cola. Prueba a crear una nueva más tarde.',
                 'notified' => 1,
                 'timemodified' => time(),
             ]);

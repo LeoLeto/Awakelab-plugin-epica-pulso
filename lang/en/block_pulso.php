@@ -83,22 +83,22 @@ $string['task_index_course_adhoc'] = 'Index a single course on demand for RAG (P
 // === CACHES ===
 $string['cachedef_coursecontext'] = 'Unified course analytics context used by the Pulse chat';
 
-// === Creation requests to Epica (infographics; v1.18.0) ===
+// === Creations with Epica (infographics and games; v1.18.0) ===
 $string['pulso:createactivity'] = 'Request a creation (infographic) from Pulse';
-$string['creationquota_heading'] = 'Creation requests (Epica) — quotas';
-$string['creationquota_heading_desc'] = 'Anti-abuse limits for creation requests sent through Pulse (infographics today; challenges and presentations in future versions). These count REQUESTS, not finished creations — Epica shares its queue across tools.';
+$string['creationquota_heading'] = 'Creations (Epica) — quotas';
+$string['creationquota_heading_desc'] = 'Anti-abuse limits for creations sent through Pulse (infographics and games today). These count creations requested, not finished ones — Epica shares its queue across tools.';
 $string['quota_user_section_day'] = 'Per user, section and day';
-$string['quota_user_section_day_desc'] = 'Maximum creation requests a single user can submit for resources in the same course section, per day.';
+$string['quota_user_section_day_desc'] = 'Maximum creations a single user can submit for resources in the same course section, per day.';
 $string['quota_user_course_day'] = 'Per user and day, in a course';
-$string['quota_user_course_day_desc'] = 'Maximum creation requests a single user can submit within one course, per day.';
+$string['quota_user_course_day_desc'] = 'Maximum creations a single user can submit within one course, per day.';
 $string['quota_course_hour'] = 'Per course and hour';
-$string['quota_course_hour_desc'] = 'Maximum creation requests a single course can generate in a rolling hour.';
+$string['quota_course_hour_desc'] = 'Maximum creations a single course can generate in a rolling hour.';
 $string['quota_course_day_floor'] = 'Per course and day — minimum';
-$string['quota_course_day_floor_desc'] = 'Minimum daily requests allowed per course, regardless of enrolment size (see the multiplier setting below for the actual formula: the higher of this floor and enrolled users × multiplier).';
+$string['quota_course_day_floor_desc'] = 'Minimum daily creations allowed per course, regardless of enrolment size (see the multiplier setting below for the actual formula: the higher of this floor and enrolled users × multiplier).';
 $string['quota_course_day_multiplier'] = 'Per course and day — multiplier per enrolled user';
-$string['quota_course_day_multiplier_desc'] = 'Multiplied by the course\'s enrolled users to get the daily cap (e.g. 1.5 means 150 enrolled users allow up to 225 requests/day). The effective limit is the higher of this and the floor above.';
+$string['quota_course_day_multiplier_desc'] = 'Multiplied by the course\'s enrolled users to get the daily cap (e.g. 1.5 means 150 enrolled users allow up to 225 creations/day). The effective limit is the higher of this and the floor above.';
 $string['quota_teacher_day'] = 'Per teacher and day (all courses)';
-$string['quota_teacher_day_desc'] = 'Maximum creation requests a single teaching-staff member can submit per day, across ALL their courses.';
+$string['quota_teacher_day_desc'] = 'Maximum creations a single teaching-staff member can submit per day, across ALL their courses.';
 
 // === Resource expansion: YouTube + OpenAlex (v1.24.0) ===
 $string['ampliacion_heading'] = 'Resource expansion — videos and articles';
@@ -127,14 +127,14 @@ $string['retos_max_elegidos_curso_dia_desc'] = 'Maximum challenges picked in a s
 // === Epica cycle: sign, order, poll, collect (v1.19.0) ===
 $string['task_epica_ciclo_adhoc'] = 'One step of the Epica creation cycle (Pulse AI)';
 $string['epica_heading'] = 'Epica integration — creation cycle';
-$string['epica_heading_desc'] = 'Where Pulse sends creation requests (infographics) and how the background task talks to Epica. The whole cycle (sign, order, poll, collect) runs in an adhoc task — it never happens inside a web request.';
+$string['epica_heading_desc'] = 'Where Pulse sends creations (infographics and games) and how the background task talks to Epica. The whole cycle (sign, order, poll, collect) runs in an adhoc task — it never happens inside a web request.';
 $string['epica_base_url'] = 'Epica base URL';
-$string['epica_base_url_desc'] = 'Base URL of the Epica environment to send creation requests to (e.g. the QA environment while piloting, production once cleared). The task appends the fixed API paths to this. Must start with https://. EMPTY = Epica unavailable: no infographics, games, challenges or history are offered (Expand resource keeps working).';
+$string['epica_base_url_desc'] = 'Base URL of the Epica environment to send creations to (e.g. the QA environment while piloting, production once cleared). The task appends the fixed API paths to this. Must start with https://. EMPTY = Epica unavailable: no infographics, games, challenges or history are offered (Expand resource keeps working).';
 $string['epica_dry_run'] = 'Dry-run mode (build the envelope, never send it)';
-$string['epica_dry_run_desc'] = 'When enabled, the task builds the full request envelope for each pending creation request and stores it, but never signs a token or calls Epica — the request is left in its own terminal state ("ensayo"). Use this to verify the payload shape before local_awkepica has a production secret configured, or to test the cycle without spending Epica quota. Off by default.';
+$string['epica_dry_run_desc'] = 'When enabled, the task builds the full request envelope for each pending creation and stores it, but never signs a token or calls Epica — the request is left in its own terminal state ("ensayo"). Use this to verify the payload shape before local_awkepica has a production secret configured, or to test the cycle without spending Epica quota. Off by default.';
 
 // === Epica cycle: status panel + notification (v1.20.0) ===
-$string['messageprovider:epica_encargo'] = 'A creation request (infographic) is ready or failed';
+$string['messageprovider:epica_encargo'] = 'A creation (infographic or game) is ready or failed';
 
 // === User-facing chat/endpoint errors (v1.30.0) — chosen by a stable error_code, never by API text ===
 $string['err_busy'] = 'Pulse is very busy right now. Try again in a minute.';

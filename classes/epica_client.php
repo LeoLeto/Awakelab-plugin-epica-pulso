@@ -64,7 +64,7 @@ class epica_client {
      * detalle va a error_log en cada sitio donde se usan.
      */
     const MOTIVO_SERVICIO_NO_DISPONIBLE = 'El servicio de generación no está disponible ahora mismo. Avisa a quien administre Moodle.';
-    const MOTIVO_SERVICIO_RECHAZO = 'El servicio de generación no ha podido atender el encargo. Prueba a crear uno nuevo más tarde.';
+    const MOTIVO_SERVICIO_RECHAZO = 'El servicio de generación no ha podido atender la creación. Prueba a crear una nueva más tarde.';
 
     /** Espera larga de respaldo (s) si local_awkepica no está o no la expone: la de epica::ESPERA_LARGA_S. */
     const ESPERA_LARGA_RESPALDO_S = 180;
@@ -176,7 +176,7 @@ class epica_client {
 
         $user = \core_user::get_user((int)$encargo->userid, '*', IGNORE_MISSING);
         if (!$user || !empty($user->deleted)) {
-            self::marcar_fallo($encargo, 'El usuario que hizo el encargo ya no existe.');
+            self::marcar_fallo($encargo, 'El usuario que hizo la creación ya no existe.');
             return ['requeue' => false, 'delay' => 0];
         }
 
@@ -295,7 +295,7 @@ class epica_client {
             return self::MOTIVO_SERVICIO_NO_DISPONIBLE;
         }
         if (empty($user) || empty($user->email)) {
-            return 'El usuario que hizo el encargo no tiene correo electrónico configurado.';
+            return 'El usuario que hizo la creación no tiene correo electrónico configurado.';
         }
         return null;
     }
@@ -340,14 +340,14 @@ class epica_client {
         global $DB;
 
         if (empty($encargo->epica_job_id)) {
-            self::marcar_fallo($encargo, 'El encargo no tiene un trabajo de Épica asociado.');
+            self::marcar_fallo($encargo, 'La creación no tiene un trabajo asociado en el servicio de generación.');
             return ['requeue' => false, 'delay' => 0];
         }
 
         $course = get_course((int)$encargo->courseid);
         $user = \core_user::get_user((int)$encargo->userid, '*', IGNORE_MISSING);
         if (!$user || !empty($user->deleted)) {
-            self::marcar_fallo($encargo, 'El usuario que hizo el encargo ya no existe.');
+            self::marcar_fallo($encargo, 'El usuario que hizo la creación ya no existe.');
             return ['requeue' => false, 'delay' => 0];
         }
 
@@ -514,7 +514,7 @@ class epica_client {
             error_log("Pulso Epica: encargo {$encargo->id} fallado tras {$errorcount} fallos transitorios seguidos al {$accion}: {$clase}: {$mensaje}");
             self::marcar_fallo(
                 $encargo,
-                'No hemos podido conectar con el servicio de generación. Prueba a crear un encargo nuevo más tarde.'
+                'No hemos podido conectar con el servicio de generación. Prueba a crear una nueva más tarde.'
             );
             return ['requeue' => false, 'delay' => 0];
         }
@@ -1121,10 +1121,10 @@ class epica_client {
         $base = trim((string)get_config('block_pulso', 'epica_base_url'));
         if ($base === '') {
             // Sin valor por defecto a propósito (v1.31.0): una producción sin configurar no debe mandar nada al QA.
-            return 'No hay URL de Épica configurada en el plugin, así que no se envía nada.';
+            return 'No hay URL del servicio de generación configurada en el plugin, así que no se envía nada.';
         }
         if (stripos($base, 'https://') !== 0 || !parse_url($base, PHP_URL_HOST)) {
-            return 'La URL de Épica configurada en el plugin no es https://, así que no se envía nada (el token y el material no pueden viajar sin cifrar).';
+            return 'La URL del servicio de generación configurada en el plugin no es https://, así que no se envía nada (el token y el material no pueden viajar sin cifrar).';
         }
         return null;
     }

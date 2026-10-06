@@ -98,7 +98,7 @@ try {
         $lock = null; // Sin factoria de candados: se sigue sin proteccion extra.
     }
     if ($lock === false) {
-        throw new \block_pulso\pulso_error('busy', 'Ya tienes un encargo en marcha. Espera un momento antes de enviar otro.', 409);
+        throw new \block_pulso\pulso_error('busy', 'Ya tienes una creación en marcha. Espera un momento antes de enviar otra.', 409);
     }
     try {
         $quota = creation_quota::check_general_quota($courseid, $userid, $isteacher);
@@ -128,7 +128,7 @@ try {
     echo json_encode([
         'success' => true,
         'encargoid' => $encargoid,
-        'message' => 'Encargo guardado. En cuanto Pulse pueda enviarlo a generación, te avisaremos aquí.',
+        'message' => 'Creación guardada. En cuanto Pulse pueda ponerla en marcha, te avisaremos aquí.',
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (\Throwable $e) {

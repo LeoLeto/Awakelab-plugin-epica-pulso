@@ -814,11 +814,11 @@ descomentar algo ya puesto"—. Reglas que deben persistir:
   terminar («Te avisaremos cuando esté listo; puedes cerrar el chat») es
   independiente de la herramienta y solo un texto — el aviso real ya lo
   manda `notify_completion()` (paso 4) al llegar a un estado terminal.
-- **Reabrir con la herramienta correcta.** «Crear un encargo nuevo», «←
+- **Reabrir con la herramienta correcta.** «Empezar una creación nueva» (antes «Crear un encargo nuevo»), «←
   Volver al formulario» y abrir un ítem de la galería
   (`openCreateGalleryItem(id, tool)`) propagan el `tool` del encargo que se
   está viendo, nunca vuelven a `'infografia'` por defecto — si no, un alumno
-  que falla creando un juego y pulsa «Crear un encargo nuevo» aterrizaría en
+  que falla creando un juego y pulsa «Empezar una creación nueva» aterrizaría en
   el formulario de infografía sin darse cuenta.
 
 ## Cómo se trabaja este repo con prompts
@@ -1636,6 +1636,16 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
   Tras desplegar JS nuevo, purgar cachés (Moodle cachea los módulos por revisión de JS).
 - El script de partición y la prueba de paridad (jsdom, 28 pasos × profesor/alumno × con/sin Épica, comparando DOM,
   peticiones y errores contra el monolito de v1.33.0) no se guardan en el repo: eran de un solo uso.
+
+- **Terminología única (v1.35.0), solo en lo que VE una persona.** «Pulse AI» en la cabecera y el nombre del bloque,
+  «Pulse» en los textos (nunca «Pulso»); «creación» y nunca «encargo» (ni «pedido»); «infografía» y nunca «lámina»;
+  «el servicio de generación» / «el servicio de retos» en vez de «Épica» salvo donde la persona SALE a Épica («Mi
+  historial en Épica», «Continuar a Épica» en `epica_historial.php`) o es administración (ajustes, `diagnostico.php`,
+  logs). **No se renombran identificadores internos**: `block_pulso_encargos`, `encargoid`, `encargo.*`, la filearea
+  `encargo`, `epica_encargo`, los códigos `encargo-ambiguo`/`encargo-sin-tema`, las rutas `/laminas/…` de Épica y los
+  logs («Pulso …») se quedan: cambiarlos rompe datos, URL y contratos. Para comprobarlo, extraer los literales de cadena
+  (PHP con `token_get_all`, JS con un parser) y mirar solo los que ve el usuario; un `grep` a pelo da cientos de falsos
+  positivos (variables, comentarios y nombres de tabla).
 
 ## Dev notes
 

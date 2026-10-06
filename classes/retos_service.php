@@ -133,7 +133,7 @@ class retos_service {
             }
             $epicaid = trim((string)($datos['propuesta'] ?? ''));
             if ($epicaid === '') {
-                throw new reto_error('respuesta-inesperada', 'Épica aceptó la petición pero no devolvió el identificador de la propuesta.', 502);
+                throw new reto_error('respuesta-inesperada', 'El servicio de retos aceptó la petición pero no devolvió el identificador de la propuesta.', 502);
             }
 
             $estado = self::estado_conocido($datos['estado'] ?? '', self::ESTADO_EN_COLA);
@@ -189,7 +189,7 @@ class retos_service {
                 $DB->update_record('block_pulso_reto_propuestas', (object)[
                     'id' => $row->id,
                     'estado' => self::ESTADO_DESCONOCIDO,
-                    'motivo' => 'Épica ya no reconoce esta propuesta (caducó o no es de este centro).',
+                    'motivo' => 'Esta propuesta ya no está disponible (caducó o no es de este centro).',
                     'timemodified' => time(),
                 ]);
             }
@@ -205,7 +205,7 @@ class retos_service {
                 $retos = self::normalizar_retos($datos['retos'] ?? null);
                 if (empty($retos)) {
                     $upd->estado = self::ESTADO_FALLADO;
-                    $upd->motivo = 'Épica devolvió la propuesta como lista pero sin retos.';
+                    $upd->motivo = 'La propuesta llegó sin retos.';
                     self::registrar_traza('propuesta', $row->id, $upd->motivo, $traza);
                     break;
                 }
@@ -233,12 +233,12 @@ class retos_service {
 
             case self::ESTADO_DESCONOCIDO:
                 $upd->estado = self::ESTADO_DESCONOCIDO;
-                $upd->motivo = 'Épica no reconoce esta propuesta (ha caducado o no es de este centro). Pide una nueva.';
+                $upd->motivo = 'Esta propuesta ya no está disponible (ha caducado o no es de este centro). Pide una nueva.';
                 self::registrar_traza('propuesta', $row->id, 'desconocido', $traza);
                 break;
 
             default:
-                throw new reto_error('respuesta-inesperada', 'Épica contestó con un estado que no esperábamos.', 502, ['reintentable' => true]);
+                throw new reto_error('respuesta-inesperada', 'El servicio de retos contestó con un estado que no esperábamos.', 502, ['reintentable' => true]);
         }
 
         $DB->update_record('block_pulso_reto_propuestas', $upd);
@@ -313,7 +313,7 @@ class retos_service {
                     $DB->update_record('block_pulso_reto_propuestas', (object)[
                         'id' => $row->id,
                         'estado' => self::ESTADO_DESCONOCIDO,
-                        'motivo' => 'Épica ya no reconoce esta propuesta (caducó o no es de este centro).',
+                        'motivo' => 'Esta propuesta ya no está disponible (caducó o no es de este centro).',
                         'timemodified' => time(),
                     ]);
                 }
@@ -324,7 +324,7 @@ class retos_service {
             $enlace = self::enlace_epica($datos['enlace'] ?? '');
             if ($codigo === '' || mb_strlen($codigo, 'UTF-8') > 64 || $enlace === '') {
                 throw new reto_error('respuesta-inesperada',
-                    'Épica aceptó la elección pero no devolvió un enlace válido al reto.', 502);
+                    'El servicio de retos aceptó la elección pero no devolvió un enlace válido al reto.', 502);
             }
             $enlacecurso = self::enlace_epica($datos['enlace_curso'] ?? '');
             // El del reto elegido es el PROPUESTO: el modelo le pondrá su propio título al escribirlo (refrescar lo recoge).
@@ -487,7 +487,7 @@ class retos_service {
      */
     private static function llamar(string $ruta, array $cuerpo, \stdClass $user, \stdClass $course, ?int $espera = null): array {
         if (!class_exists('\local_awkepica\epica')) {
-            throw new reto_error('epica-no-disponible', 'Épica no está disponible en este sitio.', 503);
+            throw new reto_error('epica-no-disponible', 'Los retos no están disponibles en este sitio.', 503);
         }
         $motivo = epica_client::precondiciones_error($user);
         if ($motivo !== null) {
@@ -500,7 +500,7 @@ class retos_service {
         }
 
         $reintentable = ['reintentable' => true];
-        $transitorio = 'Épica no responde ahora mismo. Inténtalo de nuevo en unos segundos.';
+        $transitorio = 'El servicio de retos no responde ahora mismo. Inténtalo de nuevo en unos segundos.';
         try {
             $context = \context_course::instance((int)$course->id);
             // Token nuevo en CADA llamada; (string) del id, nunca el objeto del curso.
@@ -531,7 +531,7 @@ class retos_service {
             case 'cuota-agotada':
                 $espera = epica_client::retry_after($datos);
                 return new reto_error($motivo,
-                    'Has pedido varios retos seguidos y Épica te pide un respiro (3 cada 10 minutos). Podrás seguir en '
+                    'Has pedido varios retos seguidos y el servicio te pide un respiro (3 cada 10 minutos). Podrás seguir en '
                     . self::formatear_espera($espera) . '.', 429, ['esperaS' => $espera]);
             case 'cuota-del-centro':
                 $espera = epica_client::retry_after($datos);
@@ -551,19 +551,19 @@ class retos_service {
             case 'material-ilegible':
                 return new reto_error($motivo, 'No hemos podido leer el material de este recurso. Prueba con otro recurso o escribe un tema.');
             case 'origen-contradictorio':
-                return new reto_error($motivo, 'La plataforma no coincide con la que Épica tiene registrada. Avisa a quien administra el sitio.');
+                return new reto_error($motivo, 'La plataforma no coincide con la registrada en el servicio de retos. Avisa a quien administra el sitio.');
             case 'herramienta-no-contratada':
                 return new reto_error($motivo, 'Retos no está activado en esta plataforma. Avisa a quien administra el sitio.', 409);
         }
 
         if ($http === 429) {
-            return new reto_error('cuota-agotada', 'Épica no puede atender más peticiones por ahora. Inténtalo en unos minutos.',
+            return new reto_error('cuota-agotada', 'El servicio de retos no puede atender más peticiones por ahora. Inténtalo en unos minutos.',
                 429, ['esperaS' => epica_client::retry_after($datos)]);
         }
         $detalle = preg_replace('/[^\p{L}\p{N} _.\-]/u', '', $motivo);
         $detalle = mb_substr((string)$detalle, 0, 100, 'UTF-8');
         return new reto_error($detalle !== '' ? $detalle : 'epica-' . $http,
-            'Épica no ha podido atender la petición' . ($detalle !== '' ? " ({$detalle})" : " (HTTP {$http})") . '.', 502);
+            'El servicio de retos no ha podido atender la petición' . ($detalle !== '' ? " ({$detalle})" : " (HTTP {$http})") . '.', 502);
     }
 
     // ----------------------------------------------------------------

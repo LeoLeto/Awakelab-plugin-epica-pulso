@@ -160,7 +160,7 @@ class diagnostics {
         global $DB;
         $last = (int)$DB->get_field_sql('SELECT MAX(lastruntime) FROM {task_scheduled}');
         if ($last <= 0) {
-            return self::result(self::FAIL, 'Cron: no consta ninguna ejecución. Sin cron no se indexa el texto ni se procesan los encargos.');
+            return self::result(self::FAIL, 'Cron: no consta ninguna ejecución. Sin cron no se indexa el texto ni se procesan las creaciones.');
         }
         $age = time() - $last;
         $when = userdate($last) . ' (hace ' . format_time($age) . ')';

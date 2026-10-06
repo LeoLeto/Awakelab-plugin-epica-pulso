@@ -38,7 +38,7 @@ try {
         'success' => true,
         'courseid' => $courseid,
         'enabled' => $enabled,
-        'message' => $enabled ? 'Pulso enabled for this course' : 'Pulso disabled for this course',
+        'message' => $enabled ? 'Pulse enabled for this course' : 'Pulse disabled for this course',
     ], JSON_UNESCAPED_UNICODE);
 
 } catch (\Throwable $e) {

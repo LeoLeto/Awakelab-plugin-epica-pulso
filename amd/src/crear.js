@@ -266,7 +266,7 @@ define(['block_pulso/common'], function(C) {
                         return;
                     }
                     if (!data.quota_ok) {
-                        renderCreateNotice(data.quota_message || 'Has alcanzado el límite de encargos.');
+                        renderCreateNotice(data.quota_message || 'Has alcanzado el límite de creaciones.');
                         return;
                     }
                     // Retos sigue siendo usable sin recursos: queda la opción de solo tema.
@@ -430,7 +430,7 @@ define(['block_pulso/common'], function(C) {
             if (!resource) return;
 
             if (resource.sectionused >= resource.sectionlimit) {
-                hint.textContent = 'Ya has llegado al límite de encargos de hoy para la sección de este recurso ('
+                hint.textContent = 'Ya has llegado al límite de creaciones de hoy para la sección de este recurso ('
                     + resource.sectionlimit + '). Elige otro recurso.';
                 hint.classList.add('warn');
                 if (btn) pulsoSetDisabled(btn, true);
@@ -478,10 +478,10 @@ define(['block_pulso/common'], function(C) {
                 .then(function(data) {
                     if (data.success) {
                         const body = document.getElementById('pulso-create-body');
-                        if (body) body.innerHTML = '<p class="pulso-create-hint">Encargo guardado. Comprobando estado…</p>';
+                        if (body) body.innerHTML = '<p class="pulso-create-hint">Creación guardada. Comprobando estado…</p>';
                         startCreatePolling(data.encargoid);
                     } else {
-                        renderCreateNotice(data.message || 'No se ha podido guardar el encargo. Inténtalo de nuevo.');
+                        renderCreateNotice(data.message || 'No se ha podido guardar la creación. Inténtalo de nuevo.');
                         if (btn) {
                             pulsoSetDisabled(btn, false);
                             btn.textContent = labels.submitLabel;
@@ -489,7 +489,7 @@ define(['block_pulso/common'], function(C) {
                     }
                 })
                 .catch(function() {
-                    renderCreateNotice('No se ha podido conectar para guardar el encargo. Inténtalo de nuevo.');
+                    renderCreateNotice('No se ha podido conectar para guardar la creación. Inténtalo de nuevo.');
                     if (btn) {
                         pulsoSetDisabled(btn, false);
                         btn.textContent = labels.submitLabel;
@@ -555,7 +555,7 @@ define(['block_pulso/common'], function(C) {
                     if (token !== S.pulsoAmpToken) return; // el usuario ya salió de esta pantalla
                     if (!data.success) {
                         stopCreatePolling();
-                        renderCreateNotice(data.message || 'No se ha podido comprobar el estado del encargo.');
+                        renderCreateNotice(data.message || 'No se ha podido comprobar el estado de la creación.');
                         return;
                     }
                     renderCreateStatus(data.encargo);
@@ -689,7 +689,7 @@ define(['block_pulso/common'], function(C) {
             // Nunca se enseña el texto de relleno de marcar_fallo()
             // ("Sin motivo especificado.") ni un motivo vacío.
             if (!motivo.trim() || /^sin motivo especificado\.?$/i.test(motivo.trim())) {
-                return 'No se ha podido generar. Prueba a crear un encargo nuevo.';
+                return 'No se ha podido generar. Prueba a crear una nueva.';
             }
             return 'No se ha podido generar ' + (esjuego ? 'el juego' : 'la infografía') + ': ' + motivo;
         }
@@ -717,12 +717,12 @@ define(['block_pulso/common'], function(C) {
                 } else {
                     progressLine = encargo.posicion
                         ? ('Posición en cola: ' + encargo.posicion)
-                        : 'Esperando turno en la cola de Épica.';
+                        : 'Esperando turno en la cola de generación.';
                 }
             } else if (encargo.status === 'trabajando') {
                 progressLine = esjuego
                     ? 'Casi listo, suele tardar alrededor de un minuto.'
-                    : 'Generando la lámina… puede tardar un par de minutos.';
+                    : 'Generando la infografía… puede tardar un par de minutos.';
             } else if (encargo.status === 'pendiente') {
                 progressLine = esjuego ? 'Generando tu juego…' : 'Generando tu infografía…';
             }
@@ -794,7 +794,7 @@ define(['block_pulso/common'], function(C) {
             if (encargo.status === 'listo' && (encargo.imageurl || encargo.playurl)) {
                 if (encargo.mock) {
                     html += '<div class="pulso-create-notice-inline warn">'
-                        + (esjuego ? 'Este juego es de prueba' : 'Esta lámina es de prueba') + ', no una generación real.</div>';
+                        + (esjuego ? 'Este juego es de prueba' : 'Esta infografía es de prueba') + ', no una generación real.</div>';
                 }
                 if (encargo.verificado === false) {
                     html += '<div class="pulso-create-notice-inline warn">No hemos podido confirmar que '
@@ -830,9 +830,9 @@ define(['block_pulso/common'], function(C) {
                 }
             } else if (encargo.status === 'fallado' || encargo.status === 'desconocido') {
                 html += '<div class="pulso-create-notice-inline danger">' + escapeHtmlText(pulsoCreateFailureMessage(encargo)) + '</div>'
-                    + '<button type="button" class="pulso-create-submit" data-pulso-action="openCreatePanel" data-pulso-arg="' + pulsoCreateTool + '">Crear un encargo nuevo</button>';
+                    + '<button type="button" class="pulso-create-submit" data-pulso-action="openCreatePanel" data-pulso-arg="' + pulsoCreateTool + '">Empezar una creación nueva</button>';
             } else if (encargo.status === 'ensayo') {
-                html += '<div class="pulso-create-notice-inline warn">Modo de ensayo activo: el sobre se construyó pero no se envió a Épica.</div>';
+                html += '<div class="pulso-create-notice-inline warn">Modo de ensayo activo: el sobre se construyó pero no se envió al servicio de generación.</div>';
                 if (encargo.sobre) {
                     html += '<details class="pulso-create-sobre"><summary>Ver sobre construido</summary>'
                         + '<pre>' + escapeHtmlText(JSON.stringify(encargo.sobre, null, 2)) + '</pre></details>';

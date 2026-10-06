@@ -1,5 +1,15 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-06 — Fase 4 UX, pasos 1–3: styles.css, AMD y terminología (v1.33.0–1.35.0)
+
+Reglas en `CLAUDE.md` → «Fase 4 — arquitectura cacheable y rediseño». Lo que costó ver:
+- **`Poppins` a secas se mezclaría con la del tema** (styles.css va a todo el sitio): la familia del `@font-face` es `Pulso Poppins`, y hubo que añadir el 700 (el `@import` original lo cargaba y `<strong>`/`h2`/`h3` lo usan).
+- **Partir 4.200 líneas de JS en módulos AMD se hizo con análisis de ámbitos (eslint-scope), no a ojo**: referencias cruzadas → `C.fn.<nombre>` (se resuelve al llamar, sin ciclos), estado compartido → `C.S`, `window.*` → `cfg`. Un `const` de primer nivel no puede llamar a una función de otro módulo al cargar (el script lo detecta). Los manejadores en línea (52 en el HTML + los de las cadenas del JS) pasaron a `data-pulso-action` con argumentos como CADENA.
+- **El build de Moodle necesita `define` con NOMBRE** (`block_pulso/<modulo>`): `lib/requirejs.php` une módulos en una respuesta. `tools/build-amd.mjs` lo hace con terser; `--check` ignora CRLF (autocrlf del checkout).
+- **Prueba de paridad jsdom** (28 pasos × rol × con/sin Épica) contra el monolito, comparando DOM, peticiones y errores: cazó que el arranque debe esperar a DOMContentLoaded (el primer clic en la burbuja se perdía si la prueba no esperaba). No se guarda en el repo (de un solo uso).
+- **Terminología**: se extrajeron los literales de cadena (PHP `token_get_all`, JS espree) porque el grep a pelo daba ~1.000 aciertos casi todos falsos (tabla `block_pulso_encargos`, `encargoid`, comentarios). Los motivos de fallo que ve el alumno ya no dicen «Épica»; los de administración sí.
+- **NO probado** (sin Moodle ni navegador real): carga por requirejs de los define nombrados, dictado por voz, arrastre, `[[font:]]`/`[[pix:]]`. El paso 1 y el 2 se confirmaron en sanase-test.
+
 ## 2026-10-05 — Fase 4 UX: plan y maqueta (sin código)
 
 Entregados `docs/plan_fase4.md` y `docs/maqueta_v2.html`; a la espera del visto bueno. Hallazgos que condicionan el plan:

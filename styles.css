@@ -547,6 +547,82 @@
     background: #E2E6F2;
 }
 
+/* «Ver más ideas»: desplegable con el resto de sugerencias (frases completas, agrupadas). */
+.pulso-home-more-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 40px;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    color: #003670;
+    font-family: var(--pulso-font);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pulso-home-more-btn:hover {
+    background: var(--pulso-surface-2);
+}
+
+.pulso-home-more-btn svg {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.15s;
+}
+
+.pulso-home-more-btn[aria-expanded="true"] svg {
+    transform: rotate(180deg);
+}
+
+.pulso-home-ideas[hidden] {
+    display: none;
+}
+
+.pulso-home-ideas-title {
+    margin: 14px 0 8px;
+    font-family: var(--pulso-font);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--pulso-slate);
+}
+
+.pulso-home-ideas-list {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.pulso-idea {
+    width: 100%;
+    padding: 9px 12px;
+    background: #ffffff;
+    border: 1px solid var(--pulso-line);
+    border-radius: 10px;
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+    font-size: 0.85rem;
+    font-weight: 400;
+    line-height: 1.35;
+    text-align: left;
+    cursor: pointer;
+}
+
+.pulso-idea:hover {
+    border-color: rgba(11, 147, 170, 0.55);
+    background: var(--pulso-surface);
+}
+
 .pulso-action-icon {
     width: 20px;
     height: 20px;
@@ -2587,6 +2663,11 @@ a.pulso-create-gallery-item {
 
     .pulso-home-grid {
         grid-template-columns: 1fr;
+    }
+
+    .pulso-home-more-btn,
+    .pulso-idea {
+        min-height: 44px;
     }
 }
 

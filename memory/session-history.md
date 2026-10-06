@@ -1,5 +1,14 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-06 — Fase 4 UX, paso 5: home corta por rol (v1.37.0)
+
+Regla en `CLAUDE.md` → «Fase 4 — Home corta por rol». Solo plantilla, CSS y `toggleIdeas` (chat.js); `chat_simple_view.php` no cambia. Lo que costó ver:
+- **Las 4 destacadas del plan ya tenían frase equivalente hoy** (Panorama, Riesgo, Notas medias, Entregas; Resumen, Explícame, Repaso, Materiales): no hubo que inventar ninguna. Al desplegar salen 5+5 (profesor) y 4 (alumno): 14 y 8 frases en total, las mismas que en v1.36.1 (comprobado como conjunto).
+- **La lista desplegada muestra la frase completa** como texto del botón (como la maqueta) en vez de una etiqueta corta: es lo que de verdad se envía y así no hay dos textos que mantener.
+- **La plantilla se generó con un script** que extrae icono/título de las tarjetas actuales por frase (lanza si una frase no es única) para no retocar a mano ningún `data-pulso-arg`.
+- **El script de paridad contra el monolito v1.35.0 ya no sirve** como tal (la home cambió a propósito); la verificación de este paso es frase-por-frase contra v1.36.1.
+- **NO probado** (sin navegador): aspecto real de las tarjetas y del desplegable, 320 px, foco visible, lector. Pendiente en sanase-test (purgar cachés).
+
 ## 2026-10-06 — Fase 4 UX, paso 4 (1.36.1: se quitó la sección «Crear» de la home, duplicaba la pestaña; «Mi historial» pasó a la lista de Crear)
 
 ### Paso 4: pestañas «Preguntar» y «Crear» + Mustache (v1.36.0)

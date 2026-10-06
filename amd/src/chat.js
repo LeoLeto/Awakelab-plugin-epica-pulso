@@ -49,6 +49,25 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         }
 
 
+        // «Ver más ideas»: despliega/pliega el resto de sugerencias de la home. Solo `hidden` +
+        // aria-expanded (el cambio lo anuncia el propio estado del botón); el foco no se mueve.
+        function pulsoSetIdeas(open) {
+            const btn = document.getElementById('pulso-home-more-btn');
+            const box = document.getElementById('pulso-home-ideas');
+            if (!btn || !box) return;
+            box.hidden = !open;
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            const label = btn.querySelector('.pulso-home-more-label');
+            if (label) label.textContent = open ? 'Ver menos ideas' : 'Ver más ideas';
+        }
+
+
+        function toggleIdeas() {
+            const btn = document.getElementById('pulso-home-more-btn');
+            if (btn) pulsoSetIdeas(btn.getAttribute('aria-expanded') !== 'true');
+        }
+
+
         // Botón "¿Qué puede hacer Pulso?": explicación instantánea (sin LLM),
         // formateada como lista, para que un recién llegado lo entienda rápido.
         function showCapabilities() {
@@ -1234,6 +1253,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             removeStreamBubble();
             showLoading(false);
             setHomeVisible(true);
+            pulsoSetIdeas(false); // la home vuelve plegada
             pulsoSelectTab('ask', { focus: false }); // el botón de la cabecera también se ve desde Crear
 
             const bubble = document.getElementById('pulso-chat-bubble');
@@ -1506,6 +1526,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
     C.fn.toggleChatSize = toggleChatSize;
     C.fn.showCapabilities = showCapabilities;
     C.fn.askPreset = askPreset;
+    C.fn.toggleIdeas = toggleIdeas;
     C.fn.toggleMic = toggleMic;
 
     return {init: init};

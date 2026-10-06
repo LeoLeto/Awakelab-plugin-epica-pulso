@@ -25,8 +25,8 @@ but the `$plugin->version` bump is still mandatory every time.
   back automatically to `api_chat.php` (XHR/JSON) if streaming is unavailable.
   Design (v1.4+): DARK theme with Awakelab 2026 brand (deep blues bg, vivid cyan
   accents on dark, Poppins via Google Fonts, isotipo logo from
-  media.awakelab.world); Phia-style home screen (`#pulso-home`) with preset
-  action cards (`askPreset()`) in two sections (Analítica / Contenido; each card
+  media.awakelab.world); Phia-style SHORT home screen (`#pulso-home`, v1.37.0: 4 featured cards per role +
+  «Ver más ideas», see «Fase 4 — paso 5»; each card/idea
   injects a full natural-language question into the pipeline — phrase new ones to
   hit analytics/structural intents, not generic single words, to avoid backlog
   bug #2's activity-matcher misfire) that
@@ -1640,6 +1640,19 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
 - El script de partición y la prueba de paridad (jsdom, 28 pasos × profesor/alumno × con/sin Épica, comparando DOM,
   peticiones y errores contra el monolito de v1.33.0) no se guardan en el repo: eran de un solo uso.
 
+- **Home corta por rol (v1.37.0).** Saludo + «¿Qué puede hacer Pulse?» (`showCapabilities()`, hardcodeado) + sección
+  «Para empezar» con el chip del curso: **4 tarjetas destacadas** por rol y un botón «Ver más ideas»
+  (`#pulso-home-more-btn`, `aria-expanded`/`aria-controls` → `#pulso-home-ideas`, plegado por defecto,
+  `toggleIdeas()`/`pulsoSetIdeas()`; el foco no se mueve, el cambio lo anuncia `aria-expanded`, y «Nueva conversación»
+  lo deja plegado). Profesorado: Panorama del curso, Alumnos en riesgo, Notas medias, Estado de entregas; al desplegar,
+  «Analítica del curso» (5) y «Contenido del curso» (5). Alumnado: Resumen del curso, Explícame un tema, Repaso rápido,
+  Materiales de estudio; al desplegar, «Contenido del curso» (4). **Regla: las sugerencias son FRASES COMPLETAS FIJAS**
+  (el `data-pulso-arg` es el texto que entra por el pipeline y el matcher lo necesita así; backlog #2): el botón/idea
+  muestra título o la propia frase, pero nunca se reescribe ni se inventa una frase; una nueva debe apuntar a una
+  intención de analítica o estructural. Cada una es `data-pulso-action="askPreset"`. **El alumno no recibe las de
+  analítica NI en «Ver más ideas»**: van dentro de `{{#isteacher}}`, las del alumno en `{{^isteacher}}` (se comprobó
+  que el HTML del alumno no contiene ninguna de las 9 frases de analítica). Las 14 frases del profesorado y las 8 del
+  alumnado son exactamente las de v1.36.1.
 - **Pestañas «Preguntar» / «Crear» + plantilla Mustache (v1.36.0).** Cabecera = fila marca/controles +
   `#pulso-tablist` (`role="tablist"`, dos `role="tab"` con `aria-selected`/`aria-controls`, roving `tabindex`).
   Dos `role="tabpanel"` HERMANOS (`#pulso-panel-ask`, `#pulso-panel-crear`, con `aria-labelledby`) que se alternan

@@ -102,18 +102,13 @@
                 {{#isteacher}}
                 <div class="pulso-home-section">
                     <div class="pulso-home-section-head">
-                        <h3 class="pulso-home-section-title">Analítica del curso</h3>
+                        <h3 class="pulso-home-section-title">Para empezar</h3>
                         <span class="pulso-home-context-chip">{{coursename}}</span>
                     </div>
                     <div class="pulso-home-grid">
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuál es la tasa de completitud?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-                            <span class="pulso-action-label">Completitud</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son las notas promedio?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>
-                            <span class="pulso-action-label">Notas medias</span>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="Dame un panorama general del curso: tasa de completitud, nota media y cuántos alumnos están en riesgo.">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+                            <span class="pulso-action-label">Panorama del curso</span>
                             <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                         </button>
                         <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué estudiantes están en riesgo?">
@@ -121,29 +116,9 @@
                             <span class="pulso-action-label">Alumnos en riesgo</span>
                             <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                         </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuál es el engagement?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                            <span class="pulso-action-label">Participación</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son los mejores alumnos del curso?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                            <span class="pulso-action-label">Mejores alumnos</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué alumnos llevan más de una semana sin acceder?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            <span class="pulso-action-label">Alumnos inactivos</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="Dame un panorama general del curso: tasa de completitud, nota media y cuántos alumnos están en riesgo.">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
-                            <span class="pulso-action-label">Panorama del curso</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son los resultados de los cuestionarios del curso: nota media, número de intentos y cuántos alumnos aprobaron?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
-                            <span class="pulso-action-label">Resultados de cuestionarios</span>
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son las notas promedio?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="20" x2="6" y2="14"/><line x1="12" y1="20" x2="12" y2="8"/><line x1="18" y1="20" x2="18" y2="4"/></svg>
+                            <span class="pulso-action-label">Notas medias</span>
                             <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                         </button>
                         <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Cuál es el estado de las entregas de las tareas: cuántas entregadas, cuántas pendientes y cuántas sin calificar?">
@@ -152,44 +127,40 @@
                             <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                         </button>
                     </div>
+                    <button type="button" class="pulso-home-more-btn" id="pulso-home-more-btn" aria-expanded="false" aria-controls="pulso-home-ideas" data-pulso-action="toggleIdeas">
+                        <span class="pulso-home-more-label">Ver más ideas</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="pulso-home-ideas" id="pulso-home-ideas" hidden>
+                        <h4 class="pulso-home-ideas-title">Analítica del curso</h4>
+                        <ul class="pulso-home-ideas-list">
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Cuál es la tasa de completitud?">¿Cuál es la tasa de completitud?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Cuál es el engagement?">¿Cuál es el engagement?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son los mejores alumnos del curso?">¿Cuáles son los mejores alumnos del curso?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué alumnos llevan más de una semana sin acceder?">¿Qué alumnos llevan más de una semana sin acceder?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Cuáles son los resultados de los cuestionarios del curso: nota media, número de intentos y cuántos alumnos aprobaron?">¿Cuáles son los resultados de los cuestionarios del curso: nota media, número de intentos y cuántos alumnos aprobaron?</button></li>
+                        </ul>
+                        <h4 class="pulso-home-ideas-title">Contenido del curso</h4>
+                        <ul class="pulso-home-ideas-list">
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿De qué trata este curso?">¿De qué trata este curso?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué actividades y recursos tiene el curso?">¿Qué actividades y recursos tiene el curso?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué secciones tiene el curso?">¿Qué secciones tiene el curso?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué cuestionarios hay en el curso?">¿Qué cuestionarios hay en el curso?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué tareas hay en el curso?">¿Qué tareas hay en el curso?</button></li>
+                        </ul>
+                    </div>
                 </div>
                 {{/isteacher}}
-
-                <div class="pulso-home-section course">
+                {{^isteacher}}
+                <div class="pulso-home-section">
                     <div class="pulso-home-section-head">
-                        <h3 class="pulso-home-section-title">Contenido del curso</h3>
-                        {{^isteacher}}<span class="pulso-home-context-chip">{{coursename}}</span>{{/isteacher}}
+                        <h3 class="pulso-home-section-title">Para empezar</h3>
+                        <span class="pulso-home-context-chip">{{coursename}}</span>
                     </div>
                     <div class="pulso-home-grid">
                         <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿De qué trata este curso?">
                             <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             <span class="pulso-action-label">Resumen del curso</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué actividades y recursos tiene el curso?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-                            <span class="pulso-action-label">Actividades y recursos</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué secciones tiene el curso?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                            <span class="pulso-action-label">Secciones</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué cuestionarios hay en el curso?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                            <span class="pulso-action-label">Cuestionarios</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué tareas hay en el curso?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="m9 15 2 2 4-4"/></svg>
-                            <span class="pulso-action-label">Tareas del curso</span>
-                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
-                        </button>
-                        {{^isteacher}}
-                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué materiales y documentos hay disponibles en el curso para estudiar?">
-                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                            <span class="pulso-action-label">Materiales de estudio</span>
                             <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                         </button>
                         <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="Explícame de qué trata la sección 1 del curso y qué contenidos incluye.">
@@ -202,9 +173,27 @@
                             <span class="pulso-action-label">Repaso rápido</span>
                             <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
                         </button>
-                        {{/isteacher}}
+                        <button class="pulso-action-card" data-pulso-action="askPreset" data-pulso-arg="¿Qué materiales y documentos hay disponibles en el curso para estudiar?">
+                            <svg class="pulso-action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                            <span class="pulso-action-label">Materiales de estudio</span>
+                            <span class="pulso-action-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                        </button>
+                    </div>
+                    <button type="button" class="pulso-home-more-btn" id="pulso-home-more-btn" aria-expanded="false" aria-controls="pulso-home-ideas" data-pulso-action="toggleIdeas">
+                        <span class="pulso-home-more-label">Ver más ideas</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div class="pulso-home-ideas" id="pulso-home-ideas" hidden>
+                        <h4 class="pulso-home-ideas-title">Contenido del curso</h4>
+                        <ul class="pulso-home-ideas-list">
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué actividades y recursos tiene el curso?">¿Qué actividades y recursos tiene el curso?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué secciones tiene el curso?">¿Qué secciones tiene el curso?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué cuestionarios hay en el curso?">¿Qué cuestionarios hay en el curso?</button></li>
+                            <li><button type="button" class="pulso-idea" data-pulso-action="askPreset" data-pulso-arg="¿Qué tareas hay en el curso?">¿Qué tareas hay en el curso?</button></li>
+                        </ul>
                     </div>
                 </div>
+                {{/isteacher}}
             </div>
 
             <!-- Región en vivo SOLO para mensajes: la home y los paneles de pestaña quedan fuera. -->

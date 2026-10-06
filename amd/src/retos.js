@@ -35,7 +35,9 @@ define(['block_pulso/common'], function(C) {
 
 
         // ---- Crear reto (api_retos.php, v1.27) ----
-        // Mismo panel y mismo desplegable que el resto de Crear. Retos se llama desde la
+        // Formulario y pantallas dentro de la pila de Crear (ver crear.js): el formulario es el nivel 1
+        // y todo lo que viene después (espera, seis retos, reto elegido, errores finales) es UN solo
+        // detalle: «Volver» desde cualquiera de ellos va al formulario. Retos se llama desde la
         // petición web (carta 8 §1): el navegador sondea NUESTRO endpoint cada 4 s y
         // nunca habla con Épica. Todo lo que viene de Épica se escapa (atributos con
         // pulsoEscapeAttr), los enlaces solo si son https:// y no hay ningún iframe:
@@ -310,7 +312,9 @@ define(['block_pulso/common'], function(C) {
                 pulsoRetosRenderWaiting();
                 pulsoRetosShowStatus(d.estado, d.posicion);
                 pulsoRetosRetryFn = function() { pulsoRetosPoll(S.pulsoAmpToken); };
-                pulsoRetosSchedulePoll(token);
+                // Entrar en la espera es un cambio de pantalla (token nuevo desde el formulario): el
+                // sondeo se arma con el token VIGENTE, no con el de la petición que acaba de volver.
+                pulsoRetosSchedulePoll(S.pulsoAmpToken);
             });
         }
 
@@ -319,6 +323,7 @@ define(['block_pulso/common'], function(C) {
         function pulsoRetosRenderWaiting() {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
+            C.fn.pulsoCreateEnter('retos', 'retos');
             body.innerHTML = '<div class="pulso-retos">'
                 + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
                 + '<div class="pulso-amp-loading" role="status">'
@@ -459,7 +464,6 @@ define(['block_pulso/common'], function(C) {
                 + '<span class="pulso-retos-own-count" id="pulso-retos-own-count">0/' + PULSO_RETO_PROPIO_MAX + '</span>'
                 + '<button type="button" class="pulso-create-submit" id="pulso-retos-own-btn" data-retos-action data-pulso-action="pulsoRetosElegirPropio">Crear mi reto</button>'
                 + '</div>'
-                + '<button type="button" class="pulso-create-back-link" data-retos-action data-pulso-action="openCreatePanel" data-pulso-arg="retos">← Volver al formulario</button>'
                 + '</div>';
             body.innerHTML = html;
         }

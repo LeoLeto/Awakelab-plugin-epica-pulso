@@ -38,8 +38,11 @@ define(['block_pulso/common'], function(C) {
         // ========== PESTAÑA CREAR (infografía, juego, retos, ampliación) ==========
         // Es una PESTAÑA propia (#pulso-panel-crear), no un mensaje del chat: si se colara como
         // mensaje acabaría en el historial que viaja a Anthropic en cada petición. Dentro tiene
-        // dos pantallas hermanas que se alternan con `hidden`: #pulso-create-root (las
+        // dos pantallas hermanas que se alternan con `hidden`: #pulso-create-root (la lista de
         // herramientas) y #pulso-create-panel (la herramienta abierta: formulario, estado…).
+        // Lo que se ve dentro del panel lo manda una PILA de pantallas (pulsoCreateStack):
+        //   lista (pila vacía) → formulario → estado / retos / resultado de la ampliación.
+        // «Volver» desapila UNA pantalla; no vuelve siempre a la lista.
         // De momento no manda nada a Epica (eso es el paso 4): solo valida,
         // comprueba cupo y guarda el encargo como "pendiente".
 
@@ -51,6 +54,58 @@ define(['block_pulso/common'], function(C) {
         // envía submitCreate() — el desplegable de recursos y los cupos son
         // iguales para las dos (contador conjunto, CLAUDE.md paso 3).
         let pulsoCreateTool = 'infografia';
+
+        // ---- Pila de pantallas de Crear (fase 4, paso 6) ----
+        // Vacía = la lista de herramientas (#pulso-create-root). Con elementos, el último es la
+        // pantalla visible en #pulso-create-panel. Solo hay dos niveles:
+        //   [formulario(tool)]                 profundidad 1
+        //   [formulario(tool), detalle]        profundidad 2; detalle = status | retos | amp
+        // Los tres «detalle» son del mismo nivel: pasar de uno a otro (o entre dos estados de
+        // la misma herramienta, p. ej. Retos: espera → seis retos → reto elegido) REEMPLAZA, no
+        // apila, así que «Volver» desde cualquiera de ellos va al formulario.
+        // Cada elemento es una descripción ({kind, tool}), no un DOM: al desapilar la pantalla se
+        // vuelve a pintar (el formulario vuelve a pedir el cupo, que habrá cambiado).
+        let pulsoCreateStack = [];
+
+        const PULSO_CREATE_TOOLS = ['infografia', 'gamificacion', 'ampliacion', 'retos'];
+
+        function pulsoCreateNormTool(tool) {
+            return PULSO_CREATE_TOOLS.indexOf(tool) >= 0 ? tool : 'infografia';
+        }
+
+        function pulsoCreateTop() {
+            return pulsoCreateStack.length ? pulsoCreateStack[pulsoCreateStack.length - 1] : null;
+        }
+
+        // «Volver» dice a dónde va: al formulario desde un detalle, a la lista desde el formulario.
+        function pulsoCreateSyncBack() {
+            const btn = document.getElementById('pulso-create-back');
+            if (!btn) return;
+            btn.setAttribute('aria-label', pulsoCreateStack.length > 1
+                ? 'Volver al formulario'
+                : 'Volver a la lista de herramientas de creación');
+        }
+
+        // Se entra en una pantalla de detalle (estado, Retos, resultado de Ampliar) desde el formulario
+        // o desde otro detalle. La misma pantalla de nuevo = nada (los repintados de un mismo estado no
+        // son un cambio de pantalla y no deben invalidar el token de los sondeos en marcha).
+        function pulsoCreateEnter(kind, tool) {
+            const top = pulsoCreateTop();
+            if (top && top.kind === kind) {
+                top.tool = tool;
+                return;
+            }
+            stopCreatePolling();
+            S.pulsoAmpToken++;
+            if (top && top.kind !== 'form') {
+                pulsoCreateStack[pulsoCreateStack.length - 1] = { kind: kind, tool: tool };
+            } else if (top) {
+                pulsoCreateStack.push({ kind: kind, tool: tool });
+            } else {
+                pulsoCreateStack = [{ kind: 'form', tool: tool }, { kind: kind, tool: tool }];
+            }
+            pulsoCreateSyncBack();
+        }
 
 
         // ¿Hay una herramienta abierta (pantalla de la herramienta, no la lista)?
@@ -245,13 +300,24 @@ define(['block_pulso/common'], function(C) {
         }
 
 
+        // Entra en el formulario de una herramienta con la pila reiniciada (desde la lista, o «empezar
+        // una creación nueva» desde un estado: ya no hay nada que desapilar).
         function openCreatePanel(tool) {
-            const body = document.getElementById('pulso-create-body');
-            if (!body) return;
+            pulsoCreateStack = [{ kind: 'form', tool: pulsoCreateNormTool(tool || pulsoCreateTool) }];
+            pulsoCreateRenderForm();
+        }
 
-            pulsoCreateSetTool(tool || pulsoCreateTool);
+
+        // Pinta el formulario que está en la cima de la pila: pide el cupo/recursos al servidor.
+        function pulsoCreateRenderForm() {
+            const body = document.getElementById('pulso-create-body');
+            const top = pulsoCreateTop();
+            if (!body || !top) return;
+
+            pulsoCreateSetTool(top.tool);
             stopCreatePolling();
             S.pulsoAmpToken++;
+            pulsoCreateSyncBack();
             pulsoCreateShowTool();
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
             pulsoCreateScreen(true);
@@ -286,18 +352,31 @@ define(['block_pulso/common'], function(C) {
         }
 
 
-        // «Volver»: de la herramienta abierta a la lista de herramientas de la pestaña Crear
-        // (no sale de la pestaña). Es un cambio de pantalla dentro de Crear: para y descarta los
-        // sondeos. El foco va al título de la lista.
-        function closeCreatePanel() {
+        // «Volver»: desapila UNA pantalla (no sale de la pestaña Crear). Es un cambio de pantalla
+        // dentro de Crear: para el sondeo de la pantalla que se deja y descarta cualquier respuesta
+        // en vuelo (token). NO cancela ni borra nada en el servidor: una creación en curso sigue y
+        // se recupera después (galería hoy, «Mis creaciones» en el paso 7); basta con dejar de
+        // mirarla. Los detalles vuelven al formulario (que se repinta); el formulario, a la lista.
+        function pulsoCreateBack() {
+            if (!pulsoCreateStack.length) return;
+            const leaving = pulsoCreateStack.pop();
             stopCreatePolling();
             S.pulsoAmpToken++;
+            if (pulsoCreateStack.length) {
+                pulsoCreateRenderForm();
+                return;
+            }
             const root = document.getElementById('pulso-create-root');
             const panel = document.getElementById('pulso-create-panel');
             if (panel) panel.hidden = true;
             if (root) root.hidden = false;
-            const title = document.getElementById('pulso-create-root-title');
-            if (title && S.pulsoTab === 'crear') title.focus();
+            pulsoCreateSyncBack();
+            if (S.pulsoTab !== 'crear') return;
+            // El foco vuelve a la fila de la herramienta de la que se venía; si ya no está en la
+            // lista, al título.
+            const row = root ? root.querySelector('[data-pulso-tool="' + leaving.tool + '"]') : null;
+            const target = row || document.getElementById('pulso-create-root-title');
+            if (target) target.focus();
         }
 
 
@@ -473,6 +552,7 @@ define(['block_pulso/common'], function(C) {
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.success) {
+                        pulsoCreateEnter('status', pulsoCreateTool);
                         const body = document.getElementById('pulso-create-body');
                         if (body) body.innerHTML = '<p class="pulso-create-hint">Creación guardada. Comprobando estado…</p>';
                         startCreatePolling(data.encargoid);
@@ -838,8 +918,7 @@ define(['block_pulso/common'], function(C) {
                 }
             }
 
-            html += '<button type="button" class="pulso-create-back-link" data-pulso-action="openCreatePanel" data-pulso-arg="' + pulsoCreateTool + '">← Volver al formulario</button>'
-                + '</div><div id="pulso-create-gallery"></div>';
+            html += '</div><div id="pulso-create-gallery"></div>';
 
             body.innerHTML = html;
             // La galeria NO se pide en cada sondeo (2 peticiones extra cada 7 s):
@@ -991,6 +1070,7 @@ define(['block_pulso/common'], function(C) {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
             pulsoCreateSetTool(tool);
+            pulsoCreateEnter('status', pulsoCreateTool);
             pulsoCreateShowTool();
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
             pulsoCreateScreen(true);
@@ -1000,7 +1080,9 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoCreateIsOpen = pulsoCreateIsOpen;
     C.fn.pulsoCreateScreen = pulsoCreateScreen;
     C.fn.openCreatePanel = openCreatePanel;
-    C.fn.closeCreatePanel = closeCreatePanel;
+    C.fn.pulsoCreateBack = pulsoCreateBack;
+    C.fn.closeCreatePanel = pulsoCreateBack; // nombre anterior de la acción
+    C.fn.pulsoCreateEnter = pulsoCreateEnter;
     C.fn.pulsoSyncPolling = pulsoSyncPolling;
     C.fn.loadCreateGallery = loadCreateGallery;
     C.fn.pulsoAbrirHistorial = pulsoAbrirHistorial;

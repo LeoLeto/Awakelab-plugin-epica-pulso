@@ -1,0 +1,89 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template block_pulso/chat_create_tools
+
+    Lista de herramientas de la pestana Crear: una fila por herramienta (icono, nombre y una linea).
+    Sin Epica solo queda «Ampliar recurso», que no es una creacion (no se guarda).
+    El orden es el de la pila de pantallas: esta lista es la raiz, cada fila abre el formulario.
+
+    Context variables required for this template:
+    * cancreate - true con block/pulso:createactivity
+    * epica - true si local_awkepica esta disponible (infografia, juego y reto)
+
+    Example context (json):
+    {
+        "cancreate": true,
+        "epica": true
+    }
+}}
+{{#cancreate}}
+<ul class="pulso-tools" id="pulso-tools">
+{{#epica}}
+        <li>
+            <button type="button" class="pulso-tool" data-pulso-action="openCreatePanel" data-pulso-arg="infografia" data-pulso-tool="infografia">
+                <span class="pulso-tool-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                </span>
+                <span class="pulso-tool-text">
+                    <span class="pulso-tool-title">Infografía</span>
+                    <span class="pulso-tool-sub">Resume un recurso del curso en una imagen</span>
+                </span>
+                <svg class="pulso-tool-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </li>
+        <li>
+            <button type="button" class="pulso-tool" data-pulso-action="openCreatePanel" data-pulso-arg="gamificacion" data-pulso-tool="gamificacion">
+                <span class="pulso-tool-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>
+                </span>
+                <span class="pulso-tool-text">
+                    <span class="pulso-tool-title">Juego</span>
+                    <span class="pulso-tool-sub">Practica un recurso con un juego interactivo</span>
+                </span>
+                <svg class="pulso-tool-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </li>
+{{/epica}}
+        <li>
+            <button type="button" class="pulso-tool" data-pulso-action="openCreatePanel" data-pulso-arg="ampliacion" data-pulso-tool="ampliacion">
+                <span class="pulso-tool-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                </span>
+                <span class="pulso-tool-text">
+                    <span class="pulso-tool-title">Ampliar recurso</span>
+                    <span class="pulso-tool-sub">Vídeos y artículos para profundizar en un recurso</span>
+                </span>
+                <svg class="pulso-tool-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </li>
+{{#epica}}
+        <li>
+            <button type="button" class="pulso-tool" data-pulso-action="openCreatePanel" data-pulso-arg="retos" data-pulso-tool="retos">
+                <span class="pulso-tool-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                </span>
+                <span class="pulso-tool-text">
+                    <span class="pulso-tool-title">Reto</span>
+                    <span class="pulso-tool-sub">Un caso práctico que corrige la IA</span>
+                </span>
+                <svg class="pulso-tool-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </li>
+{{/epica}}
+</ul>
+{{/cancreate}}

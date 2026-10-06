@@ -19,7 +19,7 @@ but the `$plugin->version` bump is still mandatory every time.
 
 ## Architecture (chat request path)
 
-- `chat_simple_view.php` — floating chat UI (shell en `templates/chat.mustache` + parcial `chat_create_cta`; CSS en
+- `chat_simple_view.php` — floating chat UI (shell en `templates/chat.mustache` + parcial `chat_create_tools`; CSS en
   `styles.css`, JS en `amd/src/*.js`; rendered by `block_pulso.php`). Cabecera con pestañas «Preguntar» / «Crear» (v1.36.0). Sends messages to `api_chat_stream.php` via fetch + SSE
   (ChatGPT-style token streaming, progressive preview of partial JSON) and falls
   back automatically to `api_chat.php` (XHR/JSON) if streaming is unavailable.
@@ -774,8 +774,8 @@ paso 1 ya lo dejó dicho: "añadirlos es repetir este mismo patrón, no
 descomentar algo ya puesto"—. Reglas que deben persistir:
 
 - **Un único formulario parametrizado por herramienta, nunca una copia.**
-  `pulsoCreateTool` (`'infografia'`/`'gamificacion'`) decide en
-  `chat_simple_view.php` los textos (`PULSO_CREATE_TOOL_LABELS`), si se pide
+  `pulsoCreateTool` (`'infografia'`/`'gamificacion'`; desde v1.38.0 lo fija la cima de la pila, ver «Fase 4 — paso 6») decide en
+  `crear.js` los textos (`PULSO_CREATE_TOOL_LABELS`), si se pide
   el selector de formato (solo infografías) y qué manda `submitCreate()`
   (antes `submitCreateInfografia()`, renombrada al dejar de ser exclusiva de
   una herramienta). El desplegable de recursos, el cupo por sección y el
@@ -1181,11 +1181,11 @@ Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya i
 Tercer CTA del bloque Crear que llama a `api_ampliacion.php` y pinta vídeos + artículos.
 Casi todo cliente (`chat_simple_view.php`); en servidor solo `api_create_form.php` (ver abajo). Sin `db/`. Reglas:
 
-- **Mismo panel y mismo desplegable, no uno nuevo.** `pulsoCreateTool = 'ampliacion'`
+- **Mismo formulario parametrizado, no uno nuevo.** `pulsoCreateTool = 'ampliacion'`
   reutiliza `#pulso-create-panel`, `openCreatePanel()` y `api_create_form.php`. El
   formulario es solo recurso + «Ampliar» (sin texto libre ni formato). Misma capability
-  (`createactivity`) y misma sección `{{#cancreate}}`. La fila de CTA pasó de
-  `flex` a rejilla de 2 columnas (con el cuarto CTA de Retos, v1.27, es 2×2; 1 columna a ≤420px).
+  (`createactivity`) y misma sección `{{#cancreate}}`. Es una fila de la LISTA de herramientas de Crear (v1.38.0: ya no hay
+  rejilla de CTA); el resultado es un detalle de la pila (formulario → resultado) y «Ampliar otro recurso» desapila.
 - **Los cupos de Épica no aplican, tampoco en servidor.** No se pinta el aviso de cupo por
   sección ni se bloquea por él. `api_create_form.php` acepta `tool=ampliacion` (el cliente lo
   manda al abrir el panel): salta `check_general_quota()` (`quota_ok` siempre true) y pide
@@ -1302,8 +1302,9 @@ Cuarto CTA del bloque Crear, solo cliente (`chat_simple_view.php`, funciones `pu
 línea en `api_create_form.php`. Habla únicamente con `api_retos.php`. Sin `db/`. Reglas que deben
 persistir:
 
-- **Mismo panel y mismo desplegable** (`pulsoCreateTool = 'retos'`, `renderRetosForm()`); la rejilla
-  de CTA es 2×2 (1 columna a ≤420 px; se quitó la regla del «último impar a todo el ancho»).
+- **Mismo formulario parametrizado** (`pulsoCreateTool = 'retos'`, `renderRetosForm()`); es una fila de la lista de
+  Crear (v1.38.0, sin rejilla). Espera → seis retos → reto elegido son UN solo detalle de la pila: «Volver» desde
+  cualquiera va al formulario.
   `api_create_form.php` trata `tool=retos` igual que `ampliacion` (sin cupos de Épica ni
   `sectionused`). **Sin recursos el formulario sigue siendo usable** (opción «Sin recurso, solo un
   tema»): `openCreatePanel()` no pinta el aviso de «no hay recursos» para `retos`.
@@ -1476,7 +1477,7 @@ Reglas permanentes. Tocan `db/caches.php` (definición nueva `chatrate`): hay qu
   **ninguna referencia a `\local_awkepica\...` fuera de código que ya haya pasado por `disponible()` o
   `class_exists()`** (`precondiciones_error()` ya lo comprueba por sí mismo; la espera larga sale de
   `epica_client::espera_larga()`, que cae a 180 s si el plugin no está). Sin Épica: `render_chat_simple()`
-  no renderiza (sección `{{#epica}}` del Mustache, no CSS) los CTA de infografía, juego, retos y
+  no renderiza (sección `{{#epica}}` del Mustache, no CSS) las filas de infografía, juego y reto y
   «Mi historial» —«Ampliar recurso» sigue— y pasa `epicaAvailable` en la config del módulo AMD (el cliente salta
   `mis_retos`); `api_create_form` (todo menos `tool=ampliacion`), `api_create_submit`, `api_retos` y
   `epica_historial` contestan «La creación de contenidos no está disponible en este sitio» **sin
@@ -1552,8 +1553,10 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   Al abrir (`openCreatePanel`, `openCreateGalleryItem`) se enfoca siempre; en los repintados posteriores un
   `MutationObserver` sobre `#pulso-create-body` (solo hijos directos) lo lleva al título únicamente si el
   foco se perdió o estaba dentro del cuerpo (`pulsoCreateScreen()`), así que nunca roba el foco a quien
-  escribe en el chat, y solo con la pestaña Crear activa. «Volver» lleva a la lista de herramientas de Crear
-  (`#pulso-create-root`) y enfoca `#pulso-create-root-title` (ya no hay `pulsoCreateOpener`).
+  escribe en el chat, y solo con la pestaña Crear activa. «Volver» desapila UNA pantalla (ver «Fase 4 — paso 6»):
+  de un detalle al formulario (foco al título) y del formulario a la lista, donde el foco va a la fila de la
+  herramienta de la que se venía (`[data-pulso-tool]`) o, si ya no está, a `#pulso-create-root-title`
+  (`pulsoCreateOpener` ya no existe: la pila sabe de dónde se viene).
   **Una pantalla nueva de Crear = repintar `#pulso-create-body` con `innerHTML`**; una pantalla que se pinte
   por otra vía dejaría el foco perdido.
 - **Una pregunta lanzada desde cualquier sitio cambia a Preguntar antes de enviar** (`sendMessage()` y
@@ -1657,9 +1660,9 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
   `#pulso-tablist` (`role="tablist"`, dos `role="tab"` con `aria-selected`/`aria-controls`, roving `tabindex`).
   Dos `role="tabpanel"` HERMANOS (`#pulso-panel-ask`, `#pulso-panel-crear`, con `aria-labelledby`) que se alternan
   con `hidden` — nunca se destruye el DOM: la conversación y el estado de Crear sobreviven al cambio.
-  **Preguntar** = home + `#pulso-messages` + cuadro de texto (+ aviso offline). La home NO lleva sección «Crear» (v1.36.1: los CTA solo viven en la lista de Crear;
+  **Preguntar** = home + `#pulso-messages` + cuadro de texto (+ aviso offline). La home NO lleva sección «Crear» (v1.36.1: las herramientas solo viven en la lista de Crear;
   «Mi historial» del alumnado también está ahí). **Crear** = lista de herramientas
-  (`#pulso-create-root`, el mismo parcial de CTA que la home) o la herramienta abierta (`#pulso-create-panel`,
+  (`#pulso-create-root`, parcial `chat_create_tools`) o la herramienta abierta (`#pulso-create-panel`,
   `hidden` mientras no hay ninguna). Si el usuario no tiene `createactivity`, la plantilla no pinta ni tablist ni
   panel Crear (y el panel Preguntar deja de ser `tabpanel`).
   - **Teclado:** activación automática; ←/→ (con vuelta), Inicio y Fin cambian y activan (`pulsoTabsKeydown`);
@@ -1668,7 +1671,7 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
     de texto). Las pestañas no son asa de arrastre (`startDrag` las ignora).
   - **Cambiar de pestaña PAUSA los sondeos, no los cancela.** `pulsoSelectTab()` (chat.js, cruzada por
     `C.fn.pulsoSelectTab`) no toca `pulsoAmpToken`: este solo se invalida al cambiar de pantalla DENTRO de Crear
-    (`openCreatePanel`, `closeCreatePanel` = «Volver», `stopCreatePolling`). Los sondeos arman SIEMPRE su pendiente
+    (`pulsoCreateEnter`, `openCreatePanel`, `pulsoCreateBack` = «Volver», `stopCreatePolling`). Los sondeos arman SIEMPRE su pendiente
     antes de mirar `C.pollsPaused()` y `pulsoSyncPolling()` lo retoma al volver. Una respuesta en vuelo al cambiar de
     pestaña se pinta en el DOM oculto (sin robar el foco: `pulsoCreateScreen` exige pestaña Crear). Retos `en-cola` sigue
     sin cortarse; el reloj de 2 min cuenta desde `trabajando_desde` (tiempo REAL del servidor, también con la pestaña
@@ -1676,7 +1679,7 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
     propuesta. Minimizar el chat NO pausa ni cancela nada (como antes).
   - **`S.pulsoTab`** ('ask' | 'crear') es el estado de la vista (módulo `common`). Un panel oculto pierde su
     `scrollTop`: `pulsoSelectTab` lo guarda en `data-pulso-scrolltop` y lo restaura.
-  - **El shell es Mustache** (`templates/chat.mustache` + parcial `chat_create_cta.mustache`): variables `isotipo`,
+  - **El shell es Mustache** (`templates/chat.mustache` + parcial `chat_create_tools.mustache`): variables `isotipo`,
     `isteacher`, `cancreate`, `epica`, `showversion`, `release`, `greeting`, `coursename`. Las secciones
     `{{#isteacher}}`/`{{^isteacher}}`/`{{#cancreate}}`/`{{#epica}}` NO renderizan lo que no le toca al usuario (no se oculta con
     CSS). Sustituye a los marcadores `<!--PULSO_…-->` y a los `%%PULSO_…%%`: **no volver a ponerlos**. Moodle cachea las
@@ -1691,6 +1694,54 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
   logs («Pulso …») se quedan: cambiarlos rompe datos, URL y contratos. Para comprobarlo, extraer los literales de cadena
   (PHP con `token_get_all`, JS con un parser) y mirar solo los que ve el usuario; un `grep` a pelo da cientos de falsos
   positivos (variables, comentarios y nombres de tabla).
+
+## Fase 4 — paso 6: lista de herramientas y pila de pantallas de Crear (v1.38.0)
+
+Solo cliente + plantilla (`chat_create_tools.mustache`, `crear.js`, `retos.js`, `ampliacion.js`, `styles.css`); sin `db/`
+ni servidor. **Purgar cachés** al desplegar (plantilla + CSS) y regenerar `amd/build`. Sustituye a la rejilla 2×2 de CTA,
+al «mismo panel y mismo desplegable» y a `pulsoCreateOpener`. Reglas que deben persistir:
+
+- **Lista de herramientas = la raíz de la pila.** `#pulso-create-root` contiene `<ul class="pulso-tools">` con una fila
+  `.pulso-tool` por herramienta (icono, nombre, una línea; `data-pulso-action="openCreatePanel"`, `data-pulso-arg` y
+  `data-pulso-tool` iguales). Orden: infografía, juego, ampliar recurso, reto. Cada fila sigue en su sección Mustache: el
+  parcial entero va en `{{#cancreate}}` y infografía/juego/reto en `{{#epica}}` — lo que no le toca al usuario no se
+  renderiza (sin Épica solo queda «Ampliar recurso»). «Ampliar recurso» está en la lista pero NO es una creación (decisión 5).
+  Texto de las filas ≥ 0.75rem, título `#003670` y línea `#34547A`; el cian solo en el icono, el borde al hover y el foco.
+- **Pila de pantallas** (`pulsoCreateStack` en `crear.js`): vacía = lista; con elementos, la cima es lo que se ve en
+  `#pulso-create-panel`. Solo hay DOS niveles: `[form(tool)]` y `[form(tool), detalle]` con detalle = `status` (estado de
+  una infografía/juego), `retos` (espera, seis retos, reto elegido y pantallas finales de error: UN solo detalle) o
+  `amp` (resultado de Ampliar). Pasar de un detalle a otro, o repintar el mismo, REEMPLAZA/no cambia: **«Volver» desde cualquier
+  detalle va al formulario, y desde el formulario a la lista**, nunca saltando dos niveles. Los elementos son descripciones
+  (`{kind, tool}`), no DOM: al desapilar al formulario se vuelve a pintar y vuelve a pedir el cupo (`sectionused`/`sectionlimit`
+  habrán cambiado).
+- **API**: `pulsoCreateEnter(kind, tool)` apila/reemplaza un detalle (lo llaman `submitCreate`, `openCreateGalleryItem`,
+  `submitAmpliacion` y `pulsoRetosRenderWaiting`; la misma pantalla de nuevo no hace nada); `openCreatePanel(tool)` reinicia la
+  pila con ese formulario (desde la lista, o «Empezar una creación nueva» / «Crear otro reto», que ya no tienen nada que
+  desapilar); `pulsoCreateBack()` desapila UNA (`closeCreatePanel` queda como alias del nombre antiguo). Un detalle nuevo
+  se registra SIEMPRE con `pulsoCreateEnter`, no pintando a mano: si no, «Volver» no sabe dónde está.
+- **No hay «← Volver al formulario» sueltos**: lo hace el botón «Volver» de la cabecera del panel (`#pulso-create-back`, icono +
+  texto visible, `aria-label` dinámico: «Volver al formulario» con un detalle abierto, «Volver a la lista de herramientas de
+  creación» en el formulario; 44 px de alto en móvil). Los botones de ACCIÓN con otro nombre se quedan («Ampliar otro recurso» =
+  desapilar; «Empezar una creación nueva», «Crear otro reto», «Volver a intentarlo»).
+- **Token y sondeos, sin cambiar la semántica.** Apilar y desapilar invalidan `pulsoAmpToken` (`stopCreatePolling()` + `++`);
+  cambiar de pestaña de Pulse no (pausa). **Trampa vista al implementarlo:** entrar en un detalle desde una petición en
+  vuelo (`proponer` de Retos) sube el token DESPUÉS de capturarlo, así que el sondeo se arma con `S.pulsoAmpToken` (el vigente),
+  no con el que se capturó al lanzar la petición; con el viejo el primer sondeo muere en silencio. Pasar de la lista de retos al
+  reto elegido NO es cambio de pantalla (token intacto), o se mataría el refresco del título final.
+- **«Volver» NO cancela nada en el servidor.** Solo para el sondeo de la pantalla que se deja y descarta respuestas tardías (token):
+  una infografía/juego `encolado` sigue y se recupera desde la galería (paso 7: «Mis creaciones»); una propuesta de Retos `en-cola`
+  tampoco se pierde en el servidor, pero **no hay vuelta atrás en la interfaz**: hasta que exista algo en «Mis creaciones» para
+  propuestas (no es un reto elegido, así que `mis_retos` no la lista), quien sale y vuelve a pulsar «Proponer retos» gasta
+  otra unidad de cupo. Es el mismo comportamiento que antes del paso 6 (antes «Volver» también mataba el sondeo), no una regresión,
+  pero queda como hueco conocido.
+- **Foco.** Al apilar o desapilar un detalle/formulario, el foco va al `h3#pulso-create-title` (`tabindex="-1"`) mediante el
+  `MutationObserver` de hijos directos de `#pulso-create-body` (y `pulsoCreateScreen(true)` al repintar el formulario); nunca se
+  roba el foco fuera de la pestaña Crear. Al volver a la lista, a la fila `[data-pulso-tool="<tool del formulario que se deja>"]`
+  y, si ya no está, a `#pulso-create-root-title`.
+- **Tests (fuera del repo, jsdom + motor PHP de Mustache):** lista por rol/Épica; profundidad y destino de «Volver» en las 4
+  herramientas × profesor/alumno; foco; Volver con una infografía `encolado` y con Retos `en-cola` (sin peticiones que gasten cupo,
+  sondeo parado); respuestas tardías tras Volver (estado, Retos, Ampliar) sin pintar; ensayo; galería (apila UN detalle, desde un
+  detalle reemplaza). Mutación comprobada: con el token viejo en Retos fallan 2 pruebas; con «Volver siempre a la raíz», 5+.
 
 ## Dev notes
 

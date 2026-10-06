@@ -35,7 +35,7 @@ define(['block_pulso/common'], function(C) {
 
 
         // ---- Ampliar recurso: vídeos + artículos (api_ampliacion.php) ----
-        // Misma pantalla y mismo desplegable que Crear. TODO lo que viene de
+        // Formulario (nivel 1 de la pila de Crear) y resultado (detalle, nivel 2). TODO lo que viene de
         // fuera (títulos, canales, autores, revistas, tema, avisos) se escapa;
         // las URLs solo se pintan si son https://, y no se incrusta YouTube.
 
@@ -115,10 +115,10 @@ define(['block_pulso/common'], function(C) {
         }
 
 
+        // «Ampliar otro recurso» es lo mismo que «Volver»: desapila el resultado y vuelve al formulario.
         function pulsoAmpActions(primaryLabel) {
             return '<div class="pulso-amp-actions">'
-                + '<button type="button" class="pulso-create-submit" data-pulso-action="openCreatePanel" data-pulso-arg="ampliacion">' + escapeHtmlText(primaryLabel) + '</button>'
-                + '<button type="button" class="pulso-create-back-link" data-pulso-action="closeCreatePanel">Volver</button>'
+                + '<button type="button" class="pulso-create-submit" data-pulso-action="pulsoCreateBack">' + escapeHtmlText(primaryLabel) + '</button>'
                 + '</div>';
         }
 
@@ -179,6 +179,7 @@ define(['block_pulso/common'], function(C) {
             const cmid = parseInt(select.value, 10);
             const resource = S.pulsoCreateResources.find(function(r) { return r.cmid === cmid; });
             const name = resource ? resource.name : '';
+            C.fn.pulsoCreateEnter('amp', 'ampliacion'); // cambio de pantalla: invalida lo anterior
             const token = ++S.pulsoAmpToken;
 
             body.innerHTML = '<div class="pulso-amp-loading" role="status">'

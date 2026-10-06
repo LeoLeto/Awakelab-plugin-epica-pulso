@@ -232,14 +232,15 @@
         <div class="pulso-chat-messages" id="pulso-crear-scroll">
             <div class="pulso-create-root" id="pulso-create-root">
                 <h3 class="pulso-create-root-title" id="pulso-create-root-title" tabindex="-1">¿Qué quieres crear?</h3>
-                {{> block_pulso/chat_create_cta}}
+                {{> block_pulso/chat_create_tools}}
                 {{^isteacher}}{{#epica}}<button type="button" class="pulso-historial-link head" data-pulso-action="pulsoAbrirHistorial">Mi historial<span aria-hidden="true"> ↗</span><span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></button>{{/epica}}{{/isteacher}}
             </div>
 
             <div class="pulso-create-panel" id="pulso-create-panel" hidden>
                 <div class="pulso-create-head">
-                    <button type="button" class="pulso-create-back" data-pulso-action="closeCreatePanel" aria-label="Volver a la lista de herramientas de creación">
+                    <button type="button" class="pulso-create-back" id="pulso-create-back" data-pulso-action="pulsoCreateBack" aria-label="Volver a la lista de herramientas de creación">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+                        <span>Volver</span>
                     </button>
                     <h3 id="pulso-create-title" tabindex="-1">Crear</h3>
                 </div>

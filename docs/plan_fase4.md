@@ -104,7 +104,7 @@ Leyenda: **R** = se reescribe (queda obsoleta tal como está) · **M** = se mant
 - M Ampliación: sin iframe de YouTube, todo escapado, peticiones en vuelo invalidadas con token.
 - M Cupos (`sectionused`/`sectionlimit`, aviso al cambiar el recurso), revalidados en servidor.
 - M Ejemplos de juego («Prueba con:»): textos literales de la carta 9, un clic rellena y no envía.
-- M `closeCreatePanel`: al volver, el foco regresa al elemento que abrió (`pulsoCreateOpener`) — se traslada a «Volver».
+- M `closeCreatePanel`: al volver, el foco regresa al elemento que abrió (`pulsoCreateOpener`) — se traslada a «Volver». **Hecho en v1.38.0:** `pulsoCreateBack()`; el foco va a la fila de la herramienta (`data-pulso-tool`), ya no hay `pulsoCreateOpener`.
 
 **Paso 7 (Mis creaciones)**
 - R «La galería… se enseña siempre debajo del formulario… SOLO de los encargos propios» → pantalla propia; **se mantiene lo de «solo propios del usuario en el curso»**, el filtro del servidor `status='listo' AND filename<>''`, y que `playurl` va sin `imageurl` para juegos.

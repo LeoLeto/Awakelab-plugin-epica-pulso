@@ -1,5 +1,30 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-06 — Fase 4 UX, paso 6: lista de herramientas y pila de Crear (v1.38.0)
+
+Regla en `CLAUDE.md` → «Fase 4 — paso 6». Solo plantilla (parcial renombrado a `chat_create_tools`), CSS y `crear.js`/`retos.js`/`ampliacion.js`;
+sin servidor ni `db/`. Lo que costó ver:
+- **Entrar en el detalle de Retos desde una respuesta en vuelo rompe el sondeo si se reutiliza el token capturado.** `proponer` captura
+  `pulsoAmpToken`, vuelve y pinta la espera; esa pantalla ahora llama a `pulsoCreateEnter` (que invalida el token porque apilar es cambiar de
+  pantalla), así que armar el sondeo con el token capturado lo mataba en silencio (el sondeo es `if (token !== S.pulsoAmpToken) return`).
+  Solución: armar con `S.pulsoAmpToken`. Mutación comprobada (2 pruebas fallan). Los repintados dentro del mismo detalle (espera → seis
+  retos → reto elegido) NO son cambio de pantalla: `pulsoCreateEnter` con el mismo `kind` no hace nada; si invalidara el token, el
+  refresco del título final (que lo captura al pintar el reto elegido) moriría.
+- **Dos niveles bastan** (formulario + un detalle que se reemplaza) y simplifican «Volver» a «desde un detalle, al formulario». Un
+  detalle abierto desde la galería (que sale bajo el formulario, y también bajo el estado) apila si viene del formulario y reemplaza si viene
+  de otro detalle; la galería de debajo del formulario no se toca (se retira en el paso 7).
+- **La galería ordena por fecha**: al hacer clic en «el segundo» tras abrir el primero, el DOM ya está reordenado — mi primera prueba abrió dos
+  veces la misma. Seleccionar por `data-pulso-arg`, no por posición.
+- **Hueco que no es del paso 6 pero sale a la luz**: «Volver» desde una propuesta de Retos `en-cola` la deja viva en el servidor pero sin vía
+  de vuelta en la UI (`mis_retos` solo lista retos elegidos): quien vuelve a proponer gasta otra unidad de cupo. Igual que antes del paso
+  (antes «Volver» también mataba el sondeo). Habría que decidir si «Mis creaciones» (paso 7) debe listar propuestas en curso.
+- **Una prueba se adaptó a propósito:** «Volver … foco al título de la lista» → ahora es a la fila de la herramienta (decisión del paso 6); el resto de
+  las 92 de pestañas y las 40 de la home sigue igual (solo cambió el selector `.pulso-create-cta` → `.pulso-tool`).
+- **Prueba** (jsdom, fuera del repo, la del paso 4 ampliada): 148 comprobaciones nuevas de la pila; 92 de pestañas y 40 de la home en verde;
+  motor PHP de Mustache y mustache.js dan el mismo DOM en las 5 combinaciones rol/`createactivity`/Épica.
+- **NO probado** (sin navegador): aspecto real de las filas y del botón «Volver» con texto, contraste, 320 px y zoom 200 %, foco visible y lector (NVDA),
+  recorrido real en sanase-test (purgar cachés: plantilla y CSS).
+
 ## 2026-10-06 — Fase 4 UX, paso 5: home corta por rol (v1.37.0)
 
 Regla en `CLAUDE.md` → «Fase 4 — Home corta por rol». Solo plantilla, CSS y `toggleIdeas` (chat.js); `chat_simple_view.php` no cambia. Lo que costó ver:

@@ -19,7 +19,7 @@ but the `$plugin->version` bump is still mandatory every time.
 
 ## Architecture (chat request path)
 
-- `chat_simple_view.php` — floating chat UI (inline HTML/CSS/JS, rendered by
+- `chat_simple_view.php` — floating chat UI (HTML estático; CSS en `styles.css`, JS en `amd/src/*.js`; rendered by
   `block_pulso.php`). Sends messages to `api_chat_stream.php` via fetch + SSE
   (ChatGPT-style token streaming, progressive preview of partial JSON) and falls
   back automatically to `api_chat.php` (XHR/JSON) if streaming is unavailable.
@@ -201,7 +201,7 @@ que los evitan son poco intuitivas, así que quedan escritas aquí:
   `api_chat_stream.php`, `toggle_course.php`) y el orden de validación es
   autenticar → sesskey → permisos → `check_enabled()`. `check_enabled()` no puede
   volver a subir antes de `require_login()` (filtraba a anónimos si Pulso estaba
-  activo en un curso). El cliente manda el token desde `window.pulsoSesskey` en
+  activo en un curso). El cliente manda el token desde `cfg.sesskey` (módulo AMD `chat`) en
   `buildChatFormData()`: cualquier endpoint nuevo debe recibirlo por ahí.
 
 ## Modo alumno — dos capabilities, tres capas (v1.10.0)
@@ -217,7 +217,7 @@ Desde v1.10.0 un ALUMNO puede usar el chat, pero solo para CONTENIDO. Las reglas
 - **La UI no es un control de acceso.** `render_chat_simple($courseid, $context,
   $isteacher)` elimina del HTML el bloque del otro rol (marcadores
   `<!--PULSO_TEACHER_ONLY_START/END-->` y `<!--PULSO_STUDENT_ONLY_*-->`, borrados con
-  `preg_replace`) y expone `window.pulsoIsTeacher` solo para adaptar textos. El
+  `preg_replace`) y pasa `isTeacher` al módulo AMD (config de `js_call_amd`) solo para adaptar textos. El
   bloqueo real está en las tres capas de servidor de abajo. Si añades un bloque
   para un rol, envuélvelo en esos marcadores; si añades un texto de capacidades en
   el JS, recuerda que el del otro rol SÍ viaja en el fuente (es copy estático, sin
@@ -1399,7 +1399,7 @@ pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reg
 - **Puerta `/api/auth/alumno`, solo alumnado.** Un token de docente ahí es 403 `rol-sin-permiso`,
   así que `epica_historial.php` NO firma nada si el usuario tiene `viewanalytics` (ni si
   `rol_de()` no sale `estudiante`): pinta «El historial de Épica es para el alumnado…». El
-  botón solo se pinta con `window.pulsoIsTeacher === false` (la UI no es control de acceso; lo es
+  botón solo se pinta con `cfg.isTeacher === false` (la UI no es control de acceso; lo es
   el endpoint) y la home lo mete en `PULSO_STUDENT_ONLY_*` anidado dentro de `PULSO_CREATE_ONLY_*`
   (los `preg_replace` de marcadores no se pisan: el de rol se aplica antes y los quita enteros).
 - **Token NUEVO por POST y nunca en una URL ni en un log.** Se firma en `epica_historial.php`
@@ -1479,7 +1479,7 @@ Reglas permanentes. Tocan `db/caches.php` (definición nueva `chatrate`): hay qu
   `class_exists()`** (`precondiciones_error()` ya lo comprueba por sí mismo; la espera larga sale de
   `epica_client::espera_larga()`, que cae a 180 s si el plugin no está). Sin Épica: `render_chat_simple()`
   quita del HTML (marcadores `PULSO_EPICA_ONLY_START/END`, no CSS) los CTA de infografía, juego, retos y
-  «Mi historial» —«Ampliar recurso» sigue— y expone `window.pulsoEpicaAvailable` (el cliente salta
+  «Mi historial» —«Ampliar recurso» sigue— y pasa `epicaAvailable` en la config del módulo AMD (el cliente salta
   `mis_retos`); `api_create_form` (todo menos `tool=ampliacion`), `api_create_submit`, `api_retos` y
   `epica_historial` contestan «La creación de contenidos no está disponible en este sitio» **sin
   insertar nada** (antes el encargo se guardaba, gastaba cupo y fallaba en el cron). `epica_base_url`
@@ -1564,7 +1564,7 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   `dispatchMessage(message)` con el MISMO mensaje (sin repintar la burbuja del usuario ni tocar el cuadro).
   Un código nuevo se declara en `PULSO_ERROR_TEXTS` y, si reenviar tiene sentido, en `PULSO_RETRYABLE`.
 - **Todo el texto del cliente va en castellano**, no por `navigator.language`. Si algún día hay multidioma,
-  el idioma sale de Moodle vía `JSINIT`.
+  el idioma sale de Moodle vía la config de `js_call_amd`.
 - **El historial de `sessionStorage` se pinta** (`pulsoRenderHistory()`, bajo «Conversación anterior»,
   con `escapeHtmlText`: son digests de texto). `clearConversation()` también quita ese separador.
 - **Texto ≥ 0.75rem, siempre** (≈12 px): ningún `font-size` en `rem` por debajo de 0.75 ni en `px` por debajo
@@ -1595,9 +1595,9 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   visible; un contenedor con `hidden` que se destapa no se anuncia.
 - `console.log` solo tras `window.pulsoDebug` (`pulsoLog()`).
 
-## Fase 4 — arquitectura cacheable (pasos 1–3, en curso; ver docs/plan_fase4.md)
+## Fase 4 — arquitectura cacheable y rediseño (en curso; ver docs/plan_fase4.md)
 
-Refactor SIN cambios visuales. Al terminar la fase se reescribe el resto de este fichero (la sección
+Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el resto de este fichero (la sección
 "Architecture" y las "Dev notes" describen todavía el chat con CSS/JS en línea).
 
 - **CSS en `styles.css` (v1.33.0).** Moodle lo mete en el CSS del tema: se cachea, pero se carga en TODAS
@@ -1613,13 +1613,37 @@ Refactor SIN cambios visuales. Al terminar la fase se reescribe el resto de este
   `thirdpartylibs.xml` (que lista fuentes y `lib/pdfparser`). Excepción consciente: miniaturas
   `i.ytimg.com` de Ampliación, solo al pedir una ampliación.
 
+- **JS en módulos AMD (v1.34.0).** `amd/src/{common,format,chat,crear,retos,ampliacion}.js`. El punto de entrada es
+  `block_pulso/chat` → `init(cfg)`, llamado por `$PAGE->requires->js_call_amd()` desde `render_chat_simple()` con
+  `courseid`, las URLs de los endpoints, `sesskey`, `isTeacher` y `epicaAvailable`. **Ya no hay estado en `window.*`**
+  (salvo el interruptor de depuración `window.pulsoDebug`): la config vive en `C.cfg` y el estado mutable que de verdad
+  comparten varios módulos en `C.S` (`conversationHistory`, `tableState`, `pulsoAmpToken`, `pulsoCreateResources`, los
+  temporizadores de Retos). Un estado que solo usa un módulo es una `let` local de ese módulo.
+- **Los módulos solo dependen de `common`, nunca entre sí** (sin ciclos). Una función de otro módulo se llama por el
+  registro `C.fn.<nombre>(…)`, que se resuelve **al llamar**, no al cargar: por eso un `const` de primer nivel no puede
+  usar en su inicializador una función de otro módulo. `chat` carga a los demás (son dependencias suyas) y arranca todo.
+  Si una función nueva se usa desde otro módulo o desde HTML, se exporta con `C.fn.nombre = nombre;` al final de su módulo.
+- **Sin manejadores en línea (ni en el HTML ni en las cadenas que genera el JS).** Prohibido `onclick=`/`oninput=`/
+  `onkeyup=`/`onsubmit=`. Un botón lleva `data-pulso-action="funcion"` (o `data-pulso-input`/`data-pulso-keyup`) y,
+  si hace falta, `data-pulso-arg` y `data-pulso-arg2`. **Los argumentos llegan como CADENA**: la función convierte lo
+  que sea número (`parseInt`). La delegación (`C.bindActions`) se engancha en `pulsoBoot()` sobre el contenedor y la
+  burbuja (que se mueven al `<body>`); un elemento `disabled` no dispara. El envío del formulario se engancha con
+  `addEventListener('submit', …)`.
+- **`amd/build/` se commitea** (Moodle sirve `build`, no `src`, salvo con `cachejs` apagado). Se genera con
+  `tools/build-amd.mjs` (terser; nombra el `define` como `block_pulso/<modulo>`, necesario porque Moodle une módulos en
+  una sola respuesta) o con `grunt amd` en un checkout de Moodle; `node build-amd.mjs --check` falla si `build` no
+  coincide con `src`. Cualquier cambio de JS: editar `src`, regenerar, commitear los dos y subir la versión.
+  Tras desplegar JS nuevo, purgar cachés (Moodle cachea los módulos por revisión de JS).
+- El script de partición y la prueba de paridad (jsdom, 28 pasos × profesor/alumno × con/sin Épica, comparando DOM,
+  peticiones y errores contra el monolito de v1.33.0) no se guardan en el repo: eran de un solo uso.
+
 ## Dev notes
 
 - No PHP installed locally: lint with the portable PHP in the session scratchpad
   (download `php-8.3-nts` zip from windows.php.net) or Docker (`php:8.2-cli`)
   if the daemon is running.
-- The big JS blob lives inside a nowdoc heredoc in `chat_simple_view.php` —
-  `${...}` template literals are safe there; the small `JSINIT` heredoc DOES
-  interpolate PHP variables.
+- The chat JS lives in `amd/src/*.js` (AMD modules; see "Fase 4 — arquitectura cacheable"). Edit `src`, then
+  regenerate `amd/build` with `tools/build-amd.mjs` and commit both. `chat_simple_view.php` holds only the
+  static HTML (a nowdoc: no interpolation) and the `js_call_amd` config.
 - Language: UI and answers are Spanish-first; keep new user-facing strings in
   Spanish and add lang strings to `lang/en/block_pulso.php`.

@@ -13,3 +13,4 @@ Thumbs.db
 .idea/
 .vscode/
 *.sublime-workspace
+tools/node_modules/

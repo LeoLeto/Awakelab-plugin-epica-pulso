@@ -1,6 +1,8 @@
 # Historial de sesiones — block_pulso
 
-## 2026-10-06 — Fase 4 UX, paso 4: pestañas «Preguntar» y «Crear» + Mustache (v1.36.0)
+## 2026-10-06 — Fase 4 UX, paso 4 (1.36.1: se quitó la sección «Crear» de la home, duplicaba la pestaña; «Mi historial» pasó a la lista de Crear)
+
+### Paso 4: pestañas «Preguntar» y «Crear» + Mustache (v1.36.0)
 
 Reglas en `CLAUDE.md` → «Fase 4 — paso 4» (y las secciones R/A que el plan marcaba, ya reescritas). Sin `db/`. Lo que costó ver:
 - **Pausar ≠ cancelar exige que cada sondeo ARME su pendiente antes de mirar si está pausado.** Los cuatro

@@ -1644,7 +1644,8 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
   `#pulso-tablist` (`role="tablist"`, dos `role="tab"` con `aria-selected`/`aria-controls`, roving `tabindex`).
   Dos `role="tabpanel"` HERMANOS (`#pulso-panel-ask`, `#pulso-panel-crear`, con `aria-labelledby`) que se alternan
   con `hidden` — nunca se destruye el DOM: la conversación y el estado de Crear sobreviven al cambio.
-  **Preguntar** = home + `#pulso-messages` + cuadro de texto (+ aviso offline). **Crear** = lista de herramientas
+  **Preguntar** = home + `#pulso-messages` + cuadro de texto (+ aviso offline). La home NO lleva sección «Crear» (v1.36.1: los CTA solo viven en la lista de Crear;
+  «Mi historial» del alumnado también está ahí). **Crear** = lista de herramientas
   (`#pulso-create-root`, el mismo parcial de CTA que la home) o la herramienta abierta (`#pulso-create-panel`,
   `hidden` mientras no hay ninguna). Si el usuario no tiene `createactivity`, la plantilla no pinta ni tablist ni
   panel Crear (y el panel Preguntar deja de ser `tabpanel`).

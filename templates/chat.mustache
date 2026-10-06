@@ -205,15 +205,6 @@
                         {{/isteacher}}
                     </div>
                 </div>
-                {{#cancreate}}
-                <div class="pulso-home-section create">
-                    <div class="pulso-home-section-head">
-                        <h3 class="pulso-home-section-title">Crear</h3>
-                        {{^isteacher}}{{#epica}}<button type="button" class="pulso-historial-link head" data-pulso-action="pulsoAbrirHistorial">Mi historial<span aria-hidden="true"> ↗</span><span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></button>{{/epica}}{{/isteacher}}
-                    </div>
-                    {{> block_pulso/chat_create_cta}}
-                </div>
-                {{/cancreate}}
             </div>
 
             <!-- Región en vivo SOLO para mensajes: la home y los paneles de pestaña quedan fuera. -->
@@ -253,6 +244,7 @@
             <div class="pulso-create-root" id="pulso-create-root">
                 <h3 class="pulso-create-root-title" id="pulso-create-root-title" tabindex="-1">¿Qué quieres crear?</h3>
                 {{> block_pulso/chat_create_cta}}
+                {{^isteacher}}{{#epica}}<button type="button" class="pulso-historial-link head" data-pulso-action="pulsoAbrirHistorial">Mi historial<span aria-hidden="true"> ↗</span><span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></button>{{/epica}}{{/isteacher}}
             </div>
 
             <div class="pulso-create-panel" id="pulso-create-panel" hidden>

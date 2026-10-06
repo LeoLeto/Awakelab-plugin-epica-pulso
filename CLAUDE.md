@@ -1547,9 +1547,16 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   `pulsoSystemMessage()` llaman a `pulsoSelectTab('ask')`; antes «enviar con Crear abierto cierra Crear»). El cuadro
   de texto solo existe en Preguntar, así que lo habitual es que ya se esté en ella; `askPreset`, las sugerencias y
   «Reintentar» pasan por ahí. `pulsoSystemMessage()` sustituye a los `alert()` (no hay `alert()` en el cliente).
-- **Errores con reintento.** `addErrorMessage(payload, message)` pinta SVG `aria-hidden` + «Error:» + el texto
-  por `error_code` (sin emoji) y, si el código está en `PULSO_RETRYABLE`, «Reintentar», que llama a
-  `dispatchMessage(message)` con el MISMO mensaje (sin repintar la burbuja del usuario ni tocar el cuadro).
+- **Errores con reintento y copia (v1.40.0).** `addErrorMessage(payload, message)` pinta SVG `aria-hidden` + «Error:» + el
+  texto por `error_code` (sin emoji) y, si hay `message`, una fila `.pulso-error-actions` con: «Reintentar» solo si el
+  código está en `PULSO_RETRYABLE` (llama a `dispatchMessage(message)` con el MISMO mensaje, sin repintar la burbuja del
+  usuario ni tocar el cuadro; retira la burbuja) y «Copiar pregunta» SIEMPRE (con un código no reintentable es la única
+  acción). El texto de la pregunta **no va a ningún atributo**: se guarda en `pulsoErrorQuestions` por id de burbuja
+  (`pulso-error-N`) y el botón lleva solo `data-pulso-action="pulsoCopyQuestion"` + el id como `data-pulso-arg`
+  (`clearConversation()` vacía el mapa). `pulsoCopyText()`: `navigator.clipboard.writeText` y, si no existe o rechaza
+  (HTTP sin TLS, permiso), textarea oculto + `execCommand('copy')` que devuelve el foco al botón. Confirma por
+  `pulsoAnnounce()` («Pregunta copiada» / «No se ha podido copiar») y cambiando el texto del botón ~2 s; nunca mueve el
+  foco. `truncated` también recibe el mensaje (así se puede copiar). `pulsoSystemMessage()` no pasa pregunta: sin acciones.
   Un código nuevo se declara en `PULSO_ERROR_TEXTS` y, si reenviar tiene sentido, en `PULSO_RETRYABLE`.
 - **Todo el texto del cliente va en castellano**, no por `navigator.language`. Si algún día hay multidioma,
   el idioma sale de Moodle vía la config de `js_call_amd`.
@@ -1578,8 +1585,11 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   `<button class="pulso-sort-btn">` dentro (no `th onclick`) y recuento `role="status"` que dice «N de M».
   Enlaces que abren pestaña nueva: «↗» con `aria-hidden` y `PULSO_NEWTAB_SR` («se abre en una pestaña nueva»).
 - **Teclado** (el tablist se describe en «Fase 4 — paso 4»): Enter con `keydown` y `!e.isComposing` (un IME confirma, no envía); Escape cierra el chat y el
-  foco vuelve a la burbuja (`aria-expanded`/`aria-controls`); «Ampliar/Reducir» (`toggleChatSize()`,
-  640 px ↔ 90 vw). El contenedor es `role="region"` (no `dialog`: no atrapa el foco). Jerarquía: `h2` en la
+  foco vuelve a la burbuja (`aria-expanded`/`aria-controls`); «Ampliar/Reducir» (`toggleChatSize()`: UN único estado ancho,
+  `min(960px, 90vw)` × `100vh − 112px` (`− 162px` con `.drawer-collapsed`), igual que el `max-height` del CSS: **si se cambia
+  un `bottom`/`max-height` del CSS, se cambian estas constantes a la vez**; Reducir = `min(640px, 100vw − 48px)` × `min(600px, …)`;
+  botón con etiqueta FIJA «Ampliar el chat» (`aria-label` y `title`: un lector diría «Reducir el chat, pulsado» si además cambiara) y `aria-pressed` true/false para el estado (solo cambia el icono); si el chat se arrastró (`left`/`top` en línea) se CONSERVA la
+  posición recortada para que quede dentro de la ventana, y sin arrastre no se escribe ninguna posición; no hace nada en ≤ 480 px). El contenedor es `role="region"` (no `dialog`: no atrapa el foco). Jerarquía: `h2` en la
   cabecera, `h3` en secciones de la home y del panel.
 - **`juego.php`**: la caja de puntuación va dentro de un `role="status" aria-live="polite"` SIEMPRE presente y
   visible; un contenedor con `hidden` que se destapa no se anuncia.

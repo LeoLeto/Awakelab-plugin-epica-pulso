@@ -2626,8 +2626,15 @@ a.pulso-retos-open {
     color: #B3261E;
 }
 
-.pulso-error-retry {
+.pulso-error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-top: 10px;
+}
+
+.pulso-error-retry,
+.pulso-error-copy {
     min-height: 36px;
     padding: 6px 16px;
     border: 1px solid var(--pulso-navy);
@@ -2640,7 +2647,8 @@ a.pulso-retos-open {
     cursor: pointer;
 }
 
-.pulso-error-retry:hover {
+.pulso-error-retry:hover,
+.pulso-error-copy:hover {
     background: var(--pulso-surface-2);
 }
 
@@ -2723,6 +2731,11 @@ a.pulso-retos-open {
     .pulso-create-back {
         min-height: 44px;
         border-radius: 22px;
+    }
+
+    .pulso-error-retry,
+    .pulso-error-copy {
+        min-height: 44px;
     }
 
     .pulso-create-back-link,

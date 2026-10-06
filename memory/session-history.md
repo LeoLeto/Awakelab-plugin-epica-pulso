@@ -1,5 +1,27 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-06 — Fase 4 UX, paso 8: errores con «Copiar pregunta» y «Ampliar» ancho (v1.40.0)
+
+Reglas en `CLAUDE.md` → «Errores con reintento y copia» y «Teclado» (Ampliar/Reducir). Solo cliente (`chat.js`, `styles.css`,
+una línea de plantilla: `aria-pressed="false"`); sin servidor ni `db/`. Lo que costó ver:
+- **El «Ampliar» anterior soltaba la posición** (borraba `left/top/right/bottom` en línea), así que nunca podía salirse de la ventana pero
+  perdía donde el usuario había puesto el chat. Ahora se conserva y se recorta con el tamaño NUEVO (`left ≤ innerWidth − ancho`); sin
+  arrastre no se escribe nada y manda el CSS. Ojo: `doDrag` ya recortaba con `offsetWidth`, pero al ampliar el tamaño cambia después.
+- **La altura ancha es la del `max-height` del CSS** (100vh − 112 px; − 162 px con `.drawer-collapsed`), no «100vh − 130/180» de antes.
+  Son constantes duplicadas JS↔CSS: la prueba comprueba las dos reglas del CSS y que ancho + `bottom` + 12 cabe en una ventana de 520 px.
+- **«Copiar pregunta» sobre un texto con `<script>`, comillas y `&`**: se prueba con `writeText` y con el fallback, comparando por igualdad
+  estricta; el texto no se escribe en ningún atributo (el mapa por id evita escapar y el riesgo de truncar con `"`).
+- **Con `execCommand` hay que devolver el foco**: seleccionar el textarea oculto lo roba; se restaura `document.activeElement` previo (el botón).
+  jsdom no implementa `execCommand` (es `undefined`): la prueba lo inyecta; en navegador está deprecado pero es el único fallback sin HTTPS.
+- **`aria-pressed` + etiqueta que cambia se anuncia doble** («Reducir el chat, pulsado»): etiqueta fija «Ampliar el chat» y solo `aria-pressed` + icono
+  cambian. Pendiente de oírlo en NVDA.
+- **Truncated** pasaba sin `message` (sin acciones); ahora lo recibe para poder copiar la pregunta. No es reintentable (el modelo volvería a cortar).
+- **Pruebas** (jsdom, fuera del repo; el arnés ganó un hook `beforeInit` para sembrar `sessionStorage`): `errores.test.js` 112 comprobaciones
+  (8 códigos, Reintentar mismo texto, Copiar con clipboard/rechazo/fallback/todo falla, anuncio en `#pulso-live-status`, Ampliar×3 ventanas, 4 arrastres,
+  `.drawer-collapsed`, móvil, separador de recarga + «Nueva conversación»). Baterías previas: Mis creaciones 163, pila 147, pestañas 92, home 40.
+- **NO probado** (sin navegador): portapapeles real (permisos y HTTP sin TLS), aspecto de los dos botones y 44 px en móvil, cómo anuncia NVDA
+  el botón con `aria-pressed`, y el arrastre+ampliar con ratón real (en jsdom `offsetWidth` es 0). Purgar cachés al desplegar (plantilla + CSS + JS).
+
 ## 2026-10-06 — Fase 4 UX, paso 7: «Mis creaciones» (v1.39.0)
 
 Reglas en `CLAUDE.md` → «Fase 4 — paso 7» (y las secciones de galería/historial reescritas). Cliente + plantilla + CSS + un cambio de

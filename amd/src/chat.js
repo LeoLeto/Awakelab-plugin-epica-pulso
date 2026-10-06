@@ -599,9 +599,19 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         }
 
 
-        // Burbuja de error: SVG decorativo (aria-hidden) + «Error:» + el texto del código. Si
-        // procede, lleva «Reintentar», que reenvía el MISMO mensaje (la pregunta ya no se pierde
-        // aunque el campo se haya vaciado al enviar). textOverride sustituye al texto por código.
+        // Texto exacto de la pregunta que falló, por id de burbuja de error. Nunca va a un atributo
+        // (solo el id): es texto del usuario y se copia tal cual, sin pasar por HTML.
+        const pulsoErrorQuestions = {};
+
+        let pulsoErrorSeq = 0;
+
+        const PULSO_COPY_LABEL = 'Copiar pregunta';
+
+
+        // Burbuja de error: SVG decorativo (aria-hidden) + «Error:» + el texto del código. Si hay
+        // pregunta, lleva «Copiar pregunta» (siempre) y, si el código lo admite, «Reintentar», que
+        // reenvía el MISMO mensaje (la pregunta ya no se pierde aunque el campo se haya vaciado al
+        // enviar). textOverride sustituye al texto por código.
         function addErrorMessage(payload, message, textOverride) {
             const log = document.getElementById('pulso-messages');
             if (!log) return;
@@ -623,28 +633,104 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             head.appendChild(txt);
             content.appendChild(head);
 
-            if (message && PULSO_RETRYABLE.indexOf(code) !== -1) {
-                const retry = document.createElement('button');
-                retry.type = 'button';
-                retry.className = 'pulso-error-retry';
-                retry.textContent = 'Reintentar';
-                retry.addEventListener('click', function() {
-                    if (pulsoSending) return;
-                    if (navigator.onLine === false) {
-                        pulsoSetOffline(true);
-                        return;
-                    }
-                    el.remove();
-                    dispatchMessage(message);
-                    const input = document.getElementById('pulso-input');
-                    if (input) input.focus();
-                });
-                content.appendChild(retry);
+            if (typeof message === 'string' && message !== '') {
+                const id = 'pulso-error-' + (++pulsoErrorSeq);
+                el.id = id;
+                pulsoErrorQuestions[id] = message;
+
+                const actions = document.createElement('div');
+                actions.className = 'pulso-error-actions';
+
+                if (PULSO_RETRYABLE.indexOf(code) !== -1) {
+                    const retry = document.createElement('button');
+                    retry.type = 'button';
+                    retry.className = 'pulso-error-retry';
+                    retry.textContent = 'Reintentar';
+                    retry.addEventListener('click', function() {
+                        if (pulsoSending) return;
+                        if (navigator.onLine === false) {
+                            pulsoSetOffline(true);
+                            return;
+                        }
+                        delete pulsoErrorQuestions[id];
+                        el.remove();
+                        dispatchMessage(message);
+                        const input = document.getElementById('pulso-input');
+                        if (input) input.focus();
+                    });
+                    actions.appendChild(retry);
+                }
+
+                const copy = document.createElement('button');
+                copy.type = 'button';
+                copy.className = 'pulso-error-copy';
+                copy.setAttribute('data-pulso-action', 'pulsoCopyQuestion');
+                copy.setAttribute('data-pulso-arg', id);
+                copy.textContent = PULSO_COPY_LABEL;
+                actions.appendChild(copy);
+
+                content.appendChild(actions);
             }
 
             el.appendChild(content);
             log.appendChild(el);
             pulsoScrollToEnd();
+        }
+
+
+        // Copia al portapapeles con la API moderna y, si no existe o falla (contexto no seguro,
+        // permiso denegado), con un textarea oculto + execCommand('copy'). Devuelve una promesa de
+        // true/false; el foco vuelve al elemento que lo tenía (el botón).
+        function pulsoCopyText(text) {
+            function legacy() {
+                const prev = document.activeElement;
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.setAttribute('readonly', '');
+                ta.setAttribute('aria-hidden', 'true');
+                ta.tabIndex = -1;
+                ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px;';
+                document.body.appendChild(ta);
+                let done = false;
+                try {
+                    ta.select();
+                    ta.setSelectionRange(0, text.length);
+                    done = !!document.execCommand('copy');
+                } catch (e) {
+                    done = false;
+                }
+                ta.remove();
+                if (prev && prev.focus) prev.focus();
+                return done;
+            }
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                try {
+                    return Promise.resolve(navigator.clipboard.writeText(text)).then(function() {
+                        return true;
+                    }, function() {
+                        return legacy();
+                    });
+                } catch (e) {
+                    return Promise.resolve(legacy());
+                }
+            }
+            return Promise.resolve(legacy());
+        }
+
+
+        // data-pulso-action="pulsoCopyQuestion" data-pulso-arg="<id de la burbuja>".
+        function pulsoCopyQuestion(id, unused, btn) {
+            const text = Object.prototype.hasOwnProperty.call(pulsoErrorQuestions, id) ? pulsoErrorQuestions[id] : null;
+            if (typeof text !== 'string' || !btn) return;
+            pulsoCopyText(text).then(function(done) {
+                btn.textContent = done ? 'Pregunta copiada' : 'No se ha podido copiar';
+                pulsoAnnounce(done ? 'Pregunta copiada' : 'No se ha podido copiar');
+                if (btn._pulsoCopyTimer) clearTimeout(btn._pulsoCopyTimer);
+                btn._pulsoCopyTimer = setTimeout(function() {
+                    btn.textContent = PULSO_COPY_LABEL;
+                    btn._pulsoCopyTimer = null;
+                }, 2000);
+            });
         }
 
 
@@ -683,7 +769,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                 // el historial (un turno cortado, reenviado al modelo, hacía que lo
                 // continuara en vez de contestar la pregunta nueva). Sin sugerencias.
                 if (response.truncated) {
-                    addErrorMessage({error_code: 'truncated'});
+                    addErrorMessage({error_code: 'truncated'}, message);
                     return;
                 }
 
@@ -1195,23 +1281,33 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         }
 
 
-        // Ampliar / Reducir (640 px ↔ 90 vw): hasta ahora solo se redimensionaba con el ratón
-        // (resize: both). Al ampliar se suelta la posición arrastrada para que no se salga de la pantalla.
+        // Ampliar / Reducir: un único estado ancho, min(960px, 90vw) y casi toda la altura (el tope es
+        // el max-height del CSS: 100vh - 112px, o 100vh - 162px con el cajón de bloques plegado; si
+        // cambia uno, cambia el otro). Si el chat se arrastró (left/top en línea) se conserva la
+        // posición, recortada para que el panel entero siga dentro de la ventana. No existe en ≤ 480 px.
         function toggleChatSize() {
             const container = document.getElementById('pulso-chat-container');
             if (!container || !floatingState.isOpen) return;
+            if (window.matchMedia && window.matchMedia('(max-width: 480px)').matches) return;
             pulsoChatWide = !pulsoChatWide;
-            const spare = container.classList.contains('drawer-collapsed') ? 180 : 130;
-            container.style.left = '';
-            container.style.top = '';
-            container.style.right = '';
-            container.style.bottom = '';
+            const collapsed = container.classList.contains('drawer-collapsed');
+            let width;
+            let height;
             if (pulsoChatWide) {
-                container.style.width = Math.round(window.innerWidth * 0.9) + 'px';
-                container.style.height = Math.max(300, window.innerHeight - spare) + 'px';
+                width = Math.min(960, Math.round(window.innerWidth * 0.9));
+                height = Math.max(300, window.innerHeight - (collapsed ? 162 : 112));
             } else {
-                container.style.width = Math.min(640, window.innerWidth - 48) + 'px';
-                container.style.height = Math.min(600, window.innerHeight - spare) + 'px';
+                const spare = collapsed ? 180 : 130;
+                width = Math.min(640, window.innerWidth - 48);
+                height = Math.min(600, window.innerHeight - spare);
+            }
+            container.style.width = width + 'px';
+            container.style.height = height + 'px';
+            if (container.style.left !== '' || container.style.top !== '') {
+                const left = parseFloat(container.style.left) || 0;
+                const top = parseFloat(container.style.top) || 0;
+                container.style.left = Math.max(0, Math.min(left, window.innerWidth - width)) + 'px';
+                container.style.top = Math.max(0, Math.min(top, window.innerHeight - height)) + 'px';
             }
             pulsoSyncSizeButton();
         }
@@ -1220,9 +1316,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         function pulsoSyncSizeButton() {
             const btn = document.getElementById('pulso-expand-btn');
             if (!btn) return;
-            const label = pulsoChatWide ? 'Reducir el chat' : 'Ampliar el chat';
-            btn.setAttribute('aria-label', label);
-            btn.title = pulsoChatWide ? 'Reducir' : 'Ampliar';
+            btn.setAttribute('aria-pressed', pulsoChatWide ? 'true' : 'false');
             btn.innerHTML = pulsoChatWide
                 ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>'
                 : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
@@ -1250,6 +1344,9 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                     el.remove();
                 });
             }
+            Object.keys(pulsoErrorQuestions).forEach(function(k) {
+                delete pulsoErrorQuestions[k];
+            });
             removeStreamBubble();
             showLoading(false);
             setHomeVisible(true);
@@ -1524,6 +1621,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
     C.fn.toggleChat = toggleChat;
     C.fn.clearConversation = clearConversation;
     C.fn.toggleChatSize = toggleChatSize;
+    C.fn.pulsoCopyQuestion = pulsoCopyQuestion;
     C.fn.showCapabilities = showCapabilities;
     C.fn.askPreset = askPreset;
     C.fn.toggleIdeas = toggleIdeas;

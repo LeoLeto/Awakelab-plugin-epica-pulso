@@ -2,8 +2,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026100604; // Paso 6 fase 4: pestaña Crear con lista de herramientas y pila con Volver
-$plugin->release   = '1.38.0';    // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026100605; // Paso 7 fase 4: «Mis creaciones» (única galería) y propuestas de retos sin elegir
+$plugin->release   = '1.39.0';    // Semver visible en el header del chat — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;
 // Sin $plugin->dependencies: local_awkepica es OPCIONAL (v1.31.0). Pulse se instala en una

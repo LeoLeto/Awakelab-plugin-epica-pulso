@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Pestana Crear de Pulse AI: formulario, estado de una creacion, galeria e historial.
+ * Pestana Crear de Pulse AI: formulario, estado de una creacion, «Mis creaciones» e historial.
  *
  * @module     block_pulso/crear
  * @copyright  2026 Awakelab
@@ -41,7 +41,8 @@ define(['block_pulso/common'], function(C) {
         // dos pantallas hermanas que se alternan con `hidden`: #pulso-create-root (la lista de
         // herramientas) y #pulso-create-panel (la herramienta abierta: formulario, estado…).
         // Lo que se ve dentro del panel lo manda una PILA de pantallas (pulsoCreateStack):
-        //   lista (pila vacía) → formulario → estado / retos / resultado de la ampliación.
+        //   lista (pila vacía) → formulario → estado / retos / resultado de la ampliación
+        //   lista (pila vacía) → «Mis creaciones» → estado de una creación / propuesta de retos
         // «Volver» desapila UNA pantalla; no vuelve siempre a la lista.
         // De momento no manda nada a Epica (eso es el paso 4): solo valida,
         // comprueba cupo y guarda el encargo como "pendiente".
@@ -58,8 +59,9 @@ define(['block_pulso/common'], function(C) {
         // ---- Pila de pantallas de Crear (fase 4, paso 6) ----
         // Vacía = la lista de herramientas (#pulso-create-root). Con elementos, el último es la
         // pantalla visible en #pulso-create-panel. Solo hay dos niveles:
-        //   [formulario(tool)]                 profundidad 1
+        //   [formulario(tool)]                 profundidad 1   (o [mine]: «Mis creaciones»)
         //   [formulario(tool), detalle]        profundidad 2; detalle = status | retos | amp
+        //   [mine, detalle]                    detalle = status | retos (una creación o propuesta abierta)
         // Los tres «detalle» son del mismo nivel: pasar de uno a otro (o entre dos estados de
         // la misma herramienta, p. ej. Retos: espera → seis retos → reto elegido) REEMPLAZA, no
         // apila, así que «Volver» desde cualquiera de ellos va al formulario.
@@ -77,13 +79,16 @@ define(['block_pulso/common'], function(C) {
             return pulsoCreateStack.length ? pulsoCreateStack[pulsoCreateStack.length - 1] : null;
         }
 
-        // «Volver» dice a dónde va: al formulario desde un detalle, a la lista desde el formulario.
+        // «Volver» dice a dónde va: al formulario (o a «Mis creaciones») desde un detalle, a la lista desde
+        // el nivel base.
         function pulsoCreateSyncBack() {
             const btn = document.getElementById('pulso-create-back');
             if (!btn) return;
-            btn.setAttribute('aria-label', pulsoCreateStack.length > 1
-                ? 'Volver al formulario'
-                : 'Volver a la lista de herramientas de creación');
+            let label = 'Volver a la lista de herramientas de creación';
+            if (pulsoCreateStack.length > 1) {
+                label = pulsoCreateStack[0].kind === 'mine' ? 'Volver a Mis creaciones' : 'Volver al formulario';
+            }
+            btn.setAttribute('aria-label', label);
         }
 
         // Se entra en una pantalla de detalle (estado, Retos, resultado de Ampliar) desde el formulario
@@ -97,7 +102,7 @@ define(['block_pulso/common'], function(C) {
             }
             stopCreatePolling();
             S.pulsoAmpToken++;
-            if (top && top.kind !== 'form') {
+            if (top && top.kind !== 'form' && top.kind !== 'mine') {
                 pulsoCreateStack[pulsoCreateStack.length - 1] = { kind: kind, tool: tool };
             } else if (top) {
                 pulsoCreateStack.push({ kind: kind, tool: tool });
@@ -308,6 +313,17 @@ define(['block_pulso/common'], function(C) {
         }
 
 
+        // Repinta el nivel base de la pila: «Mis creaciones» o el formulario de una herramienta.
+        function pulsoCreateRenderTop() {
+            const top = pulsoCreateTop();
+            if (top && top.kind === 'mine') {
+                pulsoCreateRenderMine();
+            } else {
+                pulsoCreateRenderForm();
+            }
+        }
+
+
         // Pinta el formulario que está en la cima de la pila: pide el cupo/recursos al servidor.
         function pulsoCreateRenderForm() {
             const body = document.getElementById('pulso-create-body');
@@ -355,15 +371,16 @@ define(['block_pulso/common'], function(C) {
         // «Volver»: desapila UNA pantalla (no sale de la pestaña Crear). Es un cambio de pantalla
         // dentro de Crear: para el sondeo de la pantalla que se deja y descarta cualquier respuesta
         // en vuelo (token). NO cancela ni borra nada en el servidor: una creación en curso sigue y
-        // se recupera después (galería hoy, «Mis creaciones» en el paso 7); basta con dejar de
-        // mirarla. Los detalles vuelven al formulario (que se repinta); el formulario, a la lista.
+        // se recupera después desde «Mis creaciones» (una propuesta de Retos sin elegir también);
+        // basta con dejar de mirarla. Los detalles vuelven al formulario o a «Mis creaciones» (que se
+        // repintan); el nivel base, a la lista.
         function pulsoCreateBack() {
             if (!pulsoCreateStack.length) return;
             const leaving = pulsoCreateStack.pop();
             stopCreatePolling();
             S.pulsoAmpToken++;
             if (pulsoCreateStack.length) {
-                pulsoCreateRenderForm();
+                pulsoCreateRenderTop();
                 return;
             }
             const root = document.getElementById('pulso-create-root');
@@ -372,24 +389,20 @@ define(['block_pulso/common'], function(C) {
             if (root) root.hidden = false;
             pulsoCreateSyncBack();
             if (S.pulsoTab !== 'crear') return;
-            // El foco vuelve a la fila de la herramienta de la que se venía; si ya no está en la
-            // lista, al título.
+            // El foco vuelve a la fila de la que se venía (herramienta o «Mis creaciones»); si ya no está
+            // en la lista, al título.
             const row = root ? root.querySelector('[data-pulso-tool="' + leaving.tool + '"]') : null;
             const target = row || document.getElementById('pulso-create-root-title');
             if (target) target.focus();
         }
 
 
-        // La galería de "últimas infografías" se enseña siempre debajo,
-        // tenga o no cupo el usuario ahora mismo: una lámina de ayer no deja
-        // de existir porque hoy no queden encargos.
+        // Ya no hay galería bajo el aviso: lo creado antes se ve en «Mis creaciones».
         function renderCreateNotice(text) {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
-            const isamp = pulsoCreateTool === 'ampliacion';
-            body.innerHTML = '<div class="pulso-create-notice"></div>' + (isamp ? '' : '<div id="pulso-create-gallery"></div>');
+            body.innerHTML = '<div class="pulso-create-notice"></div>';
             body.querySelector('.pulso-create-notice').textContent = text;
-            if (!isamp) loadCreateGallery();
         }
 
 
@@ -439,7 +452,7 @@ define(['block_pulso/common'], function(C) {
             );
 
             // Ampliación: solo recurso + botón. Sin aviso de cupo por sección ni
-            // galería (una ampliación es compartida por recurso, no del usuario).
+            // entrada en «Mis creaciones» (una ampliación es compartida por recurso, no del usuario).
             if (isamp) {
                 body.innerHTML = ''
                     + '<div class="pulso-create-field">'
@@ -463,8 +476,7 @@ define(['block_pulso/common'], function(C) {
                 + (isjuego ? '<div class="pulso-create-ejemplos" id="pulso-juego-ejemplos" style="display:none"></div>' : '')
                 + '</div>'
                 + formatFieldHtml
-                + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" data-pulso-action="submitCreate">' + escapeHtmlText(labels.submitLabel) + '</button>'
-                + '<div id="pulso-create-gallery"></div>';
+                + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" data-pulso-action="submitCreate">' + escapeHtmlText(labels.submitLabel) + '</button>';
 
             const select = document.getElementById('pulso-create-resource');
             if (select) {
@@ -487,7 +499,6 @@ define(['block_pulso/common'], function(C) {
                 }
                 pulsoJuegoRefresh(false);
             }
-            loadCreateGallery();
         }
 
 
@@ -555,7 +566,7 @@ define(['block_pulso/common'], function(C) {
                         pulsoCreateEnter('status', pulsoCreateTool);
                         const body = document.getElementById('pulso-create-body');
                         if (body) body.innerHTML = '<p class="pulso-create-hint">Creación guardada. Comprobando estado…</p>';
-                        startCreatePolling(data.encargoid);
+                        startCreatePolling(data.encargoid, true);
                     } else {
                         renderCreateNotice(data.message || 'No se ha podido guardar la creación. Inténtalo de nuevo.');
                         if (btn) {
@@ -590,6 +601,8 @@ define(['block_pulso/common'], function(C) {
         let pulsoCreateStatusKey = '';
        // «pantalla» pintada: si no cambia, solo se actualiza la píldora
         let pulsoCreateAnnounced = '';
+        let pulsoCreateSawPending = false;
+        // el encargo visto estuvo en curso: al terminar, «Mis creaciones» se refresca
        // último estado anunciado al lector de pantalla
         const PULSO_CREATE_POLL_MS = 7000;
 
@@ -606,8 +619,12 @@ define(['block_pulso/common'], function(C) {
         }
 
 
-        function startCreatePolling(encargoid) {
+        // nuevo = true cuando acaba de crearse (puede llegar a estado terminal en el primer sondeo y entonces
+        // «Mis creaciones» tiene una creación más); false al reabrir una existente (no hay nada que refrescar
+        // si ya estaba terminada).
+        function startCreatePolling(encargoid, nuevo) {
             stopCreatePolling();
+            pulsoCreateSawPending = !!nuevo;
             pulsoCreatePollStart = Date.now();
             pulsoCreateStatusKey = '';
             pulsoCreateAnnounced = '';
@@ -636,10 +653,13 @@ define(['block_pulso/common'], function(C) {
                     }
                     renderCreateStatus(data.encargo);
                     if (!data.encargo.terminal) {
+                        pulsoCreateSawPending = true;
                         scheduleNextCreatePoll(encargoid);
-                    } else {
-                        // Estado terminal: la galeria se refresca UNA vez (hay una creacion nueva).
-                        loadCreateGallery();
+                    } else if (pulsoCreateSawPending) {
+                        // Estado terminal tras haber estado en curso: la caché de «Mis creaciones» se
+                        // refresca UNA vez (hay una creación nueva), no en cada sondeo.
+                        pulsoCreateSawPending = false;
+                        loadMisCreaciones();
                     }
                 })
                 .catch(function() {
@@ -918,119 +938,228 @@ define(['block_pulso/common'], function(C) {
                 }
             }
 
-            html += '</div><div id="pulso-create-gallery"></div>';
+            html += '</div>';
 
             body.innerHTML = html;
-            // La galeria NO se pide en cada sondeo (2 peticiones extra cada 7 s):
-            // se repinta desde la ultima carga y solo se pide si nunca se cargo.
-            // En estado terminal la pide pollCreateStatusOnce justo despues.
-            if (pulsoGalleryCache) {
-                renderCreateGallery(pulsoGalleryCache.encargos, pulsoGalleryCache.retos);
-            } else if (!encargo.terminal && !pulsoGalleryLoading) {
-                loadCreateGallery();
-            }
         }
 
 
-        let pulsoGalleryCache = null;
-   // {encargos, retos} de la ultima carga correcta
-        let pulsoGalleryLoading = false;
+        // ---- «Mis creaciones» (fase 4, paso 7) ----
+        // ÚNICA galería: infografías, juegos y retos del usuario en el curso (más las propuestas de retos
+        // aún sin elegir), más recientes primero. Es el nivel base de la pila (`{kind:'mine'}`) y cada
+        // creación que se abre desde ella es un detalle encima: «Volver» regresa aquí. Ampliar recurso NO
+        // entra (es una búsqueda cacheada por recurso, no una creación del usuario).
+        // La caché del cliente se pinta al entrar y se refresca en segundo plano; se pide al entrar en la
+        // pantalla y al llegar un estado terminal, NUNCA en cada sondeo (2 peticiones cada vez).
+        const PULSO_MINE_FILTERS = [['all', 'Todo'], ['infografia', 'Infografías'], ['juego', 'Juegos'], ['reto', 'Retos']];
 
+        let pulsoMineFilter = 'all';
+
+        let pulsoGalleryCache = null;
+   // {encargos, retos, propuestas, partial} de la ultima carga correcta
         let pulsoGallerySeq = 0;
         // solo vale la ultima peticion lanzada
 
-        // La galería es un extra: si falla, no debe romper el resto del panel.
-        function loadCreateGallery() {
+        // Plantilla inerte (<template>) del pie de historial: solo existe en el HTML del alumnado con Épica
+        // ({{^isteacher}}{{#epica}}), así que quien no debe verlo no la recibe. La UI no es control de
+        // acceso (lo es epica_historial.php); el chequeo de cfg es una segunda red.
+        function pulsoMineHistorialHtml() {
+            if (cfg.isTeacher !== false || cfg.epicaAvailable === false) return '';
+            const tpl = document.getElementById('pulso-mine-historial-tpl');
+            return tpl ? tpl.innerHTML : '';
+        }
+
+
+        function openMisCreaciones() {
+            if (cfg.epicaAvailable === false) return;
+            pulsoMineFilter = 'all';
+            pulsoCreateStack = [{ kind: 'mine', tool: 'mine' }];
+            pulsoCreateRenderMine();
+        }
+
+
+        // Pinta la pantalla (esqueleto + caché si la hay) y lanza la carga. Cambio de pantalla dentro de
+        // Crear: invalida los sondeos (token) igual que el formulario.
+        function pulsoCreateRenderMine() {
+            const body = document.getElementById('pulso-create-body');
+            if (!body || !pulsoCreateTop()) return;
+
+            const titleEl = document.getElementById('pulso-create-title');
+            if (titleEl) titleEl.textContent = 'Mis creaciones';
+            stopCreatePolling();
+            S.pulsoAmpToken++;
+            pulsoCreateSyncBack();
+            pulsoCreateShowTool();
+
+            body.innerHTML = '<div class="pulso-mine-filters" role="group" aria-label="Filtrar por tipo">'
+                + PULSO_MINE_FILTERS.map(function(f) {
+                    return '<button type="button" class="pulso-mine-filter" aria-pressed="' + (f[0] === pulsoMineFilter ? 'true' : 'false')
+                        + '" data-pulso-action="pulsoMineFilter" data-pulso-arg="' + f[0] + '">' + f[1] + '</button>';
+                }).join('')
+                + '</div>'
+                + '<p class="pulso-mine-count" id="pulso-mine-count" role="status" aria-live="polite"></p>'
+                + '<div id="pulso-mine-msg"></div>'
+                + '<ul class="pulso-mine-list" id="pulso-mine-list"></ul>'
+                + '<p class="pulso-create-hint">Aquí salen las creaciones que has hecho en este curso. Ampliar un recurso no se guarda: es una búsqueda.</p>'
+                + pulsoMineHistorialHtml();
+            pulsoCreateScreen(true);
+
+            if (pulsoGalleryCache) {
+                renderMineList();
+            } else {
+                pulsoMineMessage('<p class="pulso-create-hint">Cargando…</p>');
+            }
+            loadMisCreaciones();
+        }
+
+
+        // Solo con «Mis creaciones» en la cima de la pila: el cuerpo de una pantalla que se dejó (p. ej. al
+        // volver a la lista de herramientas) sigue en el DOM, oculto, y una respuesta tardía no debe tocarlo.
+        function pulsoMineActive() {
+            const top = pulsoCreateTop();
+            return !!(top && top.kind === 'mine');
+        }
+
+
+        function pulsoMineMessage(html) {
+            const el = document.getElementById('pulso-mine-msg');
+            if (el && pulsoMineActive()) el.innerHTML = html;
+        }
+
+
+        // Pide infografías/juegos (api_create_status.php) y retos + propuestas (api_retos.php mis_retos,
+        // que no llama a Épica) a la vez. Cada fuente falla por separado: si una cae se conserva lo último
+        // que se supo de ella y se avisa. Sin Épica, api_retos.php contesta «no disponible»: ni se pide.
+        function loadMisCreaciones() {
             const seq = ++pulsoGallerySeq;
-            pulsoGalleryLoading = true;
             const params = new URLSearchParams();
             params.set('courseid', cfg.courseid);
             params.set('sesskey', cfg.sesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
 
-            // Infografías/juegos (api_create_status.php) y retos (api_retos.php
-            // mis_retos, que no llama a Épica) se piden a la vez y se mezclan.
-            // Cada fuente falla por separado: si una cae, se pinta la otra.
             const encargosP = fetch(cfg.apiCreateStatusUrl + '?' + params.toString(), { credentials: 'same-origin' })
                 .then(function(r) { return r.json(); })
                 .then(function(data) { return data.success ? (data.encargos || []) : null; })
                 .catch(function() { return null; });
-            // Sin Épica, api_retos.php contesta «no disponible» a todo: ni se pide.
             const retosP = (cfg.epicaAvailable === false)
-                ? Promise.resolve([])
-                : C.fn.pulsoRetosCall('mis_retos')
-                    .then(function(d) { return d.ok && Array.isArray(d.retos) ? d.retos : []; });
+                ? Promise.resolve({ retos: [], propuestas: [] })
+                : C.fn.pulsoRetosCall('mis_retos').then(function(d) {
+                    return d.ok ? {
+                        retos: Array.isArray(d.retos) ? d.retos : [],
+                        propuestas: Array.isArray(d.propuestas) ? d.propuestas : []
+                    } : null;
+                });
 
             Promise.all([encargosP, retosP]).then(function(res) {
                 if (seq !== pulsoGallerySeq) return;
-                pulsoGalleryLoading = false;
-                if (res[0] === null && !res[1].length) return;
-                pulsoGalleryCache = { encargos: res[0] || [], retos: res[1] };
-                renderCreateGallery(pulsoGalleryCache.encargos, pulsoGalleryCache.retos);
+                const prev = pulsoGalleryCache;
+                if (res[0] === null && res[1] === null) {
+                    if (!prev) {
+                        pulsoMineMessage('<div class="pulso-create-notice-inline warn">No hemos podido cargar tus creaciones.</div>'
+                            + '<button type="button" class="pulso-create-secondary" data-pulso-action="loadMisCreaciones">Reintentar</button>');
+                    }
+                    return;
+                }
+                pulsoGalleryCache = {
+                    encargos: res[0] !== null ? res[0] : (prev ? prev.encargos : []),
+                    retos: res[1] !== null ? res[1].retos : (prev ? prev.retos : []),
+                    propuestas: res[1] !== null ? res[1].propuestas : (prev ? prev.propuestas : []),
+                    partial: res[0] === null || res[1] === null
+                };
+                renderMineList(); // no hace nada si la pantalla ya no está
             }).catch(function() {
-                if (seq === pulsoGallerySeq) pulsoGalleryLoading = false;
-                /* la galería es un extra, no bloquea el panel */
+                /* la carga es un extra: sin respuesta se queda lo que ya hubiera pintado */
             });
         }
 
 
-        // Galería conjunta (paso 3): infografía y juego mezclados, más
-        // recientes primero. Una infografía se ENSEÑA (miniatura real); un
-        // juego se JUEGA, así que su tarjeta no tiene imagen (pluginfile.php
-        // sigue bloqueando su filearea a propósito) — icono + título de
-        // respaldo + etiqueta. Ninguna de las dos usa el cian como texto.
-        // Retos (v1.27): tarjetas-enlace a Épica (pestaña nueva, sin iframe),
-        // mezcladas por fecha con las demás; etiqueta «Reto» en slate.
-        function renderCreateGallery(encargos, retos) {
-            const container = document.getElementById('pulso-create-gallery');
-            if (!container) return;
-            retos = (retos || []).filter(function(r) { return pulsoAmpIsHttps(r.enlace); }).slice(0, 8);
-            if (!encargos.length && !retos.length) {
-                container.innerHTML = '<p class="pulso-create-hint">Aún no has creado nada en este curso.</p>' + pulsoHistorialFooter();
-                return;
-            }
-
-            const items = encargos.map(function(e) { return { t: e.timecreated, e: e }; })
-                .concat(retos.map(function(r) { return { t: r.creado, r: r }; }))
-                .sort(function(a, b) { return b.t - a.t; });
-
-            // El servidor ya filtra a status='listo' con fichero (ver
-            // api_create_status.php), así que aquí no hay placeholder de
-            // estado: todas las tarjetas son creaciones terminadas.
-            let html = '<div class="pulso-create-gallery-title">Tus últimas creaciones</div><div class="pulso-create-gallery-grid">';
-            items.forEach(function(it) {
-                if (it.r) {
-                    html += '<a class="pulso-create-gallery-item" href="' + pulsoEscapeAttr(it.r.enlace) + '" target="_blank" rel="noopener noreferrer">'
-                        + '<span class="pulso-create-gallery-icon" aria-hidden="true">' + C.fn.pulsoRetosIconSvg('target') + '</span>'
-                        + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(it.r.titulo || 'Reto') + '</span>'
-                        + '<span class="pulso-create-gallery-tag">Reto</span>'
-                        + '<span class="pulso-create-gallery-date">' + escapeHtmlText(new Date(it.r.creado * 1000).toLocaleDateString()) + '</span>'
-                        + PULSO_NEWTAB_SR + '</a>';
-                    return;
-                }
-                const e = it.e;
-                const dateLabel = new Date(e.timecreated * 1000).toLocaleDateString();
-                const esjuego = e.tool === 'gamificacion';
-                const tag = esjuego ? 'Juego' : 'Infografía';
-                // "tool" entra en un onclick: solo uno de los dos valores conocidos, y el id como entero.
-                const toolSeguro = esjuego ? 'gamificacion' : 'infografia';
-                html += '<button type="button" class="pulso-create-gallery-item" data-pulso-action="openCreateGalleryItem" data-pulso-arg="' + (parseInt(e.id, 10) || 0) + '" data-pulso-arg2="' + toolSeguro + '">';
-                if (esjuego) {
-                    html += '<span class="pulso-create-gallery-icon" aria-hidden="true">'
-                        + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-                        + '<rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/>'
-                        + '<line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/></svg>'
-                        + '</span>'
-                        + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(e.titulo || 'Juego') + '</span>';
-                } else {
-                    html += '<img src="' + pulsoEscapeAttr(e.imageurl) + '" alt="">'
-                        + '<span class="pulso-create-gallery-item-title">' + escapeHtmlText(e.titulo || 'Infografía') + '</span>';
-                }
-                html += '<span class="pulso-create-gallery-tag">' + tag + '</span>'
-                    + '<span class="pulso-create-gallery-date">' + escapeHtmlText(dateLabel) + '</span>'
-                    + '</button>';
+        // Todas las creaciones de la caché en una lista, con su tipo para el filtro. Un reto es un enlace
+        // a Épica (solo https); una propuesta sin elegir se reabre en Pulse con la MISMA propuesta.
+        function pulsoMineItems() {
+            const c = pulsoGalleryCache;
+            const items = [];
+            c.encargos.forEach(function(e) {
+                items.push({ t: Number(e.timecreated) || 0, kind: e.tool === 'gamificacion' ? 'juego' : 'infografia', e: e });
             });
-            html += '</div>' + pulsoHistorialFooter();
-            container.innerHTML = html;
+            c.retos.filter(function(r) { return pulsoAmpIsHttps(r.enlace); }).forEach(function(r) {
+                items.push({ t: Number(r.creado) || 0, kind: 'reto', r: r });
+            });
+            c.propuestas.forEach(function(p) {
+                items.push({ t: Number(p.creado) || 0, kind: 'reto', p: p });
+            });
+            return items.sort(function(x, y) { return y.t - x.t; });
+        }
+
+
+        const PULSO_MINE_ICONS = {
+            juego: '<rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/>'
+                + '<line x1="15" y1="13" x2="15.01" y2="13"/><line x1="18" y1="11" x2="18.01" y2="11"/>',
+            infografia: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/>'
+        };
+
+
+        function pulsoMineInfo(title, kindLabel, t) {
+            return '<span class="pulso-mine-info"><span class="pulso-mine-title">' + escapeHtmlText(title) + '</span>'
+                + '<span class="pulso-mine-meta">' + escapeHtmlText(kindLabel) + ' · '
+                + escapeHtmlText(new Date(t * 1000).toLocaleDateString()) + '</span></span>';
+        }
+
+
+        function pulsoMineItemHtml(it) {
+            if (it.r) {
+                return '<a class="pulso-mine-item" href="' + pulsoEscapeAttr(it.r.enlace) + '" target="_blank" rel="noopener noreferrer">'
+                    + '<span class="pulso-mine-thumb" aria-hidden="true">' + C.fn.pulsoRetosIconSvg('target') + '</span>'
+                    + pulsoMineInfo(it.r.titulo || 'Reto', 'Reto', it.t) + PULSO_NEWTAB_SR + '</a>';
+            }
+            if (it.p) {
+                const lista = it.p.estado === 'listo';
+                return '<button type="button" class="pulso-mine-item" data-pulso-action="pulsoRetosAbrirPropuesta" data-pulso-arg="' + (parseInt(it.p.id, 10) || 0) + '">'
+                    + '<span class="pulso-mine-thumb" aria-hidden="true">' + C.fn.pulsoRetosIconSvg('target') + '</span>'
+                    + pulsoMineInfo('Propuesta de retos · ' + (lista ? 'Lista para elegir' : 'En preparación'), 'Reto', it.t) + '</button>';
+            }
+            const e = it.e;
+            const esjuego = it.kind === 'juego';
+            // Solo dos herramientas conocidas: el id como entero y la herramienta de una lista cerrada.
+            const thumb = esjuego
+                ? '<span class="pulso-mine-thumb" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + PULSO_MINE_ICONS.juego + '</svg></span>'
+                : '<span class="pulso-mine-thumb" aria-hidden="true"><img src="' + pulsoEscapeAttr(e.imageurl) + '" alt=""></span>';
+            return '<button type="button" class="pulso-mine-item" data-pulso-action="openCreateGalleryItem" data-pulso-arg="' + (parseInt(e.id, 10) || 0)
+                + '" data-pulso-arg2="' + (esjuego ? 'gamificacion' : 'infografia') + '">'
+                + thumb + pulsoMineInfo(e.titulo || (esjuego ? 'Juego' : 'Infografía'), esjuego ? 'Juego' : 'Infografía', it.t) + '</button>';
+        }
+
+
+        // Repinta SOLO la lista, el recuento y el aviso (no el cuerpo entero): así el foco del usuario sobre
+        // un filtro no se pierde y el observador de foco de Crear (hijos directos del cuerpo) no salta.
+        function renderMineList() {
+            const list = document.getElementById('pulso-mine-list');
+            const count = document.getElementById('pulso-mine-count');
+            if (!list || !count || !pulsoGalleryCache || !pulsoMineActive()) return;
+
+            const all = pulsoMineItems();
+            const shown = all.filter(function(it) { return pulsoMineFilter === 'all' || it.kind === pulsoMineFilter; });
+            list.innerHTML = shown.map(function(it) {
+                return '<li data-pulso-type="' + it.kind + '">' + pulsoMineItemHtml(it) + '</li>';
+            }).join('');
+            count.textContent = shown.length + (shown.length === 1 ? ' creación' : ' creaciones');
+
+            let msg = '';
+            if (pulsoGalleryCache.partial) {
+                msg += '<div class="pulso-create-notice-inline warn">No hemos podido cargar todas tus creaciones. Vuelve a entrar en un momento.</div>';
+            }
+            if (!shown.length) {
+                msg += '<p class="pulso-create-hint">' + (all.length ? 'Todavía no tienes nada de este tipo.' : 'Aún no has creado nada en este curso.') + '</p>';
+            }
+            pulsoMineMessage(msg);
+        }
+
+
+        // Filtro por tipo: botones con aria-pressed; el recuento (role="status") anuncia «N creaciones».
+        function pulsoMineFilterSet(filter) {
+            pulsoMineFilter = PULSO_MINE_FILTERS.some(function(f) { return f[0] === filter; }) ? filter : 'all';
+            document.querySelectorAll('#pulso-create-body .pulso-mine-filter').forEach(function(btn) {
+                btn.setAttribute('aria-pressed', btn.getAttribute('data-pulso-arg') === pulsoMineFilter ? 'true' : 'false');
+            });
+            renderMineList();
         }
 
 
@@ -1038,13 +1167,7 @@ define(['block_pulso/common'], function(C) {
         // epica_historial.php ya lo exige). El token nunca pasa por este JS: se
         // crea un <form> POST con courseid + sesskey hacia nuestro endpoint, en
         // pestaña nueva y en el propio clic (sin bloqueo de ventanas emergentes).
-        function pulsoHistorialFooter() {
-            if (cfg.isTeacher !== false || cfg.epicaAvailable === false) return '';
-            return '<p class="pulso-create-hint"><button type="button" class="pulso-historial-link" data-pulso-action="pulsoAbrirHistorial">Ver todo mi historial en Épica<span aria-hidden="true"> ↗</span>' + PULSO_NEWTAB_SR + '</button><br>'
-                + 'Se abre en una pestaña nueva. Solo aparece lo creado desde el 5 de octubre de 2026.</p>';
-        }
-
-
+        // El botón vive al pie de «Mis creaciones» (plantilla pulso-mine-historial-tpl).
         function pulsoAbrirHistorial() {
             if (cfg.isTeacher !== false || !cfg.apiHistorialUrl) return;
             const form = document.createElement('form');
@@ -1075,16 +1198,19 @@ define(['block_pulso/common'], function(C) {
             body.innerHTML = '<p class="pulso-create-hint">Cargando…</p>';
             pulsoCreateScreen(true);
             // Si sigue en curso, se sondea igual que un encargo recién creado.
-            startCreatePolling(encargoid);
+            startCreatePolling(encargoid, false);
         }
     C.fn.pulsoCreateIsOpen = pulsoCreateIsOpen;
     C.fn.pulsoCreateScreen = pulsoCreateScreen;
     C.fn.openCreatePanel = openCreatePanel;
+    C.fn.openMisCreaciones = openMisCreaciones;
+    C.fn.pulsoMineFilter = pulsoMineFilterSet;
+    C.fn.loadMisCreaciones = loadMisCreaciones;
+    C.fn.pulsoCreateSetTool = pulsoCreateSetTool;
     C.fn.pulsoCreateBack = pulsoCreateBack;
     C.fn.closeCreatePanel = pulsoCreateBack; // nombre anterior de la acción
     C.fn.pulsoCreateEnter = pulsoCreateEnter;
     C.fn.pulsoSyncPolling = pulsoSyncPolling;
-    C.fn.loadCreateGallery = loadCreateGallery;
     C.fn.pulsoAbrirHistorial = pulsoAbrirHistorial;
     C.fn.submitCreate = submitCreate;
     C.fn.openCreateGalleryItem = openCreateGalleryItem;

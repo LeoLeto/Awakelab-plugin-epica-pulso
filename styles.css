@@ -1038,12 +1038,169 @@
     word-break: break-word;
 }
 
-/* Galeria de encargos anteriores del usuario en el curso. */
-.pulso-create-gallery-title {
-    font-size: 0.8rem;
-    font-weight: 600;
+/* ========== «MIS CREACIONES» ==========
+   Única galería de Pulse: infografías, juegos y retos (y propuestas de retos sin elegir) del usuario en el curso.
+   Texto tinta/slate, nunca cian; todo el texto >= 0.75rem; filas de >= 44 px. */
+.pulso-mine-wrap {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--pulso-line);
+}
+
+.pulso-mine-btn {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    min-height: 44px;
+    text-align: left;
+    border: 1px solid var(--pulso-deep);
+    border-radius: 12px;
+    background: var(--pulso-bg);
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+    cursor: pointer;
+}
+
+.pulso-mine-btn:hover {
+    background: var(--pulso-surface);
+}
+
+.pulso-mine-btn-icon {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--pulso-surface-2);
+    color: var(--pulso-cyan);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pulso-mine-btn-icon svg {
+    width: 22px;
+    height: 22px;
+}
+
+.pulso-mine-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0 0 8px;
+}
+
+.pulso-mine-filter {
+    min-height: 32px;
+    padding: 6px 12px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 999px;
+    background: var(--pulso-bg);
     color: var(--pulso-slate);
-    margin: 18px 0 8px;
+    font-family: var(--pulso-font);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.pulso-mine-filter[aria-pressed="true"] {
+    background: var(--pulso-navy);
+    border-color: var(--pulso-navy);
+    color: #FFFFFF;
+}
+
+.pulso-mine-count {
+    margin: 0 0 10px;
+    min-height: 1em;
+    font-size: 0.75rem;
+    color: var(--pulso-slate);
+}
+
+.pulso-mine-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.pulso-mine-item {
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px;
+    min-height: 44px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    background: var(--pulso-surface);
+    color: var(--pulso-ink);
+    text-align: left;
+    text-decoration: none;
+    font-family: var(--pulso-font);
+    cursor: pointer;
+}
+
+.pulso-mine-item:hover {
+    border-color: var(--pulso-cyan);
+    background: var(--pulso-bg);
+}
+
+.pulso-mine-thumb {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--pulso-surface-2);
+    color: var(--pulso-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pulso-mine-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.pulso-mine-thumb svg {
+    width: 24px;
+    height: 24px;
+}
+
+.pulso-mine-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pulso-mine-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--pulso-ink);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.pulso-mine-meta {
+    font-size: 0.75rem;
+    color: var(--pulso-slate);
+}
+
+.pulso-mine-historial {
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px solid var(--pulso-line);
 }
 
 /* «Mi historial» (carta 10): enlace discreto, texto slate (nunca cian). */
@@ -1060,79 +1217,8 @@
     border-radius: 4px;
 }
 
-.pulso-historial-link.head {
-    margin-left: auto;
-}
-
 .pulso-historial-link:hover {
     color: var(--pulso-navy);
-}
-
-.pulso-create-gallery-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-}
-
-.pulso-create-gallery-item {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 0;
-    border: 1px solid var(--pulso-line);
-    border-radius: 10px;
-    background: var(--pulso-surface);
-    cursor: pointer;
-    overflow: hidden;
-    font-family: var(--pulso-font);
-}
-
-.pulso-create-gallery-item img {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    object-fit: cover;
-    display: block;
-}
-
-/* Tarjeta de juego: sin imagen (no la hay), icono + título de respaldo. */
-.pulso-create-gallery-icon {
-    width: 100%;
-    aspect-ratio: 1 / 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--pulso-surface-2);
-    color: var(--pulso-muted);
-}
-
-.pulso-create-gallery-icon svg {
-    width: 26px;
-    height: 26px;
-}
-
-.pulso-create-gallery-item-title {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--pulso-ink);
-    padding: 0 4px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
-/* "Juego" / "Infografía" — nunca cian como color de texto. */
-.pulso-create-gallery-tag {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--pulso-slate);
-    padding: 0 4px;
-}
-
-.pulso-create-gallery-date {
-    font-size: 0.75rem;
-    color: var(--pulso-muted);
-    padding: 0 4px 4px;
 }
 
 /* ========== AMPLIAR RECURSO (resultados) ==========
@@ -1491,10 +1577,6 @@ a.pulso-retos-open {
     font-size: 0.76rem;
     color: var(--pulso-slate);
     line-height: 1.45;
-}
-
-a.pulso-create-gallery-item {
-    text-decoration: none;
 }
 
 .pulso-message {
@@ -2661,8 +2743,10 @@ a.pulso-create-gallery-item {
         padding-left: 0;
     }
 
-    .pulso-create-gallery-grid {
-        grid-template-columns: repeat(2, 1fr);
+    .pulso-mine-btn,
+    .pulso-mine-filter,
+    .pulso-mine-item {
+        min-height: 44px;
     }
 
     .pulso-home-grid {

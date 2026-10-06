@@ -1,5 +1,33 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-06 — Fase 4 UX, paso 7: «Mis creaciones» (v1.39.0)
+
+Reglas en `CLAUDE.md` → «Fase 4 — paso 7» (y las secciones de galería/historial reescritas). Cliente + plantilla + CSS + un cambio de
+servidor (`api_create_status.php` 8→24 filas y `tool` opcional; `retos_service::mis_retos` con propuestas); sin `db/`. Lo que costó ver:
+- **Un cuerpo de pantalla «abandonado» sigue en el DOM.** Al volver a la lista de herramientas, `#pulso-create-body` conserva el
+  HTML de «Mis creaciones» (el panel solo se oculta), así que una respuesta tardía de la lista encontraba `#pulso-mine-list` y
+  pintaba en un panel oculto. Antes de la guarda `pulsoMineActive()` (la cima de la pila debe ser `mine`) la prueba lo cazó;
+  comprobar el elemento no basta, hay que comprobar la pila.
+- **Una fila `.pulso-tool` más habría roto las 147 pruebas de la pila** (cuentan filas `.pulso-tool`) y, sobre todo, mezclaba una
+  herramienta con una vista. La fila de «Mis creaciones» es `.pulso-mine-btn` en un bloque aparte, con `data-pulso-tool="mine"` solo para
+  devolver el foco.
+- **El pie del historial va en un `<template>`**, porque la pantalla se pinta con `innerHTML` desde JS y las secciones Mustache no
+  llegan ahí: la plantilla inerte vive en `{{^isteacher}}{{#epica}}` (el HTML del profesorado no la contiene) y el JS copia su
+  `innerHTML`. jsdom lo soporta; falta confirmarlo en un navegador real.
+- **Abrir una creación ya terminada disparaba un refresco inútil** (el `terminal` del primer sondeo). Se distingue con
+  `pulsoCreateSawPending`: solo refresca si el encargo estuvo en curso (o se acaba de crear).
+- **Las propuestas «de la madre» tras «Proponer otros» no se pueden ocultar**: la tabla no guarda el padre (la hija hereda `cmid` y
+  `tema`), así que la madre sigue saliendo como «Lista para elegir» hasta que caduque. Documentado; arreglarlo pide una columna.
+- **El cliente no usa el parámetro `tool` del servidor** (filtra en cliente sobre las 24 filas): una segunda consulta por filtro
+  complicaba la caché y el spec no la pedía. Con >24 de un tipo el filtro solo ve las más recientes.
+- **Pruebas** (fuera del repo): jsdom `mine.test.js` 163 comprobaciones; pila 147 (eran 148: 5 de la galería → 4 de «ya no hay
+  galería»), pestañas 92, home 40 (su script apuntaba al parcial viejo `chat_create_cta`; actualizado). PHP sin `mbstring`/sqlite:
+  `mis_retos` con un `$DB` falso que captura el SQL, ejecutado después en SQLite de Node con datos de otro usuario, otro curso,
+  fallado, desconocido, con reto elegido y caducada → solo salen las 3 buenas; `api_create_status` con `tool` válido/sin/inválido
+  (400 sin tocar la BD) y Mustache PHP en las 5 combinaciones rol/`createactivity`/Épica.
+- **NO probado** (sin navegador): aspecto real de la lista y los filtros, contraste, 320 px, foco visible, lector (NVDA), `<template>`
+  en navegador, y el recorrido en sanase-test (purgar cachés: plantilla y CSS).
+
 ## 2026-10-06 — Fase 4 UX, paso 6: lista de herramientas y pila de Crear (v1.38.0)
 
 Regla en `CLAUDE.md` → «Fase 4 — paso 6». Solo plantilla (parcial renombrado a `chat_create_tools`), CSS y `crear.js`/`retos.js`/`ampliacion.js`;

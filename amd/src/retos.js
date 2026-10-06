@@ -244,9 +244,7 @@ define(['block_pulso/common'], function(C) {
                 + '</div>'
                 + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
                 + '<button type="button" class="pulso-create-submit" id="pulso-retos-propose-btn" data-retos-action data-pulso-action="pulsoRetosProponer">Proponer retos</button>'
-                + '<button type="button" class="pulso-create-back-link" data-pulso-action="pulsoRetosVerCurso">Ver todos los retos del curso' + PULSO_NEWTAB_SR + '</button>'
-                + '<div id="pulso-create-gallery"></div>';
-            C.fn.loadCreateGallery();
+                + '<button type="button" class="pulso-create-back-link" data-pulso-action="pulsoRetosVerCurso">Ver todos los retos del curso' + PULSO_NEWTAB_SR + '</button>';
         }
 
 
@@ -316,6 +314,26 @@ define(['block_pulso/common'], function(C) {
                 // sondeo se arma con el token VIGENTE, no con el de la petición que acaba de volver.
                 pulsoRetosSchedulePoll(S.pulsoAmpToken);
             });
+        }
+
+
+        // Abre una propuesta que YA existe (desde «Mis creaciones»): la MISMA propuesta, nunca un `proponer`
+        // nuevo (gastaría otra unidad de cupo). Es un detalle de la pila: «Volver» regresa a «Mis creaciones».
+        // El sondeo normal hace el resto: en cola/trabajando espera sin límite en cola, lista pinta los seis.
+        function pulsoRetosAbrirPropuesta(id) {
+            id = parseInt(id, 10) || 0;
+            if (!id || !document.getElementById('pulso-create-body')) return;
+            C.fn.pulsoCreateSetTool('retos');
+            pulsoRetosPropuestaId = id;
+            // Sin parámetros de una propuesta anterior: «Volver a intentarlo» (si acaba fallando) lleva al
+            // formulario y no repite otra propuesta distinta de la que se abrió.
+            pulsoRetosLastParams = null;
+            pulsoRetosGrace = 0;
+            pulsoRetosLastSeen = 0;
+            pulsoRetosRenderWaiting();
+            C.fn.pulsoCreateScreen(true);
+            // Entrar en el detalle ha subido el token: se arma con el VIGENTE.
+            pulsoRetosPoll(S.pulsoAmpToken);
         }
 
 
@@ -555,8 +573,9 @@ define(['block_pulso/common'], function(C) {
                     ? '<a class="pulso-create-secondary" href="' + pulsoEscapeAttr(d.enlace_curso) + '" target="_blank" rel="noopener noreferrer">Ver retos del curso' + PULSO_NEWTAB_SR + '</a>'
                     : '')
                 + '<button type="button" class="pulso-create-secondary" data-pulso-action="openCreatePanel" data-pulso-arg="retos">Crear otro reto</button>'
-                + '</div><div id="pulso-create-gallery"></div>';
-            C.fn.loadCreateGallery();
+                + '</div>';
+            // Hay un reto elegido nuevo: «Mis creaciones» se refresca (solo su caché, no se pinta aquí).
+            C.fn.loadMisCreaciones();
 
             // Sin bloquear nada: a los ~45 s, y luego cada 20 s mientras no esté listo, hasta 3 min en total.
             const codigo = String(d.codigo || '');
@@ -646,6 +665,7 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoRetosReset = pulsoRetosReset;
     C.fn.renderRetosForm = renderRetosForm;
     C.fn.pulsoRetosPoll = pulsoRetosPoll;
+    C.fn.pulsoRetosAbrirPropuesta = pulsoRetosAbrirPropuesta;
     C.fn.pulsoRetosRefrescar = pulsoRetosRefrescar;
     C.fn.pulsoRetosRetry = pulsoRetosRetry;
     C.fn.pulsoRetosSeguirEsperando = pulsoRetosSeguirEsperando;

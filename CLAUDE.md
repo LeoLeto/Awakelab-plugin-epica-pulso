@@ -581,25 +581,17 @@ infografía, en vez del «Encargo guardado» estático del paso 1. Vive en
   (no necesariamente `cuota-agotada`, que puede seguir reintentando sin
   problema), y entonces sí que el mapeo de mensajes del cliente ya funciona
   sin tocarlo.
-- **La galería ("últimas infografías") es SOLO de los encargos propios del
-  usuario en el curso** (`api_create_status.php` sin `encargoid`) — no un
-  listado de todo el curso para el profesorado; eso seguiría exigiendo
-  comprobar `viewanalytics` por fila, no por vista completa, y no lo pidió el
-  encargo. Se enseña siempre debajo del formulario, del aviso de cupo/sin
-  recursos y de la vista de progreso: una lámina de ayer no deja de existir
-  porque hoy no queden encargos o cupo.
-- **La galería enseña SOLO infografías de verdad**: la consulta de
-  `api_create_status.php` (rama sin `encargoid`) filtra en el SERVIDOR por
-  `status = 'listo' AND filename IS NOT NULL AND filename <> ''`, además de
-  `courseid`+`userid`. Un encargo `pendiente`/`encolado`/`trabajando`/
-  `fallado`/`desconocido`/`ensayo` no sale ahí — ese seguimiento es cosa del
-  panel de progreso (`renderCreateStatus`), no de la galería. `filename` es
-  `char` en `install.xml`, así que la comparación es SQL directo, sin
-  `sql_isnotempty()`. Consecuencia en el frontend: como el servidor ya
-  garantiza imagen, `renderCreateGallery()` ya no pinta un placeholder con
-  píldora de estado (se quitó junto con el CSS `.pulso-create-gallery-placeholder`,
-  que se quedó sin uso) y una galería vacía muestra un texto explícito en vez
-  de no pintar nada.
+- **«Mis creaciones» es SOLO de los encargos propios del usuario en el curso**
+  (`api_create_status.php` sin `encargoid`; v1.39.0 sustituye a la galería «Tus últimas
+  creaciones» que salía bajo cada formulario y estado — ya no existe, ver «Fase 4 — paso 7»). No es un
+  listado de todo el curso para el profesorado; eso seguiría exigiendo comprobar
+  `viewanalytics` por fila, no por vista completa.
+- **La lista enseña SOLO creaciones de verdad**: la consulta (rama sin `encargoid`) filtra en el
+  SERVIDOR por `status = 'listo' AND filename IS NOT NULL AND filename <> ''`, además de
+  `courseid`+`userid`. Un encargo `pendiente`/`encolado`/`trabajando`/`fallado`/`desconocido`/
+  `ensayo` no sale ahí — ese seguimiento es cosa del panel de progreso (`renderCreateStatus`).
+  `filename` es `char` en `install.xml`, así que la comparación es SQL directo, sin
+  `sql_isnotempty()`. Como el servidor ya garantiza fichero, no hay tarjetas «en curso».
 - **`db/install.xml` estaba desincronizado con `db/upgrade.php` desde
   v1.19.0**: las columnas del paso 3 (`epica_plataforma`, `mock`,
   `verificado`, `avisos`, `titulo`, `tema`, `arquetipo`, `filename`,
@@ -672,11 +664,8 @@ es el paso 2— y sin página de juego, puente ni CSP —eso es el paso 3—.
   encargar (carta 5 §3.3 lo pide explícitamente para esta herramienta). El
   de láminas NO lo lleva y no se le añade: es un sobre ya probado en
   producción y "lo demás no cambia" es parte del contrato de este paso.
-- **La galería de infografías filtra por `tool = 'infografia'`** en
-  `api_create_status.php` — sin este filtro, en cuanto exista el primer
-  juego `listo` (que también tiene `filename` relleno, solo que en su propia
-  filearea) empezaría a colarse en la galería de infografías. La galería de
-  juegos es del paso 2, con su propia UI y su propia consulta.
+- **La lista de creaciones ya no filtra por `tool` por defecto** (era necesario mientras no
+  existía la UI de juegos; ver «Gamificación — paso 3» y «Fase 4 — paso 7»).
 - **`notify_completion()` distingue género, no solo la palabra**: "el juego"
   (masculino) vs. "la infografía" (femenino) cambia también el adjetivo
   (listo/lista) y el artículo (ábrelo/ábrela) — sustituir solo el sustantivo
@@ -745,7 +734,7 @@ de un paso futuro (ver `lib.php`). Reglas que no se pueden romper:
   `imageurl`/`downloadurl` — esa URL apuntaría a la filearea `juego`, que
   `pluginfile.php` bloquea a propósito. `puntua` solo se añade al payload de
   un juego, no al de una infografía. **`tool` sí viaja en los dos** desde el
-  paso 3 (antes solo en el de un juego): la galería conjunta lo necesita para
+  paso 3 (antes solo en el de un juego): la lista conjunta lo necesita para
   distinguir tarjeta e icono sin adivinarlo por la ausencia de `imageurl`.
 - **`juego.php`/`juego_html.php` comparten el mismo criterio de acceso que
   `block_pulso_pluginfile()`** (dueño del encargo o `viewanalytics` en el
@@ -787,26 +776,21 @@ descomentar algo ya puesto"—. Reglas que deben persistir:
   panel de chat: el panel es estrecho y el juego ya corre en su propio marco
   aislado con CSP/`sandbox` (paso 2). Para una infografía se mantiene la
   vista actual (imagen + "Abrir a tamaño completo"/"Descargar").
-- **La galería es conjunta, con `tool` en cada fila.** `api_create_status.php`
-  quitó el filtro `tool = 'infografia'` de la rama sin `encargoid`: ahora
-  devuelve los últimos 8 encargos `listo` con fichero de las DOS
-  herramientas, más recientes primero. Consecuencia en el payload
-  (`pulso_status_encargo_payload()`): **`tool` viaja para las dos** (antes
-  solo para un juego) — sin ese campo el frontend no podría decidir tarjeta
-  ni icono en la galería mezclada. `puntua`/`playurl` siguen siendo
-  exclusivos de un juego.
+- **La lista de «Mis creaciones» es conjunta, con `tool` en cada fila.** `api_create_status.php`
+  sin `encargoid` devuelve las DOS herramientas, más recientes primero (24 filas desde v1.39.0;
+  antes 8). **`tool` viaja en el payload de las dos** (antes solo en el de un juego) — sin él el
+  frontend no podría decidir icono ni miniatura. `puntua`/`playurl` siguen siendo exclusivos de
+  un juego.
 - **Título de respaldo del juego, calculado en SERVIDOR, no en el cliente.**
   Mismo criterio que `juego.php`: si `titulo` viene vacío, `tema` → nombre
   del recurso (`get_fast_modinfo()->get_cm($cmid)->name`) → `"Juego"`.
   Calculado una vez en `pulso_status_encargo_payload()` y reutilizado tanto
-  en el detalle del encargo como en la galería — evita reimplementar la
+  en el detalle del encargo como en la lista — evita reimplementar la
   regla en JavaScript y que las dos vistas puedan divergir.
-- **Tarjeta de juego sin imagen, a propósito.** `pluginfile.php` sigue
-  bloqueando la filearea `juego` (paso 1), así que un juego nunca lleva
-  `imageurl`/`downloadurl`: su tarjeta en la galería es icono de gamepad +
-  título de respaldo + fecha, no una miniatura. Etiqueta «Juego»/«Infografía»
-  en cada tarjeta con `#34547A` — nunca cian como color de texto (regla del
-  tema claro, sigue aplicando).
+- **La fila de un juego en «Mis creaciones» no lleva imagen, a propósito.** `pluginfile.php` sigue
+  bloqueando la filearea `juego` (paso 1), así que un juego nunca lleva `imageurl`/`downloadurl`: su
+  fila es icono de gamepad + título de respaldo + fecha, no una miniatura. Etiqueta «Juego»/«Infografía»
+  en `#34547A` — nunca cian como color de texto (regla del tema claro, sigue aplicando).
 - **Estimación de espera de un juego, de la carta 6 (C3), no inventada:**
   en cola, `posición × 35 s`; trabajando, «Casi listo, suele tardar
   alrededor de un minuto». Para infografías se mantienen los textos de
@@ -815,7 +799,7 @@ descomentar algo ya puesto"—. Reglas que deben persistir:
   independiente de la herramienta y solo un texto — el aviso real ya lo
   manda `notify_completion()` (paso 4) al llegar a un estado terminal.
 - **Reabrir con la herramienta correcta.** «Empezar una creación nueva» (antes «Crear un encargo nuevo»), «←
-  Volver al formulario» y abrir un ítem de la galería
+  Volver al formulario» y abrir un ítem de «Mis creaciones»
   (`openCreateGalleryItem(id, tool)`) propagan el `tool` del encargo que se
   está viendo, nunca vuelven a `'infografia'` por defecto — si no, un alumno
   que falla creando un juego y pulsa «Empezar una creación nueva» aterrizaría en
@@ -1345,9 +1329,10 @@ persistir:
   `intentos`** — el servidor solo lo manda con `viewanalytics` (nota agregada de cualquiera que
   abrió el reto, nunca del alumno que lo pidió), así que el cliente no decide el rol, solo pinta
   lo que llega.
-- **Galería conjunta:** `loadCreateGallery()` pide a la vez `api_create_status.php` y
-  `accion=mis_retos` (esta no llama a Épica) y mezcla por fecha; cada fuente falla por separado. La
-  tarjeta de reto es un `<a>` a su enlace (pestaña nueva), etiqueta «Reto» en `#34547A`.
+- **«Mis creaciones» mezcla los retos con lo demás:** `loadMisCreaciones()` pide a la vez
+  `api_create_status.php` y `accion=mis_retos` (esta no llama a Épica) y mezcla por fecha; cada fuente
+  falla por separado. El reto es un `<a>` a su enlace (pestaña nueva), etiqueta «Reto» en `#34547A`.
+  `mis_retos` devuelve además las propuestas sin elegir (ver «Fase 4 — paso 7»).
 - **«Ver todos los retos del curso»** llama a `accion=curso` y abre su `enlace`; no se pinta la lista.
   Como el navegador bloquea un `window.open` tras un `fetch`, se abre la pestaña EN el clic y se le
   pone la URL al llegar (si el navegador la bloquea, se ofrece un enlace).
@@ -1358,11 +1343,10 @@ persistir:
   captura `pulsoAmpToken` al lanzar y sale en `.then`/`.catch` si ya no coincide
   (`stopCreatePolling()` lo incrementa vía `pulsoRetosReset()`). Sin eso, una respuesta
   tardía pintaba encima de Retos o de otra pantalla y reprogramaba el sondeo.
-- **La galería NO se pide en cada sondeo.** `renderCreateStatus()` repinta desde
-  `pulsoGalleryCache` y solo pide si nunca se cargó (y el encargo no es terminal);
-  `pollCreateStatusOnce()` la refresca UNA vez al llegar a estado terminal. Cada carga son 2
-  peticiones (`api_create_status` + `mis_retos`); `pulsoGallerySeq` descarta respuestas
-  de cargas ya superadas.
+- **La lista de «Mis creaciones» NO se pide en cada sondeo.** Se pinta desde `pulsoGalleryCache` y se
+  pide al entrar en la pantalla y UNA vez al llegar a estado terminal un encargo que estuvo en curso
+  (`pulsoCreateSawPending`; abrir una ya terminada no repide). Cada carga son 2 peticiones
+  (`api_create_status` + `mis_retos`); `pulsoGallerySeq` descarta respuestas de cargas ya superadas.
 - **El `motivo` TERMINAL nunca lleva detalle técnico.** Al tope de fallos transitorios,
   `reintentar_o_fallar_transitorio()` guarda un motivo genérico («No hemos podido conectar
   con el servicio de generación…») y deja clase y mensaje de la excepción solo en
@@ -1392,14 +1376,14 @@ persistir:
 
 ## Historial del alumno en Épica (carta 10) (v1.29.0)
 
-Botón «Mi historial»: lleva al ALUMNO a `/mis-recursos` de Épica (sus láminas, juegos y retos
+Botón «Mi historial en Épica» (desde v1.39.0 al pie de «Mis creaciones», ver «Fase 4 — paso 7»): lleva al ALUMNO a `/mis-recursos` de Épica (sus láminas, juegos y retos
 pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reglas:
 
 - **Puerta `/api/auth/alumno`, solo alumnado.** Un token de docente ahí es 403 `rol-sin-permiso`,
   así que `epica_historial.php` NO firma nada si el usuario tiene `viewanalytics` (ni si
   `rol_de()` no sale `estudiante`): pinta «El historial de Épica es para el alumnado…». El
   botón solo se pinta con `cfg.isTeacher === false` (la UI no es control de acceso; lo es
-  el endpoint) y la home lo mete en `{{^isteacher}}` anidado dentro de `{{#cancreate}}` (y de `{{#epica}}`): lo que no le toca
+  el endpoint) y la plantilla lo mete en `{{^isteacher}}` + `{{#epica}}` dentro de `{{#cancreate}}`: lo que no le toca
   al usuario no se renderiza.
 - **Token NUEVO por POST y nunca en una URL ni en un log.** Se firma en `epica_historial.php`
   justo antes de pintar (vale 120 s, un solo uso) y viaja en el CUERPO de un `<form method=post>`
@@ -1409,8 +1393,8 @@ pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reg
 - **Pestaña nueva abierta en el clic**: el JS (`pulsoAbrirHistorial()`) crea un `<form>` POST
   `target=_blank` hacia NUESTRO endpoint con `courseid` + `sesskey`, lo envía y lo quita. Así no hay
   bloqueo de ventanas y el token nunca pasa por JS. Sin iframes ni historial dentro de Pulse.
-- **Lo anterior al 05-10-2026 no aparece** (Épica no guardaba de quién era): el panel de Crear lo
-  avisa bajo la galería. El `sub` (id de Moodle) y el `iss` deben seguir estables o el historial
+- **Lo anterior al 05-10-2026 no aparece** (Épica no guardaba de quién era): «Mis creaciones» lo
+  avisa al pie (junto al botón). El `sub` (id de Moodle) y el `iss` deben seguir estables o el historial
   sale vacío. La sesión de Épica dura 2 h; se vuelve a pulsar el botón.
 - **El rol firmado sale de `viewanalytics`, no de `createactivity`** (hallazgo de esta versión;
   ver la regla en «Integración con Épica — paso 3»).
@@ -1661,7 +1645,7 @@ Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el
   Dos `role="tabpanel"` HERMANOS (`#pulso-panel-ask`, `#pulso-panel-crear`, con `aria-labelledby`) que se alternan
   con `hidden` — nunca se destruye el DOM: la conversación y el estado de Crear sobreviven al cambio.
   **Preguntar** = home + `#pulso-messages` + cuadro de texto (+ aviso offline). La home NO lleva sección «Crear» (v1.36.1: las herramientas solo viven en la lista de Crear;
-  «Mi historial» del alumnado también está ahí). **Crear** = lista de herramientas
+  el «Mi historial en Épica» del alumnado está ahora al pie de «Mis creaciones», v1.39.0). **Crear** = lista de herramientas
   (`#pulso-create-root`, parcial `chat_create_tools`) o la herramienta abierta (`#pulso-create-panel`,
   `hidden` mientras no hay ninguna). Si el usuario no tiene `createactivity`, la plantilla no pinta ni tablist ni
   panel Crear (y el panel Preguntar deja de ser `tabpanel`).
@@ -1729,19 +1713,66 @@ al «mismo panel y mismo desplegable» y a `pulsoCreateOpener`. Reglas que deben
   no con el que se capturó al lanzar la petición; con el viejo el primer sondeo muere en silencio. Pasar de la lista de retos al
   reto elegido NO es cambio de pantalla (token intacto), o se mataría el refresco del título final.
 - **«Volver» NO cancela nada en el servidor.** Solo para el sondeo de la pantalla que se deja y descarta respuestas tardías (token):
-  una infografía/juego `encolado` sigue y se recupera desde la galería (paso 7: «Mis creaciones»); una propuesta de Retos `en-cola`
-  tampoco se pierde en el servidor, pero **no hay vuelta atrás en la interfaz**: hasta que exista algo en «Mis creaciones» para
-  propuestas (no es un reto elegido, así que `mis_retos` no la lista), quien sale y vuelve a pulsar «Proponer retos» gasta
-  otra unidad de cupo. Es el mismo comportamiento que antes del paso 6 (antes «Volver» también mataba el sondeo), no una regresión,
-  pero queda como hueco conocido.
+  una infografía/juego `encolado` sigue y se recupera desde «Mis creaciones»; una propuesta de Retos `en-cola` también, y desde
+  v1.39.0 `mis_retos` la lista (hueco cerrado: antes quien salía y volvía a pulsar «Proponer retos» gastaba otra unidad de cupo).
 - **Foco.** Al apilar o desapilar un detalle/formulario, el foco va al `h3#pulso-create-title` (`tabindex="-1"`) mediante el
-  `MutationObserver` de hijos directos de `#pulso-create-body` (y `pulsoCreateScreen(true)` al repintar el formulario); nunca se
+  `MutationObserver` de hijos directos de `#pulso-create-body` (y `pulsoCreateScreen(true)` al repintar el formulario o «Mis creaciones»); nunca se
   roba el foco fuera de la pestaña Crear. Al volver a la lista, a la fila `[data-pulso-tool="<tool del formulario que se deja>"]`
   y, si ya no está, a `#pulso-create-root-title`.
 - **Tests (fuera del repo, jsdom + motor PHP de Mustache):** lista por rol/Épica; profundidad y destino de «Volver» en las 4
   herramientas × profesor/alumno; foco; Volver con una infografía `encolado` y con Retos `en-cola` (sin peticiones que gasten cupo,
-  sondeo parado); respuestas tardías tras Volver (estado, Retos, Ampliar) sin pintar; ensayo; galería (apila UN detalle, desde un
-  detalle reemplaza). Mutación comprobada: con el token viejo en Retos fallan 2 pruebas; con «Volver siempre a la raíz», 5+.
+  sondeo parado); respuestas tardías tras Volver (estado, Retos, Ampliar) sin pintar; ensayo; «Mis creaciones» (ver paso 7). Mutación comprobada: con el token viejo en Retos fallan 2 pruebas; con «Volver siempre a la raíz», 5+.
+
+## Fase 4 — paso 7: «Mis creaciones» (v1.39.0)
+
+Plantilla (`chat_create_tools.mustache`, `chat.mustache`), `crear.js`/`retos.js`, CSS y UN cambio de servidor
+(`api_create_status.php`, `retos_service::mis_retos`); sin `db/`. **Purgar cachés** al desplegar (plantilla + CSS) y
+`amd/build` regenerado. Sustituye a la galería «Tus últimas creaciones» de debajo de cada formulario y estado. Reglas:
+
+- **Es la ÚNICA galería.** Fila «Mis creaciones» (`.pulso-mine-btn`, `data-pulso-action="openMisCreaciones"`, **no** `.pulso-tool`)
+  en un bloque propio debajo de la lista de herramientas, dentro de `{{#cancreate}}{{#epica}}`: sin Épica no hay ninguna
+  creación que listar (Ampliar no se guarda) y la fila no sale. Ampliar recurso NO entra (decisión 5 del plan).
+- **Nivel base de la pila.** La pila admite `[mine]` además de `[form(tool)]`; un detalle (estado de una creación, Retos) se
+  apila encima: **«Volver» desde un detalle va a «Mis creaciones» y desde ella a la lista**, con foco a la fila
+  (`[data-pulso-tool="mine"]`). `pulsoCreateEnter` apila sobre `form` o `mine` y reemplaza sobre un detalle; el aria-label de
+  «Volver» dice `Volver a Mis creaciones` / `Volver al formulario` / `Volver a la lista de herramientas de creación`. Cada
+  entrada o salida invalida `pulsoAmpToken` como cualquier cambio de pantalla.
+- **Se repinta por dentro.** La pantalla se construye UNA vez (filtros, `#pulso-mine-count`, `#pulso-mine-msg`, `#pulso-mine-list`) y
+  la caché/respuestas repintan solo la lista: así el foco sobre un filtro no se pierde y el `MutationObserver` de hijos
+  directos del cuerpo no salta. Una respuesta tardía solo toca la pantalla si `mine` sigue en la cima (`pulsoMineActive()`; el
+  cuerpo de una pantalla que se dejó sigue en el DOM, oculto).
+- **Filtros** Todo / Infografías / Juegos / Retos: botones con `aria-pressed`, filtrado EN EL CLIENTE sobre lo cargado (no repide);
+  el recuento (`role="status"`) dice «N creaciones»/«1 creación». El filtro se reinicia a «Todo» al entrar desde la lista y se
+  conserva al volver de un detalle. Un reto y una propuesta cuentan como «Retos».
+- **Servidor.** `api_create_status.php` sin `encargoid`: 24 filas (`PULSO_STATUS_LIST_MAX`), orden `timecreated DESC, id DESC`, y
+  `tool` opcional contra lista cerrada (`infografia`|`gamificacion`; otro valor = 400 `bad_request` sin tocar la BD). El
+  filtro `status='listo' AND filename<>''`, «solo del propio usuario en el curso» y `playurl` sin `imageurl` para juegos no
+  cambian. **El cliente de esta versión NO pasa `tool`** (filtra en cliente); está para que un filtro por servidor pueda
+  traer más de 24 de un tipo si algún día hace falta.
+- **Propuestas de retos sin elegir** (cierra el hueco del paso 6). `retos_service::mis_retos` devuelve `propuestas`: `{id, estado,
+  creado}` de las del usuario en el curso en `en-cola`/`trabajando`/`listo`, de menos de 7 días y **sin fila en
+  `block_pulso_retos`** (`NOT EXISTS … propuestaid = p.id`), máx. `MIS_RETOS_MAX` = 24, sin llamar a Épica (el estado es el de
+  la última vez que se sondeó). Misma pertenencia que `cargar_propuesta()`: `userid` + `courseid`. `fallado`/`desconocido` no salen.
+  Salen como «Propuesta de retos · En preparación» (cola y trabajando) o «· Lista para elegir». `pulsoRetosAbrirPropuesta(id)`
+  apila Retos con ESA propuesta y llama a `pulsoRetosPoll`: **nunca a `proponer`**; deja `pulsoRetosLastParams = null` para que
+  «Volver a intentarlo» (si acaba `fallado`) lleve al formulario en vez de repetir OTRA propuesta. Limitación conocida: un
+  «Proponer otros» deja la propuesta madre sin elegir, y sigue saliendo como «Lista para elegir» hasta que caduque
+  (no hay enlace padre→hija en la tabla).
+- **Caché del cliente.** `pulsoGalleryCache` {encargos, retos, propuestas, partial} se pinta al instante al entrar y se refresca en
+  segundo plano (2 peticiones); también tras elegir un reto y al llegar a estado terminal una creación que estuvo en curso.
+  Si falla una fuente se conserva lo último que se supo de ella y se avisa («No hemos podido cargar todas…»); sin caché y sin
+  nada, aviso con «Reintentar». Sin Épica no se pide `mis_retos` (y la fila no existe).
+- **Historial en Épica (solo alumnado con Épica) al pie de «Mis creaciones».** El botón y su aviso («en el historial de Épica solo
+  aparece lo creado desde el 5 de octubre de 2026») viven en un `<template id="pulso-mine-historial-tpl">` dentro de
+  `{{^isteacher}}{{#epica}}` (nada de ello llega al HTML del profesorado ni sin Épica); el JS copia su `innerHTML` al final de la
+  pantalla. Ya no está en la lista de Crear. `pulsoAbrirHistorial()` no cambia (POST `target=_blank` con `courseid`+`sesskey`).
+- **Sin cambios:** todo lo externo con `escapeHtmlText`/`pulsoEscapeAttr` (ids a entero, `tool` de lista cerrada), enlaces solo
+  `https://`, el reto se abre en pestaña nueva, el cian nunca como texto, texto ≥ 0.75rem, 44 px en móvil, sondeos pausados
+  fuera de la pestaña Crear.
+- **Tests (fuera del repo):** jsdom `mine.test.js` (163: roles × Épica, filtros y recuento, caché, abrir/Volver de infografía,
+  juego, reto y propuesta, cero `proponer`, sondeo de la misma propuesta y pausa, historial, escape, CSS), más las baterías de
+  pila (147; 5 comprobaciones de la galería se sustituyeron por 4 de «ya no hay galería»), pestañas (92) y home (40);
+  Mustache PHP en las 5 combinaciones; `api_create_status` con/sin/inválido `tool`; SQL de propuestas ejecutado en SQLite.
 
 ## Dev notes
 

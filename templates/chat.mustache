@@ -233,7 +233,15 @@
             <div class="pulso-create-root" id="pulso-create-root">
                 <h3 class="pulso-create-root-title" id="pulso-create-root-title" tabindex="-1">¿Qué quieres crear?</h3>
                 {{> block_pulso/chat_create_tools}}
-                {{^isteacher}}{{#epica}}<button type="button" class="pulso-historial-link head" data-pulso-action="pulsoAbrirHistorial">Mi historial<span aria-hidden="true"> ↗</span><span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></button>{{/epica}}{{/isteacher}}
+                {{! El pie de «Mis creaciones» (historial en Épica) solo existe en el HTML del alumnado con Épica: el JS lo copia de esta plantilla inerte al pintar esa pantalla. }}
+                {{^isteacher}}{{#epica}}
+                <template id="pulso-mine-historial-tpl">
+                    <div class="pulso-mine-historial">
+                        <button type="button" class="pulso-historial-link" data-pulso-action="pulsoAbrirHistorial">Mi historial en Épica<span aria-hidden="true"> ↗</span><span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></button>
+                        <p class="pulso-create-hint">Se abre en una pestaña nueva. En el historial de Épica solo aparece lo creado desde el 5 de octubre de 2026.</p>
+                    </div>
+                </template>
+                {{/epica}}{{/isteacher}}
             </div>
 
             <div class="pulso-create-panel" id="pulso-create-panel" hidden>

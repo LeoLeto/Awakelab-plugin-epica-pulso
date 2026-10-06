@@ -7,10 +7,12 @@
  *
  * GET params:
  *   courseid  (obligatorio)
- *   encargoid (opcional): con él, detalle de UN encargo; sin él, la galería
- *             con los últimos encargos 'listo' (con fichero) de ESTE usuario
- *             en el curso, infografías Y juegos — pendientes/fallidos/de
- *             ensayo no salen ahí.
+ *   encargoid (opcional): con él, detalle de UN encargo; sin él, la lista de
+ *             «Mis creaciones»: los últimos 24 encargos 'listo' (con fichero)
+ *             de ESTE usuario en el curso, infografías Y juegos —
+ *             pendientes/fallidos/de ensayo no salen ahí.
+ *   tool      (opcional, solo sin encargoid): 'infografia' | 'gamificacion'.
+ *             Lista cerrada; cualquier otro valor es un 400.
  *
  * Nunca se devuelve el base64 de la imagen: solo la URL de pluginfile.php,
  * que ya valida el acceso ella misma (block_pulso_pluginfile() en lib.php).
@@ -30,8 +32,12 @@ require_once(__DIR__ . '/classes/creation_quota.php');
 use block_pulso\chat_pipeline;
 use block_pulso\creation_quota;
 
+/** Filas que devuelve la lista de «Mis creaciones» (antes 8, galería bajo cada formulario). */
+const PULSO_STATUS_LIST_MAX = 24;
+
 $courseid = required_param('courseid', PARAM_INT);
 $encargoid = optional_param('encargoid', 0, PARAM_INT);
+$toolfilter = optional_param('tool', '', PARAM_ALPHANUMEXT);
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -212,28 +218,36 @@ try {
             'encargo' => pulso_status_encargo_payload($encargo, $context, $canviewanalytics),
         ], JSON_UNESCAPED_UNICODE);
     } else {
-        // Galería: solo LOS PROPIOS encargos del usuario en este curso que son
-        // creaciones de verdad (status = 'listo' con fichero guardado), más
+        // «Mis creaciones»: solo LOS PROPIOS encargos del usuario en este curso que
+        // son creaciones de verdad (status = 'listo' con fichero guardado), más
         // recientes primero. No es un listado de todo el curso (eso seguiría
         // exigiendo viewanalytics por fila, no por vista completa), y no
         // enseña encargos en curso/fallidos/de ensayo: esos los sigue el panel
-        // de progreso, no la galería.
+        // de progreso, no la lista.
         //
-        // Desde Gamificación paso 3, SIN filtro de "tool": la galería es
-        // conjunta de infografías y juegos (cada fila lleva "tool" en el
-        // payload para que el frontend distinga tarjeta e icono). Antes
-        // filtraba a "infografia" porque un juego 'listo' también tiene
-        // "filename" relleno (el .html, en su propia filearea) y todavía no
-        // existía UI para enseñarlo aquí.
+        // SIN filtro de "tool" por defecto: la lista es conjunta de infografías
+        // y juegos (cada fila lleva "tool" en el payload). Un juego 'listo'
+        // también tiene "filename" relleno (el .html, en su propia filearea),
+        // así que "tool" es lo que los distingue. El filtro opcional va contra
+        // una lista cerrada: nada del cliente se pasa al SQL sin validar.
+        $select = "courseid = :courseid AND userid = :userid AND status = :status
+                AND filename IS NOT NULL AND filename <> ''";
+        $params = ['courseid' => $courseid, 'userid' => $userid, 'status' => 'listo'];
+        if ($toolfilter !== '') {
+            if (!in_array($toolfilter, [creation_quota::TOOL_INFOGRAFIA, creation_quota::TOOL_GAMIFICACION], true)) {
+                throw new \block_pulso\pulso_error('bad_request', 'Ese tipo de creación no existe.', 400);
+            }
+            $select .= ' AND tool = :tool';
+            $params['tool'] = $toolfilter;
+        }
         $rows = $DB->get_records_select(
             'block_pulso_encargos',
-            "courseid = :courseid AND userid = :userid AND status = :status
-                AND filename IS NOT NULL AND filename <> ''",
-            ['courseid' => $courseid, 'userid' => $userid, 'status' => 'listo'],
-            'timecreated DESC',
+            $select,
+            $params,
+            'timecreated DESC, id DESC',
             '*',
             0,
-            8
+            PULSO_STATUS_LIST_MAX
         );
 
         $encargos = [];

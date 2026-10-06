@@ -55,8 +55,8 @@ class retos_service {
     /** @var int Una propuesta caduca en Epica a los 7 dias (carta 7 §4). */
     const PROPUESTA_VIDA_S = 7 * DAYSECS;
 
-    /** @var int Tope de retos en "mis retos". */
-    const MIS_RETOS_MAX = 20;
+    /** @var int Tope de retos (y de propuestas pendientes) en «Mis creaciones»; igual que api_create_status.php. */
+    const MIS_RETOS_MAX = 24;
 
     /** @var int Candado por usuario: la peticion mas larga es proponer con material (espera larga) + margen. */
     const CANDADO_VIDA_S = 300;
@@ -455,6 +455,15 @@ class retos_service {
     // 6. mis_retos (sin llamar a Epica)
     // ----------------------------------------------------------------
 
+    /**
+     * Retos elegidos de ESTE usuario en ESTE curso, más las propuestas que aún no
+     * tienen reto elegido (en cola, trabajando o listas, de menos de 7 días): sin
+     * ellas, quien sale de una propuesta en cola no tiene vía de vuelta y volver a
+     * proponer gasta otra unidad de cupo. Solo lee nuestras tablas (el estado es el
+     * de la última vez que se sondeó; abrir la propuesta lo refresca).
+     *
+     * @return array{retos: array, propuestas: array}
+     */
     public static function mis_retos(\stdClass $user, int $courseid): array {
         global $DB;
         self::asegurar_tablas();
@@ -471,7 +480,43 @@ class retos_service {
                 'creado' => (int)$r->timecreated,
             ];
         }
-        return ['retos' => $out];
+        return ['retos' => $out, 'propuestas' => self::propuestas_pendientes($user, $courseid)];
+    }
+
+    /**
+     * Propuestas sin reto elegido, vigentes y no fallidas. Misma pertenencia que
+     * cargar_propuesta(): userid + courseid; una ajena no sale nunca.
+     */
+    private static function propuestas_pendientes(\stdClass $user, int $courseid): array {
+        global $DB;
+
+        [$insql, $inparams] = $DB->get_in_or_equal(
+            [self::ESTADO_EN_COLA, self::ESTADO_TRABAJANDO, self::ESTADO_LISTO], SQL_PARAMS_NAMED, 'est');
+        $params = $inparams + [
+            'userid' => (int)$user->id,
+            'courseid' => $courseid,
+            'desde' => time() - self::PROPUESTA_VIDA_S,
+        ];
+        $rows = $DB->get_records_sql(
+            "SELECT p.id, p.estado, p.timecreated
+               FROM {block_pulso_reto_propuestas} p
+              WHERE p.userid = :userid AND p.courseid = :courseid
+                AND p.timecreated > :desde
+                AND p.estado $insql
+                AND NOT EXISTS (SELECT 1 FROM {block_pulso_retos} r WHERE r.propuestaid = p.id)
+           ORDER BY p.timecreated DESC, p.id DESC",
+            $params, 0, self::MIS_RETOS_MAX
+        );
+
+        $out = [];
+        foreach ($rows as $p) {
+            $out[] = [
+                'id' => (int)$p->id,
+                'estado' => (string)$p->estado,
+                'creado' => (int)$p->timecreated,
+            ];
+        }
+        return $out;
     }
 
     // ----------------------------------------------------------------

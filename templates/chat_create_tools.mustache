@@ -20,6 +20,8 @@
     Lista de herramientas de la pestana Crear: una fila por herramienta (icono, nombre y una linea).
     Sin Epica solo queda «Ampliar recurso», que no es una creacion (no se guarda).
     El orden es el de la pila de pantallas: esta lista es la raiz, cada fila abre el formulario.
+    Debajo, separada de las herramientas, la fila «Mis creaciones» (infografias, juegos y retos): sin
+    Epica no hay ninguna de esas creaciones, asi que tampoco sale.
 
     Context variables required for this template:
     * cancreate - true con block/pulso:createactivity
@@ -86,4 +88,18 @@
         </li>
 {{/epica}}
 </ul>
+{{#epica}}
+<div class="pulso-mine-wrap">
+    <button type="button" class="pulso-mine-btn" data-pulso-action="openMisCreaciones" data-pulso-tool="mine">
+        <span class="pulso-mine-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        </span>
+        <span class="pulso-tool-text">
+            <span class="pulso-tool-title">Mis creaciones</span>
+            <span class="pulso-tool-sub">Tus infografías, juegos y retos de este curso</span>
+        </span>
+        <svg class="pulso-tool-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+    </button>
+</div>
+{{/epica}}
 {{/cancreate}}

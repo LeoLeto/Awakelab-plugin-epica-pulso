@@ -1,4 +1,4 @@
-# Pendientes de Pulse AI (tras v2.3.1 — 07-10-2026)
+# Pendientes de Pulse AI (tras v2.3.2 — 07-10-2026)
 
 ## En cola (cartas de Épica, por hacer)
 - [x] **Carta 11 — colores de cada centro** (v2.1.0, hecho en código; falta probarlo en sanase-test con un tema real). **Contestar a Chema las 4 preguntas de §6**: variables `principal` y `acento` y para qué las usamos; `texto` nos sirve pero lo comprobamos y, si no da 4,5:1, lo calculamos; sin modo oscuro (mismo color); tarea cada hora + botón. Avisarle de que su acento de ejemplo `#0fced3` (1,7:1 sobre blanco) lo ignoramos, y de que pedimos acentos con >= 3:1 sobre blanco.
@@ -8,7 +8,7 @@
 - [x] **Privacy provider (RGPD)** (v2.3.0, hecho en código; falta verificar en sanase-test: Registro de privacidad de plugins y una exportación de datos de una persona de prueba; y ejecutar `tests/privacy/provider_test.php` en un Moodle).
 - [x] **429 `cuota-del-centro`** (v2.3.1, hecho en código): terminal a la primera; el resto de 429 reintenta con tope de 6 h; la notificación traduce los códigos. Falta verlo con un 429 real de Épica en QA.
 - [ ] **SCORM (P55/P56)**: indexar el contenido de los SCORM y el modo «resumen/explicación de unidad».
-- [ ] **Propuesta madre de «Proponer otros»**: sigue saliendo como «Lista para elegir» en Mis creaciones hasta que caduca (falta enlace padre→hija).
+- [x] **Propuesta madre de «Proponer otros»** (v2.3.2, hecho en código): `padreid` + `NOT EXISTS` de hija viva. Las filas anteriores siguen saliendo hasta caducar (≤ 7 días). Al desplegar, Notificaciones.
 - [ ] **`confirm()` de «Nueva conversación»**: cambiarlo por un aviso dentro del chat.
 
 ## Fuera del plugin

@@ -83,6 +83,7 @@ class retos_service {
         $cuerpo = [];
         $espera = null;
         $cmidfila = null;
+        $padreid = null; // Solo «Proponer otros» lo rellena (id de la madre ya validada).
 
         if ($propuestaid > 0) {
             // «Proponer otros»: SOLO la propuesta (con material o tema es 400 encargo-ambiguo).
@@ -99,6 +100,7 @@ class retos_service {
             // La nueva propuesta hereda recurso y tema: es la misma fuente.
             $cmidfila = $padre->cmid !== null ? (int)$padre->cmid : null;
             $tema = (string)$padre->tema;
+            $padreid = (int)$padre->id;
         } else if ($cmid > 0) {
             // El cmid se RECALCULA: visible de verdad para este usuario y con texto aprovechable.
             $recurso = self::recurso_disponible($courseid, (int)$user->id, $cmid);
@@ -124,7 +126,7 @@ class retos_service {
             $cuerpo['alumno'] = self::sobre_alumno($courseid, $user, 0);
         }
 
-        return self::con_candado($user, $courseid, function() use ($DB, $user, $courseid, $course, $cuerpo, $espera, $cmidfila, $tema) {
+        return self::con_candado($user, $courseid, function() use ($DB, $user, $courseid, $course, $cuerpo, $espera, $cmidfila, $tema, $padreid) {
             self::comprobar_tope_propuestas((int)$user->id);
 
             [$http, $datos] = self::llamar(self::RUTA_PROPONER, $cuerpo, $user, $course, $espera);
@@ -151,6 +153,7 @@ class retos_service {
                 'retos_json' => null,
                 'motivo' => null,
                 'timetrabajando' => $estado === self::ESTADO_TRABAJANDO ? $now : null,
+                'padreid' => $padreid,
                 'timecreated' => $now,
                 'timemodified' => $now,
             ]);
@@ -486,6 +489,11 @@ class retos_service {
     /**
      * Propuestas sin reto elegido, vigentes y no fallidas. Misma pertenencia que
      * cargar_propuesta(): userid + courseid; una ajena no sale nunca.
+     *
+     * Una madre de «Proponer otros» no sale mientras tenga una hija VIVA (ni fallada ni
+     * desconocida): cada eslabon de una cadena se oculta solo, sin recursion. Si la hija
+     * falla, la madre vuelve (sigue siendo elegible en Epica). Las filas anteriores a v2.3.2
+     * tienen padreid NULL y sus madres salen hasta caducar: no se rellena nada a posteriori.
      */
     private static function propuestas_pendientes(\stdClass $user, int $courseid): array {
         global $DB;
@@ -504,6 +512,8 @@ class retos_service {
                 AND p.timecreated > :desde
                 AND p.estado $insql
                 AND NOT EXISTS (SELECT 1 FROM {block_pulso_retos} r WHERE r.propuestaid = p.id)
+                AND NOT EXISTS (SELECT 1 FROM {block_pulso_reto_propuestas} h
+                                 WHERE h.padreid = p.id AND h.estado NOT IN ('fallado', 'desconocido'))
            ORDER BY p.timecreated DESC, p.id DESC",
             $params, 0, self::MIS_RETOS_MAX
         );

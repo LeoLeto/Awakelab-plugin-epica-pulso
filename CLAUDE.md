@@ -1228,7 +1228,7 @@ sobre la 7**. Reglas que deben persistir:
   es decisión de Épica, no nuestra.
 - **Tablas** `block_pulso_reto_propuestas` (una fila por `proponer`, incluidos los «otros»; se
   inserta DESPUÉS del 202, así que un fallo no cuenta para los topes) y `block_pulso_retos` (una por
-  `elegir`; `codigo` único). `install.xml` y `upgrade.php` (2026100104) describen lo mismo — si se
+  `elegir`; `codigo` único; `padreid` = id de la madre, solo en las creadas con «Proponer otros»). `install.xml` y `upgrade.php` (2026100104 y 2026100706 para `padreid`) describen lo mismo — si se
   tocan, los dos a la vez. Privacidad: ver «Privacidad (v2.3.0)».
 
 ## Retos — paso 2: «Crear reto» en el bloque Crear (v1.27.0)
@@ -1735,9 +1735,12 @@ Plantilla (`chat_create_tools.mustache`, `chat.mustache`), `crear.js`/`retos.js`
   la última vez que se sondeó). Misma pertenencia que `cargar_propuesta()`: `userid` + `courseid`. `fallado`/`desconocido` no salen.
   Salen como «Propuesta de retos · En preparación» (cola y trabajando) o «· Lista para elegir». `pulsoRetosAbrirPropuesta(id)`
   apila Retos con ESA propuesta y llama a `pulsoRetosPoll`: **nunca a `proponer`**; deja `pulsoRetosLastParams = null` para que
-  «Volver a intentarlo» (si acaba `fallado`) lleve al formulario en vez de repetir OTRA propuesta. Limitación conocida: un
-  «Proponer otros» deja la propuesta madre sin elegir, y sigue saliendo como «Lista para elegir» hasta que caduque
-  (no hay enlace padre→hija en la tabla).
+  «Volver a intentarlo» (si acaba `fallado`) lleve al formulario en vez de repetir OTRA propuesta. **La madre de «Proponer otros» no
+  sale (v2.3.2)**: `proponer()` guarda `padreid` (id de la madre ya validada) en la hija, y la consulta añade un `NOT EXISTS` de una hija
+  con `padreid = p.id` y estado fuera de `fallado`/`desconocido`. Si la hija falla, la madre vuelve (sigue siendo elegible en Épica);
+  una hija lista o elegida también oculta a la madre. Las cadenas funcionan sin recursión (cada eslabón se oculta por su propia
+  hija). **Las filas anteriores a v2.3.2 tienen `padreid` NULL y NO se rellenan** (no hay forma fiable de emparejarlas): sus madres
+  siguen saliendo hasta caducar, 7 días como mucho.
 - **Caché del cliente.** `pulsoGalleryCache` {encargos, retos, propuestas, partial} se pinta al instante al entrar y se refresca en
   segundo plano (2 peticiones); también tras elegir un reto y al llegar a estado terminal una creación que estuvo en curso.
   Si falla una fuente se conserva lo último que se supo de ella y se avisa («No hemos podido cargar todas…»); sin caché y sin

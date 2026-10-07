@@ -144,6 +144,7 @@
         <FIELD NAME="retos_json" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Los seis retos propuestos; 'elegir' solo acepta ids guardados aqui"/>
         <FIELD NAME="motivo" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Motivo de fallado/desconocido, tal cual lo dio Epica o la causa local"/>
         <FIELD NAME="timetrabajando" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Primer 'trabajando' visto: el limite de 2 min del sondeo cuenta desde aqui, no desde la cola"/>
+        <FIELD NAME="padreid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Nuestro id de la propuesta madre; solo en las creadas con 'proponer otros'. NULL en el resto y en filas anteriores a v2.3.2"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
       </FIELDS>
@@ -153,6 +154,7 @@
       <INDEXES>
         <INDEX NAME="idx_userid_courseid" UNIQUE="false" FIELDS="userid, courseid"/>
         <INDEX NAME="idx_courseid_timecreated" UNIQUE="false" FIELDS="courseid, timecreated"/>
+        <INDEX NAME="idx_padreid" UNIQUE="false" FIELDS="padreid"/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="block_pulso_retos" COMMENT="Retos (Epica): retos elegidos. Una fila por llamada a retos/elegir; cuenta para los topes diarios.">

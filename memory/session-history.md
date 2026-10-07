@@ -1,5 +1,13 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-07 — La propuesta madre de «Proponer otros» deja de salir (v2.3.2)
+
+Reglas en `CLAUDE.md` → «Fase 4 — paso 7» (sustituye la limitación conocida). `classes/retos_service.php`, `db/install.xml` + `db/upgrade.php` (2026100706); cliente sin tocar. Lo que costó ver:
+- **El cliente no cambia**: solo pinta lo que trae `mis_retos`, y entrar en «Mis creaciones» siempre refresca desde servidor; el filtro es solo de servidor.
+- **Una sola regla cubre las cadenas**: ocultar toda propuesta con una hija viva (`padreid = p.id`, estado fuera de `fallado`/`desconocido`); no hace falta recursión.
+- **Privacidad sin cambios**: la metadata del provider no lista `id`/`cmid`/`epica_propuesta`/`posicion`, solo campos con dato propio, y `padreid` es un id interno; exportar y borrar actúan sobre filas enteras.
+- **Filas antiguas**: `padreid` NULL a propósito; sus madres salen hasta caducar (≤ 7 días).
+
 ## 2026-10-07 — 429 `cuota-del-centro` deja de quedarse en «pendiente» (v2.3.1)
 
 Reglas en `CLAUDE.md` → «Integración con Épica — paso 4» (punto «429 de Épica»). `epica_client.php` + 3 cadenas en `lang/en` y `lang/es`; sin `db/`, cliente sin tocar. Lo que costó ver:

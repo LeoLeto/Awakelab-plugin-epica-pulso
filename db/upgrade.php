@@ -466,5 +466,22 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026100104, 'pulso');
     }
 
+    if ($oldversion < 2026100706) {
+        // v2.3.2: enlace padre->hija de «Proponer otros» (padreid). Las filas anteriores se quedan
+        // con NULL a proposito: no hay forma fiable de saber que madre corresponde a cada hija, asi que
+        // sus madres siguen saliendo en «Mis creaciones» hasta caducar (7 dias como maximo).
+        $table = new xmldb_table('block_pulso_reto_propuestas');
+        $field = new xmldb_field('padreid', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'timetrabajando');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $index = new xmldb_index('idx_padreid', XMLDB_INDEX_NOTUNIQUE, ['padreid']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+
+        upgrade_block_savepoint(true, 2026100706, 'pulso');
+    }
+
     return true;
 }

@@ -61,3 +61,49 @@ function block_pulso_pluginfile($course, $cm, $context, $filearea, $args, $force
 
     send_stored_file($file, 0, 0, $forcedownload, $options);
 }
+
+/**
+ * Limpieza al borrar un curso: Moodle llama a <componente>_pre_course_delete($course) desde
+ * delete_course() (lib de cursos), con los datos del curso aún en pie.
+ *
+ * Borra todas las filas del curso en TODAS las tablas del plugin y sus ajustes por curso
+ * (enabled_course_N, lastindexqueue_N). Los ficheros (encargo/juego) los borra Moodle con el
+ * contexto del curso: no se tocan aquí. Cada tabla en su try/catch; ante un fallo, error_log y NO
+ * se lanza nada: un fallo nuestro no puede bloquear el borrado de un curso.
+ *
+ * Cualquier tabla nueva del plugin con courseid/userid entra aquí y en classes/privacy/provider.php.
+ *
+ * @param stdClass $course
+ */
+function block_pulso_pre_course_delete($course) {
+    global $DB;
+
+    $courseid = (int)$course->id;
+    $tables = [
+        'block_pulso_content_chunks',
+        'block_pulso_full_text',
+        'block_pulso_encargos',
+        'block_pulso_ampliaciones',
+        'block_pulso_reto_propuestas',
+        'block_pulso_retos',
+    ];
+
+    // Sin transacción: un rollback anidado dentro de la de delete_course() tumbaría el borrado del curso.
+    foreach ($tables as $table) {
+        try {
+            if ($DB->get_manager()->table_exists($table)) {
+                $DB->delete_records($table, ['courseid' => $courseid]);
+            }
+        } catch (\Throwable $e) {
+            error_log('Pulso: no se pudo limpiar ' . $table . ' del curso ' . $courseid . ': ' . get_class($e) . ': ' . $e->getMessage());
+        }
+    }
+
+    foreach (['enabled_course_', 'lastindexqueue_'] as $prefix) {
+        try {
+            unset_config($prefix . $courseid, 'block_pulso');
+        } catch (\Throwable $e) {
+            error_log('Pulso: no se pudo quitar el ajuste ' . $prefix . $courseid . ': ' . $e->getMessage());
+        }
+    }
+}

@@ -12,6 +12,7 @@
 - **Auditoría de UX, fases 1–3** — visibilidad en el RAG y `pulso_error`; Épica opcional, topes y diagnóstico; accesibilidad y móvil.
 - **Colores de cada centro (carta 11, v2.1.0)** — tema de Épica: sincronización, validación doble, contraste, fondo vs texto.
 - **Fase 4 (cerrada, v2.0.0)** — `styles.css`, módulos AMD, pestañas + Mustache, home, pila de Crear (paso 6), «Mis creaciones» (paso 7).
+- **Privacidad (v2.3.0)** — privacy provider (RGPD) y limpieza al borrar un curso.
 - **Cómo se trabaja este repo con prompts** — una sesión por paso. **Bug backlog** — solo lo vivo. **Dev notes** — build de `amd/build`, purgas y Notificaciones.
 - Historial de lo que costó cada paso: `memory/session-history.md`. Plan de la fase 4: `docs/plan_fase4.md`. Instalación y despliegue: `README.md`.
 
@@ -1111,9 +1112,7 @@ Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya i
   caché es compartida por recurso. `from_row()` devuelve `idioma_curso` (calculado al leer, no
   guardado) y el cliente pinta la etiqueta «En inglés» (`Intl.DisplayNames`, es) solo si
   `idioma` está y difiere de él, en `#34547A`. Upgrade 2026100103 vacía la caché.
-- **Hueco RGPD documentado**: la tabla guarda `userid` (quién la generó) pero el plugin NO tiene
-  `classes/privacy/provider.php`, así que no hay metadata/export/borrado ni para esta tabla ni
-  para las demás. Pendiente como tarea propia; tampoco hay limpieza de filas al borrar un curso.
+- **RGPD**: la tabla guarda `userid` (quién la generó); su tratamiento está en «Privacidad (v2.3.0)».
 
 ## Ampliación de recursos — paso 2: «Ampliar recurso» en el bloque Crear (v1.25.0)
 
@@ -1233,7 +1232,7 @@ sobre la 7**. Reglas que deben persistir:
 - **Tablas** `block_pulso_reto_propuestas` (una fila por `proponer`, incluidos los «otros»; se
   inserta DESPUÉS del 202, así que un fallo no cuenta para los topes) y `block_pulso_retos` (una por
   `elegir`; `codigo` único). `install.xml` y `upgrade.php` (2026100104) describen lo mismo — si se
-  tocan, los dos a la vez. Sin `privacy\provider` (el hueco RGPD del plugin sigue abierto).
+  tocan, los dos a la vez. Privacidad: ver «Privacidad (v2.3.0)».
 
 ## Retos — paso 2: «Crear reto» en el bloque Crear (v1.27.0)
 
@@ -1807,6 +1806,26 @@ v2.0.0 y el HTML de la plantilla es idéntico). Lógica en `classes/tema_service
   equivalencia del CSS por defecto contra HEAD. **Sin navegador no se ve** el aspecto real con colores de centro (cabecera, pestañas,
   tablas), ni `color-mix`, ni el botón de los ajustes, ni la tarea contra Épica real: eso va a sanase-test (con un tema oscuro, uno
   amarillo y uno cian claro).
+
+## Privacidad (v2.3.0)
+
+`classes/privacy/provider.php` (metadata + exportar + borrar) y `block_pulso_pre_course_delete()` en `lib.php`. Sin `db/`; cadenas `privacy:*` en
+`lang/en` y `lang/es`. Pruebas: `tests/privacy/provider_test.php` (PHPUnit de Moodle; no se ha podido ejecutar fuera de un Moodle).
+
+- **Todo es contexto de CURSO** (filas con `userid`+`courseid` y las fileareas `encargo`/`juego`, que viven en el contexto del curso). Personales:
+  `block_pulso_encargos`, `_reto_propuestas`, `_retos` y `_ampliaciones` (solo `userid`). `content_chunks` y `full_text` son material, sin persona.
+- **Exportar**: creaciones (petición, estado, título, tema, `motivo` solo si es terminal, fechas) con sus ficheros, propuestas y retos, y qué
+  ampliaciones generó la persona. **Nunca `sobre_json`** (repite la petición y lleva el material del curso).
+- **Ampliaciones se ANONIMIZAN (`userid = 0`), no se borran**: la fila es la caché compartida por `content_hash` que protege la cuota de YouTube.
+  El resto se borra. Los ficheros, encargo a encargo (`delete_area_files($ctx, 'block_pulso', area, $itemid)`), nunca el área entera al borrar a UNA persona.
+  Efecto aceptado: borrar los encargos de hoy devuelve cupo de ese día.
+- **Al borrar un curso**: `block_pulso_pre_course_delete()` (hook de `delete_course()`) borra las 6 tablas por `courseid` (cada una en su try/catch, sin transacción) y quita
+  `enabled_course_N` y `lastindexqueue_N`; no lanza nunca (`error_log`). Los ficheros los borra Moodle con el contexto. La tarea `epica_ciclo_adhoc` ya sale si el encargo no existe.
+- **Declarado como ubicación externa**: Anthropic (pregunta, historial, rol, contexto del curso; al profesorado también nombres/notas/accesos), OpenAI (solo
+  embeddings), Épica (`sub`, correo, nombre, rol, curso, petición, grupo, intento). YouTube/OpenAlex no: solo reciben consultas generadas.
+- **Sin transacción en `pre_course_delete`**: un rollback anidado tumbaría el borrado del curso; cada tabla y cada ajuste en su propio try/catch.
+- **Regla**: cualquier tabla NUEVA con `userid` entra en el provider (metadata, contextos, exportar, borrar) y cualquier tabla con `courseid` en `pre_course_delete`.
+- Lo que Épica guarda del alumno (historial por `sub`) no se borra desde Moodle: pendiente de cómo se pide a Épica.
 
 ## Dev notes
 

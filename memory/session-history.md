@@ -1,5 +1,15 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-07 — Privacidad (RGPD) y limpieza al borrar un curso (v2.3.0)
+
+Reglas en `CLAUDE.md` → «Privacidad (v2.3.0)». `classes/privacy/provider.php`, `block_pulso_pre_course_delete()` en `lib.php`, cadenas `privacy:*`, `tests/privacy/provider_test.php`. Sin `db/`. Lo que costó ver:
+- **Datos reales que salen**: el contexto analítico que va a Anthropic al profesorado lleva nombres de participantes, notas y accesos (`chat_pipeline`/`data_retriever`), no solo la pregunta; hay que declararlo. El token a Épica lleva `sub`, correo y `nombre` (`fullname`), y el sobre `alumno.grupo`/`intento`.
+- **Contextos**: los ficheros de `encargo`/`juego` están en el contexto de CURSO, no en el del bloque; por eso todo el provider es de `CONTEXT_COURSE`.
+- **Ampliaciones**: borrarlas rompería la caché compartida que protege la cuota de YouTube (~100 búsquedas/día); se pone `userid = 0`.
+- **Ajustes por curso**: solo `enabled_course_N` y `lastindexqueue_N` (comprobado con grep de `get_config`/`set_config`).
+- **Hook de borrado**: `<componente>_pre_course_delete($course)` lo llama `delete_course()` vía `get_plugins_with_function('pre_course_delete')` (existe en el mínimo 4.1; lo sé de memoria, sin un Moodle local para comprobarlo).
+- **NO probado**: PHPUnit no se puede ejecutar aquí (sin Moodle); solo `php -l` y diff de claves de idioma. Pendiente: Registro de privacidad y una exportación en sanase-test.
+
 ## 2026-10-07 — Carta 12: retos con la sesión del alumno (v2.2.0)
 
 Reglas en `CLAUDE.md` → «Historial del alumno en Épica» (último punto). `epica_historial.php` + `crear.js`/`retos.js` (+ `amd/build`); sin `db/` ni

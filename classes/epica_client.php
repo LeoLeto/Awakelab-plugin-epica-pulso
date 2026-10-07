@@ -112,6 +112,17 @@ class epica_client {
     const CONSECUTIVE_ERROR_THRESHOLD = 10;
 
     /**
+     * Tiempo maximo (desde "timecreated" del encargo) que un encargo puede
+     * seguir encadenando 429 que NO son "cuota-del-centro" (cuota-agotada, otro
+     * motivo o ninguno) antes de darse por fallado. Sin este tope, un 429 que
+     * nunca se libera (cupo mal configurado, Epica atascada) reencolaba la tarea
+     * indefinidamente y la persona veia su creacion «pendiente» para siempre.
+     * 6 h: de sobra para un cupo propio (se libera en minutos) y corto para no
+     * dejar un encargo huerfano durante dias.
+     */
+    const QUOTA_RETRY_MAX_S = 6 * HOURSECS;
+
+    /**
      * ¿Se pueden usar las herramientas de Épica (infografía, juego, retos, historial)
      * en este sitio? local_awkepica es OPCIONAL (v1.31.0): Pulse se instala sin él.
      * Requiere el plugin, su plataforma/secreto configurados y una URL de Épica https://.
@@ -301,28 +312,19 @@ class epica_client {
     }
 
     /**
-     * Errores de /encargar. 429 (cuota-agotada o cuota-del-centro) es
-     * transitorio: se reencola con el Retry-After que dan. El resto
-     * (material-ilegible, material-excesivo, origen-contradictorio,
+     * Errores de /encargar. 429: ver procesar_cuota() (cuota-del-centro es
+     * terminal a la primera; el resto reintenta con tope de QUOTA_RETRY_MAX_S).
+     * El resto (material-ilegible, material-excesivo, origen-contradictorio,
      * rol-sin-permiso, herramienta-no-contratada…) no mejora solo: fallo
      * terminal, sin reintentos.
      *
      * @return array{requeue: bool, delay: int}
      */
     private static function procesar_error_encargar(\stdClass $encargo, int $httpcode, array $data): array {
-        global $DB;
         $motivo = (string)($data['motivo'] ?? '');
 
         if ($httpcode === 429) {
-            $espera = self::retry_after($data);
-            $DB->update_record('block_pulso_encargos', (object)[
-                'id' => $encargo->id,
-                'error_count' => 0, // Respuesta real de Épica: la red funciona, solo es cupo.
-                'pollcount' => (int)$encargo->pollcount + 1,
-                'timemodified' => time(),
-            ]);
-            mtrace("Pulso Epica: encargo {$encargo->id} recibió 429 ({$motivo}); reintentando en {$espera}s.");
-            return ['requeue' => true, 'delay' => $espera];
+            return self::procesar_cuota($encargo, $data, 'encargar');
         }
 
         if ($motivo === '') {
@@ -330,6 +332,64 @@ class epica_client {
         }
         self::marcar_fallo($encargo, $motivo !== '' ? $motivo : self::MOTIVO_SERVICIO_RECHAZO, $data['traza'] ?? null);
         return ['requeue' => false, 'delay' => 0];
+    }
+
+    /**
+     * Un 429 de Epica (al encargar o al sondear).
+     *
+     * - "cuota-del-centro" es el cupo DIARIO de todo el centro: reintentar no
+     *   sirve y puede tardar hasta el dia siguiente, asi que es terminal a la
+     *   primera (y el cliente ya pinta su mensaje, pulsoCreateFailureMessage()).
+     *   En el sondeo no deberia llegar (el trabajo ya estaba admitido): si llega,
+     *   pasa algo raro y tambien se corta.
+     * - Cualquier otro 429 (cuota-agotada = cupo propio de la persona, otro
+     *   motivo o ninguno) se reencola con el "esperaS" de Epica. AL ENCARGAR
+     *   lleva ademas un tope de QUOTA_RETRY_MAX_S desde "timecreated": pasado,
+     *   fallado con el ultimo motivo recibido. AL SONDEAR no hay tope: el
+     *   trabajo ya esta admitido y Epica lo guarda 7 dias, asi que un 429 de
+     *   ritmo no puede tirar un encargo que quizas ya esta listo (no existe en
+     *   epica_client un tope de vida del trabajo; el sondeo sigue en segundo plano).
+     *
+     * El encargo fallado SIGUE contando en los topes propios de hoy
+     * (creation_quota): es aceptable, porque con "cuota-del-centro" el centro
+     * tampoco puede generar hoy. Nunca se registra token ni material.
+     *
+     * @return array{requeue: bool, delay: int}
+     */
+    private static function procesar_cuota(\stdClass $encargo, array $data, string $etapa): array {
+        global $DB;
+
+        $motivo = trim((string)($data['motivo'] ?? ''));
+        $traza = $data['traza'] ?? null;
+
+        if ($motivo === 'cuota-del-centro') {
+            error_log("Pulso Epica: encargo {$encargo->id} fallado al {$etapa}: 429 cuota-del-centro (terminal).");
+            mtrace("Pulso Epica: encargo {$encargo->id} recibió 429 cuota-del-centro al {$etapa}; sin reintento.");
+            self::marcar_fallo($encargo, 'cuota-del-centro', $traza);
+            return ['requeue' => false, 'delay' => 0];
+        }
+
+        // Solo un codigo con forma de codigo se guarda como motivo (lo ve la persona);
+        // cualquier otra cosa, o nada, es el cupo propio.
+        $codigo = preg_match('/^[a-z][a-z0-9-]{0,63}\z/', $motivo) ? $motivo : 'cuota-agotada';
+
+        $edad = time() - (int)$encargo->timecreated; // Solo cuenta al encargar.
+        if ($etapa === 'encargar' && $edad > self::QUOTA_RETRY_MAX_S) {
+            error_log("Pulso Epica: encargo {$encargo->id} fallado al {$etapa}: 429 ({$codigo}) durante {$edad}s.");
+            mtrace("Pulso Epica: encargo {$encargo->id} con 429 ({$codigo}) durante más de " . self::QUOTA_RETRY_MAX_S . "s; se da por fallado.");
+            self::marcar_fallo($encargo, $codigo, $traza);
+            return ['requeue' => false, 'delay' => 0];
+        }
+
+        $espera = self::retry_after($data);
+        $DB->update_record('block_pulso_encargos', (object)[
+            'id' => $encargo->id,
+            'error_count' => 0, // Respuesta real de Épica: la red funciona, solo es cupo.
+            'pollcount' => (int)$encargo->pollcount + 1,
+            'timemodified' => time(),
+        ]);
+        mtrace("Pulso Epica: encargo {$encargo->id} recibió 429 ({$codigo}) al {$etapa}; reintentando en {$espera}s.");
+        return ['requeue' => true, 'delay' => $espera];
     }
 
     // ----------------------------------------------------------------
@@ -441,18 +501,10 @@ class epica_client {
     }
 
     private static function procesar_error_sondeo(\stdClass $encargo, int $httpcode, array $data): array {
-        global $DB;
         $motivo = (string)($data['motivo'] ?? '');
 
         if ($httpcode === 429) {
-            $espera = self::retry_after($data);
-            $DB->update_record('block_pulso_encargos', (object)[
-                'id' => $encargo->id,
-                'error_count' => 0,
-                'pollcount' => (int)$encargo->pollcount + 1,
-                'timemodified' => time(),
-            ]);
-            return ['requeue' => true, 'delay' => $espera];
+            return self::procesar_cuota($encargo, $data, 'sondear');
         }
 
         if ($motivo === '') {
@@ -844,6 +896,24 @@ class epica_client {
         }
     }
 
+    /**
+     * Texto para la persona de un motivo que es un CODIGO de Epica, en su idioma;
+     * null si no es uno conocido (entonces se enseña el motivo tal cual).
+     */
+    public static function texto_motivo(string $motivo, \stdClass $recipient): ?string {
+        $claves = [
+            'cuota-agotada' => 'notif_motivo_cuota_agotada',
+            'cuota-del-centro' => 'notif_motivo_cuota_centro',
+            'material-ilegible' => 'notif_motivo_material_ilegible',
+        ];
+        $clave = $claves[trim($motivo)] ?? null;
+        if ($clave === null) {
+            return null;
+        }
+        $lang = !empty($recipient->lang) ? $recipient->lang : null;
+        return get_string_manager()->get_string($clave, 'block_pulso', null, $lang);
+    }
+
     private static function enviar_aviso(int $encargoid, string $status): void {
         global $DB;
 
@@ -874,8 +944,12 @@ class epica_client {
         } else {
             $motivo = ($encargo->motivo !== null && $encargo->motivo !== '') ? $encargo->motivo : 'sin motivo especificado';
             $subject = $esjuego ? 'Tu juego no se ha podido generar' : 'Tu infografía no se ha podido generar';
-            $body = $sustantivo . ' que pediste en "' . format_string($course->fullname) . '" no se ha podido generar ('
-                . $motivo . '). Puedes intentarlo de nuevo desde el curso: ' . $courseurl->out(false);
+            // Los codigos de Epica no se enseñan en crudo: se traducen (mismos textos
+            // que pulsoCreateFailureMessage() en crear.js). Sin traduccion, va el motivo.
+            $razon = self::texto_motivo($motivo, $recipient);
+            $body = $sustantivo . ' que pediste en "' . format_string($course->fullname) . '" no se ha podido generar'
+                . ($razon !== null ? '. ' . $razon : ' (' . $motivo . ').')
+                . ' Puedes intentarlo de nuevo desde el curso: ' . $courseurl->out(false);
         }
 
         try {

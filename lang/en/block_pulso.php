@@ -135,6 +135,9 @@ $string['epica_dry_run_desc'] = 'When enabled, the task builds the full request 
 
 // === Epica cycle: status panel + notification (v1.20.0) ===
 $string['messageprovider:epica_encargo'] = 'A creation (infographic or game) is ready or failed';
+$string['notif_motivo_cuota_agotada'] = 'You have requested several creations in a row and your generation allowance has run out. Try again in a few minutes.';
+$string['notif_motivo_cuota_centro'] = 'Your school has reached its generation limit for today. It is nothing you did: try again later.';
+$string['notif_motivo_material_ilegible'] = 'There was a problem reading the material of this resource. It is not your fault: we are looking into it.';
 
 // === User-facing chat/endpoint errors (v1.30.0) — chosen by a stable error_code, never by API text ===
 $string['err_busy'] = 'Pulse is very busy right now. Try again in a minute.';

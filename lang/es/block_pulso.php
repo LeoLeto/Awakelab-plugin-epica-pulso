@@ -136,6 +136,9 @@ $string['epica_dry_run_desc'] = 'Si se activa, la tarea construye el sobre compl
 
 // === Ciclo con Épica: panel de estado + aviso (v1.20.0) ===
 $string['messageprovider:epica_encargo'] = 'Una creación (infografía o juego) está lista o ha fallado';
+$string['notif_motivo_cuota_agotada'] = 'Has pedido varias creaciones seguidas y se ha agotado tu cupo de generación. Vuelve a intentarlo en unos minutos.';
+$string['notif_motivo_cuota_centro'] = 'El centro ha alcanzado su límite de generaciones de hoy. No es nada que hayas hecho tú: vuelve a intentarlo más tarde.';
+$string['notif_motivo_material_ilegible'] = 'Hubo un problema para leer el material de este recurso. No es culpa tuya: lo estamos revisando.';
 
 // === Errores de chat y endpoints para la persona (v1.30.0) — se eligen por error_code estable, nunca por texto de una API ===
 $string['err_busy'] = 'Pulse está muy ocupado ahora mismo. Prueba en un minuto.';

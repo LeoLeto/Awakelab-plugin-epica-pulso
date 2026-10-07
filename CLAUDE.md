@@ -519,24 +519,21 @@ infografía, en vez del «Encargo guardado» estático del paso 1. Vive en
   hayas hecho tú" — la persona no ha gastado nada) de `material-ilegible`
   (fallo nuestro, nunca del usuario) del genérico (motivo de Épica sin
   adornos + botón para crear un encargo nuevo, nunca reintentar el mismo).
-  **Gap conocido, apuntado como SIGUIENTE PASO — no arreglar sin que lo pida
-  otro encargo**: hoy `cuota-agotada`/`cuota-del-centro` nunca llegan a
-  aparecer en un `fallado` real, porque `epica_client::
-  procesar_error_encargar()` trata CUALQUIER 429 como transitorio y lo
-  reencola indefinidamente con el `retry_after` que dé Épica, sin límite de
-  reintentos ni de tiempo total (el corte a los 30 min es solo de PRIMER
-  PLANO del navegador; la tarea sigue sondeando en segundo plano). Revisado
-  con Marcos: con `cuota-agotada` no urge (es el cupo del propio usuario, y
-  reintentar solo hasta que le toque no es grave); con `cuota-del-centro` SÍ
-  importa, porque el límite es de TODO el centro y puede tardar hasta el día
-  siguiente en liberarse — mientras tanto el usuario ve su encargo en
-  `pendiente` sin ninguna explicación, y el mensaje correcto
-  (`pulsoCreateFailureMessage()`) ya está escrito pero nunca llega a
-  mostrarse porque el encargo jamás pasa a `fallado`. Cuando se aborde: dar
-  por terminado un `cuota-del-centro` tras un tope de reintentos o de tiempo
-  (no necesariamente `cuota-agotada`, que puede seguir reintentando sin
-  problema), y entonces sí que el mapeo de mensajes del cliente ya funciona
-  sin tocarlo.
+- **429 de Épica (v2.3.1)** — `epica_client::procesar_cuota()`, llamado desde `procesar_error_encargar()` y `procesar_error_sondeo()`:
+  - **`cuota-del-centro` es terminal a la primera**, sin reintento (es el cupo DIARIO de todo el centro y puede tardar hasta el día
+    siguiente): `marcar_fallo($encargo, 'cuota-del-centro', traza)` y el cliente pinta su mensaje. En el sondeo no debería llegar
+    (el trabajo ya estaba admitido); si llega, también es terminal.
+  - **Cualquier otro 429** (`cuota-agotada`, otro motivo o ninguno) reintenta con el `esperaS` de Épica. **El tope de
+    `QUOTA_RETRY_MAX_S` (6 h) es SOLO al encargar**, medido desde `timecreated` (sin columnas nuevas): en el sondeo el trabajo ya
+    está admitido y Épica lo guarda 7 días, así que un 429 de ritmo no puede tirar un encargo que quizá ya está listo (en el
+    sondeo no hay tope: `epica_client` no tiene un límite de vida del trabajo). Pasado el tope al encargar, `fallado` con el último motivo recibido
+    (solo si tiene forma de código `^[a-z][a-z0-9-]{0,63}\z`; si no, `cuota-agotada`).
+  - El encargo fallado por cupo SIGUE contando en los topes propios de hoy (`creation_quota`): aceptado, el centro tampoco puede
+    generar hoy.
+  - **La notificación traduce los códigos** (`epica_client::texto_motivo()`, cadenas `notif_motivo_*` en `lang/en` y `lang/es`,
+    con los mismos textos que `pulsoCreateFailureMessage()`; en el idioma de quien recibe). El `motivo` guardado sigue siendo el
+    código: el cliente decide su texto por él. Un motivo que no es un código conocido se enseña tal cual entre paréntesis. Si se
+    añade un texto nuevo en `pulsoCreateFailureMessage()`, añadir también su cadena y su clave en `texto_motivo()`.
 - **«Mis creaciones» es SOLO de los encargos propios del usuario en el curso**
   (`api_create_status.php` sin `encargoid`; v1.39.0 sustituye a la galería «Tus últimas
   creaciones» que salía bajo cada formulario y estado — ya no existe, ver «Fase 4 — paso 7»). No es un
@@ -1484,8 +1481,8 @@ Reglas permanentes. Tocan `db/caches.php` (definición nueva `chatrate`): hay qu
   `check_api_key.php` / `check_anthropic_key.php` ahora son envoltorios de la misma clase. **Nunca
   muestra claves** (`diagnostics::scrub()`). Los ajustes numéricos validan `>= 0` (`set_validate_function`).
 - **Cron parado visible**: `api_create_status` marca `delayed` si un encargo lleva > 10 min en
-  `pendiente`; el panel dice «La cola de trabajos de este sitio va con retraso…». (El hueco conocido del
-  429 `cuota-del-centro` también deja encargos en `pendiente`: el aviso es neutro a propósito.)
+  `pendiente`; el panel dice «La cola de trabajos de este sitio va con retraso…». (Un 429 que no es
+  `cuota-del-centro` también deja encargos en `pendiente` hasta 6 h, ver «paso 4»: el aviso es neutro a propósito.)
 
 ## Auditoría de UX, fase 3 — estados, teclado, lector de pantalla y móvil (v1.32.0)
 

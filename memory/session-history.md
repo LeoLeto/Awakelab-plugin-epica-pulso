@@ -1,5 +1,16 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-07 — 429 `cuota-del-centro` deja de quedarse en «pendiente» (v2.3.1)
+
+Reglas en `CLAUDE.md` → «Integración con Épica — paso 4» (punto «429 de Épica»). `epica_client.php` + 3 cadenas en `lang/en` y `lang/es`; sin `db/`, cliente sin tocar. Lo que costó ver:
+- **El cliente ya estaba bien**: `api_create_status.php` devuelve `motivo` al dueño cuando el encargo es terminal y `pulsoCreateFailureMessage()` ya reconocía los códigos; el trabajo era solo de servidor.
+- **La notificación sí filtraba el código en crudo**: `enviar_aviso()` metía `motivo` tal cual («… no se ha podido generar (cuota-del-centro)»). Ahora traduce con `texto_motivo()` (también `material-ilegible`, que tenía el mismo problema); motivos libres se conservan.
+- **Un solo sitio para el 429**: los dos `procesar_error_*` duplicaban el bloque; ahora los dos llaman a `procesar_cuota()` (el sondeo antes ni siquiera hacía `mtrace`).
+- **El tope de 6 h solo vale al ENCARGAR**: la primera versión lo aplicaba también al sondear y tiraba un encargo ya admitido (Épica lo guarda 7 días) por un único 429 de ritmo. Corregido en revisión; en el sondeo no hay tope porque `epica_client` no tiene límite de vida del trabajo.
+- **Motivo de un fallo por tope**: viene de Épica y lo ve la persona, así que solo se guarda si tiene forma de código; si no, `cuota-agotada`.
+- **Verificado**: `php -l` de lo tocado, diff de claves de idioma, y un arnés fuera del repo (PHP portátil, stubs de `$DB`/`mtrace`/mensajería, reflexión sobre los métodos privados): 39 comprobaciones (cuota-del-centro al encargar y al sondear, cuota-agotada a 1 min / 5 h 59 / 6 h + 1 s, sin motivo, motivo raro, `material-ilegible` y `rol-sin-permiso` terminales, 503 con contador y fallo al décimo, aviso de infografía y juego sin el código en crudo).
+- **NO probado**: contra Épica real (nunca se ha visto un 429 de verdad en QA) ni el cron de Moodle; los textos de la notificación en inglés no se han leído en un Moodle real.
+
 ## 2026-10-07 — Privacidad (RGPD) y limpieza al borrar un curso (v2.3.0)
 
 Reglas en `CLAUDE.md` → «Privacidad (v2.3.0)». `classes/privacy/provider.php`, `block_pulso_pre_course_delete()` en `lib.php`, cadenas `privacy:*`, `tests/privacy/provider_test.php`. Sin `db/`. Lo que costó ver:

@@ -1,5 +1,30 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-07 — Carta 11: colores de cada centro (v2.1.0)
+
+Reglas en `CLAUDE.md` → «Colores de cada centro (carta 11)». Servidor (`tema_service`, tarea `sync_tema`, `sync_tema.php`, ajustes,
+diagnóstico) + plantilla + CSS + una línea de `chat.js`; `db/tasks.php` cambia (Notificaciones). Lo que costó ver:
+- **`container.style.cssText = ''` al minimizar borraba el tema.** Las variables van en el `style` en línea del contenedor y `toggleChat()`
+  lo vaciaba entero en el primer cierre: el tema habría desaparecido tras minimizar una vez. Ahora quita solo las propiedades que pone
+  el propio chat. Sin ese hallazgo, las pruebas de HTML y CSS habrían salido en verde y el fallo solo se habría visto en un navegador.
+- **«Exactamente como hoy» se comprueba, no se supone.** Dos pruebas: el HTML de `render_chat_simple()` sin tema es idéntico byte a byte al
+  de la plantilla de HEAD (2 roles × con/sin Crear), y el CSS por defecto resuelve a las mismas 1.666 declaraciones que el de v2.0.0
+  (se sustituyen las variables en los dos y se comparan). Por eso los cambios de aspecto van bajo `[data-pulso-tema~="…"]`, no en las
+  reglas base: con el atributo ausente no casan.
+- **Fondo vs texto**: casi todo el azul `#003670` de la interfaz era FONDO (`--pulso-navy`) y se pasó a `--pulso-brand`; el que es texto
+  (`--pulso-navy`/`--pulso-deep` como `color`) se quedó fijo. Los avatares se quedaron en `#003670`: llevan el isotipo de Awakelab,
+  que se vería sobre un centro claro solo si cambiara también el isotipo (la cabecera y la burbuja sí lo cambian a `isotipo-claro`).
+- **`$` en la regex deja pasar `"#aabbcc\n"`**: las de Épica (`^#[0-9a-f]{6}$`) se usan con `\z` para que un salto de línea final no llegue a un
+  atributo. Y `disponible()` está memoizado por petición: las pruebas «sin Épica» van cada una en su propio proceso.
+- **El acento de ejemplo de la carta (`#0fced3`) se ignora** con la regla pedida (>= 3:1 sobre blanco; da 1,7:1). Con las cuatro combinaciones
+  de la prueba (azul oscuro, amarillo, cian claro, negro) solo un acento rojo sobre amarillo pasó; los cianes y el amarillo sobre negro no.
+  Hay que decírselo a Épica (queda en PENDIENTES).
+- **Sin PHP en la máquina**: se usó el zip portátil `php-8.3` (con `mbstring`) y bobthecow/mustache.php 3.0.0 descomprimido en una ruta
+  corta (`C:\pm`; en la ruta del scratchpad Windows pasa del límite de 260 caracteres).
+- **NO probado** (sin navegador ni Épica real): el aspecto con colores de centro, `color-mix` (los navegadores sin él conservan el tinte por
+  defecto, sin romper), el botón de los ajustes, la tarea contra Épica, y las baterías jsdom de v2.0.0 (los scripts viven fuera del repo y no
+  estaban en esta máquina: solo se comprobó `build-amd.mjs --check` y que quitar propiedades en vez de `cssText` conserva el tema).
+
 ## 2026-10-07 — Fase 4 UX, paso 9: cierre de la fase (v2.0.0)
 
 Sin cambios de comportamiento: `CLAUDE.md` reescrito (índice al principio; «Architecture», notas de frontend, Tema claro, «Dev notes» y

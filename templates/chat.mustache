@@ -23,7 +23,10 @@
     acceso, pero el HTML de analitica no tiene por que llegar al navegador de un alumno.
 
     Context variables required for this template:
-    * isotipo - URL del isotipo (pix/isotipo-oscuro)
+    * isotipo - URL del isotipo (pix/isotipo-oscuro; isotipo-claro si el color de centro es claro)
+    * hastema - true solo si Épica manda un tema válido (colores del centro, carta 11)
+    * temastyle - variables --pulso-brand/--pulso-brand-text/--pulso-accent ya validadas (solo con hastema)
+    * temaflags - qué variables hay: «principal», «acento» o las dos (solo con hastema)
     * isteacher - true con block/pulso:viewanalytics (profesorado); false = version de alumno
     * cancreate - true con block/pulso:createactivity: hay pestana «Crear»
     * epica - true si local_awkepica esta disponible: infografia, juego, retos e historial
@@ -35,6 +38,9 @@
     Example context (json):
     {
         "isotipo": "https://example.com/blocks/pulso/pix/isotipo-oscuro.png",
+        "hastema": true,
+        "temastyle": "--pulso-brand:#003670;--pulso-brand-text:#ffffff;",
+        "temaflags": "principal",
         "isteacher": true,
         "cancreate": true,
         "epica": true,
@@ -46,11 +52,11 @@
 }}
 
 <!-- Botón circular flotante -->
-<button class="pulso-chat-bubble" id="pulso-chat-bubble" data-pulso-action="toggleChat" title="Pulse AI — Asistente del curso" aria-label="Abrir el asistente Pulse AI" aria-expanded="false" aria-controls="pulso-chat-container">
+<button class="pulso-chat-bubble" id="pulso-chat-bubble"{{#hastema}} style="{{temastyle}}" data-pulso-tema="{{temaflags}}"{{/hastema}} data-pulso-action="toggleChat" title="Pulse AI — Asistente del curso" aria-label="Abrir el asistente Pulse AI" aria-expanded="false" aria-controls="pulso-chat-container">
     <img src="{{isotipo}}" alt="" aria-hidden="true">
 </button>
 
-<div class="pulso-chat-container" id="pulso-chat-container" role="region" aria-label="Pulse AI">
+<div class="pulso-chat-container" id="pulso-chat-container"{{#hastema}} style="{{temastyle}}" data-pulso-tema="{{temaflags}}"{{/hastema}} role="region" aria-label="Pulse AI">
     <div class="pulso-chat-header" id="pulso-chat-header">
         <div class="pulso-header-top">
             <div class="pulso-header-brand">

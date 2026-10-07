@@ -1261,7 +1261,11 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                 floatingState.isOpen = false;
                 if (pulsoMicRecording && pulsoRecognition) pulsoRecognition.stop();
                 container.classList.remove('is-open');
-                container.style.cssText = '';
+                // Solo lo que pusieron abrir/arrastrar/ampliar: un cssText vacío borraría también las
+                // variables del tema del centro (--pulso-brand…, carta 11), que viven en el style en línea.
+                ['width', 'height', 'left', 'top', 'right', 'bottom'].forEach(function(prop) {
+                    container.style.removeProperty(prop);
+                });
                 pulsoChatWide = false;
                 pulsoSyncSizeButton();
                 bubble.style.display = 'flex';

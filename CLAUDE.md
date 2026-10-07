@@ -10,6 +10,7 @@
 - **Enlaces directos (v1.11)** y **Tema claro (v1.16)** — botón «Ir a…»; paleta y contraste.
 - **Épica** — pasos 1, 3 y 4 (bloque Crear, ciclo adhoc, panel de estado), **Gamificación** 1–4, **Ampliación** 1–2, **Retos** 1–2, **QA general**, **Historial del alumno**.
 - **Auditoría de UX, fases 1–3** — visibilidad en el RAG y `pulso_error`; Épica opcional, topes y diagnóstico; accesibilidad y móvil.
+- **Colores de cada centro (carta 11, v2.1.0)** — tema de Épica: sincronización, validación doble, contraste, fondo vs texto.
 - **Fase 4 (cerrada, v2.0.0)** — `styles.css`, módulos AMD, pestañas + Mustache, home, pila de Crear (paso 6), «Mis creaciones» (paso 7).
 - **Cómo se trabaja este repo con prompts** — una sesión por paso. **Bug backlog** — solo lo vivo. **Dev notes** — build de `amd/build`, purgas y Notificaciones.
 - Historial de lo que costó cada paso: `memory/session-history.md`. Plan de la fase 4: `docs/plan_fase4.md`. Instalación y despliegue: `README.md`.
@@ -427,12 +428,13 @@ esas variables (ver abajo). Paleta activa:
 | `--pulso-bg` | `#FFFFFF` | fondo del panel |
 | `--pulso-surface` | `#F7F9FD` | tarjetas, sugerencias |
 | `--pulso-surface-2` | `#EDF1FA` | cabecera de tabla, chips |
-| `--pulso-deep` / `--pulso-navy` | `#003670` | cabecera del chat, botones de acción |
+| `--pulso-brand` / `--pulso-brand-text` | `#003670` / `#FFFFFF` | FONDOS de marca (cabecera, botones de acción, activos, burbuja propia) y lo que va encima; los pisa el tema del centro (v2.1.0) |
+| `--pulso-deep` / `--pulso-navy` | `#003670` | TEXTO fijo de paleta (títulos, bordes de botón secundario); nunca fondo de centro |
 | `--pulso-ink` | `#27334F` | texto principal |
 | `--pulso-slate` | `#34547A` | texto secundario |
 | `--pulso-muted` | `#3B6996` | etiquetas pequeñas |
 | `--pulso-line` | `#DCE3F2` | separadores y bordes |
-| `--pulso-cyan` / `--pulso-teal` / `--pulso-teal-ink` | `#0B93AA` | acento (iconos, bordes, foco — nunca texto) |
+| `--pulso-accent` (antes `--pulso-cyan`/`--pulso-teal`/`--pulso-teal-ink`, que ya no existen) | `#0B93AA` | acento (iconos, bordes, foco — nunca texto); lo pisa el tema del centro |
 | `--pulso-cyan-soft` | `#D9FBFF` | cian claro de marca (fondo del bloque de siguiente paso) |
 
 Estados (sustituyen a los pasteles del tema oscuro, ilegibles sobre blanco):
@@ -1737,6 +1739,56 @@ Plantilla (`chat_create_tools.mustache`, `chat.mustache`), `crear.js`/`retos.js`
   juego, reto y propuesta, cero `proponer`, sondeo de la misma propuesta y pausa, historial, escape, CSS), más las baterías de
   pila (147; 5 comprobaciones de la galería se sustituyeron por 4 de «ya no hay galería»), pestañas (92) y home (40);
   Mustache PHP en las 5 combinaciones; `api_create_status` con/sin/inválido `tool`; SQL de propuestas ejecutado en SQLite.
+
+## Colores de cada centro (carta 11) (v2.1.0)
+
+Cada centro ve Pulse con sus colores, elegidos en Épica (`docs/epica_tema_carta11.md`). Épica es opcional: sin Épica, o con
+`tema: null`, Pulse se ve **exactamente** como antes (comprobado: sin tema el CSS resuelve a las mismas 1.666 declaraciones que
+v2.0.0 y el HTML de la plantilla es idéntico). Lógica en `classes/tema_service.php`; tarea `\block_pulso\task\sync_tema` (cada hora,
+`db/tasks.php`: pasar por Notificaciones); botón en los ajustes → `sync_tema.php`; una fila en `diagnostico.php` (`check_tema()`).
+
+- **Nunca se llama a Épica al pintar.** `sincronizar()` solo lo ejecutan la tarea y el botón (`sync_tema.php`: `require_admin()` +
+  POST + sesskey; el formulario lo crea un script porque los ajustes ya son UN `<form>`). `render_chat_simple()` solo lee lo
+  guardado (`tema_service::para_pintar()`) y no pinta nada si `epica_client::disponible()` es falso. Qué hacer con cada respuesta
+  (contrato §4): 200 con tema y `version` distinta → guardar; 200 con `tema: null` → borrar lo guardado; fallo, timeout o http 0 →
+  quedarse con lo último guardado (y dejar un código GENÉRICO en `tema_sync_error` para el diagnóstico; el detalle va a `error_log`,
+  nunca a la interfaz). Token nuevo en cada llamada, firmado con el admin (`get_admin()`, debe tener correo), contexto de sistema,
+  `viewanalytics` y SIN curso; espera corta (la de `pedir()`, no la larga). Config del plugin: `tema_json`, `tema_version`,
+  `tema_sync_time` (+ `tema_sync_error`, `tema_sync_error_time`).
+- **Se valida DOS veces**: antes de guardar y al pintar (`validar_colores()`, la misma función). Solo claves `principal`/`acento`
+  con forma `^[a-z][a-z0-9-]{0,31}\z`; `valor`/`texto` `^#[0-9a-f]{6}\z` (con `\z`, no `$`: `$` deja pasar un salto de línea final).
+  Lo que no case se ignora color a color. Un tema sin ningún color utilizable (p. ej. solo claves que Pulse no usa) cuenta como sin
+  tema. Nada de Épica entra en el HTML sin pasar por ahí.
+- **El contraste lo calculamos nosotros (WCAG) y la variable que no lo cumple se ignora; se queda la de Pulse.** `principal`: el
+  `texto` de Épica solo se acepta si da >= 4,5:1 sobre `valor`; si no, blanco o negro (el mejor; siempre >= 4,58:1), así que el
+  principal nunca se ignora. `acento`: >= 3:1 sobre blanco (foco, bordes e iconos sobre el panel) **y** >= 3:1 sobre el principal
+  efectivo (el del centro o `#003670`). Consecuencia a vigilar con Épica: su ejemplo de la carta (`#0fced3`) da 1,7:1 sobre blanco y
+  se ignora; un cian claro de centro no será nunca acento.
+- **Fondo vs texto** (la regla de fondo del cambio). Tres variables, valor por defecto = el color de siempre: `--pulso-brand` y
+  `--pulso-brand-text` para FONDOS (cabecera, botones de acción, pestaña activa/filtro pulsado, burbuja propia, `th` de tabla,
+  insignia de paso, botón «Ir a…», burbuja flotante) y todo lo que va encima; `--pulso-accent` para iconos, bordes y foco. Los usos
+  como TEXTO sobre fondo claro siguen con colores fijos de paleta (`--pulso-deep`/`--pulso-navy` = `#003670`, `--pulso-ink`…): **un
+  color de centro nunca es texto sobre blanco**. Lo que no es del centro se queda fijo: los avatares (isotipo Awakelab sobre
+  `#003670`), los colores de estado y el cian de paleta. El cian sigue sin valer como color de texto.
+- **Inyección**: `style="--pulso-brand:#…;--pulso-brand-text:#…;--pulso-accent:#…;"` + `data-pulso-tema="principal acento"` en
+  `.pulso-chat-container` y `.pulso-chat-bubble` (`{{ }}` escapado, nunca `{{{ }}}`; nada en `:root`, nada fuera del bloque). Solo
+  lleva las variables válidas; sin tema, ninguno de los dos atributos se pinta. El `data-pulso-tema` (tokens `principal`/`acento`) es
+  la excepción documentada a «solo style»: las reglas de `styles.css` bajo `[data-pulso-tema~="…"]` (bloque «COLORES DEL CENTRO»)
+  cambian lo que NO pasa por las tres variables (degradado de cabecera y burbuja → plano; blanco/cian fijos de la cabecera →
+  `--pulso-brand-text`; botón de enviar/micrófono en marca). Sin el atributo no casan y el CSS por defecto queda intacto. Con solo el
+  principal, los detalles de la cabecera (pestaña activa, punto de estado, orden de tabla) van en `--pulso-brand-text`, porque el acento
+  por defecto no se ha comprobado contra el color del centro; el acento del centro pisa después.
+- **Isotipo**: con texto de marca negro (centro claro), la burbuja y la cabecera usan `pix/isotipo-claro.png` en vez del oscuro
+  (`isotipoclaro` en el contexto de la plantilla), que no se vería.
+- **Trampa vista**: `toggleChat()` hacía `container.style.cssText = ''` al minimizar, lo que borraba las variables del tema en el primer
+  cierre; ahora solo quita `width/height/left/top/right/bottom`. **No volver a vaciar el `style` del contenedor entero.**
+- **Pruebas** (fuera del repo, PHP 8.3 portátil + Mustache PHP + node): `tema_service` con respuestas falsas (tema, `null`, fallos,
+  http 0/401/409, excepciones, versión inválida, admin sin correo, Épica no disponible, JSON guardado manipulado), `validar_colores`
+  (`#FFF`, `red`, `#12345g`, salto de línea, claves raras), contraste y la cadena de estilo; `render_chat_simple` con y sin tema
+  (HTML sin tema idéntico al de v2.0.0 en los dos roles × con/sin Crear; el `style` solo en dos elementos; inyección bloqueada);
+  equivalencia del CSS por defecto contra HEAD. **Sin navegador no se ve** el aspecto real con colores de centro (cabecera, pestañas,
+  tablas), ni `color-mix`, ni el botón de los ajustes, ni la tarea contra Épica real: eso va a sanase-test (con un tema oscuro, uno
+  amarillo y uno cian claro).
 
 ## Dev notes
 

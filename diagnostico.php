@@ -48,6 +48,7 @@ $checks = [
     'YouTube (Ampliar recurso)' => 'check_youtube',
     'OpenAlex (Ampliar recurso)' => 'check_openalex',
     'Épica (local_awkepica)' => 'check_epica',
+    'Colores del centro (Épica)' => 'check_tema',
     'Cron de Moodle' => 'check_cron',
     'Tarea de indexación' => 'check_index_task',
     'Tareas adhoc de Pulse' => 'check_adhoc',

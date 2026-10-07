@@ -46,14 +46,18 @@
 .pulso-chat-bubble,
 .pulso-chat-container {
     --pulso-ink: #27334F;                      /* texto principal */
-    --pulso-deep: #003670;                     /* azul profundo de marca (cabecera) */
-    --pulso-navy: #003670;                     /* azul profundo secundario */
+    --pulso-deep: #003670;                     /* azul profundo de paleta: TEXTO fijo (títulos), nunca fondo de centro */
+    --pulso-navy: #003670;                     /* azul profundo de paleta: TEXTO fijo (nunca fondo de centro) */
+    /* Colores del CENTRO (carta 11). Los pisa el style en línea del contenedor/burbuja solo si Épica
+       manda un tema válido. FONDO: --pulso-brand con --pulso-brand-text encima (contraste >= 4,5 garantizado
+       por tema_service); ACENTO: --pulso-accent para iconos, bordes y foco (>= 3:1 sobre blanco y sobre
+       el principal). Un color de centro nunca se usa como TEXTO sobre fondo claro. */
+    --pulso-brand: #003670;                    /* fondo: cabecera, botones de acción, elementos activos, burbuja propia */
+    --pulso-brand-text: #FFFFFF;               /* texto/iconos encima de --pulso-brand */
+    --pulso-accent: #0B93AA;                   /* acento: iconos, bordes, foco (no texto) */
     --pulso-slate: #34547A;                     /* texto secundario */
     --pulso-muted: #3B6996;                     /* texto terciario / hints */
-    --pulso-cyan: #0B93AA;                      /* acento (iconos/bordes/foco, no texto) */
     --pulso-cyan-soft: #D9FBFF;                 /* fondo del bloque de siguiente paso */
-    --pulso-teal: #0B93AA;                      /* acento funcional (focus) */
-    --pulso-teal-ink: #0B93AA;                  /* marcadores */
     --pulso-bg: #FFFFFF;                        /* fondo del panel */
     --pulso-surface: #F7F9FD;                   /* tarjetas / superficies */
     --pulso-surface-2: #EDF1FA;                 /* cabecera de tabla / anidado */
@@ -140,7 +144,7 @@
 
 .pulso-chat-container :focus-visible,
 .pulso-chat-bubble:focus-visible {
-    outline: 2px solid var(--pulso-teal);
+    outline: 2px solid var(--pulso-accent);
     outline-offset: 2px;
 }
 
@@ -287,7 +291,7 @@
     width: 7px;
     height: 7px;
     border-radius: 50%;
-    background: var(--pulso-cyan);
+    background: var(--pulso-accent);
     box-shadow: 0 0 6px rgba(17, 234, 234, 0.9);
     flex-shrink: 0;
 }
@@ -428,7 +432,7 @@
     width: 20px;
     height: 20px;
     flex-shrink: 0;
-    color: var(--pulso-cyan);
+    color: var(--pulso-accent);
 }
 
 .pulso-home-help-btn .pulso-home-help-sub {
@@ -465,7 +469,7 @@
 }
 
 .pulso-suggest li::marker {
-    color: var(--pulso-cyan);
+    color: var(--pulso-accent);
 }
 
 .pulso-home-section {
@@ -626,7 +630,7 @@
 .pulso-action-icon {
     width: 20px;
     height: 20px;
-    color: var(--pulso-cyan);
+    color: var(--pulso-accent);
 }
 
 .pulso-action-label {
@@ -685,7 +689,7 @@
 }
 
 .pulso-tool:hover {
-    border-color: var(--pulso-cyan);
+    border-color: var(--pulso-accent);
     background: var(--pulso-bg);
 }
 
@@ -695,7 +699,7 @@
     height: 40px;
     border-radius: 10px;
     background: var(--pulso-surface-2);
-    color: var(--pulso-cyan);
+    color: var(--pulso-accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -754,7 +758,7 @@
 }
 
 .pulso-create-root-title:focus-visible {
-    outline: 2px solid var(--pulso-cyan);
+    outline: 2px solid var(--pulso-accent);
     outline-offset: 3px;
     border-radius: 4px;
 }
@@ -785,7 +789,7 @@
 }
 
 .pulso-create-back:hover {
-    border-color: var(--pulso-cyan);
+    border-color: var(--pulso-accent);
 }
 
 .pulso-create-head svg {
@@ -835,8 +839,8 @@
 .pulso-create-field select:focus,
 .pulso-create-field textarea:focus {
     outline: 2px solid transparent; /* visible en modo de alto contraste */
-    border-color: var(--pulso-cyan);
-    box-shadow: 0 0 0 2px var(--pulso-cyan);
+    border-color: var(--pulso-accent);
+    box-shadow: 0 0 0 2px var(--pulso-accent);
 }
 
 .pulso-create-field textarea {
@@ -890,11 +894,11 @@
 }
 
 .pulso-create-ejemplo:hover {
-    border-color: var(--pulso-teal);
+    border-color: var(--pulso-accent);
 }
 
 .pulso-create-ejemplo:focus-visible {
-    outline: 2px solid var(--pulso-teal);
+    outline: 2px solid var(--pulso-accent);
     outline-offset: 2px;
 }
 
@@ -913,8 +917,8 @@
     padding: 12px;
     border: none;
     border-radius: 999px;
-    background: var(--pulso-navy);
-    color: #ffffff;
+    background: var(--pulso-brand);
+    color: var(--pulso-brand-text);
     font-family: var(--pulso-font);
     font-weight: 600;
     font-size: 0.9rem;
@@ -932,7 +936,7 @@
     padding: 14px;
     border-radius: 12px;
     background: var(--pulso-surface);
-    border-left: 3px solid var(--pulso-cyan);
+    border-left: 3px solid var(--pulso-accent);
     font-size: 0.86rem;
     line-height: 1.5;
 }
@@ -1003,8 +1007,8 @@
     font-size: 0.82rem;
     font-weight: 600;
     text-decoration: none;
-    background: var(--pulso-navy);
-    color: #ffffff !important;
+    background: var(--pulso-brand);
+    color: var(--pulso-brand-text) !important;
 }
 
 .pulso-create-back-link {
@@ -1074,7 +1078,7 @@
     height: 40px;
     border-radius: 10px;
     background: var(--pulso-surface-2);
-    color: var(--pulso-cyan);
+    color: var(--pulso-accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1106,9 +1110,9 @@
 }
 
 .pulso-mine-filter[aria-pressed="true"] {
-    background: var(--pulso-navy);
-    border-color: var(--pulso-navy);
-    color: #FFFFFF;
+    background: var(--pulso-brand);
+    border-color: var(--pulso-brand);
+    color: var(--pulso-brand-text);
 }
 
 .pulso-mine-count {
@@ -1145,7 +1149,7 @@
 }
 
 .pulso-mine-item:hover {
-    border-color: var(--pulso-cyan);
+    border-color: var(--pulso-accent);
     background: var(--pulso-bg);
 }
 
@@ -1237,7 +1241,7 @@
     padding: 14px;
     border-radius: 12px;
     background: var(--pulso-surface);
-    border-left: 3px solid var(--pulso-cyan);
+    border-left: 3px solid var(--pulso-accent);
     font-size: 0.86rem;
     line-height: 1.5;
     color: var(--pulso-ink);
@@ -1276,7 +1280,7 @@
 }
 
 a.pulso-amp-card:hover {
-    border-color: var(--pulso-cyan);
+    border-color: var(--pulso-accent);
     box-shadow: 0 2px 8px rgba(1, 25, 50, 0.12);
 }
 
@@ -1398,7 +1402,7 @@ a.pulso-amp-card:hover {
 }
 
 .pulso-reto-card:hover:not(:disabled) {
-    border-color: var(--pulso-cyan);
+    border-color: var(--pulso-accent);
     box-shadow: 0 2px 8px rgba(1, 25, 50, 0.12);
 }
 
@@ -1422,7 +1426,7 @@ a.pulso-amp-card:hover {
     height: 34px;
     border-radius: 9px;
     background: var(--pulso-surface-2);
-    color: var(--pulso-cyan);
+    color: var(--pulso-accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1529,8 +1533,8 @@ a.pulso-amp-card:hover {
 
 .pulso-retos-own textarea:focus {
     outline: 2px solid transparent;
-    border-color: var(--pulso-cyan);
-    box-shadow: 0 0 0 2px var(--pulso-cyan);
+    border-color: var(--pulso-accent);
+    box-shadow: 0 0 0 2px var(--pulso-accent);
 }
 
 .pulso-retos-own textarea {
@@ -1570,7 +1574,7 @@ a.pulso-retos-open {
     text-align: center;
     text-decoration: none;
     box-sizing: border-box;
-    color: #ffffff !important;
+    color: var(--pulso-brand-text) !important;
 }
 
 .pulso-retos-note {
@@ -1628,8 +1632,8 @@ a.pulso-retos-open {
 }
 
 .pulso-message.user .pulso-message-content {
-    background: var(--pulso-navy);
-    color: #ffffff;
+    background: var(--pulso-brand);
+    color: var(--pulso-brand-text);
     border-bottom-right-radius: 4px;
     max-width: 85%;
     box-shadow: 0 2px 8px rgba(1, 25, 50, 0.2);
@@ -1680,7 +1684,7 @@ a.pulso-retos-open {
 .pulso-rich-summary {
     background: var(--pulso-surface-2);
     border: 1px solid var(--pulso-line);
-    border-left: 3px solid var(--pulso-cyan);
+    border-left: 3px solid var(--pulso-accent);
     padding: 10px 12px;
     border-radius: 10px;
     color: var(--pulso-ink);
@@ -1698,13 +1702,13 @@ a.pulso-retos-open {
     gap: 8px;
     padding: 9px 14px;
     border-radius: 10px;
-    background: var(--pulso-navy);
-    color: #ffffff !important;
+    background: var(--pulso-brand);
+    color: var(--pulso-brand-text) !important;
     font-weight: 600;
     font-size: 0.9rem;
     line-height: 1.2;
     text-decoration: none !important;
-    border: 1px solid var(--pulso-navy);
+    border: 1px solid var(--pulso-brand);
     transition: filter 0.15s ease, transform 0.15s ease;
 }
 
@@ -1713,7 +1717,7 @@ a.pulso-retos-open {
     filter: brightness(1.15);
     transform: translateY(-1px);
     text-decoration: none !important;
-    color: #ffffff !important;
+    color: var(--pulso-brand-text) !important;
 }
 
 .pulso-goto-icon {
@@ -1753,7 +1757,7 @@ a.pulso-retos-open {
     align-self: flex-start;
     padding: 2px 10px;
     border-radius: 999px;
-    background: var(--pulso-navy);
+    background: var(--pulso-brand);
     color: var(--pulso-cyan-soft);
     font-size: 0.75rem;
     font-weight: 600;
@@ -1776,7 +1780,7 @@ a.pulso-retos-open {
 }
 
 .pulso-rich-bullets li::marker {
-    color: var(--pulso-teal-ink);
+    color: var(--pulso-accent);
 }
 
 .pulso-meta-card {
@@ -1908,7 +1912,7 @@ a.pulso-retos-open {
 .pulso-formula {
     background: #E2E6F2;
     border: 1px solid var(--pulso-line);
-    border-left: 3px solid var(--pulso-cyan);
+    border-left: 3px solid var(--pulso-accent);
     border-radius: 8px;
     padding: 10px 12px;
     color: var(--pulso-ink);
@@ -1949,7 +1953,7 @@ a.pulso-retos-open {
     width: 14px;
     height: 2px;
     border-radius: 2px;
-    background: var(--pulso-cyan);
+    background: var(--pulso-accent);
 }
 
 .pulso-insights,
@@ -1967,7 +1971,7 @@ a.pulso-retos-open {
 .pulso-next-step {
     margin-top: 10px;
     padding: 8px 0 8px 12px;
-    border-left: 2px solid var(--pulso-cyan);
+    border-left: 2px solid var(--pulso-accent);
     background: var(--pulso-cyan-soft);
     color: var(--pulso-navy);
     font-size: 13px;
@@ -1988,7 +1992,7 @@ a.pulso-retos-open {
 }
 
 .pulso-insights li::marker {
-    color: var(--pulso-teal-ink);
+    color: var(--pulso-accent);
 }
 
 .pulso-recos li::marker {
@@ -2012,7 +2016,7 @@ a.pulso-retos-open {
 }
 
 .pulso-list-card.success { border-left-color: #0F7A57; }
-.pulso-list-card.info    { border-left-color: var(--pulso-cyan); }
+.pulso-list-card.info    { border-left-color: var(--pulso-accent); }
 .pulso-list-card.warn    { border-left-color: #8A6100; }
 .pulso-list-card.danger  { border-left-color: #B3261E; }
 
@@ -2056,7 +2060,7 @@ a.pulso-retos-open {
 
 .pulso-list-item-simple {
     padding: 10px 12px;
-    border-left: 3px solid var(--pulso-cyan);
+    border-left: 3px solid var(--pulso-accent);
     background: var(--pulso-surface-2);
     border-top: 1px solid var(--pulso-line);
     border-right: 1px solid var(--pulso-line);
@@ -2105,8 +2109,8 @@ a.pulso-retos-open {
 
 .pulso-table-search:focus {
     outline: 2px solid transparent;
-    border-color: var(--pulso-teal);
-    box-shadow: 0 0 0 2px var(--pulso-cyan);
+    border-color: var(--pulso-accent);
+    box-shadow: 0 0 0 2px var(--pulso-accent);
 }
 
 .pulso-table-search::placeholder {
@@ -2132,10 +2136,10 @@ a.pulso-retos-open {
 }
 
 .pulso-table th {
-    background: var(--pulso-deep);
+    background: var(--pulso-brand);
     padding: 0;
     text-align: left;
-    color: #ffffff;
+    color: var(--pulso-brand-text);
     font-weight: 600;
     font-size: 0.95em;
     letter-spacing: 0.02em;
@@ -2146,12 +2150,12 @@ a.pulso-retos-open {
 }
 
 .pulso-table th:hover {
-    background: var(--pulso-navy);
+    background: var(--pulso-brand);
 }
 
 .pulso-table th.is-sorted {
-    background: var(--pulso-navy);
-    border-bottom-color: var(--pulso-cyan);
+    background: var(--pulso-brand);
+    border-bottom-color: var(--pulso-accent);
 }
 
 /* La ordenación es un <button> dentro del <th> (alcanzable con teclado). */
@@ -2325,7 +2329,7 @@ a.pulso-retos-open {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--pulso-cyan);
+    background: var(--pulso-accent);
     opacity: 0.35;
     animation: pulso-typing-bounce 1.2s ease-in-out infinite;
 }
@@ -2364,7 +2368,7 @@ a.pulso-retos-open {
     height: 1.05em;
     margin-left: 3px;
     border-radius: 2px;
-    background: var(--pulso-cyan);
+    background: var(--pulso-accent);
     vertical-align: text-bottom;
     animation: pulso-blink 1s steps(2, start) infinite;
 }
@@ -2405,9 +2409,9 @@ a.pulso-retos-open {
 
 .pulso-input-group input:focus {
     outline: 2px solid transparent;
-    border-color: var(--pulso-cyan);
+    border-color: var(--pulso-accent);
     background: var(--pulso-surface-2);
-    box-shadow: 0 0 0 2px var(--pulso-cyan);
+    box-shadow: 0 0 0 2px var(--pulso-accent);
 }
 
 .pulso-send-btn {
@@ -2417,7 +2421,7 @@ a.pulso-retos-open {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--pulso-cyan);
+    background: var(--pulso-accent);
     color: var(--pulso-deep);
     border: none;
     border-radius: 50%;
@@ -2458,7 +2462,7 @@ a.pulso-retos-open {
     align-items: center;
     justify-content: center;
     background: var(--pulso-surface);
-    color: var(--pulso-cyan);
+    color: var(--pulso-accent);
     border: 1px solid var(--pulso-line);
     border-radius: 50%;
     cursor: pointer;
@@ -2482,9 +2486,9 @@ a.pulso-retos-open {
 
 /* Estado grabando: acento cian con anillo pulsante */
 .pulso-mic-btn.pulso-mic-recording {
-    background: var(--pulso-cyan);
+    background: var(--pulso-accent);
     color: var(--pulso-deep);
-    border-color: var(--pulso-cyan);
+    border-color: var(--pulso-accent);
     animation: pulso-mic-pulse 1.4s ease-out infinite;
 }
 
@@ -2571,7 +2575,7 @@ a.pulso-retos-open {
 }
 
 .pulso-create-head h3:focus-visible {
-    outline: 2px solid var(--pulso-cyan);
+    outline: 2px solid var(--pulso-accent);
     outline-offset: 3px;
     border-radius: 4px;
 }
@@ -2672,6 +2676,126 @@ a.pulso-retos-open {
 
 .pulso-offline[hidden] {
     display: none;
+}
+
+/* ========== COLORES DEL CENTRO (carta 11, v2.1.0) ==========
+   Solo casan con data-pulso-tema (lo pinta la plantilla únicamente si hay un tema válido); sin tema,
+   nada de esto se aplica y Pulse queda como siempre. Fondo = --pulso-brand con --pulso-brand-text
+   encima (texto y iconos de la cabecera, controles, pestañas, insignia). Con el principal del centro
+   la cabecera y la burbuja son planas (el degradado es de la marca Awakelab). Los tintes usan
+   color-mix sobre el texto de marca; un navegador sin color-mix conserva el tinte por defecto.
+   El acento (--pulso-accent, ya validado contra blanco y contra el principal) pisa al final: con
+   solo el principal, los detalles de la cabecera van en --pulso-brand-text, porque el acento por
+   defecto no se ha comprobado contra el color del centro. */
+.pulso-chat-bubble[data-pulso-tema~="principal"] {
+    background: var(--pulso-brand);
+    color: var(--pulso-brand-text);
+    border-color: color-mix(in srgb, var(--pulso-brand-text) 35%, transparent);
+}
+
+.pulso-chat-bubble[data-pulso-tema~="principal"]:hover {
+    box-shadow: 0 10px 28px rgba(1, 25, 50, 0.4),
+        0 0 0 4px color-mix(in srgb, var(--pulso-brand-text) 25%, transparent);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-chat-header {
+    background: var(--pulso-brand);
+    color: var(--pulso-brand-text);
+    border-bottom-color: var(--pulso-brand-text);
+    border-bottom-color: color-mix(in srgb, var(--pulso-brand-text) 45%, transparent);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-chat-header h2,
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-tab,
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-tab[aria-selected="true"] {
+    color: var(--pulso-brand-text);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-tab[aria-selected="true"] {
+    border-bottom-color: var(--pulso-brand-text);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-tab:hover {
+    background: color-mix(in srgb, var(--pulso-brand-text) 12%, transparent);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-header-sub {
+    color: var(--pulso-brand-text);
+    opacity: 1;
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-status-dot {
+    background: var(--pulso-brand-text);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--pulso-brand-text) 70%, transparent);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-version-badge {
+    color: var(--pulso-brand-text);
+    background: color-mix(in srgb, var(--pulso-brand-text) 14%, transparent);
+    border-color: color-mix(in srgb, var(--pulso-brand-text) 35%, transparent);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .header-btn {
+    color: var(--pulso-brand-text);
+    background: color-mix(in srgb, var(--pulso-brand-text) 10%, transparent);
+    border-color: color-mix(in srgb, var(--pulso-brand-text) 35%, transparent);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .header-btn:hover {
+    background: color-mix(in srgb, var(--pulso-brand-text) 20%, transparent);
+    border-color: color-mix(in srgb, var(--pulso-brand-text) 60%, transparent);
+}
+
+/* Foco sobre fondo de marca: el texto de marca, no el cian claro (que sobre un centro claro no se ve). */
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-chat-header :focus-visible,
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-table .pulso-sort-btn:focus-visible {
+    outline-color: var(--pulso-brand-text);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-table th.is-sorted {
+    border-bottom-color: var(--pulso-brand-text);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-step-badge {
+    color: var(--pulso-brand-text);
+}
+
+/* Botones de acción rellenos: con el principal van en marca (el cian solo es seguro con icono y fondo
+   de paleta; sobre un acento cualquiera no se garantiza el icono). */
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn,
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn:hover,
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-mic-btn.pulso-mic-recording {
+    background: var(--pulso-brand);
+    color: var(--pulso-brand-text);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn:hover {
+    filter: brightness(1.15);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-mic-btn.pulso-mic-recording {
+    border-color: var(--pulso-brand);
+}
+
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn[aria-disabled="true"],
+.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn[aria-disabled="true"]:hover {
+    background: #72A3C4;
+    color: #27334F;
+    filter: none;
+}
+
+/* El acento del centro (solo si pasó el contraste) en los detalles de la cabecera. */
+.pulso-chat-container[data-pulso-tema~="acento"] .pulso-tab[aria-selected="true"] {
+    border-bottom-color: var(--pulso-accent);
+}
+
+.pulso-chat-container[data-pulso-tema~="acento"] .pulso-status-dot {
+    background: var(--pulso-accent);
+    box-shadow: 0 0 6px var(--pulso-accent);
+}
+
+.pulso-chat-container[data-pulso-tema~="acento"] .pulso-table th.is-sorted {
+    border-bottom-color: var(--pulso-accent);
 }
 
 /* ========== MÓVIL: pantalla completa ========== */

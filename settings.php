@@ -322,6 +322,43 @@ if ($ADMIN->fulltree) {
     ));
 
     // ============================================================
+    // Colores de cada centro (carta 11, v2.1.0): solo si Épica está disponible.
+    // Un botón (POST + sesskey a sync_tema.php); la tarea programada lo hace cada hora.
+    // El formulario lo arma un script: los ajustes ya son UN <form> y no se anidan.
+    // ============================================================
+    require_once(__DIR__ . '/classes/epica_client.php');
+    require_once(__DIR__ . '/classes/tema_service.php');
+    if (\block_pulso\epica_client::disponible()) {
+        $temaversion = (string)get_config('block_pulso', 'tema_version');
+        $temahora = (int)get_config('block_pulso', 'tema_sync_time');
+        $temaestado = $temaversion !== ''
+            ? get_string('tema_estado_con', 'block_pulso', (object)[
+                'version' => s($temaversion),
+                'fecha' => $temahora > 0 ? userdate($temahora) : '—',
+            ])
+            : get_string('tema_estado_sin', 'block_pulso');
+        $temaurl = (new moodle_url('/blocks/pulso/sync_tema.php'))->out(false);
+        $settings->add(new admin_setting_heading(
+            'block_pulso/tema_heading',
+            get_string('tema_heading', 'block_pulso'),
+            get_string('tema_heading_desc', 'block_pulso') . ' ' . $temaestado
+        ));
+        $settings->add(new admin_setting_description(
+            'block_pulso/tema_sync_button',
+            '',
+            '<button type="button" id="pulso-sync-tema-btn" class="btn btn-secondary btn-sm">'
+            . s(get_string('tema_sync_button', 'block_pulso')) . '</button>'
+            . '<script>(function() {'
+            . 'var b = document.getElementById("pulso-sync-tema-btn"); if (!b) { return; }'
+            . 'b.addEventListener("click", function() {'
+            . 'var f = document.createElement("form"); f.method = "post"; f.action = ' . json_encode($temaurl) . ';'
+            . 'var i = document.createElement("input"); i.type = "hidden"; i.name = "sesskey"; i.value = ' . json_encode(sesskey()) . ';'
+            . 'f.appendChild(i); document.body.appendChild(f); f.submit();'
+            . '});})();</script>'
+        ));
+    }
+
+    // ============================================================
     // Diagnóstico para quien administra el sitio (v1.31.0)
     // ============================================================
     $settings->add(new admin_setting_heading(

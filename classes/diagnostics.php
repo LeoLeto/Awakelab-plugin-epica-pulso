@@ -155,6 +155,53 @@ class diagnostics {
         return self::result(self::WARN, 'Épica NO disponible (' . implode('; ', $why) . '). No se ofrecen infografías, juegos, retos ni historial; «Ampliar recurso» sigue.');
     }
 
+    /**
+     * Colores de cada centro (carta 11): sin tema, tema vigente con su versión y la fecha de la
+     * última sincronización, o el último error (genérico: el detalle está en el log del servidor).
+     */
+    public static function check_tema(): array {
+        require_once(__DIR__ . '/tema_service.php');
+        if (!epica_client::disponible()) {
+            return self::result(self::OK, 'Colores del centro: Épica no está disponible, Pulse usa sus colores.');
+        }
+        $version = (string)get_config('block_pulso', 'tema_version');
+        $hora = (int)get_config('block_pulso', 'tema_sync_time');
+        $codigo = (string)get_config('block_pulso', 'tema_sync_error');
+        $horaerror = (int)get_config('block_pulso', 'tema_sync_error_time');
+
+        $colores = tema_service::leer();
+        $res = tema_service::resolver($colores);
+        $usados = $colores ? implode(', ', array_keys($colores)) : '';
+
+        if ($codigo !== '') {
+            $textos = [
+                'sin_correo' => 'el administrador del sitio no tiene correo',
+                'red' => 'no se pudo contactar con Épica',
+                'rechazo' => 'Épica rechazó la petición (revisa la plataforma y el secreto de local_awkepica)',
+                'respuesta' => 'la respuesta de Épica no tenía la forma esperada',
+            ];
+            $quedan = $colores
+                ? "Se mantiene el último tema guardado (versión {$version})."
+                : 'Pulse usa sus colores.';
+            return self::result(self::WARN, 'Colores del centro: la última sincronización falló ('
+                . ($textos[$codigo] ?? 'error') . ($horaerror > 0 ? ', ' . userdate($horaerror) : '')
+                . "). {$quedan} Detalle en el log del servidor.");
+        }
+        if (!$colores) {
+            return self::result(
+                self::OK,
+                'Colores del centro: sin tema, Pulse usa sus colores'
+                . ($hora > 0 ? ' (última sincronización: ' . userdate($hora) . ').' : ' (aún no se ha sincronizado; la tarea corre cada hora).')
+            );
+        }
+        $msg = "Colores del centro: tema versión {$version} ({$usados}), última sincronización "
+            . ($hora > 0 ? userdate($hora) : 'sin fecha') . '.';
+        if ($res['ignorados']) {
+            return self::result(self::WARN, $msg . ' Ignorado por contraste insuficiente: ' . implode(', ', $res['ignorados']) . '.');
+        }
+        return self::result(self::OK, $msg);
+    }
+
     /** Última ejecución del cron de Moodle (la más reciente de las tareas programadas). */
     public static function check_cron(): array {
         global $DB;

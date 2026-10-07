@@ -60,6 +60,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     require_once(__DIR__ . '/classes/epica_client.php');
     $epicaavailable = \block_pulso\epica_client::disponible();
 
+    // Colores del centro (carta 11): se lee SOLO lo guardado y se revalida; jamás se llama a Épica
+    // al pintar. Sin Épica o sin tema, $tema = [] y la plantilla no pinta style ni data-pulso-tema.
+    require_once(__DIR__ . '/classes/tema_service.php');
+    $tema = \block_pulso\tema_service::para_pintar();
+
     // La configuracion que antes viajaba en variables globales window.* va al modulo AMD
     // (amd/src/chat.js). Solo para adaptar la UI: el servidor decide que datos se devuelven.
     $PAGE->requires->js_call_amd('block_pulso/chat', 'init', [[
@@ -104,7 +109,12 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     // comprobar qué build corre. El alumnado no la ve (a él no le dice nada).
     return $OUTPUT->render_from_template('block_pulso/chat', [
         // Isotipo desde pix/ (antes de media.awakelab.world: una petición a un tercero en cada página).
-        'isotipo' => $OUTPUT->image_url('isotipo-oscuro', 'block_pulso')->out(false),
+        // Con un color de centro CLARO (texto de marca negro) la cabecera y la burbuja llevan el isotipo
+        // para fondo claro: el oscuro (blanco) no se vería.
+        'isotipo' => $OUTPUT->image_url(!empty($tema['isotipoclaro']) ? 'isotipo-claro' : 'isotipo-oscuro', 'block_pulso')->out(false),
+        'hastema' => !empty($tema),
+        'temastyle' => $tema['style'] ?? '',
+        'temaflags' => $tema['flags'] ?? '',
         'isteacher' => !empty($isteacher),
         'cancreate' => !empty($cancreate),
         'epica' => (bool)$epicaavailable,

@@ -19,4 +19,15 @@ $tasks = [
         'dayofweek'   => '*',
         'disabled'    => 0,
     ],
+    [
+        // Colores de cada centro (carta 11): cada hora, fuera de la petición de cualquier página.
+        'classname'   => '\block_pulso\task\sync_tema',
+        'blocking'    => 0,
+        'minute'      => '17',
+        'hour'        => '*',
+        'day'         => '*',
+        'month'       => '*',
+        'dayofweek'   => '*',
+        'disabled'    => 0,
+    ],
 ];

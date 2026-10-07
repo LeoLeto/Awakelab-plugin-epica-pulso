@@ -1,5 +1,22 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-07 — Carta 12: retos con la sesión del alumno (v2.2.0)
+
+Reglas en `CLAUDE.md` → «Historial del alumno en Épica» (último punto). `epica_historial.php` + `crear.js`/`retos.js` (+ `amd/build`); sin `db/` ni
+cadenas nuevas (el texto del cliente es castellano fijo). Purgar cachés por el JS. Lo que costó ver:
+- **El ejemplo de la carta firma con `createactivity`**: seguirlo habría vuelto al error de la v1.29.0 (todo alumno firmado como docente, 403 en la puerta).
+  Se firma con `CAPABILITY_ROL`, como el historial.
+- **El `destino` no puede venir del navegador**: el cliente solo manda `reto=<codigo>` o `curso=1` y el servidor decide entre tres formas cerradas, comprobando
+  pertenencia del reto (`userid` + `courseid`) y la RUTA del enlace de la lista del curso (no la URL). Hay además una validación final antes de pintar el campo.
+- **`pulsoAbrirHistorial` ya no se duplica**: se partió en `pulsoPostHistorial(extra)` + tres envoltorios. Las acciones de clic reciben `(arg, arg2, el, e)`
+  como cadenas, así que `pulsoAbrirHistorial` no puede aceptar «params» sin que se cuele el `data-pulso-arg`; por eso el parámetro es interno.
+- **`pulsoRetosVerCurso` del alumno** ya no abre pestaña en blanco + `accion=curso`: es un POST directo en el clic (sin bloqueo de ventanas).
+- **Verificado**: `php -l`; una batería con stubs de `epica_historial.php` (reto propio, ajeno, de otro curso, inexistente, forma rara, `curso=1` con ruta buena/mala/vacía/excepción;
+  ningún destino fuera de las tres formas); jsdom propio (alumno vs profesor en los tres sitios, código raro, `window.open` solo en profesor); `build-amd.mjs --check`.
+- **NO probado**: Épica aún no lo ha desplegado en QA (el campo `destino` y la entrada con token no se han visto contra el servicio real); las baterías jsdom de v2.0.0 y
+  anteriores no están en esta máquina, así que no se han re-ejecutado; sin navegador no se ve el aspecto del botón en las filas de «Mis creaciones».
+
+
 ## 2026-10-07 — Carta 11: colores de cada centro (v2.1.0)
 
 Reglas en `CLAUDE.md` → «Colores de cada centro (carta 11)». Servidor (`tema_service`, tarea `sync_tema`, `sync_tema.php`, ajustes,

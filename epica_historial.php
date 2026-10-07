@@ -10,6 +10,11 @@
  * Solo alumnado: un token de docente en esa puerta es 403 en Épica, así que al
  * profesorado no se le firma nada (ver CLAUDE.md → «Historial del alumno»).
  *
+ * Carta 12: parámetro opcional `reto=<codigo>` (un reto PROPIO de este curso) o
+ * `curso=1` (la lista de retos del curso) → el formulario lleva además `destino`,
+ * construido SIEMPRE aquí con una de tres formas cerradas: /mis-recursos,
+ * /reto/<codigo> o /reto/curso/<llave>. Nada del navegador llega al destino tal cual.
+ *
  * Orden: POST → autenticar → sesskey → createactivity → check_enabled →
  * profesorado → precondiciones → firmar.
  *
@@ -20,6 +25,7 @@
 require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
 require_once(__DIR__ . '/classes/epica_client.php');
+require_once(__DIR__ . '/classes/retos_service.php');
 
 use block_pulso\chat_pipeline;
 use block_pulso\epica_client;
@@ -46,6 +52,55 @@ function pulso_historial_page(string $title, string $bodyhtml, int $status = 200
         . 'p{max-width:420px;line-height:1.5}button{background:#003670;color:#fff;border:0;border-radius:8px;'
         . 'padding:10px 18px;font-size:1rem;cursor:pointer}</style></head><body><div>' . $bodyhtml . '</div></body></html>';
     exit;
+}
+
+/**
+ * ¿Es uno de los tres destinos permitidos? Red de seguridad final: lo que se pinte en el formulario
+ * pasa por aquí aunque lo haya construido este mismo fichero.
+ *
+ * @param string $destino Ruta candidata.
+ * @return bool
+ */
+function pulso_historial_destino_valido(string $destino): bool {
+    return $destino === '/mis-recursos'
+        || preg_match('~^/reto/[A-Za-z0-9_-]{8,64}\z~', $destino) === 1
+        || preg_match('~^/reto/curso/[A-Za-z0-9_-]+\z~', $destino) === 1;
+}
+
+/**
+ * Destino de este clic. Cualquier cosa que no case o no sea del usuario → historial.
+ *
+ * @param int $courseid Curso actual.
+ * @param stdClass $user Alumno.
+ * @return string Una de las tres formas permitidas.
+ */
+function pulso_historial_resolver_destino(int $courseid, \stdClass $user): string {
+    global $DB;
+    $historial = '/mis-recursos';
+
+    $reto = optional_param('reto', '', PARAM_RAW_TRIMMED);
+    if ($reto !== '') {
+        // Solo un reto elegido por ESTE usuario en ESTE curso; uno ajeno o inexistente no abre nada.
+        if (preg_match('~^[A-Za-z0-9_-]{8,64}\z~', $reto) === 1
+                && $DB->record_exists('block_pulso_retos', ['codigo' => $reto, 'courseid' => $courseid, 'userid' => (int)$user->id])) {
+            return '/reto/' . $reto;
+        }
+        return $historial;
+    }
+
+    if (optional_param('curso', 0, PARAM_INT) === 1) {
+        try {
+            // Misma lógica que accion=curso; solo se acepta la ruta de la lista del curso.
+            $lista = \block_pulso\retos_service::curso($user, $courseid);
+            $ruta = parse_url((string)($lista['enlace'] ?? ''), PHP_URL_PATH);
+            if (is_string($ruta) && preg_match('~^/reto/curso/[A-Za-z0-9_-]+\z~', $ruta) === 1) {
+                return $ruta;
+            }
+        } catch (\Throwable $e) {
+            error_log('Pulso historial: lista de retos del curso no disponible: ' . get_class($e));
+        }
+    }
+    return $historial;
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -89,7 +144,12 @@ try {
         pulso_historial_page('Mi historial',
             '<p>El historial de Épica es para el alumnado. El profesorado entra en Épica por su acceso habitual.</p>');
     }
-    $destino = epica_client::endpoint('/api/auth/alumno');
+    $urlpuerta = epica_client::endpoint('/api/auth/alumno');
+    // Después de comprobar el rol (el profesorado no llega aquí) y antes de firmar el token de este clic.
+    $destino = pulso_historial_resolver_destino($courseid, $user);
+    if (!pulso_historial_destino_valido($destino)) {
+        $destino = '/mis-recursos';
+    }
     // Token nuevo justo ahora: vale 120 s y un solo uso.
     $token = \local_awkepica\epica::firmar_por($user, $context, epica_client::CAPABILITY_ROL, (string)$course->id);
 } catch (\Throwable $e) {
@@ -99,10 +159,14 @@ try {
         '<p>No hemos podido abrir tu historial en Épica ahora mismo. Cierra esta pestaña e inténtalo de nuevo en unos minutos.</p>', 503);
 }
 
-pulso_historial_page('Abriendo tu historial en Épica…',
-    '<form id="historial" method="post" action="' . s($destino) . '">'
+$esreto = $destino !== '/mis-recursos';
+$textoabrir = $esreto ? 'Abriendo tu reto en Épica…' : 'Abriendo tu historial en Épica…';
+
+pulso_historial_page($textoabrir,
+    '<form id="historial" method="post" action="' . s($urlpuerta) . '">'
     . '<input type="hidden" name="token" value="' . s($token) . '">'
-    . '<p>Abriendo tu historial en Épica…</p>'
+    . '<input type="hidden" name="destino" value="' . s($destino) . '">'
+    . '<p>' . s($textoabrir) . '</p>'
     . '<noscript><button type="submit">Continuar a Épica</button></noscript>'
     . '</form>'
     . '<script>document.getElementById("historial").submit();</script>');

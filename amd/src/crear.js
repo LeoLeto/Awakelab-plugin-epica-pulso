@@ -1106,6 +1106,12 @@ define(['block_pulso/common'], function(C) {
 
         function pulsoMineItemHtml(it) {
             if (it.r) {
+                // Alumnado: el reto se abre con su sesión de Épica (POST a nuestro endpoint), no con el enlace a secas.
+                if (cfg.isTeacher === false && cfg.apiHistorialUrl && pulsoRetoCodigoValido(it.r.codigo)) {
+                    return '<button type="button" class="pulso-mine-item" data-pulso-action="pulsoAbrirReto" data-pulso-arg="' + pulsoEscapeAttr(it.r.codigo) + '">'
+                        + '<span class="pulso-mine-thumb" aria-hidden="true">' + C.fn.pulsoRetosIconSvg('target') + '</span>'
+                        + pulsoMineInfo(it.r.titulo || 'Reto', 'Reto', it.t) + PULSO_NEWTAB_SR + '</button>';
+                }
                 return '<a class="pulso-mine-item" href="' + pulsoEscapeAttr(it.r.enlace) + '" target="_blank" rel="noopener noreferrer">'
                     + '<span class="pulso-mine-thumb" aria-hidden="true">' + C.fn.pulsoRetosIconSvg('target') + '</span>'
                     + pulsoMineInfo(it.r.titulo || 'Reto', 'Reto', it.t) + PULSO_NEWTAB_SR + '</a>';
@@ -1168,14 +1174,16 @@ define(['block_pulso/common'], function(C) {
         // crea un <form> POST con courseid + sesskey hacia nuestro endpoint, en
         // pestaña nueva y en el propio clic (sin bloqueo de ventanas emergentes).
         // El botón vive al pie de «Mis creaciones» (plantilla pulso-mine-historial-tpl).
-        function pulsoAbrirHistorial() {
+        // Carta 12: los retos del alumno entran por la misma puerta, con `reto=<codigo>` o `curso=1`; el
+        // `destino` lo construye el SERVIDOR (epica_historial.php), aquí solo se manda el código.
+        function pulsoPostHistorial(extra) {
             if (cfg.isTeacher !== false || !cfg.apiHistorialUrl) return;
             const form = document.createElement('form');
             form.method = 'post';
             form.action = cfg.apiHistorialUrl;
             form.target = '_blank';
             form.style.display = 'none';
-            [['courseid', cfg.courseid], ['sesskey', cfg.sesskey || (window.M && M.cfg && M.cfg.sesskey) || '']].forEach(function(p) {
+            [['courseid', cfg.courseid], ['sesskey', cfg.sesskey || (window.M && M.cfg && M.cfg.sesskey) || '']].concat(extra || []).forEach(function(p) {
                 const input = document.createElement('input');
                 input.type = 'hidden';
                 input.name = p[0];
@@ -1185,6 +1193,28 @@ define(['block_pulso/common'], function(C) {
             document.body.appendChild(form);
             form.submit();
             document.body.removeChild(form);
+        }
+
+
+        // Los tres sitios son acciones de clic: los argumentos del evento (cadenas o null) no se usan como params.
+        function pulsoAbrirHistorial() {
+            pulsoPostHistorial([]);
+        }
+
+
+        // El código solo llega a un atributo o al POST si tiene la forma que fija el servidor.
+        function pulsoRetoCodigoValido(codigo) {
+            return typeof codigo === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(codigo);
+        }
+
+
+        function pulsoAbrirReto(codigo) {
+            if (pulsoRetoCodigoValido(codigo)) pulsoPostHistorial([['reto', codigo]]);
+        }
+
+
+        function pulsoAbrirRetosCurso() {
+            pulsoPostHistorial([['curso', '1']]);
         }
 
 
@@ -1212,6 +1242,9 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoCreateEnter = pulsoCreateEnter;
     C.fn.pulsoSyncPolling = pulsoSyncPolling;
     C.fn.pulsoAbrirHistorial = pulsoAbrirHistorial;
+    C.fn.pulsoAbrirReto = pulsoAbrirReto;
+    C.fn.pulsoRetoCodigoValido = pulsoRetoCodigoValido;
+    C.fn.pulsoAbrirRetosCurso = pulsoAbrirRetosCurso;
     C.fn.submitCreate = submitCreate;
     C.fn.openCreateGalleryItem = openCreateGalleryItem;
 

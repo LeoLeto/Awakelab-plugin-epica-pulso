@@ -1353,6 +1353,24 @@ pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reg
   sale vacío. La sesión de Épica dura 2 h; se vuelve a pulsar el botón.
 - **El rol firmado sale de `viewanalytics`, no de `createactivity`** (hallazgo de esta versión;
   ver la regla en «Integración con Épica — paso 3»).
+- **Retos con la sesión del alumno (carta 12, v2.2.0).** El alumno abre sus retos por la MISMA puerta, `POST /api/auth/alumno`,
+  con un campo `destino`, para que su respuesta y su corrección queden en su historial (`docs/epica_retos_historial_carta12.md`).
+  El profesorado sigue con el `enlace` a secas (`target=_blank rel="noopener noreferrer"`); el alumno sin Épica no tiene retos.
+  - **El `destino` lo construye el SERVIDOR, nunca el navegador.** `epica_historial.php` acepta `reto=<codigo>` o `curso=1` y
+    calcula `pulso_historial_resolver_destino()`: tres formas cerradas, `/mis-recursos`, `/reto/<codigo>` y `/reto/curso/<llave>`,
+    más una red final (`pulso_historial_destino_valido()`, regex con `\z`) antes de pintar el campo. `reto`: forma
+    `^[A-Za-z0-9_-]{8,64}$` y fila en `block_pulso_retos` con ESTE `courseid` y ESTE `userid`; ajeno, inexistente o de forma rara →
+    historial. `curso=1`: `retos_service::curso()` (la lógica de `accion=curso`) y de su `enlace` solo la RUTA
+    (`parse_url`) si casa `^/reto/curso/[A-Za-z0-9_-]+$`; si falla o no casa → historial. El destino se resuelve DESPUÉS de comprobar
+    que el rol es `estudiante` (el profesorado no llama a Épica ni firma) y el token se firma después, justo antes de pintar.
+  - **Se firma con `epica_client::CAPABILITY_ROL` (`viewanalytics`), NO con `createactivity`** como dice el ejemplo de la carta:
+    con `createactivity` todo alumno sale como docente y la puerta da 403 (el error de la v1.29.0).
+  - **Tres sitios del cliente**, solo con `cfg.isTeacher === false` y `cfg.apiHistorialUrl`: «Abrir reto» y «Ver retos del curso»
+    tras elegir (`pulsoRetosRenderDone`), la fila de reto de «Mis creaciones» (`pulsoMineItemHtml`) y «Ver todos los retos del
+    curso» del formulario (`pulsoRetosVerCurso`). En vez del `<a href>`, un `<button data-pulso-action>` que hace el POST de
+    `pulsoPostHistorial(extra)` (`crear.js`; `pulsoAbrirHistorial`/`pulsoAbrirReto(codigo)`/`pulsoAbrirRetosCurso()` son envoltorios).
+    El código solo llega al atributo o al POST si pasa `pulsoRetoCodigoValido()` (misma regex); si no, la fila cae al enlace.
+    `pulsoRetosVerCurso` del alumno ya no llama a `accion=curso` ni abre ventana: el servidor resuelve el destino.
 
 ## Auditoría de UX, fase 1 — visibilidad, diagnóstico y errores (v1.30.0)
 

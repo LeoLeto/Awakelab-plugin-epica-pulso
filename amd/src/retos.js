@@ -562,16 +562,24 @@ define(['block_pulso/common'], function(C) {
         function pulsoRetosRenderDone(d, token) {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
+            // Alumnado (carta 12): se abre con su sesión de Épica por nuestro endpoint, sin el enlace a secas.
+            const alumno = cfg.isTeacher === false && !!cfg.apiHistorialUrl;
+            const abrir = alumno && C.fn.pulsoRetoCodigoValido(d.codigo)
+                ? '<button type="button" class="pulso-create-submit pulso-retos-open" data-pulso-action="pulsoAbrirReto" data-pulso-arg="' + pulsoEscapeAttr(d.codigo) + '">Abrir reto' + PULSO_NEWTAB_SR + '</button>'
+                : '<a class="pulso-create-submit pulso-retos-open" href="' + pulsoEscapeAttr(d.enlace) + '" target="_blank" rel="noopener noreferrer">Abrir reto' + PULSO_NEWTAB_SR + '</a>';
+            const abrircurso = pulsoAmpIsHttps(d.enlace_curso)
+                ? (alumno
+                    ? '<button type="button" class="pulso-create-secondary" data-pulso-action="pulsoRetosVerCurso">Ver retos del curso' + PULSO_NEWTAB_SR + '</button>'
+                    : '<a class="pulso-create-secondary" href="' + pulsoEscapeAttr(d.enlace_curso) + '" target="_blank" rel="noopener noreferrer">Ver retos del curso' + PULSO_NEWTAB_SR + '</a>')
+                : '';
             body.innerHTML = '<div class="pulso-retos-done">'
                 + '<div class="pulso-retos-done-head">¡Tu reto está listo!</div>'
                 + '<div class="pulso-reto-title" id="pulso-retos-done-title">' + escapeHtmlText(d.titulo || 'Reto') + '</div>'
                 + '<div id="pulso-retos-done-stats" class="pulso-retos-note"></div>'
                 + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
-                + '<a class="pulso-create-submit pulso-retos-open" href="' + pulsoEscapeAttr(d.enlace) + '" target="_blank" rel="noopener noreferrer">Abrir reto' + PULSO_NEWTAB_SR + '</a>'
+                + abrir
                 + '<div class="pulso-retos-note">Se abre en una pestaña nueva. Si lo abres enseguida verás "Creando tu reto": tarda menos de un minuto.</div>'
-                + (pulsoAmpIsHttps(d.enlace_curso)
-                    ? '<a class="pulso-create-secondary" href="' + pulsoEscapeAttr(d.enlace_curso) + '" target="_blank" rel="noopener noreferrer">Ver retos del curso' + PULSO_NEWTAB_SR + '</a>'
-                    : '')
+                + abrircurso
                 + '<button type="button" class="pulso-create-secondary" data-pulso-action="openCreatePanel" data-pulso-arg="retos">Crear otro reto</button>'
                 + '</div>';
             // Hay un reto elegido nuevo: «Mis creaciones» se refresca (solo su caché, no se pinta aquí).
@@ -632,6 +640,11 @@ define(['block_pulso/common'], function(C) {
         // fetch) y se le pone el enlace al llegar; sin permiso, se ofrece un enlace.
         function pulsoRetosVerCurso() {
             if (pulsoRetosCourseBusy || pulsoRetosBusy) return;
+            // Alumnado (carta 12): la lista se abre con su sesión de Épica; el servidor resuelve el destino.
+            if (cfg.isTeacher === false && cfg.apiHistorialUrl) {
+                C.fn.pulsoAbrirRetosCurso();
+                return;
+            }
             pulsoRetosCourseBusy = true;
             const token = S.pulsoAmpToken;
             pulsoRetosRetryFn = pulsoRetosVerCurso;

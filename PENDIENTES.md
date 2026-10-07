@@ -1,8 +1,8 @@
-# Pendientes de Pulse AI (tras la carta 11, v2.1.0 — 07-10-2026)
+# Pendientes de Pulse AI (tras la carta 12, v2.2.0 — 07-10-2026)
 
 ## En cola (cartas de Épica, por hacer)
 - [x] **Carta 11 — colores de cada centro** (v2.1.0, hecho en código; falta probarlo en sanase-test con un tema real). **Contestar a Chema las 4 preguntas de §6**: variables `principal` y `acento` y para qué las usamos; `texto` nos sirve pero lo comprobamos y, si no da 4,5:1, lo calculamos; sin modo oscuro (mismo color); tarea cada hora + botón. Avisarle de que su acento de ejemplo `#0fced3` (1,7:1 sobre blanco) lo ignoramos, y de que pedimos acentos con >= 3:1 sobre blanco.
-- [ ] **Carta 12 — retos con la sesión del alumno** (`docs/epica_retos_historial_carta12.md`): abrir los retos del alumno por `POST /api/auth/alumno` con `destino`. Pendiente de que Épica lo despliegue en QA. Contestar las 3 preguntas de §4.
+- [x] **Carta 12 — retos con la sesión del alumno** (v2.2.0, hecho en código; falta probarlo con Épica en QA cuando lo despliegue y con una cuenta de alumno real). **Contestar las 3 preguntas de §4**: (1) el enlace del reto se enseña al elegirlo, en «Mis creaciones» y en «Ver todos los retos del curso»; (2) sí queremos el `destino` de la lista del curso; (3) sí nos vale que, si el token falla, el alumno llegue al reto sin identificar. Avisarles de que firmamos con `viewanalytics` (no `createactivity`) y de que el profesorado sigue con el enlace a secas.
 
 ## Pendientes técnicos
 - [ ] **Privacy provider (RGPD)**: el plugin no tiene `classes/privacy/provider.php`; sin metadata/export/borrado de las tablas con `userid`, ni limpieza al borrar un curso.

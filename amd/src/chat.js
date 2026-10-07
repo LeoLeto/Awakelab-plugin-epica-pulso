@@ -157,6 +157,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                     }
                 });
                 S.pulsoTab = tab;
+                if (tab !== 'ask') pulsoClearCancel(false);
 
                 const shown = target.querySelector('.pulso-chat-messages');
                 if (shown) {
@@ -475,6 +476,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         // Lanza la petición (stream o XHR). La usa también «Reintentar», que reenvía el MISMO
         // mensaje sin volver a pintarlo ni tocar lo que haya en el cuadro de texto.
         function dispatchMessage(message) {
+            pulsoClearCancel(false);
             pulsoAnnounce('Pulse está preparando la respuesta');
             showLoading(true);
 
@@ -1259,6 +1261,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             } else {
                 // Minimizar a burbuja
                 floatingState.isOpen = false;
+                pulsoClearCancel(false);
                 if (pulsoMicRecording && pulsoRecognition) pulsoRecognition.stop();
                 container.classList.remove('is-open');
                 // Solo lo que pusieron abrir/arrastrar/ampliar: un cssText vacío borraría también las
@@ -1327,12 +1330,55 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
         }
 
 
+        // Confirmación de «Nueva conversación» dentro del chat (no confirm()): barra del panel
+        // Preguntar, fuera de #pulso-messages. Foco en «Cancelar» (la opción segura).
+        function pulsoClearBarOpen() {
+            const bar = document.getElementById('pulso-clear-confirm');
+            return !!bar && !bar.hidden;
+        }
+
+
+        // Cierra la barra. Con focusBtn el foco vuelve a #pulso-clear-btn (Cancelar, Escape);
+        // sin él no se mueve (cambio de pestaña, minimizar, enviar).
+        function pulsoClearCancel(focusBtn) {
+            const bar = document.getElementById('pulso-clear-confirm');
+            if (!bar || bar.hidden) return;
+            bar.hidden = true;
+            const btn = document.getElementById('pulso-clear-btn');
+            if (btn) {
+                btn.setAttribute('aria-expanded', 'false');
+                if (focusBtn === true) btn.focus();
+            }
+        }
+
+
+        function pulsoClearConfirm() {
+            pulsoClearCancel(false);
+            pulsoDoClear();
+        }
+
+
         function clearConversation() {
             const hasHistory = S.conversationHistory && S.conversationHistory.length > 0;
-            if (hasHistory && !confirm('¿Empezar una conversación nueva? Se borrará el historial de este chat.')) {
+            const bar = document.getElementById('pulso-clear-confirm');
+            if (!hasHistory || !bar) {
+                pulsoDoClear();
                 return;
             }
+            // El botón de la cabecera también se ve desde Crear: la barra vive en Preguntar.
+            pulsoSelectTab('ask', { focus: false });
+            const cancel = bar.querySelector('[data-pulso-action="pulsoClearCancel"]');
+            if (bar.hidden) {
+                bar.hidden = false;
+                const btn = document.getElementById('pulso-clear-btn');
+                if (btn) btn.setAttribute('aria-expanded', 'true');
+                pulsoAnnounce('¿Empezar una conversación nueva? Se borrará esta conversación.');
+            }
+            if (cancel) cancel.focus();
+        }
 
+
+        function pulsoDoClear() {
             S.conversationHistory = [];
             try {
                 sessionStorage.removeItem('pulso_history_' + cfg.courseid);
@@ -1568,6 +1614,11 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                 container.addEventListener('keydown', function(e) {
                     if (e.key === 'Escape' && floatingState.isOpen && !e.defaultPrevented) {
                         e.preventDefault();
+                        // La confirmación abierta tiene prioridad: Escape la cancela y el chat sigue abierto.
+                        if (pulsoClearBarOpen()) {
+                            pulsoClearCancel(true);
+                            return;
+                        }
                         toggleChat();
                     }
                 });
@@ -1624,6 +1675,8 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
     C.fn.selectTab = selectTab;
     C.fn.toggleChat = toggleChat;
     C.fn.clearConversation = clearConversation;
+    C.fn.pulsoClearConfirm = pulsoClearConfirm;
+    C.fn.pulsoClearCancel = function() { pulsoClearCancel(true); };
     C.fn.toggleChatSize = toggleChatSize;
     C.fn.pulsoCopyQuestion = pulsoCopyQuestion;
     C.fn.showCapabilities = showCapabilities;

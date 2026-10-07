@@ -2663,6 +2663,64 @@ a.pulso-retos-open {
     cursor: not-allowed;
 }
 
+/* Confirmación de «Nueva conversación» (v2.3.3): barra del panel Preguntar, sobre el cuadro de texto. */
+.pulso-clear-confirm {
+    flex-shrink: 0;
+    padding: 10px 14px;
+    background: var(--pulso-surface);
+    border-top: 1px solid var(--pulso-line);
+}
+
+.pulso-clear-confirm[hidden] {
+    display: none;
+}
+
+.pulso-clear-confirm-text {
+    margin: 0 0 8px;
+    color: var(--pulso-ink);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.pulso-clear-confirm-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.pulso-clear-confirm-yes,
+.pulso-clear-confirm-no {
+    min-height: 36px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-family: var(--pulso-font);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pulso-clear-confirm-yes {
+    border: 1px solid var(--pulso-brand);
+    background: var(--pulso-brand);
+    color: var(--pulso-brand-text);
+}
+
+.pulso-clear-confirm-no {
+    border: 1px solid var(--pulso-navy);
+    background: transparent;
+    color: var(--pulso-navy);
+}
+
+.pulso-clear-confirm-no:hover {
+    background: var(--pulso-surface-2);
+}
+
+.pulso-clear-confirm-yes:focus-visible,
+.pulso-clear-confirm-no:focus-visible {
+    outline: 2px solid var(--pulso-accent);
+    outline-offset: 2px;
+}
+
 /* Aviso persistente de falta de conexión (entre los mensajes y el cuadro de texto). */
 .pulso-offline {
     flex-shrink: 0;
@@ -2858,7 +2916,9 @@ a.pulso-retos-open {
     }
 
     .pulso-error-retry,
-    .pulso-error-copy {
+    .pulso-error-copy,
+    .pulso-clear-confirm-yes,
+    .pulso-clear-confirm-no {
         min-height: 44px;
     }
 

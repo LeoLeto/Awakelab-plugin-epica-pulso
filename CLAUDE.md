@@ -1515,7 +1515,12 @@ Solo cliente (hoy `amd/src/*.js`, `styles.css` y `templates/`; entonces `chat_si
 - **Una pregunta lanzada desde cualquier sitio cambia a Preguntar antes de enviar** (`sendMessage()` y
   `pulsoSystemMessage()` llaman a `pulsoSelectTab('ask')`; antes «enviar con Crear abierto cierra Crear»). El cuadro
   de texto solo existe en Preguntar, así que lo habitual es que ya se esté en ella; `askPreset`, las sugerencias y
-  «Reintentar» pasan por ahí. `pulsoSystemMessage()` sustituye a los `alert()` (no hay `alert()` en el cliente).
+  «Reintentar» pasan por ahí. `pulsoSystemMessage()` sustituye a los `alert()`. **No hay `alert()`, `confirm()` ni `prompt()` en el cliente**: una
+  confirmación va siempre en el propio chat, con el foco en la opción segura, y Escape la cancela antes de cerrar el chat.
+  «Nueva conversación» (v2.3.3): con historial no borra, abre `#pulso-clear-confirm` (en la plantilla, dentro de `#pulso-panel-ask`,
+  fuera de `#pulso-messages`, `hidden` por defecto; `#pulso-clear-btn` lleva `aria-expanded` + `aria-controls`: es un
+  disclosure, no un popup) con «Empezar de nuevo» (`pulsoClearConfirm` → `pulsoDoClear()`, el borrado de siempre) y «Cancelar»
+  (foco inicial; devuelve el foco al botón). Escape la cancela primero; cambiar a Crear, minimizar o enviar la cierran sin mover el foco.
 - **Errores con reintento y copia (v1.40.0).** `addErrorMessage(payload, message)` pinta SVG `aria-hidden` + «Error:» + el
   texto por `error_code` (sin emoji) y, si hay `message`, una fila `.pulso-error-actions` con: «Reintentar» solo si el
   código está en `PULSO_RETRYABLE` (llama a `dispatchMessage(message)` con el MISMO mensaje, sin repintar la burbuja del

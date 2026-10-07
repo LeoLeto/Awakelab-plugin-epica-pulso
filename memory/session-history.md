@@ -1,5 +1,13 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-07 — «Nueva conversación» sin `confirm()` (v2.3.3)
+
+Reglas en `CLAUDE.md` → «Auditoría de UX, fase 3» (errores con reintento y copia). `chat.js`, `chat.mustache`, `styles.css`; sin servidor ni `db/`. Purgar cachés. Lo que costó ver:
+- **El botón de la cabecera también se ve desde Crear**, pero la barra vive en Preguntar: abrirla cambia antes a esa pestaña (si no, se habría abierto en un panel oculto).
+- **Todos los envíos pasan por `dispatchMessage`** (también «Reintentar»), así que cerrar ahí cubre `askPreset`, sugerencias y reintento; el cierre por pestaña va en `pulsoSelectTab` (`tab !== 'ask'`).
+- **`aria-expanded` + `aria-controls`** (disclosure) y no `aria-haspopup`: la barra es en línea, no un menú ni un diálogo.
+- **NO probado**: jsdom (las baterías viven fuera del repo y no están en esta máquina) ni navegador; ver el estado de las pruebas en el mensaje de cierre.
+
 ## 2026-10-07 — La propuesta madre de «Proponer otros» deja de salir (v2.3.2)
 
 Reglas en `CLAUDE.md` → «Fase 4 — paso 7» (sustituye la limitación conocida). `classes/retos_service.php`, `db/install.xml` + `db/upgrade.php` (2026100706); cliente sin tocar. Lo que costó ver:

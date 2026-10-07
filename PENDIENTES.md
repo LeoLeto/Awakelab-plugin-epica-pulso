@@ -9,7 +9,7 @@
 - [x] **429 `cuota-del-centro`** (v2.3.1, hecho en código): terminal a la primera; el resto de 429 reintenta con tope de 6 h; la notificación traduce los códigos. Falta verlo con un 429 real de Épica en QA.
 - [ ] **SCORM (P55/P56)**: indexar el contenido de los SCORM y el modo «resumen/explicación de unidad».
 - [x] **Propuesta madre de «Proponer otros»** (v2.3.2, hecho en código): `padreid` + `NOT EXISTS` de hija viva. Las filas anteriores siguen saliendo hasta caducar (≤ 7 días). Al desplegar, Notificaciones.
-- [ ] **`confirm()` de «Nueva conversación»**: cambiarlo por un aviso dentro del chat.
+- [x] **`confirm()` de «Nueva conversación»** (v2.3.3, hecho en código): barra de confirmación dentro del chat. Al desplegar, purgar cachés.
 
 ## Fuera del plugin
 - [ ] **Los datos que Épica guarda del alumno (historial por `sub`) no se borran desde Moodle**: preguntar a Chema cómo se pide el borrado.

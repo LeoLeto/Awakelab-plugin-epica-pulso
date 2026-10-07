@@ -67,7 +67,7 @@
                 </div>
             </div>
             <div class="header-controls">
-                <button class="header-btn" id="pulso-clear-btn" title="Nueva conversación" aria-label="Empezar una conversación nueva" data-pulso-action="clearConversation">
+                <button class="header-btn" id="pulso-clear-btn" title="Nueva conversación" aria-label="Empezar una conversación nueva" aria-expanded="false" aria-controls="pulso-clear-confirm" data-pulso-action="clearConversation">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg>
                 </button>
                 <button type="button" class="header-btn" id="pulso-expand-btn" title="Ampliar" aria-label="Ampliar el chat" aria-pressed="false" data-pulso-action="toggleChatSize">
@@ -207,6 +207,14 @@
         </div>
 
         <div class="pulso-offline" id="pulso-offline" hidden>Sin conexión. Tus preguntas se enviarán cuando vuelva internet.</div>
+
+        <div class="pulso-clear-confirm" id="pulso-clear-confirm" role="group" aria-labelledby="pulso-clear-confirm-text" hidden>
+            <p class="pulso-clear-confirm-text" id="pulso-clear-confirm-text">¿Empezar una conversación nueva? Se borrará esta conversación.</p>
+            <div class="pulso-clear-confirm-actions">
+                <button type="button" class="pulso-clear-confirm-yes" data-pulso-action="pulsoClearConfirm">Empezar de nuevo</button>
+                <button type="button" class="pulso-clear-confirm-no" data-pulso-action="pulsoClearCancel">Cancelar</button>
+            </div>
+        </div>
 
         <div class="pulso-chat-input-area">
             <form id="pulso-chat-form">

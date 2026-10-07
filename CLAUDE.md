@@ -1,4 +1,18 @@
-# block_pulso — Moodle AI analytics chat (Pulso AI)
+# block_pulso — Pulse AI (asistente de curso para Moodle)
+
+## Índice (dónde está cada cosa)
+
+- **Versioning rule** — bump obligatorio de `version.php` en cada cambio.
+- **Architecture** — ruta de una petición de chat, UI (Mustache + `styles.css` + AMD), endpoints, clases.
+- **Anthropic API constraints** — lo que rechaza la API y cómo se evita.
+- **Invariantes que NO se pueden romper** — UTF-8, RAG fuera de la petición, cmid sintéticos, caché del prompt, historial sin JSON, sesskey.
+- **Modo alumno** — dos capabilities, tres capas. **Enrutado** — sección vs recurso vs metadatos. **Conversación proactiva** — `next_step`.
+- **Enlaces directos (v1.11)** y **Tema claro (v1.16)** — botón «Ir a…»; paleta y contraste.
+- **Épica** — pasos 1, 3 y 4 (bloque Crear, ciclo adhoc, panel de estado), **Gamificación** 1–4, **Ampliación** 1–2, **Retos** 1–2, **QA general**, **Historial del alumno**.
+- **Auditoría de UX, fases 1–3** — visibilidad en el RAG y `pulso_error`; Épica opcional, topes y diagnóstico; accesibilidad y móvil.
+- **Fase 4 (cerrada, v2.0.0)** — `styles.css`, módulos AMD, pestañas + Mustache, home, pila de Crear (paso 6), «Mis creaciones» (paso 7).
+- **Cómo se trabaja este repo con prompts** — una sesión por paso. **Bug backlog** — solo lo vivo. **Dev notes** — build de `amd/build`, purgas y Notificaciones.
+- Historial de lo que costó cada paso: `memory/session-history.md`. Plan de la fase 4: `docs/plan_fase4.md`. Instalación y despliegue: `README.md`.
 
 ## Versioning rule (MANDATORY — apply on EVERY change)
 
@@ -19,40 +33,37 @@ but the `$plugin->version` bump is still mandatory every time.
 
 ## Architecture (chat request path)
 
-- `chat_simple_view.php` — floating chat UI (shell en `templates/chat.mustache` + parcial `chat_create_tools`; CSS en
-  `styles.css`, JS en `amd/src/*.js`; rendered by `block_pulso.php`). Cabecera con pestañas «Preguntar» / «Crear» (v1.36.0). Sends messages to `api_chat_stream.php` via fetch + SSE
-  (ChatGPT-style token streaming, progressive preview of partial JSON) and falls
-  back automatically to `api_chat.php` (XHR/JSON) if streaming is unavailable.
-  Design (v1.4+): DARK theme with Awakelab 2026 brand (deep blues bg, vivid cyan
-  accents on dark, Poppins via Google Fonts, isotipo logo from
-  media.awakelab.world); Phia-style SHORT home screen (`#pulso-home`, v1.37.0: 4 featured cards per role +
-  «Ver más ideas», see «Fase 4 — paso 5»; each card/idea
-  injects a full natural-language question into the pipeline — phrase new ones to
-  hit analytics/structural intents, not generic single words, to avoid backlog
-  bug #2's activity-matcher misfire) that
-  hides on first message and returns via the "Nueva conversación" header button
-  (`clearConversation()` — removes only `.pulso-message`/followups, NOT the home
-  node). The home also has a "¿Qué puede hacer Pulso?" button
-  (`showCapabilities()`) that renders a hardcoded, client-side capabilities list
-  (no LLM/no cost, always well-formatted) + example follow-up chips, for quick
-  onboarding of new users. Table/card field keys are translated via
-  `PULSO_FIELD_LABELS` + `pulsoFieldLabel()` fallback. A meta-row value that is a
-  run-on of ≥2 questions (e.g. the greeting's "preguntas que puedes hacerme") is
-  rendered as a `<ul>` list (`pulsoSplitQuestions()` in `renderMetaRow`) instead
-  of the 2-column `key|value` grid, which clipped/broke in narrow chat widths. Design tokens are CSS vars (`--pulso-*`) on
-  `.pulso-chat-container`.
-  Voice input (v1.5+): mic button (`#pulso-mic-btn`, `toggleMic()`) does
-  client-side speech-to-text via the Web Speech API (`SpeechRecognition`,
-  `lang='es-ES'`, interim results streamed into `#pulso-input`). No backend / no
-  API key. Auto-hidden (`initPulsoMic()` shows it only if the API exists — so
-  Firefox just doesn't get the button) and only works in a secure context
-  (HTTPS or localhost). Stops on send; friendly es/en alert if mic permission is
-  blocked. Typing indicator (v1.6+): while the bot thinks, a WhatsApp-style AI
-  bubble with three animated cyan dots (`showTyping()`/`hideTyping()`, driven by
-  the existing `showLoading()` calls) appears in the message flow and is removed
-  as soon as the first stream tokens / final answer arrive. This replaced the old
-  `#pulso-loading` status bar (element and its `.pulso-loading`/
-  `.pulso-pulsewave` CSS both removed in v1.8.1).
+- **UI del chat (Fase 4, v2.0.0)** — flotante, de tema CLARO con cabecera azul profunda (ver «Tema claro»). Piezas:
+  - `block_pulso.php` llama a `render_chat_simple()` (`chat_simple_view.php`, ~120 líneas), que **solo** arma el contexto de
+    la plantilla (`release` leído de `version.php` en disco, `isteacher`, `cancreate`, `epica`, `showversion`, `greeting`…),
+    llama a `$PAGE->requires->js_call_amd('block_pulso/chat', 'init', [$cfg])` y renderiza `templates/chat.mustache`
+    (+ parcial `chat_create_tools`). No hay HTML, CSS ni JS en línea.
+  - **Estilos** en `styles.css` (variables `--pulso-*` en `.pulso-chat-bubble, .pulso-chat-container`; fuente Poppins servida
+    desde `fonts/` como familia `Pulso Poppins`; isotipos en `pix/`). Sin terceros en la carga de la página.
+  - **JS** en módulos AMD `amd/src/{common,format,chat,crear,retos,ampliacion}.js` (build commiteado en `amd/build/`):
+    `chat` = envío, SSE, historial, errores, pestañas, home, voz, arrastre/tamaño; `format` = formateo de respuestas (tablas,
+    tarjetas, exportar; funciones puras); `crear` = pila de Crear, formularios, estado de encargos, «Mis creaciones»;
+    `retos` = herramienta Retos; `ampliacion` = Ampliar recurso; `common` = config (`C.cfg`), estado compartido (`C.S`) y
+    registro de funciones entre módulos (`C.fn`). Detalle en «Fase 4».
+  - **Dos pestañas** «Preguntar» / «Crear» (`role="tablist"`, paneles hermanos que se alternan con `hidden`). Preguntar = home +
+    conversación + cuadro de texto; Crear = lista de herramientas → formulario → detalle (pila), más «Mis creaciones».
+  - El chat envía a `api_chat_stream.php` por fetch + SSE (streaming de tokens con vista previa progresiva del JSON parcial) y cae a
+    `api_chat.php` (XHR/JSON) solo ante fallo de red, 404 o 405 (ver «Auditoría fase 1»).
+  - **Home corta por rol** (`#pulso-home`, v1.37.0: 4 tarjetas destacadas + «Ver más ideas», ver «Fase 4 — Home corta»): cada
+    tarjeta/idea inyecta una pregunta completa en lenguaje natural en el pipeline — las nuevas deben apuntar a intenciones de
+    analítica o estructurales, no a palabras sueltas, para no repetir el fallo del matcher de actividades (backlog #2). La home se
+    oculta al primer mensaje y vuelve con «Nueva conversación» (`clearConversation()`: quita solo `.pulso-message`, el separador de
+    historial y las sugerencias, NO el nodo de la home). «¿Qué puede hacer Pulse?» (`showCapabilities()` en
+    `chat.js`) pinta una lista hardcodeada en cliente (sin LLM, sin coste) + chips de ejemplo.
+  - Formateo (`format.js`): las claves de tabla/tarjeta se traducen con `PULSO_FIELD_LABELS` + `pulsoFieldLabel()`; un valor de
+    meta-row que sea una tirada de ≥2 preguntas se pinta como `<ul>` (`pulsoSplitQuestions()` en `renderMetaRow`), porque la rejilla
+    de 2 columnas se rompía en anchos estrechos.
+  - **Voz** (v1.5+, `chat.js`): botón `#pulso-mic-btn` (`toggleMic()`) con Web Speech API (`SpeechRecognition`, `lang='es-ES'`,
+    resultados provisionales en `#pulso-input`). Sin backend ni clave. `initPulsoMic()` lo muestra solo si la API existe (Firefox no
+    lo tiene) y solo funciona en contexto seguro (HTTPS o localhost). Se detiene al enviar; si el permiso está bloqueado avisa por
+    `pulsoSystemMessage()`.
+  - **Indicador de escritura** (v1.6+): burbuja con tres puntos animados (`showTyping()`/`hideTyping()`, dirigidos por
+    `showLoading()`) que desaparece al llegar los primeros tokens o la respuesta final. Sustituyó a la barra `#pulso-loading` (v1.8.1).
 - `api_chat_stream.php` — SSE endpoint. Events: `status`, `delta`, `final`
   (same JSON shape as api_chat.php), `followups` (deferred, off the critical
   path), `error`.
@@ -105,7 +116,7 @@ but the `$plugin->version` bump is still mandatory every time.
   must pass `json_decode` or the original text is kept.
 - `moodle_exception` signature: 4th arg is `$a` (lang-string interpolation),
   5th is `$debuginfo`. API error details must go in the 5th.
-- Frontend note: `formatRichTextResponse()` in `chat_simple_view.php` escapes
+- Frontend note: `formatRichTextResponse()` in `amd/src/format.js` escapes
   HTML ONCE for the whole block; helpers it calls (`renderMetaRow`,
   `extractFinalAnswerBlock`) receive already-escaped text — re-escaping there
   renders literal `&quot;`.
@@ -371,75 +382,17 @@ Y un desempate de la misma tanda: **un listado no es un material**. El nombre de
 sección ("RECURSOS") mete "recurso" en `qnorm`, así que los listados (`Contenido de la
 sección X`, `Secciones del curso`) se resuelven ANTES de la rama de documento.
 
-## Bug backlog — evaluación jul-2026 (arreglar en este orden)
+## Bug backlog
 
-**OJO: esta sección está desactualizada** — #1 a #5 y casi todo #6 ya se arreglaron
-antes de la migración a Anthropic. El estado real está en
-`memory/session-history.md`; lo único vivo de #6 es el modo "resumen de unidad"
-sobre SCORM (P55/P56).
-
-Evaluación de 56 preguntas reales (resultados y prompts de arreglo detallados en
-`Pulso_AI_matriz_evaluacion.xlsx`, pestaña "Preguntas"). Los fallos se agrupan en
-6 bugs raíz. Recuerda la Versioning rule (bump `version.php`) en CADA arreglo, y
-mantén los strings de usuario en español (+ `lang/en/block_pulso.php`).
-
-**#1 (crítico, empezar por aquí). Keywords analíticas en `is_pdf_content_query`.**
-`classes/rag_retriever.php`, función `is_pdf_content_query()` (~línea 1622). La
-regex incluye keywords ANALÍTICAS (`nota media`, `calificación media|promedio`,
-`cuántos alumnos|estudiantes`, `quién ha completado`, `cuántos intentos`). Eso hace
-que preguntas de analítica se clasifiquen como "contenido de documento"
-(`isContentIntent=true`) y se respondan sobre un PDF → "el documento no proporciona
-información sobre la nota media", incluso en cursos CON notas. Comprobado: `%
-aprobados` (sin esas keywords) sí funciona por analítica. Fix: quitar esas keywords
-de la regex. No romper: la nota media de UN quiz/tarea concretos debe seguir yendo
-por la rama `$asksGradeData` de `build_quiz_answer()`/`build_assign_answer()`; el
-contenido real de un PDF ("dame el enunciado del problema 1") debe seguir en
-content_mode. Afecta: P12, P15, P16, P25, P28, P29, P45, P52.
-
-**#2 (alta). El matcher engancha por palabra genérica.**
-`classes/rag_retriever.php`, `match_activity_by_name()`. Empareja un recurso/actividad
-cuando comparte UNA sola palabra genérica con la pregunta ("alumno", "nota", "resumen",
-"estudiante", "investigación"…) y devuelve ese PDF al azar. Rompe preguntas sueltas,
-los seguimientos conversacionales y hasta los botones (En riesgo/Notas), porque los
-botones inyectan una pregunta en lenguaje natural que pasa por el mismo pipeline. Fix:
-subir el umbral (puntuar el nombre completo, usar números/ordinales como discriminador,
-ampliar stopwords, priorizar la sección mencionada); si no hay match claro NO devolver
-recurso; dar prioridad a las intenciones analíticas sobre el match de actividad. Afecta:
-P4, P6, P30, P31, P32, P33, P34, P39, P53, P54.
-
-**#3 (media). Contaminación de contexto / history-hint.**
-`classes/chat_pipeline.php`, `build_direct_query()` / `find_resource_in_history()`. El
-history-hint arrastra el último recurso visto aunque la nueva pregunta nombre otra cosa
-(reproducido: con chat sucio devuelve recursos viejos; Ctrl+F5 lo arregla). Fix: si el
-mensaje nombra explícitamente una actividad/recurso, prioridad al nombre y no aplicar el
-hint; limitar el hint a continuaciones claras ("ese", "este", "el anterior"); ampliar
-`$alreadyNamesResource` para nombres de tarea. Afecta: P14, P37, P38, P50, P51.
-
-**#4 (media, config de servidor). Extracción de PDF rota.**
-`classes/content_extractor.php`, `extract_pdf_text()`. El parser naïve no lee PDFs con
-fuentes CID TrueType / Identity-H (confirmado en sandbox: `pdftotext`/poppler SÍ extrae
-el texto, `pypdf` y el parser del plugin no; NO hace falta OCR). Fix: instalar
-`poppler-utils` (pdftotext) o `smalot/pdfparser` en el servidor y asegurar que esa
-estrategia se usa; revisar el orden de estrategias (el parser naïve puede colar basura
->20 chars antes de llegar a pdftotext). Para PDFs realmente escaneados, mensaje claro.
-Afecta: P22, P23, P24.
-
-**#5 (baja). Referencias por posición ("el primero/segundo") no se resuelven.**
-`classes/chat_pipeline.php`. "dame el enunciado del primero" se interpreta por keyword y
-engancha una actividad llamada "Resumen"/etc. Fix: resolver ordinales al N-ésimo recurso
-del historial reciente. Afecta: P51.
-
-**#6 (mejoras de funcionalidad).** Extracción de contenido Office `.docx`/`.pptx` en
-`content_extractor.php` (P39); ranking de alumnos por nota respetando privacidad (P34);
-e **indexación del contenido de los SCORM** (`extract_module()` no soporta `scorm`, por
-eso no puede resumir ni explicar el material de un SCORM; es la principal ventaja del
-plugin Phia) + modo "resumen/explicación de unidad" orientado al alumno acotado al SCORM
-actual (P55, P56).
+Los seis bugs de la evaluación de jul-2026 están arreglados (estado real y su historia en `memory/session-history.md`). Lo único
+vivo: **indexar el contenido de los SCORM** (`extract_module()` no soporta `scorm`) y el modo «resumen/explicación de unidad»
+acotado al SCORM actual (P55/P56 de `Pulso_AI_matriz_evaluacion.xlsx`). Pendientes de otras fases: ver la entrada de cierre de
+la fase 4 en `memory/session-history.md`.
 
 ## Enlaces directos a actividades (v1.11.0)
 
 Las respuestas directas que resuelven una actividad o recurso llevan un campo
-`link` en el payload (`['url' => ..., 'label' => ...]`), que `chat_simple_view.php`
+`link` en el payload (`['url' => ..., 'label' => ...]`), que `amd/src/format.js`
 pinta como botón "Ir a…" (`.pulso-goto-link`) al final de la respuesta. Reglas:
 
 - La URL se construye SIEMPRE en el servidor con `moodle_url` desde
@@ -466,7 +419,7 @@ pinta como botón "Ir a…" (`.pulso-goto-link`) al final de la respuesta. Regla
 Desde v1.16.0 el chat es de tema CLARO: cuerpo claro, cabecera azul profunda
 (`#003670`) que se mantiene oscura como ancla de marca. Todo vive en las variables
 `--pulso-*` definidas en `.pulso-chat-bubble, .pulso-chat-container` dentro de
-`chat_simple_view.php`, más una pasada de `rgba()` y hex sueltos que NO pasaban por
+`styles.css` (desde v1.33.0; antes en línea en `chat_simple_view.php`), más una pasada de `rgba()` y hex sueltos que NO pasaban por
 esas variables (ver abajo). Paleta activa:
 
 | Variable | Valor | Papel |
@@ -511,7 +464,7 @@ iconos/SVG sin texto encima (ahí aplica el umbral no-texto de 3:1, que si cumpl
 Última pieza del ciclo: que el usuario vea el progreso de su encargo y reciba la
 infografía, en vez del «Encargo guardado» estático del paso 1. Vive en
 `api_create_status.php` (endpoint nuevo) + las funciones `renderCreateStatus`/
-`loadCreateGallery`/`pollCreateStatusOnce` de `chat_simple_view.php` + un
+`pollCreateStatusOnce` de `amd/src/crear.js` (la galería de este paso se sustituyó por «Mis creaciones», v1.39.0) + un
 `notify_completion()` nuevo en `classes/epica_client.php`.
 
 - **El navegador NUNCA habla con Épica.** `api_create_status.php` solo lee la
@@ -1038,7 +991,7 @@ El ciclo completo con Épica vive en `classes/epica_client.php` (sobre + HTTP + 
 ## Gamificación — paso 4: tres juegos de partida (carta 9) (v1.28.0)
 
 Debajo del cuadro de la petición de «Crear juego», tres botones («Prueba con:») que
-rellenan el cuadro con un juego ya escrito. Solo cliente (`chat_simple_view.php`:
+rellenan el cuadro con un juego ya escrito. Solo cliente (`amd/src/crear.js`:
 `PULSO_JUEGO_EJEMPLOS`, `pulsoJuegoRefresh()`, `pulsoJuegoPickEjemplo()`). Sin servidor,
 sin `db/`, sin sobre, sin cuotas. Reglas que deben persistir:
 
@@ -1163,7 +1116,7 @@ Herramienta NUESTRA (no pasa por Épica ni `epica_client`): dado un recurso ya i
 ## Ampliación de recursos — paso 2: «Ampliar recurso» en el bloque Crear (v1.25.0)
 
 Tercer CTA del bloque Crear que llama a `api_ampliacion.php` y pinta vídeos + artículos.
-Casi todo cliente (`chat_simple_view.php`); en servidor solo `api_create_form.php` (ver abajo). Sin `db/`. Reglas:
+Casi todo cliente (`amd/src/ampliacion.js` y `crear.js`); en servidor solo `api_create_form.php` (ver abajo). Sin `db/`. Reglas:
 
 - **Mismo formulario parametrizado, no uno nuevo.** `pulsoCreateTool = 'ampliacion'`
   reutiliza `#pulso-create-panel`, `openCreatePanel()` y `api_create_form.php`. El
@@ -1282,7 +1235,7 @@ sobre la 7**. Reglas que deben persistir:
 
 ## Retos — paso 2: «Crear reto» en el bloque Crear (v1.27.0)
 
-Cuarto CTA del bloque Crear, solo cliente (`chat_simple_view.php`, funciones `pulsoRetos*`) más una
+Cuarto CTA del bloque Crear, solo cliente (`amd/src/retos.js`, funciones `pulsoRetos*`) más una
 línea en `api_create_form.php`. Habla únicamente con `api_retos.php`. Sin `db/`. Reglas que deben
 persistir:
 
@@ -1517,7 +1470,7 @@ Reglas permanentes. Tocan `db/caches.php` (definición nueva `chatrate`): hay qu
 
 ## Auditoría de UX, fase 3 — estados, teclado, lector de pantalla y móvil (v1.32.0)
 
-Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php`. Sin `db/`. Reglas permanentes:
+Solo cliente (hoy `amd/src/*.js`, `styles.css` y `templates/`; entonces `chat_simple_view.php`), más la insignia de versión y `juego.php`. Sin `db/`. Reglas permanentes:
 
 - **La región en vivo es SOLO para mensajes.** `#pulso-scroll` es el contenedor con scroll de Preguntar y envuelve
   dos hermanos: `#pulso-home` y `#pulso-messages` (`role="log" aria-live="polite"`, la
@@ -1595,10 +1548,11 @@ Solo cliente (`chat_simple_view.php`), más la insignia de versión y `juego.php
   visible; un contenedor con `hidden` que se destapa no se anuncia.
 - `console.log` solo tras `window.pulsoDebug` (`pulsoLog()`).
 
-## Fase 4 — arquitectura cacheable y rediseño (en curso; ver docs/plan_fase4.md)
+## Fase 4 — arquitectura cacheable y rediseño (CERRADA en v2.0.0; plan en docs/plan_fase4.md)
 
-Pasos 1–3 = refactor SIN cambios visuales. Al terminar la fase se reescribe el resto de este fichero (la sección
-"Architecture" y las "Dev notes" describen todavía el chat con CSS/JS en línea).
+Pasos 1–3 = refactor SIN cambios visuales; 4–8 = rediseño (pestañas, home, pila de Crear, «Mis creaciones», errores); paso 9 =
+este fichero, `README.md` y la versión 2.0.0, sin cambios de comportamiento. Lo que costó cada paso está en
+`memory/session-history.md`. Las secciones de abajo describen el estado actual.
 
 - **CSS en `styles.css` (v1.33.0).** Moodle lo mete en el CSS del tema: se cachea, pero se carga en TODAS
   las páginas del sitio. Todo va con prefijo `.pulso-`/`#pulso-`; **ningún selector de elemento global**. Al
@@ -1786,11 +1740,23 @@ Plantilla (`chat_create_tools.mustache`, `chat.mustache`), `crear.js`/`retos.js`
 
 ## Dev notes
 
-- No PHP installed locally: lint with the portable PHP in the session scratchpad
-  (download `php-8.3-nts` zip from windows.php.net) or Docker (`php:8.2-cli`)
-  if the daemon is running.
-- The chat JS lives in `amd/src/*.js` (AMD modules; see "Fase 4 — arquitectura cacheable"). Edit `src`, then
-  regenerate `amd/build` with `tools/build-amd.mjs` and commit both. `chat_simple_view.php` only builds the
-  template context (`templates/chat.mustache`) and the `js_call_amd` config.
-- Language: UI and answers are Spanish-first; keep new user-facing strings in
-  Spanish and add lang strings to `lang/en/block_pulso.php`.
+- **PHP**: no hay PHP instalado en la máquina de desarrollo; para `php -l` usar el PHP portátil (zip `php-8.3-nts` de windows.php.net)
+  o Docker (`php:8.2-cli`) si el daemon está activo.
+- **JS (`amd/src/*.js` → `amd/build/`)**: editar `src`, regenerar `build` y **commitear los dos** (Moodle sirve `build`, no `src`,
+  salvo con `cachejs` apagado). Desde `tools/`: `npm install` (una vez) y `node build-amd.mjs` (o `npm run build`); `node build-amd.mjs
+  --check` no escribe nada y sale con error si `build` no coincide con `src` (comparación sin CRLF, por el `autocrlf` de Windows). Alternativa
+  oficial: `npx grunt amd --root=blocks/pulso` desde un checkout de Moodle ≥ 4.1 (resultado equivalente, no idéntico byte a byte). Un módulo
+  nuevo necesita `define([` en su primera línea (el script lo nombra `block_pulso/<fichero>`) y, si lo usan otros, exportar con `C.fn.nombre = nombre;`.
+- **Qué hay que hacer al desplegar**:
+  - **Purgar cachés** (Administración del sitio → Desarrollo → Purgar cachés) si cambian `templates/` (Moodle cachea las plantillas),
+    `styles.css` (va en el CSS del tema, por revisión de tema) o `amd/build/` (los módulos AMD se cachean por revisión de JS). Un cambio
+    solo de PHP no lo necesita.
+  - **Notificaciones** (Administración del sitio → Notificaciones, ejecuta `db/upgrade.php`) solo si cambia `db/` (`install.xml`,
+    `upgrade.php`, `caches.php`, `tasks.php`, `access.php`, `messages.php`). Un bump de `version.php` sin cambios en `db/` no lo requiere,
+    pero con la versión nueva Moodle lo pedirá igualmente.
+  - Si cambian las capabilities, tareas o proveedores de mensajes, el bump de `version` es lo que hace que Moodle los registre.
+- **Pruebas**: no hay suite en el repo. Los pasos de la fase 4 se verificaron con jsdom (cargando `amd/src` con un `define` mínimo y
+  temporizadores falsos) y con el motor PHP de Mustache; esos scripts viven fuera del repo. Sin navegador no se prueba contraste real, foco
+  visible, 320 px/zoom 200 %, lector de pantalla ni la carga de `build`/`font.php`/`[[pix:]]`: eso se mira en sanase-test.
+- **Idioma**: la interfaz y las respuestas son en castellano; todo texto nuevo para el usuario va en español y su cadena también en
+  `lang/en/block_pulso.php` y `lang/es/block_pulso.php` (mismas claves).

@@ -1,5 +1,30 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-07 — Fase 4 UX, paso 9: cierre de la fase (v2.0.0)
+
+Sin cambios de comportamiento: `CLAUDE.md` reescrito (índice al principio; «Architecture», notas de frontend, Tema claro, «Dev notes» y
+«Bug backlog» al día; la fase pasa a cerrada), `README.md` ampliado y `version.php`. `tools/build-amd.mjs --check` pasa. Qué costó la fase entera:
+- **Partir el monolito** (`chat_simple_view.php`: 7.087 líneas, ~72 KB de CSS y ~222 KB de JS en línea) se hizo con análisis de ámbitos, no a ojo:
+  referencias entre módulos → `C.fn.<nombre>` (se resuelve al llamar; un `const` de primer nivel no puede usar otra función al cargar), estado
+  compartido → `C.S`, `window.*` → `cfg`, 52 manejadores en línea → `data-pulso-action` (argumentos siempre CADENA). Una paridad jsdom contra el
+  monolito de v1.33.0 dio la confianza; ese script y las baterías no se guardan en el repo.
+- **Fuentes y CSS**: `styles.css` va a TODAS las páginas del sitio, así que la familia es `Pulso Poppins` (no `Poppins`) y hubo que añadir el 700;
+  `[[font:]]`/`[[pix:]]` solo se resuelven dentro de `styles.css`.
+- **Build sin Moodle**: `tools/build-amd.mjs` (terser) en vez de grunt; el `define` debe llevar nombre porque Moodle une módulos. Sin verificar aún con grunt real.
+- **Mustache**: el HTML que no toca a un rol sigue sin llegar al navegador (secciones, no CSS); lo pintado desde JS no ve las secciones, de ahí el `<template>`
+  del historial. Moodle cachea plantillas: purgar al desplegar.
+- **La pila de Crear**: dos niveles bastan y «Volver» desapila uno. La trampa de verdad fue el token de Retos: entrar al detalle desde una respuesta en vuelo
+  lo sube después de capturarlo, así que el sondeo se arma con `S.pulsoAmpToken`, no con el capturado.
+- **«Mis creaciones»**: una pantalla abandonada sigue en el DOM, así que las respuestas tardías se guardan comprobando la pila (`pulsoMineActive()`), no el elemento.
+- **Verificación**: Lighthouse, NVDA, contraste real, 320 px/zoom 200 %, grunt y la carga de `build`/`font.php` quedan en sanase-test (sin navegador aquí).
+
+**Pendiente tras la fase 4**
+- **Privacy provider (RGPD)**: el plugin no tiene `classes/privacy/provider.php`; faltan metadata, export y borrado (y limpieza de filas al borrar un curso).
+- **429 `cuota-del-centro`**: `epica_client` lo reencola sin tope y el encargo se queda en `pendiente`; el mensaje del cliente ya está escrito pero nunca llega.
+- **Google Fonts del tema Moove**: la petición a terceros que queda es del tema, no del plugin.
+- **SCORM (P55/P56)**: `extract_module()` no indexa `scorm`; falta el modo «resumen de unidad».
+- **Madre de «Proponer otros»**: sigue saliendo como «Lista para elegir» hasta que caduca; arreglarlo pide una columna padre→hija.
+
 ## 2026-10-06 — Fase 4 UX, paso 8: errores con «Copiar pregunta» y «Ampliar» ancho (v1.40.0)
 
 Reglas en `CLAUDE.md` → «Errores con reintento y copia» y «Teclado» (Ampliar/Reducir). Solo cliente (`chat.js`, `styles.css`,

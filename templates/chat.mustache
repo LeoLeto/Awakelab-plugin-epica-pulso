@@ -25,8 +25,8 @@
     Context variables required for this template:
     * isotipo - URL del isotipo (pix/isotipo-oscuro; isotipo-claro si el color de centro es claro)
     * hastema - true solo si Épica manda un tema válido (colores del centro, carta 11)
-    * temastyle - variables --pulso-brand/--pulso-brand-text/--pulso-accent ya validadas (solo con hastema)
-    * temaflags - qué variables hay: «principal», «acento» o las dos (solo con hastema)
+    * temastyle - variables por papel (--pulso-header-*, --pulso-action-*, --pulso-own-*, --pulso-accent) ya resueltas y validadas (solo con hastema)
+    * temaflags - tokens de las claves EFECTIVAS: principal, cabecera, boton, burbuja, acento o acento-base (solo con hastema)
     * isteacher - true con block/pulso:viewanalytics (profesorado); false = version de alumno
     * cancreate - true con block/pulso:createactivity: hay pestana «Crear»
     * epica - true si local_awkepica esta disponible: infografia, juego, retos e historial
@@ -39,8 +39,8 @@
     {
         "isotipo": "https://example.com/blocks/pulso/pix/isotipo-oscuro.png",
         "hastema": true,
-        "temastyle": "--pulso-brand:#003670;--pulso-brand-text:#ffffff;",
-        "temaflags": "principal",
+        "temastyle": "--pulso-header-bg:#003670;--pulso-header-text:#ffffff;",
+        "temaflags": "principal cabecera",
         "isteacher": true,
         "cancreate": true,
         "epica": true,

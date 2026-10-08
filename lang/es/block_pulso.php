@@ -180,6 +180,7 @@ $string['tema_heading_desc'] = 'Cada centro ve Pulse con sus colores, elegidos e
 $string['tema_estado_con'] = 'Tema actual: versión {$a->version}, última sincronización {$a->fecha}.';
 $string['tema_estado_sin'] = 'No hay tema guardado: Pulse usa sus colores.';
 $string['tema_sync_button'] = 'Sincronizar los colores con Épica';
+$string['tema_preview_link'] = 'Vista previa de los colores del centro';
 $string['tema_msg_sin_epica'] = 'Épica no está disponible en este sitio, así que no hay nada que sincronizar.';
 $string['tema_msg_sin_correo'] = 'La persona que administra el sitio no tiene correo electrónico, así que no se puede firmar la petición a Épica. Añádelo en su perfil.';
 $string['tema_msg_error_red'] = 'No se ha podido contactar con Épica. Se mantienen los últimos colores guardados.';

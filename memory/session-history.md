@@ -1,5 +1,17 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-08 — Cualquier color de centro se ve bien; cinco claves y vista previa (v2.5.0)
+
+Reglas en `CLAUDE.md` → «Colores de cada centro». `classes/tema_service.php` (`oscurecer_para_blanco`, `resolver_tema`), `styles.css` (variables por papel + bloque «COLORES DEL CENTRO»), `tema_preview.php` (nuevo), `docs/epica_tema_claves_v2.md` (nota para Chema). Sin `db/`; purgar cachés (CSS + plantilla). Lo que costó ver:
+- **El fallo era de elección, no de cálculo**: `#ff6a00` da 2,9:1 con blanco, así que `mejor_texto()` elegía negro y la cabecera salía naranja chillón con letras negras. El principal ya no pinta superficies grandes: se deriva una versión oscurecida con texto blanco y solo se respeta un color claro si el centro lo manda en `cabecera`/`boton`/`burbuja`.
+- **Oscurecer en sRGB multiplicando los tres canales por el mismo factor** = bajar solo el valor del HSV, así que el tono y la saturación se conservan sin HSL/OKLCH; da `#c75300` para `#ff6a00` (el primer paso del 2 % que llega a 4,5:1; el `#b34a00` del encargo es más oscuro de lo necesario, 5,4:1).
+- **El acento derivado de un principal ya oscuro es el propio principal** (no cumple contra la cabecera, que es el mismo color, así que se queda en token `acento-base`): el cian de Pulse deja de verse en el foco con `#003670`. Es lo que dice el encargo; si en sanase-test se echa de menos, es una decisión de producto, no un bug. Por eso se añadió el token `acento-base`: los detalles de la cabecera y de `th` solo usan el acento si cumple contra ellas.
+- **El acento enviado se valida contra cabecera y botón efectivos**, no solo contra «el principal efectivo» (con cabecera/botón explícitos eso ya no es lo mismo que el principal).
+- **Equivalencia sin tema**: script que resuelve los `var()` de HEAD y de la versión nueva y compara declaración a declaración: 1.573 en las dos, idénticas (el 1.666 de v2.1.0 contaba de otra manera y era de otra versión del fichero). La plantilla solo cambia en comentarios Mustache.
+- **`sed -i`/Edit sobre ficheros CRLF**: `styles.css`, `lang/*`, `version.php` y `CLAUDE.md` son CRLF; se editaron con un script de Node que conserva los finales de línea.
+- **Verificado**: `php -l` de todo lo tocado; 73 comprobaciones de `tema_service` con el PHP portátil; `tema_preview.php` con un arnés de stubs (sin admin → denegado; `#fff;background:url(…)`, `<script>`, `" onmouseover="` no llegan al HTML); equivalencia de CSS.
+- **NO probado**: Mustache PHP (no hay en esta máquina; el HTML sin tema sale idéntico por construcción, solo cambian comentarios), el aspecto real en navegador (`color-mix`, cabecera/pestañas/tablas con `#c75300`, la vista previa dentro del tema de Moodle, `.pulso-chat-container` forzado a estático) ni la sincronización con Épica real.
+
 ## 2026-10-08 — Carta 14: borrar en Épica los datos de una persona (v2.4.0)
 
 Reglas en `CLAUDE.md` → «Privacidad» (subsección carta 14) y «Historial del alumno» (cómo probar). `classes/task/epica_borrar_alumno_adhoc.php`, `classes/observer.php`, `db/events.php` (nuevo: Notificaciones), `classes/privacy/provider.php`, cadenas en y es, `tests/privacy/provider_test.php`. Lo que costó ver:

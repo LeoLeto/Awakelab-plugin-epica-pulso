@@ -14,3 +14,4 @@ Thumbs.db
 .vscode/
 *.sublime-workspace
 tools/node_modules/
+.claude/settings.local.json

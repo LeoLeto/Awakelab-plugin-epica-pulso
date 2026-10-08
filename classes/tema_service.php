@@ -9,8 +9,9 @@
  *    programada y el botón de los ajustes.
  *  - Lo de Épica se valida DOS veces: antes de guardar y otra vez al pintar. Nada entra en
  *    el HTML sin pasar por validar_colores().
- *  - El contraste lo calculamos nosotros (WCAG); la variable que no lo cumple se ignora y
- *    se queda la de Pulse. El `texto` de Épica se acepta solo si da >= 4,5:1 sobre `valor`.
+ *  - El contraste lo calculamos nosotros (WCAG). El `texto` de Épica se acepta solo si da >= 4,5:1
+ *    sobre `valor`. Las superficies grandes que Épica no manda se derivan del principal oscurecido
+ *    (v2.5.0): nunca un color claro con texto negro salvo que el centro lo pida explícitamente.
  *  - Sin Épica, o con tema null, no se pinta nada: Pulse se ve exactamente como siempre.
  *
  * @package    block_pulso
@@ -28,8 +29,8 @@ class tema_service {
     /** Ruta de Épica (se cuelga de epica_client::endpoint()). */
     const RUTA = '/api/moodle/tema';
 
-    /** Las únicas claves que Pulse usa; cualquier otra que mande Épica se ignora. */
-    const CLAVES = ['principal', 'acento'];
+    /** Las únicas claves que Pulse usa (todas opcionales); cualquier otra que mande Épica se ignora. */
+    const CLAVES = ['principal', 'acento', 'cabecera', 'boton', 'burbuja'];
 
     const RE_CLAVE = '/^[a-z][a-z0-9-]{0,31}\z/';
     const RE_COLOR = '/^#[0-9a-f]{6}\z/';
@@ -254,51 +255,174 @@ class tema_service {
     }
 
     /**
-     * De unos colores YA validados saca las variables que Pulse pinta, aplicando el contraste:
-     *  - principal: se usa `valor`; su `texto` solo si da >= 4,5:1 sobre él, y si no se calcula
-     *    blanco o negro. Nunca se ignora (siempre hay un texto legible).
-     *  - acento: >= 3:1 sobre blanco (foco, bordes e iconos sobre el panel) Y >= 3:1 sobre el
-     *    principal efectivo (indicador de pestaña activa en la cabecera); si no, se ignora y
-     *    se queda el acento de Pulse.
+     * Oscurece un #rrggbb, SIN cambiar su tono, lo justo para que el texto BLANCO dé >= 4,5:1.
      *
-     * @param array $colores Salida de validar_colores().
-     * @return array{vars: array<string,string>, flags: string[], ignorados: string[], textoprincipal: ?string}
+     * Mezcla hacia negro en sRGB (multiplicar los tres canales por el mismo factor = bajar solo el
+     * valor del HSV: tono y saturación se conservan), en pasos del 2 % del color original, con tope
+     * de 50 pasos (el último es negro, que siempre cumple): termina siempre. Si ya cumple, lo
+     * devuelve tal cual.
      */
-    public static function resolver(array $colores): array {
+    public static function oscurecer_para_blanco(string $hex): string {
+        return self::oscurecer_hasta($hex, self::CONTRASTE_TEXTO);
+    }
+
+    /** Como oscurecer_para_blanco() pero con el contraste mínimo sobre blanco que se pida. */
+    private static function oscurecer_hasta(string $hex, float $minimo): string {
+        if (self::contraste($hex, self::BLANCO) >= $minimo) {
+            return $hex;
+        }
+        $r = hexdec(substr($hex, 1, 2));
+        $g = hexdec(substr($hex, 3, 2));
+        $b = hexdec(substr($hex, 5, 2));
+        for ($paso = 1; $paso <= 50; $paso++) {
+            $k = 1 - 0.02 * $paso;
+            $c = sprintf('#%02x%02x%02x', (int)round($r * $k), (int)round($g * $k), (int)round($b * $k));
+            if (self::contraste($c, self::BLANCO) >= $minimo) {
+                return $c;
+            }
+        }
+        return self::NEGRO;
+    }
+
+    /**
+     * Texto sobre un fondo explícito del centro: el `texto` de Épica solo si da >= 4,5:1; si no,
+     * el mejor de blanco/negro.
+     */
+    private static function texto_para(string $fondo, ?string $texto): string {
+        if ($texto === null || $texto === '' || self::contraste($texto, $fondo) < self::CONTRASTE_TEXTO) {
+            return self::mejor_texto($fondo);
+        }
+        return $texto;
+    }
+
+    /**
+     * De unos colores del centro saca las variables CSS finales (v2.5.0). Pura: sin BD ni Épica.
+     *
+     * Reglas (CLAUDE.md → «Colores de cada centro»):
+     *  - SUPERFICIES GRANDES (cabecera, botón, burbuja propia): una clave enviada se respeta (es la
+     *    elección del centro) y su texto se calcula con texto_para(). Una clave no enviada se
+     *    DERIVA del principal con oscurecer_para_blanco() y lleva texto blanco: un principal claro
+     *    nunca acaba como superficie grande con letras negras (salvo que el centro lo pida
+     *    explícitamente con cabecera/boton/burbuja). Sin principal, lo no enviado queda en Pulse.
+     *  - ACENTO enviado: >= 3:1 sobre blanco y sobre la cabecera y el botón efectivos; si no, se
+     *    ignora. No enviado (o ignorado) y con principal: el principal original si cumple lo mismo;
+     *    si no, su versión oscurecida hasta >= 3:1 sobre blanco (iconos y bordes sobre el panel).
+     *  - Ni principal ni ninguna clave válida: vacío = sin tema.
+     *
+     * @param array $colores Colores del centro; se REVALIDAN aquí (validar_colores() es idempotente).
+     * @return array{
+     *   vars: array<string,string>, flags: string[], ignorados: string[], isotipoclaro: bool,
+     *   detalle: array<int,array{var:string,valor:string,texto:?string,contraste:?float,origen:string}>
+     * } `origen`: «epica» (enviado), «derivado» (calculado del principal) o «pulse» (el de siempre).
+     */
+    public static function resolver_tema(array $colores): array {
+        $colores = self::validar_colores($colores);
         $vars = [];
         $flags = [];
         $ignorados = [];
-        $textoprincipal = null;
-        $principal = self::PRINCIPAL_DEFECTO;
+        $origen = [];
 
-        if (isset($colores['principal'])) {
-            $valor = $colores['principal']['valor'];
-            $texto = $colores['principal']['texto'] ?? '';
-            if ($texto === '' || self::contraste($texto, $valor) < self::CONTRASTE_TEXTO) {
-                $texto = self::mejor_texto($valor);
-            }
-            $vars['--pulso-brand'] = $valor;
-            $vars['--pulso-brand-text'] = $texto;
+        $principal = $colores['principal']['valor'] ?? null;
+        $derivado = $principal !== null ? self::oscurecer_para_blanco($principal) : null;
+        if ($principal !== null) {
             $flags[] = 'principal';
-            $textoprincipal = $texto;
-            $principal = $valor;
         }
 
+        // Cada superficie: clave de Épica => [variable de fondo, variable de texto].
+        $superficies = [
+            'cabecera' => ['--pulso-header-bg', '--pulso-header-text'],
+            'boton' => ['--pulso-action-bg', '--pulso-action-text'],
+            'burbuja' => ['--pulso-own-bg', '--pulso-own-text'],
+        ];
+        $fondos = [];
+        foreach ($superficies as $clave => [$vbg, $vtxt]) {
+            if (isset($colores[$clave])) {
+                $fondo = $colores[$clave]['valor'];
+                $texto = self::texto_para($fondo, $colores[$clave]['texto'] ?? null);
+                $origen[$vbg] = 'epica';
+            } else if ($derivado !== null) {
+                $fondo = $derivado;
+                $texto = self::BLANCO;
+                $origen[$vbg] = 'derivado';
+            } else {
+                continue;
+            }
+            $vars[$vbg] = $fondo;
+            $vars[$vtxt] = $texto;
+            $fondos[$clave] = $fondo;
+            $flags[] = $clave;
+        }
+
+        // El acento tiene que verse sobre el panel (blanco) y sobre la cabecera y el botón
+        // efectivos (indicador de pestaña, orden de tabla): los de Pulse si el centro no puso otros.
+        $cabecera = $fondos['cabecera'] ?? self::PRINCIPAL_DEFECTO;
+        $boton = $fondos['boton'] ?? self::PRINCIPAL_DEFECTO;
+        $cumple = function (string $c) use ($cabecera, $boton): bool {
+            return self::contraste($c, self::BLANCO) >= self::CONTRASTE_GRAFICO
+                && self::contraste($c, $cabecera) >= self::CONTRASTE_GRAFICO
+                && self::contraste($c, $boton) >= self::CONTRASTE_GRAFICO;
+        };
+        $acento = null;
+        $tokenacento = 'acento';
         if (isset($colores['acento'])) {
-            $valor = $colores['acento']['valor'];
-            if (self::contraste($valor, self::BLANCO) >= self::CONTRASTE_GRAFICO
-                && self::contraste($valor, $principal) >= self::CONTRASTE_GRAFICO) {
-                $vars['--pulso-accent'] = $valor;
-                $flags[] = 'acento';
+            if ($cumple($colores['acento']['valor'])) {
+                $acento = $colores['acento']['valor'];
+                $origen['--pulso-accent'] = 'epica';
             } else {
                 $ignorados[] = 'acento';
             }
         }
+        if ($acento === null && $principal !== null) {
+            $origen['--pulso-accent'] = 'derivado';
+            if ($cumple($principal)) {
+                $acento = $principal;
+            } else {
+                // No se ve sobre las superficies del centro: vale para iconos y bordes sobre el
+                // panel (>= 3:1 sobre blanco), pero no para los detalles de la cabecera.
+                $acento = self::oscurecer_hasta($principal, self::CONTRASTE_GRAFICO);
+                $tokenacento = $cumple($acento) ? 'acento' : 'acento-base';
+            }
+        }
+        if ($acento !== null) {
+            $vars['--pulso-accent'] = $acento;
+            $flags[] = $tokenacento;
+        }
 
-        return ['vars' => $vars, 'flags' => $flags, 'ignorados' => $ignorados, 'textoprincipal' => $textoprincipal];
+        $detalle = [];
+        if ($vars) {
+            $defectos = [
+                '--pulso-header-bg' => self::PRINCIPAL_DEFECTO,
+                '--pulso-action-bg' => self::PRINCIPAL_DEFECTO,
+                '--pulso-own-bg' => self::PRINCIPAL_DEFECTO,
+                '--pulso-accent' => '#0b93aa',
+            ];
+            foreach ($defectos as $nombre => $defecto) {
+                $valor = $vars[$nombre] ?? $defecto;
+                // Fondos: el texto que lleva encima. Acento: se mide contra el panel blanco.
+                $texto = $nombre === '--pulso-accent'
+                    ? self::BLANCO
+                    : ($vars[substr($nombre, 0, -3) . '-text'] ?? self::BLANCO);
+                $detalle[] = [
+                    'var' => $nombre,
+                    'valor' => $valor,
+                    'texto' => $texto,
+                    'contraste' => self::contraste($valor, $texto),
+                    'origen' => $origen[$nombre] ?? 'pulse',
+                ];
+            }
+        }
+
+        return [
+            'vars' => $vars,
+            'flags' => $flags,
+            'ignorados' => $ignorados,
+            // Con texto negro la cabecera es clara: el isotipo para fondo claro.
+            'isotipoclaro' => ($vars['--pulso-header-text'] ?? '') === self::NEGRO,
+            'detalle' => $detalle,
+        ];
     }
 
-    /** Cadena de `style` con las variables resueltas: «--pulso-brand:#…;--pulso-accent:#…;». */
+    /** Cadena de `style` con las variables resueltas: «--pulso-header-bg:#…;--pulso-accent:#…;». */
     public static function css_de(array $vars): string {
         $css = '';
         foreach ($vars as $nombre => $valor) {
@@ -318,7 +442,7 @@ class tema_service {
             return [];
         }
         try {
-            $res = self::resolver(self::leer());
+            $res = self::resolver_tema(self::leer());
         } catch (\Throwable $e) {
             error_log('Pulso tema: no se pudo leer lo guardado: ' . get_class($e));
             return [];
@@ -329,8 +453,7 @@ class tema_service {
         return [
             'style' => self::css_de($res['vars']),
             'flags' => implode(' ', $res['flags']),
-            // Con texto negro la cabecera es clara: el isotipo para fondo claro.
-            'isotipoclaro' => $res['textoprincipal'] === self::NEGRO,
+            'isotipoclaro' => $res['isotipoclaro'],
         ];
     }
 }

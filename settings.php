@@ -347,7 +347,8 @@ if ($ADMIN->fulltree) {
             'block_pulso/tema_sync_button',
             '',
             '<button type="button" id="pulso-sync-tema-btn" class="btn btn-secondary btn-sm">'
-            . s(get_string('tema_sync_button', 'block_pulso')) . '</button>'
+            . s(get_string('tema_sync_button', 'block_pulso')) . '</button> '
+            . html_writer::link(new moodle_url('/blocks/pulso/tema_preview.php'), get_string('tema_preview_link', 'block_pulso'))
             . '<script>(function() {'
             . 'var b = document.getElementById("pulso-sync-tema-btn"); if (!b) { return; }'
             . 'b.addEventListener("click", function() {'

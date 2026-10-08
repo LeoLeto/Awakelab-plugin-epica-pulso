@@ -179,6 +179,7 @@ $string['tema_heading_desc'] = 'Each center sees Pulse in its own colors, chosen
 $string['tema_estado_con'] = 'Current theme: version {$a->version}, last synchronized {$a->fecha}.';
 $string['tema_estado_sin'] = 'No theme stored: Pulse uses its own colors.';
 $string['tema_sync_button'] = 'Sync the colors with Epica';
+$string['tema_preview_link'] = 'Preview the center colors';
 $string['tema_msg_sin_epica'] = 'Epica is not available on this site, so there is nothing to synchronize.';
 $string['tema_msg_sin_correo'] = 'The site administrator has no email address, so the request to Epica cannot be signed. Add one to the administrator profile.';
 $string['tema_msg_error_red'] = 'Could not reach Epica. The last stored colors are kept.';

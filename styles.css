@@ -48,12 +48,19 @@
     --pulso-ink: #27334F;                      /* texto principal */
     --pulso-deep: #003670;                     /* azul profundo de paleta: TEXTO fijo (títulos), nunca fondo de centro */
     --pulso-navy: #003670;                     /* azul profundo de paleta: TEXTO fijo (nunca fondo de centro) */
-    /* Colores del CENTRO (carta 11). Los pisa el style en línea del contenedor/burbuja solo si Épica
-       manda un tema válido. FONDO: --pulso-brand con --pulso-brand-text encima (contraste >= 4,5 garantizado
-       por tema_service); ACENTO: --pulso-accent para iconos, bordes y foco (>= 3:1 sobre blanco y sobre
-       el principal). Un color de centro nunca se usa como TEXTO sobre fondo claro. */
-    --pulso-brand: #003670;                    /* fondo: cabecera, botones de acción, elementos activos, burbuja propia */
-    --pulso-brand-text: #FFFFFF;               /* texto/iconos encima de --pulso-brand */
+    /* Colores del CENTRO (carta 11, v2.1.0; por papel desde v2.5.0). Los pisa el style en línea del
+       contenedor/burbuja solo si Épica manda un tema válido; cada variable vale por defecto el color de
+       siempre. FONDOS grandes, cada uno con su texto encima (contraste >= 4,5 garantizado por
+       tema_service): --pulso-header-* (cabecera y burbuja flotante), --pulso-action-* (botones de
+       acción, pestaña/filtro activos, th, insignia de paso, «Ir a…») y --pulso-own-* (burbuja propia).
+       ACENTO: --pulso-accent para iconos, bordes y foco (>= 3:1 sobre blanco y sobre cabecera y botón).
+       Un color de centro nunca se usa como TEXTO sobre fondo claro. */
+    --pulso-header-bg: #003670;                /* fondo: cabecera y burbuja flotante (solo con tema; la de siempre es un degradado) */
+    --pulso-header-text: #FFFFFF;              /* texto/iconos encima de --pulso-header-bg */
+    --pulso-action-bg: #003670;                /* fondo: botones de acción, elementos activos, th, insignia de paso, «Ir a…» */
+    --pulso-action-text: #FFFFFF;              /* texto/iconos encima de --pulso-action-bg */
+    --pulso-own-bg: #003670;                   /* fondo: mensajes que escribe la persona */
+    --pulso-own-text: #FFFFFF;                 /* texto encima de --pulso-own-bg */
     --pulso-accent: #0B93AA;                   /* acento: iconos, bordes, foco (no texto) */
     --pulso-slate: #34547A;                     /* texto secundario */
     --pulso-muted: #3B6996;                     /* texto terciario / hints */
@@ -917,8 +924,8 @@
     padding: 12px;
     border: none;
     border-radius: 999px;
-    background: var(--pulso-brand);
-    color: var(--pulso-brand-text);
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text);
     font-family: var(--pulso-font);
     font-weight: 600;
     font-size: 0.9rem;
@@ -1007,8 +1014,8 @@
     font-size: 0.82rem;
     font-weight: 600;
     text-decoration: none;
-    background: var(--pulso-brand);
-    color: var(--pulso-brand-text) !important;
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text) !important;
 }
 
 .pulso-create-back-link {
@@ -1110,9 +1117,9 @@
 }
 
 .pulso-mine-filter[aria-pressed="true"] {
-    background: var(--pulso-brand);
-    border-color: var(--pulso-brand);
-    color: var(--pulso-brand-text);
+    background: var(--pulso-action-bg);
+    border-color: var(--pulso-action-bg);
+    color: var(--pulso-action-text);
 }
 
 .pulso-mine-count {
@@ -1574,7 +1581,7 @@ a.pulso-retos-open {
     text-align: center;
     text-decoration: none;
     box-sizing: border-box;
-    color: var(--pulso-brand-text) !important;
+    color: var(--pulso-action-text) !important;
 }
 
 .pulso-retos-note {
@@ -1632,8 +1639,8 @@ a.pulso-retos-open {
 }
 
 .pulso-message.user .pulso-message-content {
-    background: var(--pulso-brand);
-    color: var(--pulso-brand-text);
+    background: var(--pulso-own-bg);
+    color: var(--pulso-own-text);
     border-bottom-right-radius: 4px;
     max-width: 85%;
     box-shadow: 0 2px 8px rgba(1, 25, 50, 0.2);
@@ -1702,13 +1709,13 @@ a.pulso-retos-open {
     gap: 8px;
     padding: 9px 14px;
     border-radius: 10px;
-    background: var(--pulso-brand);
-    color: var(--pulso-brand-text) !important;
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text) !important;
     font-weight: 600;
     font-size: 0.9rem;
     line-height: 1.2;
     text-decoration: none !important;
-    border: 1px solid var(--pulso-brand);
+    border: 1px solid var(--pulso-action-bg);
     transition: filter 0.15s ease, transform 0.15s ease;
 }
 
@@ -1717,7 +1724,7 @@ a.pulso-retos-open {
     filter: brightness(1.15);
     transform: translateY(-1px);
     text-decoration: none !important;
-    color: var(--pulso-brand-text) !important;
+    color: var(--pulso-action-text) !important;
 }
 
 .pulso-goto-icon {
@@ -1757,7 +1764,7 @@ a.pulso-retos-open {
     align-self: flex-start;
     padding: 2px 10px;
     border-radius: 999px;
-    background: var(--pulso-brand);
+    background: var(--pulso-action-bg);
     color: var(--pulso-cyan-soft);
     font-size: 0.75rem;
     font-weight: 600;
@@ -2136,10 +2143,10 @@ a.pulso-retos-open {
 }
 
 .pulso-table th {
-    background: var(--pulso-brand);
+    background: var(--pulso-action-bg);
     padding: 0;
     text-align: left;
-    color: var(--pulso-brand-text);
+    color: var(--pulso-action-text);
     font-weight: 600;
     font-size: 0.95em;
     letter-spacing: 0.02em;
@@ -2150,11 +2157,11 @@ a.pulso-retos-open {
 }
 
 .pulso-table th:hover {
-    background: var(--pulso-brand);
+    background: var(--pulso-action-bg);
 }
 
 .pulso-table th.is-sorted {
-    background: var(--pulso-brand);
+    background: var(--pulso-action-bg);
     border-bottom-color: var(--pulso-accent);
 }
 
@@ -2700,9 +2707,9 @@ a.pulso-retos-open {
 }
 
 .pulso-clear-confirm-yes {
-    border: 1px solid var(--pulso-brand);
-    background: var(--pulso-brand);
-    color: var(--pulso-brand-text);
+    border: 1px solid var(--pulso-action-bg);
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text);
 }
 
 .pulso-clear-confirm-no {
@@ -2736,113 +2743,120 @@ a.pulso-retos-open {
     display: none;
 }
 
-/* ========== COLORES DEL CENTRO (carta 11, v2.1.0) ==========
-   Solo casan con data-pulso-tema (lo pinta la plantilla únicamente si hay un tema válido); sin tema,
-   nada de esto se aplica y Pulse queda como siempre. Fondo = --pulso-brand con --pulso-brand-text
-   encima (texto y iconos de la cabecera, controles, pestañas, insignia). Con el principal del centro
-   la cabecera y la burbuja son planas (el degradado es de la marca Awakelab). Los tintes usan
-   color-mix sobre el texto de marca; un navegador sin color-mix conserva el tinte por defecto.
-   El acento (--pulso-accent, ya validado contra blanco y contra el principal) pisa al final: con
-   solo el principal, los detalles de la cabecera van en --pulso-brand-text, porque el acento por
-   defecto no se ha comprobado contra el color del centro. */
-.pulso-chat-bubble[data-pulso-tema~="principal"] {
-    background: var(--pulso-brand);
-    color: var(--pulso-brand-text);
-    border-color: color-mix(in srgb, var(--pulso-brand-text) 35%, transparent);
+/* ========== COLORES DEL CENTRO (carta 11, v2.1.0; por papel desde v2.5.0) ==========
+   Solo casan con data-pulso-tema (lo pinta la plantilla únicamente si hay un tema válido; lista los
+   tokens de las claves EFECTIVAS: principal, cabecera, boton, burbuja, acento, acento-base); sin
+   tema, nada de esto se aplica y Pulse queda como siempre. Cada superficie lleva su variable de papel
+   con su texto encima: «cabecera» (--pulso-header-*: cabecera y burbuja flotante, planas; el degradado
+   es de la marca Awakelab), «boton» (--pulso-action-*: botón de enviar, th, insignia de paso). La
+   burbuja propia no necesita regla: usa --pulso-own-* y su valor por defecto es el de siempre.
+   Los tintes usan color-mix sobre el texto de la superficie; un navegador sin color-mix conserva el
+   tinte por defecto. «acento» (ya validado contra blanco, cabecera y botón) pisa al final los
+   detalles de cabecera y de th; sin él, esos detalles van en el texto de su superficie, porque el
+   acento por defecto no se ha comprobado contra el color del centro. «acento-base» solo cambia
+   --pulso-accent (iconos, bordes, foco sobre el panel), sin tocar la cabecera. */
+.pulso-chat-bubble[data-pulso-tema~="cabecera"] {
+    background: var(--pulso-header-bg);
+    color: var(--pulso-header-text);
+    border-color: color-mix(in srgb, var(--pulso-header-text) 35%, transparent);
 }
 
-.pulso-chat-bubble[data-pulso-tema~="principal"]:hover {
+.pulso-chat-bubble[data-pulso-tema~="cabecera"]:hover {
     box-shadow: 0 10px 28px rgba(1, 25, 50, 0.4),
-        0 0 0 4px color-mix(in srgb, var(--pulso-brand-text) 25%, transparent);
+        0 0 0 4px color-mix(in srgb, var(--pulso-header-text) 25%, transparent);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-chat-header {
-    background: var(--pulso-brand);
-    color: var(--pulso-brand-text);
-    border-bottom-color: var(--pulso-brand-text);
-    border-bottom-color: color-mix(in srgb, var(--pulso-brand-text) 45%, transparent);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-chat-header {
+    background: var(--pulso-header-bg);
+    color: var(--pulso-header-text);
+    border-bottom-color: var(--pulso-header-text);
+    border-bottom-color: color-mix(in srgb, var(--pulso-header-text) 45%, transparent);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-chat-header h2,
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-tab,
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-tab[aria-selected="true"] {
-    color: var(--pulso-brand-text);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-chat-header h2,
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-tab,
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-tab[aria-selected="true"] {
+    color: var(--pulso-header-text);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-tab[aria-selected="true"] {
-    border-bottom-color: var(--pulso-brand-text);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-tab[aria-selected="true"] {
+    border-bottom-color: var(--pulso-header-text);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-tab:hover {
-    background: color-mix(in srgb, var(--pulso-brand-text) 12%, transparent);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-tab:hover {
+    background: color-mix(in srgb, var(--pulso-header-text) 12%, transparent);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-header-sub {
-    color: var(--pulso-brand-text);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-header-sub {
+    color: var(--pulso-header-text);
     opacity: 1;
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-status-dot {
-    background: var(--pulso-brand-text);
-    box-shadow: 0 0 6px color-mix(in srgb, var(--pulso-brand-text) 70%, transparent);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-status-dot {
+    background: var(--pulso-header-text);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--pulso-header-text) 70%, transparent);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-version-badge {
-    color: var(--pulso-brand-text);
-    background: color-mix(in srgb, var(--pulso-brand-text) 14%, transparent);
-    border-color: color-mix(in srgb, var(--pulso-brand-text) 35%, transparent);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-version-badge {
+    color: var(--pulso-header-text);
+    background: color-mix(in srgb, var(--pulso-header-text) 14%, transparent);
+    border-color: color-mix(in srgb, var(--pulso-header-text) 35%, transparent);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .header-btn {
-    color: var(--pulso-brand-text);
-    background: color-mix(in srgb, var(--pulso-brand-text) 10%, transparent);
-    border-color: color-mix(in srgb, var(--pulso-brand-text) 35%, transparent);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .header-btn {
+    color: var(--pulso-header-text);
+    background: color-mix(in srgb, var(--pulso-header-text) 10%, transparent);
+    border-color: color-mix(in srgb, var(--pulso-header-text) 35%, transparent);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .header-btn:hover {
-    background: color-mix(in srgb, var(--pulso-brand-text) 20%, transparent);
-    border-color: color-mix(in srgb, var(--pulso-brand-text) 60%, transparent);
+.pulso-chat-container[data-pulso-tema~="cabecera"] .header-btn:hover {
+    background: color-mix(in srgb, var(--pulso-header-text) 20%, transparent);
+    border-color: color-mix(in srgb, var(--pulso-header-text) 60%, transparent);
 }
 
-/* Foco sobre fondo de marca: el texto de marca, no el cian claro (que sobre un centro claro no se ve). */
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-chat-header :focus-visible,
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-table .pulso-sort-btn:focus-visible {
-    outline-color: var(--pulso-brand-text);
+/* Foco sobre la cabecera del centro: el texto de la cabecera, no el cian claro (que sobre un centro
+   claro no se ve). */
+.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-chat-header :focus-visible {
+    outline-color: var(--pulso-header-text);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-table th.is-sorted {
-    border-bottom-color: var(--pulso-brand-text);
+/* Superficies de acción: th de tabla, insignia de paso y botones rellenos (el cian solo es seguro con
+   icono y fondo de paleta; sobre un color de centro cualquiera no se garantiza el icono). */
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-table .pulso-sort-btn:focus-visible {
+    outline-color: var(--pulso-action-text);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-step-badge {
-    color: var(--pulso-brand-text);
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-table th.is-sorted {
+    border-bottom-color: var(--pulso-action-text);
 }
 
-/* Botones de acción rellenos: con el principal van en marca (el cian solo es seguro con icono y fondo
-   de paleta; sobre un acento cualquiera no se garantiza el icono). */
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn,
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn:hover,
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-mic-btn.pulso-mic-recording {
-    background: var(--pulso-brand);
-    color: var(--pulso-brand-text);
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-step-badge {
+    color: var(--pulso-action-text);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn:hover {
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-send-btn,
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-send-btn:hover,
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-mic-btn.pulso-mic-recording {
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text);
+}
+
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-send-btn:hover {
     filter: brightness(1.15);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-mic-btn.pulso-mic-recording {
-    border-color: var(--pulso-brand);
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-mic-btn.pulso-mic-recording {
+    border-color: var(--pulso-action-bg);
 }
 
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn[aria-disabled="true"],
-.pulso-chat-container[data-pulso-tema~="principal"] .pulso-send-btn[aria-disabled="true"]:hover {
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-send-btn[aria-disabled="true"],
+.pulso-chat-container[data-pulso-tema~="boton"] .pulso-send-btn[aria-disabled="true"]:hover {
     background: #72A3C4;
     color: #27334F;
     filter: none;
 }
 
-/* El acento del centro (solo si pasó el contraste) en los detalles de la cabecera. */
+/* El acento del centro (solo si pasó el contraste contra blanco, cabecera y botón) en los detalles. */
 .pulso-chat-container[data-pulso-tema~="acento"] .pulso-tab[aria-selected="true"] {
     border-bottom-color: var(--pulso-accent);
 }

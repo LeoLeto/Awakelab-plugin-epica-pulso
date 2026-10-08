@@ -72,6 +72,7 @@ echo $OUTPUT->header();
 echo html_writer::tag('p', 'Las claves nunca se muestran. Las llamadas de red usan el proxy de Moodle, si lo hay. '
     . 'Recarga la página para volver a comprobar.');
 echo html_writer::table($table);
+echo html_writer::tag('p', html_writer::link(new moodle_url('/blocks/pulso/tema_preview.php'), 'Vista previa de los colores del centro'));
 
 // Cursos con el bloque y sin texto completo.
 echo $OUTPUT->heading('Cursos con Pulse sin texto completo indexado', 3);

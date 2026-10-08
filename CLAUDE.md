@@ -10,7 +10,7 @@
 - **Enlaces directos (v1.11)** y **Tema claro (v1.16)** — botón «Ir a…»; paleta y contraste.
 - **Épica** — pasos 1, 3 y 4 (bloque Crear, ciclo adhoc, panel de estado), **Gamificación** 1–4, **Ampliación** 1–2, **Retos** 1–2, **QA general**, **Historial del alumno**.
 - **Auditoría de UX, fases 1–3** — visibilidad en el RAG y `pulso_error`; Épica opcional, topes y diagnóstico; accesibilidad y móvil.
-- **Colores de cada centro (carta 11, v2.1.0)** — tema de Épica: sincronización, validación doble, contraste, fondo vs texto.
+- **Colores de cada centro (carta 11, v2.1.0; por papel v2.5.0)** — tema de Épica: sincronización, validación doble, cinco claves, superficies derivadas del principal, variables por papel, vista previa.
 - **Fase 4 (cerrada, v2.0.0)** — `styles.css`, módulos AMD, pestañas + Mustache, home, pila de Crear (paso 6), «Mis creaciones» (paso 7).
 - **Privacidad (v2.3.0)** — privacy provider (RGPD) y limpieza al borrar un curso; **borrado en Épica por persona (carta 14, v2.4.0)**: tarea adhoc, contexto de usuario como gancho, observer de `user_deleted`.
 - **Cómo se trabaja este repo con prompts** — una sesión por paso. **Bug backlog** — solo lo vivo. **Dev notes** — build de `amd/build`, purgas y Notificaciones.
@@ -429,7 +429,7 @@ esas variables (ver abajo). Paleta activa:
 | `--pulso-bg` | `#FFFFFF` | fondo del panel |
 | `--pulso-surface` | `#F7F9FD` | tarjetas, sugerencias |
 | `--pulso-surface-2` | `#EDF1FA` | cabecera de tabla, chips |
-| `--pulso-brand` / `--pulso-brand-text` | `#003670` / `#FFFFFF` | FONDOS de marca (cabecera, botones de acción, activos, burbuja propia) y lo que va encima; los pisa el tema del centro (v2.1.0) |
+| `--pulso-header-*` / `--pulso-action-*` / `--pulso-own-*` (`-bg` / `-text`) | `#003670` / `#FFFFFF` | FONDOS de marca por papel (cabecera y burbuja flotante; botones de acción, activos, th; burbuja propia) y lo que va encima; los pisa el tema del centro (v2.5.0; antes una sola `--pulso-brand`, que ya no existe) |
 | `--pulso-deep` / `--pulso-navy` | `#003670` | TEXTO fijo de paleta (títulos, bordes de botón secundario); nunca fondo de centro |
 | `--pulso-ink` | `#27334F` | texto principal |
 | `--pulso-slate` | `#34547A` | texto secundario |
@@ -1151,8 +1151,8 @@ Tercera herramienta de Épica: el usuario elige un recurso o escribe un tema, É
 retos, elige uno (o escribe el suyo) y Épica devuelve un ENLACE donde se resuelve y se corrige.
 Lógica en `classes/retos_service.php`, errores en `classes/reto_error.php`, endpoint
 `api_retos.php` (POST, una `accion`: `proponer`, `propuesta`, `elegir`, `refrescar`, `curso`,
-`mis_retos`). Sin UI todavía (paso 2). Contrato: `docs/epica_retos_carta7.md`; **la carta 8 manda
-sobre la 7**. Reglas que deben persistir:
+`mis_retos`). Sin UI todavía (paso 2). Contrato: cartas 7 y 8 de Épica (sus documentos ya no están en el
+repo; **la carta 8 mandaba sobre la 7** y lo vigente está descrito en estas reglas). Reglas que deben persistir:
 
 - **Retos se llama desde la PETICIÓN WEB, no desde una tarea adhoc — y SOLO Retos.** Es la
   excepción aprobada por Épica (carta 8 §1): sus puertas contestan enseguida (`proponer` no
@@ -1328,7 +1328,7 @@ persistir:
 ## Historial del alumno en Épica (carta 10) (v1.29.0)
 
 Botón «Mi historial en Épica» (desde v1.39.0 al pie de «Mis creaciones», ver «Fase 4 — paso 7»): lleva al ALUMNO a `/mis-recursos` de Épica (sus láminas, juegos y retos
-pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reglas:
+pedidos por Pulse; solo mirar). Contrato: carta 10 de Épica (su documento ya no está en el repo; lo vigente está descrito en estas reglas). Reglas:
 
 - **Puerta `/api/auth/alumno`, solo alumnado.** Un token de docente ahí es 403 `rol-sin-permiso`,
   así que `epica_historial.php` NO firma nada si el usuario tiene `viewanalytics` (ni si
@@ -1771,11 +1771,11 @@ Plantilla (`chat_create_tools.mustache`, `chat.mustache`), `crear.js`/`retos.js`
   pila (147; 5 comprobaciones de la galería se sustituyeron por 4 de «ya no hay galería»), pestañas (92) y home (40);
   Mustache PHP en las 5 combinaciones; `api_create_status` con/sin/inválido `tool`; SQL de propuestas ejecutado en SQLite.
 
-## Colores de cada centro (carta 11) (v2.1.0)
+## Colores de cada centro (carta 11) (v2.1.0; por papel v2.5.0)
 
 Cada centro ve Pulse con sus colores, elegidos en Épica (`docs/epica_tema_carta11.md`). Épica es opcional: sin Épica, o con
-`tema: null`, Pulse se ve **exactamente** como antes (comprobado: sin tema el CSS resuelve a las mismas 1.666 declaraciones que
-v2.0.0 y el HTML de la plantilla es idéntico). Lógica en `classes/tema_service.php`; tarea `\block_pulso\task\sync_tema` (cada hora,
+`tema: null`, Pulse se ve **exactamente** como antes (comprobado en v2.1.0 y repetido en v2.5.0: sin tema el CSS resuelve a las
+mismas declaraciones que la versión anterior y el HTML de la plantilla es idéntico). Lógica en `classes/tema_service.php`; tarea `\block_pulso\task\sync_tema` (cada hora,
 `db/tasks.php`: pasar por Notificaciones); botón en los ajustes → `sync_tema.php`; una fila en `diagnostico.php` (`check_tema()`).
 
 - **Nunca se llama a Épica al pintar.** `sincronizar()` solo lo ejecutan la tarea y el botón (`sync_tema.php`: `require_admin()` +
@@ -1786,31 +1786,53 @@ v2.0.0 y el HTML de la plantilla es idéntico). Lógica en `classes/tema_service
   nunca a la interfaz). Token nuevo en cada llamada, firmado con el admin (`get_admin()`, debe tener correo), contexto de sistema,
   `viewanalytics` y SIN curso; espera corta (la de `pedir()`, no la larga). Config del plugin: `tema_json`, `tema_version`,
   `tema_sync_time` (+ `tema_sync_error`, `tema_sync_error_time`).
-- **Se valida DOS veces**: antes de guardar y al pintar (`validar_colores()`, la misma función). Solo claves `principal`/`acento`
-  con forma `^[a-z][a-z0-9-]{0,31}\z`; `valor`/`texto` `^#[0-9a-f]{6}\z` (con `\z`, no `$`: `$` deja pasar un salto de línea final).
-  Lo que no case se ignora color a color. Un tema sin ningún color utilizable (p. ej. solo claves que Pulse no usa) cuenta como sin
-  tema. Nada de Épica entra en el HTML sin pasar por ahí.
-- **El contraste lo calculamos nosotros (WCAG) y la variable que no lo cumple se ignora; se queda la de Pulse.** `principal`: el
-  `texto` de Épica solo se acepta si da >= 4,5:1 sobre `valor`; si no, blanco o negro (el mejor; siempre >= 4,58:1), así que el
-  principal nunca se ignora. `acento`: >= 3:1 sobre blanco (foco, bordes e iconos sobre el panel) **y** >= 3:1 sobre el principal
-  efectivo (el del centro o `#003670`). Consecuencia a vigilar con Épica: su ejemplo de la carta (`#0fced3`) da 1,7:1 sobre blanco y
-  se ignora; un cian claro de centro no será nunca acento.
-- **Fondo vs texto** (la regla de fondo del cambio). Tres variables, valor por defecto = el color de siempre: `--pulso-brand` y
-  `--pulso-brand-text` para FONDOS (cabecera, botones de acción, pestaña activa/filtro pulsado, burbuja propia, `th` de tabla,
-  insignia de paso, botón «Ir a…», burbuja flotante) y todo lo que va encima; `--pulso-accent` para iconos, bordes y foco. Los usos
-  como TEXTO sobre fondo claro siguen con colores fijos de paleta (`--pulso-deep`/`--pulso-navy` = `#003670`, `--pulso-ink`…): **un
-  color de centro nunca es texto sobre blanco**. Lo que no es del centro se queda fijo: los avatares (isotipo Awakelab sobre
-  `#003670`), los colores de estado y el cian de paleta. El cian sigue sin valer como color de texto.
-- **Inyección**: `style="--pulso-brand:#…;--pulso-brand-text:#…;--pulso-accent:#…;"` + `data-pulso-tema="principal acento"` en
+- **Se valida DOS veces**: antes de guardar y al pintar (`validar_colores()`, la misma función; `resolver_tema()` la vuelve a llamar).
+  Solo claves de la lista cerrada `principal`, `acento`, `cabecera`, `boton`, `burbuja` (todas opcionales) con forma
+  `^[a-z][a-z0-9-]{0,31}\z`; `valor`/`texto` `^#[0-9a-f]{6}\z` (con `\z`, no `$`: `$` deja pasar un salto de línea final).
+  Lo que no case se ignora color a color. Un tema sin ningún color utilizable cuenta como sin tema. Nada de Épica entra en el
+  HTML sin pasar por ahí.
+- **Las superficies grandes NUNCA llevan un color claro con texto negro, salvo que el centro lo pida explícitamente** (v2.5.0; el
+  centro de pruebas puso `#ff6a00`: el blanco da 2,9:1 y el cálculo elegía texto negro, una cabecera naranja chillón con letras
+  negras). `resolver_tema(array $colores): array` (pura) decide:
+  - **cabecera / boton / burbuja enviadas**: se respetan (es la elección del centro); el texto es el `texto` de Épica si da
+    >= 4,5:1 y, si no, blanco o negro (el mejor).
+  - **No enviadas**: se DERIVAN del `principal` con `oscurecer_para_blanco()` y llevan texto blanco. Esa función mezcla hacia negro
+    en sRGB (los tres canales por el mismo factor: baja solo el valor del HSV, tono y saturación se conservan) en pasos del 2 %, con
+    tope de 50, hasta >= 4,5:1 con blanco; si ya cumple, no toca (`#003670` sale igual; `#ff6a00` → `#c75300`). Sin `principal`,
+    lo no enviado queda en el color de Pulse.
+  - **acento enviado**: >= 3:1 sobre blanco, sobre la cabecera efectiva y sobre el botón efectivo (los de Pulse si no hay otros); si
+    no, se ignora. **No enviado o ignorado, con principal**: el principal original si cumple lo mismo; si no, su versión oscurecida
+    hasta >= 3:1 sobre blanco (iconos y bordes sobre el panel). Esa versión solo toca los detalles de la cabecera y de `th` si además
+    cumple contra ellas (token `acento`); si no, token `acento-base` (solo `--pulso-accent`). Consecuencia a vigilar: con un
+    principal oscuro el acento derivado es el propio principal oscuro (el cian de Pulse deja de verse); y un cian claro enviado como
+    acento (`#0fced3`, 1,7:1) se ignora siempre.
+  - **Ni principal ni ninguna clave válida** = sin tema (no se pinta ningún atributo). `resolver_tema()` devuelve `vars`, `flags`
+    (tokens), `ignorados`, `isotipoclaro` y `detalle` (valor, texto, contraste y origen `epica`/`derivado`/`pulse` por variable,
+    para la vista previa).
+- **Fondo vs texto: variables POR PAPEL** (v2.5.0; antes una sola `--pulso-brand`, que ya no existe). Cada una vale por defecto el
+  color de siempre: `--pulso-header-bg`/`-text` (cabecera y burbuja flotante), `--pulso-action-bg`/`-text` (botones de acción,
+  pestaña/filtro activos, `th`, insignia de paso, «Ir a…», confirmación de «Nueva conversación»), `--pulso-own-bg`/`-text` (burbuja
+  propia) y `--pulso-accent` (iconos, bordes y foco). Cada uso de CSS va en la variable de SU papel: no volver a una variable común.
+  Los usos como TEXTO sobre fondo claro siguen con colores fijos de paleta (`--pulso-deep`/`--pulso-navy` = `#003670`,
+  `--pulso-ink`…): **un color de centro nunca es texto sobre blanco**. Lo que no es del centro se queda fijo: los avatares (isotipo
+  Awakelab sobre `#003670`), los colores de estado y el cian de paleta. El cian sigue sin valer como color de texto.
+- **Inyección**: `style="--pulso-header-bg:#…;--pulso-header-text:#…;…;--pulso-accent:#…;"` + `data-pulso-tema="<tokens>"` en
   `.pulso-chat-container` y `.pulso-chat-bubble` (`{{ }}` escapado, nunca `{{{ }}}`; nada en `:root`, nada fuera del bloque). Solo
-  lleva las variables válidas; sin tema, ninguno de los dos atributos se pinta. El `data-pulso-tema` (tokens `principal`/`acento`) es
-  la excepción documentada a «solo style»: las reglas de `styles.css` bajo `[data-pulso-tema~="…"]` (bloque «COLORES DEL CENTRO»)
-  cambian lo que NO pasa por las tres variables (degradado de cabecera y burbuja → plano; blanco/cian fijos de la cabecera →
-  `--pulso-brand-text`; botón de enviar/micrófono en marca). Sin el atributo no casan y el CSS por defecto queda intacto. Con solo el
-  principal, los detalles de la cabecera (pestaña activa, punto de estado, orden de tabla) van en `--pulso-brand-text`, porque el acento
-  por defecto no se ha comprobado contra el color del centro; el acento del centro pisa después.
-- **Isotipo**: con texto de marca negro (centro claro), la burbuja y la cabecera usan `pix/isotipo-claro.png` en vez del oscuro
-  (`isotipoclaro` en el contexto de la plantilla), que no se vería.
+  lleva las variables resueltas; sin tema, ninguno de los dos atributos se pinta. Los tokens de `data-pulso-tema` son los de las claves
+  EFECTIVAS (`principal`, `cabecera`, `boton`, `burbuja`, `acento`, `acento-base`; derivar una superficie del principal la hace
+  efectiva) y son la excepción documentada a «solo style»: las reglas de `styles.css` bajo `[data-pulso-tema~="…"]` (bloque «COLORES
+  DEL CENTRO») cambian lo que NO pasa por las variables: bajo `cabecera`, degradado de cabecera y burbuja → plano y blanco/cian fijos
+  de la cabecera → `--pulso-header-text`; bajo `boton`, botón de enviar/micrófono en acción y detalles de `th`/insignia en
+  `--pulso-action-text`; bajo `acento`, indicador de pestaña, punto de estado y orden de tabla en `--pulso-accent`. Sin el atributo no
+  casan y el CSS por defecto queda intacto. La burbuja propia no necesita regla (usa `--pulso-own-*`).
+- **Isotipo**: se decide por el texto de la cabecera EFECTIVA: con texto negro (cabecera clara pedida por el centro) la burbuja y la
+  cabecera usan `pix/isotipo-claro.png` en vez del oscuro (`isotipoclaro` en el contexto de la plantilla), que no se vería.
+- **Vista previa para administración** (v2.5.0): `tema_preview.php` (`require_admin()`; enlazada desde los ajustes junto a «Sincronizar» y
+  desde `diagnostico.php`). Dos maquetas estáticas con las clases reales de `styles.css` («Sin tema» y «Con los colores del centro»), una
+  tabla con cada variable resuelta (valor, texto, contraste, origen) y un formulario GET con las cinco claves para probar sin guardar: pasa
+  por la MISMA `validar_colores()` + `resolver_tema()`, solo afecta a esa vista, nunca se guarda ni se manda a Épica, y un valor inválido
+  se ignora con aviso. Nada de la URL llega al HTML sin pasar por la validación (y todo va con `s()`). Sin JS del chat ni endpoints. La
+  nota para Épica con las claves está en `docs/epica_tema_claves_v2.md`.
 - **Trampa vista**: `toggleChat()` hacía `container.style.cssText = ''` al minimizar, lo que borraba las variables del tema en el primer
   cierre; ahora solo quita `width/height/left/top/right/bottom`. **No volver a vaciar el `style` del contenedor entero.**
 - **Pruebas** (fuera del repo, PHP 8.3 portátil + Mustache PHP + node): `tema_service` con respuestas falsas (tema, `null`, fallos,
@@ -1819,7 +1841,10 @@ v2.0.0 y el HTML de la plantilla es idéntico). Lógica en `classes/tema_service
   (HTML sin tema idéntico al de v2.0.0 en los dos roles × con/sin Crear; el `style` solo en dos elementos; inyección bloqueada);
   equivalencia del CSS por defecto contra HEAD. **Sin navegador no se ve** el aspecto real con colores de centro (cabecera, pestañas,
   tablas), ni `color-mix`, ni el botón de los ajustes, ni la tarea contra Épica real: eso va a sanase-test (con un tema oscuro, uno
-  amarillo y uno cian claro).
+  amarillo y uno cian claro). v2.5.0 añade: `oscurecer_para_blanco` (barrido RGB y los casos naranja, amarillo, cian, lima, blanco),
+  `resolver_tema` (principal claro/oscuro, cabecera explícita, acento inválido, claves desconocidas, formatos malos, el tema de
+  sanase-test), equivalencia del CSS sin tema contra HEAD (script que resuelve los `var()` de las dos versiones) y `tema_preview.php`
+  contra parámetros maliciosos y sin administrador.
 
 ## Privacidad (v2.3.0)
 
@@ -1852,10 +1877,9 @@ repetirla no hace daño). Reglas:
 - **Firma como `tema_service`**: `get_admin()` (necesita correo), `\context_system`, `epica_client::CAPABILITY_ROL` (`viewanalytics`) y SIN
   curso; token nuevo en cada ejecución (incluidos los reintentos de Moodle); espera corta; `sub_alumno` = `(string)$userid`.
 - **Reintento solo ante fallos transitorios.** `es_transitorio()` o excepción al firmar/pedir → la tarea LANZA y Moodle la reintenta con su
-  espera creciente (sin tope propio nuestro). **Duda sin verificar** (no hay checkout de Moodle): hasta 4.3 se cree que las adhoc que lanzan
-  se reintentan sin tope; en ≥ 4.4 puede existir `attemptsavailable` (12 por defecto), tras lo cual la tarea se descartaría y quedaría en el log
-  de tareas fallidas, y el borrado se relanzaría repitiendo la solicitud de privacidad. Comprobarlo en el Moodle de sanase-test antes de darlo por
-  sabido. Si Épica deja de estar disponible, la tarea sale en silencio.
+  espera creciente (sin tope propio nuestro). **Tope de Moodle (verificado)**: sanase-test usa Moodle 4.4.2 y desde 4.4 las adhoc que lanzan tienen tope
+  (`attemptsavailable`, 12 intentos, el último hacia las 24 h; MDL-79128 y MDL-81000). Agotado el tope, la tarea se descarta y el borrado
+  se relanza repitiendo la solicitud de privacidad. Si Épica deja de estar disponible, la tarea sale en silencio.
   4xx = terminal: `error_log` con motivo y traza, sin reintentar (un 403 sería un error de configuración nuestro). 200 → `mtrace` con
   `habia_datos` y los cuatro números. Administrador sin correo → también lanza (es un borrado debido y se arregla poniendo el correo; no se
   llama a Épica). La excepción lanzada lleva solo la clase de la causa, nunca el mensaje original.

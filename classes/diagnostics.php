@@ -170,7 +170,7 @@ class diagnostics {
         $horaerror = (int)get_config('block_pulso', 'tema_sync_error_time');
 
         $colores = tema_service::leer();
-        $res = tema_service::resolver($colores);
+        $res = tema_service::resolver_tema($colores);
         $usados = $colores ? implode(', ', array_keys($colores)) : '';
 
         if ($codigo !== '') {

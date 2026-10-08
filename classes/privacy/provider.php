@@ -98,7 +98,8 @@ class provider implements
         ], 'privacy:metadata:openai');
 
         // Épica (local_awkepica): token firmado (sub, email, nombre, rol, curso) + sobre/cuerpo
-        // (petición, material, contexto, curso, alumno.idioma/intento/grupo).
+        // (petición, material, contexto, curso, alumno.idioma/intento/grupo). Al borrar los datos
+        // de una persona se pide a Épica que borre lo suyo (carta 14): lo dice la descripción.
         $collection->add_external_location_link('epica', [
             'sub' => 'privacy:metadata:epica:sub',
             'email' => 'privacy:metadata:epica:email',
@@ -132,11 +133,24 @@ class provider implements
                  WHERE c.contextlevel = :contextlevel
                    AND c.instanceid IN (" . implode(' UNION ', $parts) . ")";
         $contextlist->add_from_sql($sql, $params);
+        // Gancho del borrado en Épica (carta 14): con Épica disponible se añade el contexto de
+        // USUARIO de la persona. Así Moodle nos llama en delete_data_for_user() aunque ya no
+        // queden filas en nuestras tablas (p. ej. porque se borró el curso). Exportar y borrar
+        // tablas ignoran ese contexto.
+        if (self::epica_disponible()) {
+            $contextlist->add_user_context($userid);
+        }
         return $contextlist;
     }
 
     public static function get_users_in_context(userlist $userlist): void {
         $context = $userlist->get_context();
+        if ($context->contextlevel === CONTEXT_USER && self::epica_disponible()) {
+            // Coherente con get_contexts_for_userid(): el contexto de usuario es el gancho del
+            // borrado en Épica. delete_data_for_users() no hace nada con él (ver allí).
+            $userlist->add_user((int)$context->instanceid);
+            return;
+        }
         if ($context->contextlevel !== CONTEXT_COURSE) {
             return;
         }
@@ -249,14 +263,28 @@ class provider implements
         if (empty($contextlist->count())) {
             return;
         }
-        $userid = $contextlist->get_user()->id;
+        $userid = (int)$contextlist->get_user()->id;
+        $pedirborradoepica = false;
         foreach ($contextlist->get_contexts() as $context) {
             if ($context->contextlevel === CONTEXT_COURSE) {
                 self::delete_in_course((int)$context->instanceid, $context->id, [$userid]);
+            } else if ($context->contextlevel === CONTEXT_USER && (int)$context->instanceid === $userid) {
+                $pedirborradoepica = true;
             }
+        }
+        // Borrado en Épica (carta 14): UNA tarea por llamada, no una por contexto, y solo desde
+        // esta solicitud por persona (ver delete_data_for_users()).
+        if ($pedirborradoepica) {
+            \block_pulso\task\epica_borrar_alumno_adhoc::encolar($userid);
         }
     }
 
+    /**
+     * NO encola el borrado en Épica, a propósito: esta llamada (y la de todos los usuarios de un
+     * contexto) también la hace la caducidad de datos por curso, y que caduque UN curso no puede
+     * borrar el historial del alumno en Épica, que es de todos sus cursos del centro («no hay
+     * borrado por curso», carta 14).
+     */
     public static function delete_data_for_users(approved_userlist $userlist): void {
         $context = $userlist->get_context();
         $userids = $userlist->get_userids();
@@ -298,6 +326,11 @@ class provider implements
             $DB->delete_records_select($table, $where, $params);
         }
         $DB->set_field_select('block_pulso_ampliaciones', 'userid', 0, $where, $params);
+    }
+
+    /** ¿Hay Épica en este sitio? Única puerta antes de tocar nada de \local_awkepica (vía epica_client). */
+    private static function epica_disponible(): bool {
+        return \block_pulso\epica_client::disponible();
     }
 
     private static function nombre_recurso(int $courseid, int $cmid, string $fallback): string {

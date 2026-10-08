@@ -228,4 +228,109 @@ final class provider_test extends \core_privacy\tests\provider_testcase {
         $this->assertFalse(get_config('block_pulso', 'lastindexqueue_' . $c1->id));
         $this->assertFalse(get_config('block_pulso', 'enabled_course_' . $c1->id));
     }
+
+    // ------------------------------------------------------------------
+    // Borrado en Épica (carta 14, v2.4.0): una tarea adhoc por persona, nunca por curso.
+    // La tarea contra Épica no se prueba aquí (necesita local_awkepica): la cubre el arnés
+    // con stubs descrito en memory/session-history.md.
+    // ------------------------------------------------------------------
+
+    private const TAREA_BORRADO = '\block_pulso\task\epica_borrar_alumno_adhoc';
+
+    private function tareas_de_borrado(): array {
+        return \core\task\manager::get_adhoc_tasks(self::TAREA_BORRADO);
+    }
+
+    public function test_borrado_epica_con_contexto_de_usuario_encola_una_tarea(): void {
+        [$u1, , $c1, $c2] = $this->escenario();
+        $ctxs = [
+            \context_course::instance($c1->id)->id,
+            \context_course::instance($c2->id)->id,
+            \context_user::instance($u1->id)->id,
+        ];
+
+        provider::delete_data_for_user(new approved_contextlist($u1, 'block_pulso', $ctxs));
+
+        // Dos contextos de curso + uno de usuario: UNA sola tarea, no una por contexto.
+        $tareas = $this->tareas_de_borrado();
+        $this->assertCount(1, $tareas);
+        $this->assertEquals($u1->id, reset($tareas)->get_custom_data()->userid);
+        // Y lo nuestro se borra como siempre.
+        $this->assertEquals(0, $this->filas('block_pulso_encargos', ['userid' => $u1->id]));
+    }
+
+    public function test_borrado_epica_solo_con_contexto_de_usuario(): void {
+        [$u1] = $this->escenario();
+
+        // Sin filas nuestras que borrar (p. ej. el curso ya no existe) también se encola.
+        provider::delete_data_for_user(new approved_contextlist($u1, 'block_pulso', [\context_user::instance($u1->id)->id]));
+
+        $this->assertCount(1, $this->tareas_de_borrado());
+    }
+
+    public function test_borrado_epica_sin_contexto_de_usuario_no_encola(): void {
+        [$u1, , $c1] = $this->escenario();
+
+        provider::delete_data_for_user(new approved_contextlist($u1, 'block_pulso', [\context_course::instance($c1->id)->id]));
+
+        $this->assertCount(0, $this->tareas_de_borrado());
+    }
+
+    public function test_borrado_epica_ignora_el_contexto_de_usuario_de_otra_persona(): void {
+        [$u1, $u2] = $this->escenario();
+
+        provider::delete_data_for_user(new approved_contextlist($u1, 'block_pulso', [\context_user::instance($u2->id)->id]));
+
+        $this->assertCount(0, $this->tareas_de_borrado());
+    }
+
+    public function test_borrado_epica_nunca_desde_lista_ni_contexto(): void {
+        [$u1, $u2, $c1] = $this->escenario();
+        $ctxcurso = \context_course::instance($c1->id);
+        $ctxuser = \context_user::instance($u1->id);
+
+        // La caducidad de datos por curso usa estas dos llamadas: no puede borrar el historial de Épica.
+        provider::delete_data_for_users(new approved_userlist($ctxcurso, 'block_pulso', [$u1->id, $u2->id]));
+        provider::delete_data_for_users(new approved_userlist($ctxuser, 'block_pulso', [$u1->id]));
+        provider::delete_data_for_all_users_in_context($ctxcurso);
+        provider::delete_data_for_all_users_in_context($ctxuser);
+
+        $this->assertCount(0, $this->tareas_de_borrado());
+    }
+
+    public function test_exportar_ignora_el_contexto_de_usuario(): void {
+        [$u1] = $this->escenario();
+        $ctxuser = \context_user::instance($u1->id);
+
+        provider::export_user_data(new approved_contextlist($u1, 'block_pulso', [$ctxuser->id]));
+
+        $this->assertFalse(writer::with_context($ctxuser)->has_any_data());
+    }
+
+    public function test_contexto_de_usuario_solo_con_epica_disponible(): void {
+        [$u1] = $this->escenario();
+        $ctxuser = \context_user::instance($u1->id)->id;
+        $hay = \block_pulso\epica_client::disponible();
+
+        $this->assertSame($hay, in_array($ctxuser, provider::get_contexts_for_userid($u1->id)->get_contextids()));
+
+        $ul = new userlist(\context_user::instance($u1->id), 'block_pulso');
+        provider::get_users_in_context($ul);
+        $this->assertEquals($hay ? [$u1->id] : [], $ul->get_userids());
+    }
+
+    public function test_borrar_la_cuenta_encola_la_tarea_solo_con_epica(): void {
+        [$u1] = $this->escenario();
+
+        delete_user($u1);
+
+        // delete_user() no llama a los providers: la tarea sale del observer de user_deleted.
+        // Sin local_awkepica disponible no se encola nada (nada de esto puede romper sin Épica).
+        $esperadas = \block_pulso\epica_client::disponible() ? 1 : 0;
+        $tareas = $this->tareas_de_borrado();
+        $this->assertCount($esperadas, $tareas);
+        if ($esperadas) {
+            $this->assertEquals($u1->id, reset($tareas)->get_custom_data()->userid);
+        }
+    }
 }

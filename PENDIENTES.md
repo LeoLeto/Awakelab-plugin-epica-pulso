@@ -12,8 +12,8 @@
 - [x] **`confirm()` de «Nueva conversación»** (v2.3.3, hecho en código): barra de confirmación dentro del chat. Al desplegar, purgar cachés.
 
 ## Fuera del plugin
-- [ ] **Los datos que Épica guarda del alumno (historial por `sub`) no se borran desde Moodle**: preguntar a Chema cómo se pide el borrado.
+- [x] **Los datos que Épica guarda del alumno (historial por `sub`) no se borran desde Moodle** (v2.4.0, carta 14, hecho en código): tarea adhoc `epica_borrar_alumno_adhoc` desde `delete_data_for_user()` (gancho: contexto de usuario) y desde `user_deleted`. Al desplegar, Notificaciones. Falta probarlo en sanase-test con una solicitud de borrado real y **contestar a Chema §5: un alumno por llamada nos vale** (y contarle que el borrado de la cuenta va por el evento `user_deleted`).
 - [ ] **Google Fonts del tema Moove**: lo pide el tema, no Pulse; quitarlo de la configuración del tema si se quiere cero terceros.
 - [ ] Restringir la clave de YouTube por IP del servidor y rotar el secreto de `local_awkepica`.
 - [ ] Actualizar las guías de profesorado y alumnado al diseño 2.0 (pestañas, Mis creaciones).
-- [ ] Probar «Mi historial en Épica» con una cuenta de alumno real.
+- [x] Probar «Mi historial en Épica» con una cuenta de alumno real (Chema lo comprobó el 07-10-2026: láminas, juegos y retos salen en su historial; el fallo era el «Cambiar rol»).

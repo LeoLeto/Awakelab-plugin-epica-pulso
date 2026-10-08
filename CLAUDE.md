@@ -12,7 +12,7 @@
 - **Auditoría de UX, fases 1–3** — visibilidad en el RAG y `pulso_error`; Épica opcional, topes y diagnóstico; accesibilidad y móvil.
 - **Colores de cada centro (carta 11, v2.1.0)** — tema de Épica: sincronización, validación doble, contraste, fondo vs texto.
 - **Fase 4 (cerrada, v2.0.0)** — `styles.css`, módulos AMD, pestañas + Mustache, home, pila de Crear (paso 6), «Mis creaciones» (paso 7).
-- **Privacidad (v2.3.0)** — privacy provider (RGPD) y limpieza al borrar un curso.
+- **Privacidad (v2.3.0)** — privacy provider (RGPD) y limpieza al borrar un curso; **borrado en Épica por persona (carta 14, v2.4.0)**: tarea adhoc, contexto de usuario como gancho, observer de `user_deleted`.
 - **Cómo se trabaja este repo con prompts** — una sesión por paso. **Bug backlog** — solo lo vivo. **Dev notes** — build de `amd/build`, purgas y Notificaciones.
 - Historial de lo que costó cada paso: `memory/session-history.md`. Plan de la fase 4: `docs/plan_fase4.md`. Instalación y despliegue: `README.md`.
 
@@ -1368,6 +1368,15 @@ pedidos por Pulse; solo mirar). Contrato: `docs/epica_historial_carta10.md`. Reg
     El código solo llega al atributo o al POST si pasa `pulsoRetoCodigoValido()` (misma regex); si no, la fila cae al enlace.
     `pulsoRetosVerCurso` del alumno ya no llama a `accion=curso` ni abre ventana: el servidor resuelve el destino.
 
+- **Cómo probar lo que pasa por una tarea (carta 14, 08-10-2026).** El «Cambiar rol a… Estudiante» NO sirve para probar nada que pase por una
+  tarea (láminas, juegos): en la petición web `has_capability` mira la sesión y sale `estudiante`, pero la tarea adhoc no tiene sesión, firma con
+  los roles reales de quien encargó y un administrador sale `docente`, sin historial y sin cuota (los retos sí valen: van por la petición web).
+  Hay que usar una cuenta de alumno de verdad (verificado el 07-10 por Chema: con ella láminas, juegos y retos salen en su historial; y como alumno
+  real la cuota sí se nota: 3 láminas y 3 juegos cada 10 minutos, así que un `429 cuota-agotada` probando seguido es lo correcto).
+  **Todo el profesorado necesita `viewanalytics` en sus cursos**: sin ella un profesor firmaría como `estudiante` (sus encargos cuentan en la
+  cuota de alumno, publicar da 403 y entraría a un historial en vez de a Épica). Si hay profesores sin permiso de edición en algún curso,
+  comprobar que la tengan.
+
 ## Auditoría de UX, fase 1 — visibilidad, diagnóstico y errores (v1.30.0)
 
 Reglas permanentes salidas de la auditoría; las tres primeras son de seguridad/privacidad.
@@ -1830,7 +1839,46 @@ v2.0.0 y el HTML de la plantilla es idéntico). Lógica en `classes/tema_service
   embeddings), Épica (`sub`, correo, nombre, rol, curso, petición, grupo, intento). YouTube/OpenAlex no: solo reciben consultas generadas.
 - **Sin transacción en `pre_course_delete`**: un rollback anidado tumbaría el borrado del curso; cada tabla y cada ajuste en su propio try/catch.
 - **Regla**: cualquier tabla NUEVA con `userid` entra en el provider (metadata, contextos, exportar, borrar) y cualquier tabla con `courseid` en `pre_course_delete`.
-- Lo que Épica guarda del alumno (historial por `sub`) no se borra desde Moodle: pendiente de cómo se pide a Épica.
+
+### Borrar en Épica los datos de una persona (carta 14, v2.4.0)
+
+Épica guarda por `sub` (id de Moodle) y por centro: historial, copias de láminas y juegos, sesiones y respuestas a retos. Contrato:
+`docs/epica_borrado_carta14.md` (`POST /api/moodle/alumno/borrar`: un alumno por llamada, 200 haya datos o no, 403 con token de estudiante,
+repetirla no hace daño). Reglas:
+
+- **Tarea adhoc, nunca llamada en línea.** `\block_pulso\task\epica_borrar_alumno_adhoc` (custom data: `userid`; se encola con
+  `::encolar()`, que usa `queue_adhoc_task($t, true)` para no duplicar). Ni el provider ni un evento llaman a Épica: una caída de Épica
+  no puede hacer fallar la solicitud de privacidad de Moodle ni el borrado de un usuario.
+- **Firma como `tema_service`**: `get_admin()` (necesita correo), `\context_system`, `epica_client::CAPABILITY_ROL` (`viewanalytics`) y SIN
+  curso; token nuevo en cada ejecución (incluidos los reintentos de Moodle); espera corta; `sub_alumno` = `(string)$userid`.
+- **Reintento solo ante fallos transitorios.** `es_transitorio()` o excepción al firmar/pedir → la tarea LANZA y Moodle la reintenta con su
+  espera creciente (sin tope propio nuestro). **Duda sin verificar** (no hay checkout de Moodle): hasta 4.3 se cree que las adhoc que lanzan
+  se reintentan sin tope; en ≥ 4.4 puede existir `attemptsavailable` (12 por defecto), tras lo cual la tarea se descartaría y quedaría en el log
+  de tareas fallidas, y el borrado se relanzaría repitiendo la solicitud de privacidad. Comprobarlo en el Moodle de sanase-test antes de darlo por
+  sabido. Si Épica deja de estar disponible, la tarea sale en silencio.
+  4xx = terminal: `error_log` con motivo y traza, sin reintentar (un 403 sería un error de configuración nuestro). 200 → `mtrace` con
+  `habia_datos` y los cuatro números. Administrador sin correo → también lanza (es un borrado debido y se arregla poniendo el correo; no se
+  llama a Épica). La excepción lanzada lleva solo la clase de la causa, nunca el mensaje original.
+- **No se guarda constancia del borrado**: el `userid` no va a ninguna tabla ni ajuste («guardarlo sería no haberlo borrado»). En logs, solo
+  el id, nunca correo ni nombre. Borrar no es vetar: si ese `sub` vuelve a pedir algo, Épica lo vuelve a guardar.
+- **Solo por persona, NUNCA por curso.** `delete_data_for_users()` y `delete_data_for_all_users_in_context()` no encolan nada: también las
+  llama la caducidad de datos por curso, y que caduque UN curso no puede borrar el historial del alumno en Épica, que es de todos sus
+  cursos («no hay borrado por curso»).
+- **El contexto de USUARIO es el gancho.** Moodle solo llama a `delete_data_for_user()` con los contextos de `get_contexts_for_userid()`,
+  y un alumno con historial en Épica pero sin filas nuestras (p. ej. se borró el curso) no aparecería. Con `epica_client::disponible()`,
+  `get_contexts_for_userid()` añade `add_user_context($userid)` y `delete_data_for_user()` encola UNA tarea (no una por contexto) solo si
+  el contexto de usuario de ESA persona está entre los aprobados. Exportar y borrar tablas ignoran ese contexto;
+  `get_users_in_context()` lista a la persona en su contexto de usuario por coherencia (sin Épica, nada).
+- **Borrar la cuenta**: `delete_user()` de Moodle NO llama a los providers (solo lanza `\core\event\user_deleted`; el camino de
+  `tool_dataprivacy` es al revés: providers primero, luego core_user borra la cuenta). Por eso `db/events.php` observa `user_deleted`
+  (`\block_pulso\observer::user_deleted`: solo encola, no lanza, no hace nada sin Épica). Una solicitud de borrado de `tool_dataprivacy`
+  encola por las dos vías: `encolar()` deduplica y, si coincidiera, borrar dos veces es seguro. **Al desplegar hay que pasar por Notificaciones**
+  (`db/events.php` nuevo) para registrar el observer.
+- **Metadata**: la ubicación externa `epica` dice (cadena `privacy:metadata:epica`, en y es) que al borrar los datos de una persona se pide a
+  Épica que borre historial, copias, sesiones y respuestas a retos, y que NO se borran los retos que eligió (son de la clase) ni su bitácora de
+  entradas (se borra sola a los 90 días).
+- **Sin Épica** nada de esto rompe: la tarea sale en `disponible()`, el observer y el contexto de usuario también, y ninguna referencia a
+  `\local_awkepica\…` queda fuera de código ya pasado por `disponible()`.
 
 ## Dev notes
 
@@ -1846,7 +1894,7 @@ v2.0.0 y el HTML de la plantilla es idéntico). Lógica en `classes/tema_service
     `styles.css` (va en el CSS del tema, por revisión de tema) o `amd/build/` (los módulos AMD se cachean por revisión de JS). Un cambio
     solo de PHP no lo necesita.
   - **Notificaciones** (Administración del sitio → Notificaciones, ejecuta `db/upgrade.php`) solo si cambia `db/` (`install.xml`,
-    `upgrade.php`, `caches.php`, `tasks.php`, `access.php`, `messages.php`). Un bump de `version.php` sin cambios en `db/` no lo requiere,
+    `upgrade.php`, `caches.php`, `tasks.php`, `access.php`, `messages.php`, `events.php`). Un bump de `version.php` sin cambios en `db/` no lo requiere,
     pero con la versión nueva Moodle lo pedirá igualmente.
   - Si cambian las capabilities, tareas o proveedores de mensajes, el bump de `version` es lo que hace que Moodle los registre.
 - **Pruebas**: no hay suite en el repo. Los pasos de la fase 4 se verificaron con jsdom (cargando `amd/src` con un `define` mínimo y

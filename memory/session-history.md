@@ -1,5 +1,16 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-08 — Carta 14: borrar en Épica los datos de una persona (v2.4.0)
+
+Reglas en `CLAUDE.md` → «Privacidad» (subsección carta 14) y «Historial del alumno» (cómo probar). `classes/task/epica_borrar_alumno_adhoc.php`, `classes/observer.php`, `db/events.php` (nuevo: Notificaciones), `classes/privacy/provider.php`, cadenas en y es, `tests/privacy/provider_test.php`. Lo que costó ver:
+- **`delete_user()` no llama a los providers** (solo lanza `user_deleted`; el camino de `tool_dataprivacy` es providers → core_user → `delete_user`). De ahí el observer, y de ahí que una solicitud de privacidad encole por las dos vías: `queue_adhoc_task($t, true)` deduplica. Lo sé de memoria del código de Moodle, **no verificado en un checkout** (no hay uno en esta máquina).
+- **El contexto de usuario como gancho** resuelve que Moodle no nos llame si ya no hay filas nuestras; se añade solo con `disponible()` y `delete_data_for_user()` lo compara con el id de ESA persona (un contexto de usuario ajeno no encola). `get_users_in_context()` lo lista por coherencia, pero `delete_data_for_users()` no encola: también la llama la caducidad por curso. Efecto: la caducidad de datos de un contexto de USUARIO tampoco borra en Épica (decisión del encargo; si se quisiera, sería una regla nueva).
+- **Bug cazado por el arnés**: `task\epica_borrar_alumno_adhoc` dentro del namespace `block_pulso\privacy` se resolvía a `block_pulso\privacy\task\…` (fatal en producción). Con `\block_pulso\task\…` completo. El arnés cargaba el provider real, no una copia.
+- **Administrador sin correo → la tarea LANZA** (no solo log): el encargo decía «comprueba las precondiciones» pero no qué hacer; un borrado debido no debe perderse en silencio y se arregla poniendo el correo. La excepción lleva solo la clase de la causa (el mensaje original podría arrastrar token/secreto).
+- **Reintentos de una adhoc que lanza**: espera creciente; si tiene tope es una duda sin verificar (hasta 4.3 sin tope; en ≥ 4.4 quizá `attemptsavailable`, 12 por defecto, y luego se descarta). Ver `CLAUDE.md`. Si Épica deja de estar disponible la tarea sale sin hacer nada.
+- **Verificado**: `php -l` de todo lo tocado; diff de claves en/es (iguales); arnés fuera del repo (PHP portátil `C:\phpl\php` con `mbstring`, stubs de adhoc/Épica/privacy/`$DB`, un proceso por escenario porque `disponible()` está memoizado): 31 escenarios (200 con y sin datos, 503/500/http 0/errno/excepción al firmar/excepción al pedir lanzan, 403 y 400 no lanzan y dejan `error_log`, sin Épica y sin configurar no llaman, admin sin correo no llama, token nuevo en cada ejecución y en el reintento, sin escrituras en BD, provider con/sin/ajeno/solo contexto de usuario, `delete_data_for_users`/`all_users_in_context` nunca encolan, observer con/sin Épica).
+- **NO probado**: `tests/privacy/provider_test.php` (PHPUnit sin Moodle), el observer vía un `delete_user()` real, la tarea contra la puerta real de Épica en QA (`entorno-qa-2`), ni la colisión provider+evento en una solicitud de `tool_dataprivacy` real.
+
 ## 2026-10-07 — «Nueva conversación» sin `confirm()` (v2.3.3)
 
 Reglas en `CLAUDE.md` → «Auditoría de UX, fase 3» (errores con reintento y copia). `chat.js`, `chat.mustache`, `styles.css`; sin servidor ni `db/`. Purgar cachés. Lo que costó ver:

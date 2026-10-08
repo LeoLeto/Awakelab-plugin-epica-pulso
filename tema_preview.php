@@ -154,7 +154,7 @@ foreach ($avisos as $aviso) {
 }
 if ($res['ignorados']) {
     echo $OUTPUT->notification('Ignorado por contraste insuficiente: ' . s(implode(', ', $res['ignorados']))
-        . '. Se usa el acento derivado del principal, o el de Pulse si no hay principal.', 'notifywarning');
+        . ' (no llega a 3:1 sobre el blanco del panel). Se usa el acento derivado del principal, o el de Pulse si no hay principal.', 'notifywarning');
 }
 
 echo html_writer::tag('p', $haypeticion
@@ -187,7 +187,7 @@ if (!$hayTema) {
         $cumple = $fila['contraste'] >= $minimo;
         $table->data[] = [
             s($fila['var']),
-            s($nombresvar[$fila['var']] ?? ''),
+            s(($nombresvar[$fila['var']] ?? '') . (isset($fila['uso']) ? ' — se usa en: ' . $fila['uso'] : '')),
             '<span class="pulso-prev-sw" style="background:' . s($fila['valor']) . '"></span>' . s($fila['valor']),
             s($fila['texto']) . ($fila['var'] === '--pulso-accent' ? ' (panel)' : ''),
             s(number_format($fila['contraste'], 2, ',', '')) . ':1 ' . ($cumple ? '✓' : '✗ (mín. '

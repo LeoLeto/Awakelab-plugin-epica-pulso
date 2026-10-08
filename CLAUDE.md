@@ -1789,7 +1789,7 @@ mismas declaraciones que la versión anterior y el HTML de la plantilla es idén
 - **Se valida DOS veces**: antes de guardar y al pintar (`validar_colores()`, la misma función; `resolver_tema()` la vuelve a llamar).
   Solo claves de la lista cerrada `principal`, `acento`, `cabecera`, `boton`, `burbuja` (todas opcionales) con forma
   `^[a-z][a-z0-9-]{0,31}\z`; `valor`/`texto` `^#[0-9a-f]{6}\z` (con `\z`, no `$`: `$` deja pasar un salto de línea final).
-  Lo que no case se ignora color a color. Un tema sin ningún color utilizable cuenta como sin tema. Nada de Épica entra en el
+  Los hex se normalizan a minúsculas (y sin espacios alrededor) antes de validar: la regex no cambia. Lo que no case se ignora color a color. Un tema sin ningún color utilizable cuenta como sin tema. Nada de Épica entra en el
   HTML sin pasar por ahí.
 - **Las superficies grandes NUNCA llevan un color claro con texto negro, salvo que el centro lo pida explícitamente** (v2.5.0; el
   centro de pruebas puso `#ff6a00`: el blanco da 2,9:1 y el cálculo elegía texto negro, una cabecera naranja chillón con letras
@@ -1800,12 +1800,16 @@ mismas declaraciones que la versión anterior y el HTML de la plantilla es idén
     en sRGB (los tres canales por el mismo factor: baja solo el valor del HSV, tono y saturación se conservan) en pasos del 2 %, con
     tope de 50, hasta >= 4,5:1 con blanco; si ya cumple, no toca (`#003670` sale igual; `#ff6a00` → `#c75300`). Sin `principal`,
     lo no enviado queda en el color de Pulse.
-  - **acento enviado**: >= 3:1 sobre blanco, sobre la cabecera efectiva y sobre el botón efectivo (los de Pulse si no hay otros); si
-    no, se ignora. **No enviado o ignorado, con principal**: el principal original si cumple lo mismo; si no, su versión oscurecida
-    hasta >= 3:1 sobre blanco (iconos y bordes sobre el panel). Esa versión solo toca los detalles de la cabecera y de `th` si además
-    cumple contra ellas (token `acento`); si no, token `acento-base` (solo `--pulso-accent`). Consecuencia a vigilar: con un
+  - **acento enviado (v2.5.1)**: se acepta si da >= 3:1 sobre blanco, y entonces va a `--pulso-accent` (foco, bordes e iconos sobre el
+    panel). Solo pinta además los detalles de la cabecera y de `th` (token `acento`) si da >= 3:1 sobre la cabecera y el botón efectivos
+    (los de Pulse si no hay otros); si no, token `acento-base`. Si no da 3:1 sobre blanco se ignora y se deriva. **Por qué no se exige
+    también contra la cabecera (error de v2.5.0, no volver)**: una cabecera apta para texto blanco tiene L <= ~0,18; un acento con
+    3:1 sobre blanco necesita L <= ~0,30 y con 3:1 sobre esa cabecera L >= 3·Lh + 0,1, así que las dos condiciones casi nunca caben
+    a la vez (con `#c75300`, derivada de `#ff6a00`, no existe ningún acento válido) y se descartaba casi cualquier acento elegido.
+    **No enviado o ignorado, con principal**: el principal original si da >= 3:1 sobre blanco; si no, su versión oscurecida hasta
+    >= 3:1; con el mismo criterio de token (`acento` solo si además cumple contra cabecera y botón). Consecuencia a vigilar: con un
     principal oscuro el acento derivado es el propio principal oscuro (el cian de Pulse deja de verse); y un cian claro enviado como
-    acento (`#0fced3`, 1,7:1) se ignora siempre.
+    acento (`#0fced3`, 1,7:1) se ignora siempre. La vista previa dice dónde se usa el acento: «panel» o «panel y cabecera».
   - **Ni principal ni ninguna clave válida** = sin tema (no se pinta ningún atributo). `resolver_tema()` devuelve `vars`, `flags`
     (tokens), `ignorados`, `isotipoclaro` y `detalle` (valor, texto, contraste y origen `epica`/`derivado`/`pulse` por variable,
     para la vista previa).

@@ -213,13 +213,16 @@ class tema_service {
             if (!in_array($clave, self::CLAVES, true) || !is_array($color)) {
                 continue;
             }
+            // Se normaliza a minúsculas y sin espacios ANTES de validar: la regex no cambia.
             $valor = $color['valor'] ?? null;
-            if (!is_string($valor) || !preg_match(self::RE_COLOR, $valor)) {
+            $valor = is_string($valor) ? strtolower(trim($valor)) : null;
+            if ($valor === null || !preg_match(self::RE_COLOR, $valor)) {
                 continue;
             }
             $entrada = ['valor' => $valor];
             $texto = $color['texto'] ?? null;
-            if (is_string($texto) && preg_match(self::RE_COLOR, $texto)) {
+            $texto = is_string($texto) ? strtolower(trim($texto)) : null;
+            if ($texto !== null && preg_match(self::RE_COLOR, $texto)) {
                 $entrada['texto'] = $texto;
             }
             $limpio[$clave] = $entrada;
@@ -353,19 +356,23 @@ class tema_service {
             $flags[] = $clave;
         }
 
-        // El acento tiene que verse sobre el panel (blanco) y sobre la cabecera y el botón
-        // efectivos (indicador de pestaña, orden de tabla): los de Pulse si el centro no puso otros.
+        // El acento tiene que verse sobre el panel (blanco): es lo único que se exige para usarlo
+        // (foco, bordes e iconos). Solo pinta además los detalles de la cabecera y del botón
+        // (indicador de pestaña, orden de tabla) si da el mismo contraste sobre ellos, que son
+        // los efectivos (los de Pulse si el centro no puso otros). Con una cabecera apta para texto
+        // blanco casi nunca ocurre, así que exigirlo para aceptar el acento lo descartaba siempre.
         $cabecera = $fondos['cabecera'] ?? self::PRINCIPAL_DEFECTO;
         $boton = $fondos['boton'] ?? self::PRINCIPAL_DEFECTO;
-        $cumple = function (string $c) use ($cabecera, $boton): bool {
-            return self::contraste($c, self::BLANCO) >= self::CONTRASTE_GRAFICO
-                && self::contraste($c, $cabecera) >= self::CONTRASTE_GRAFICO
+        $sobrepanel = function (string $c): bool {
+            return self::contraste($c, self::BLANCO) >= self::CONTRASTE_GRAFICO;
+        };
+        $sobresuperficies = function (string $c) use ($cabecera, $boton): bool {
+            return self::contraste($c, $cabecera) >= self::CONTRASTE_GRAFICO
                 && self::contraste($c, $boton) >= self::CONTRASTE_GRAFICO;
         };
         $acento = null;
-        $tokenacento = 'acento';
         if (isset($colores['acento'])) {
-            if ($cumple($colores['acento']['valor'])) {
+            if ($sobrepanel($colores['acento']['valor'])) {
                 $acento = $colores['acento']['valor'];
                 $origen['--pulso-accent'] = 'epica';
             } else {
@@ -374,18 +381,17 @@ class tema_service {
         }
         if ($acento === null && $principal !== null) {
             $origen['--pulso-accent'] = 'derivado';
-            if ($cumple($principal)) {
-                $acento = $principal;
-            } else {
-                // No se ve sobre las superficies del centro: vale para iconos y bordes sobre el
-                // panel (>= 3:1 sobre blanco), pero no para los detalles de la cabecera.
-                $acento = self::oscurecer_hasta($principal, self::CONTRASTE_GRAFICO);
-                $tokenacento = $cumple($acento) ? 'acento' : 'acento-base';
-            }
+            // El principal si se ve sobre el panel; si no, su versión oscurecida hasta >= 3:1.
+            $acento = $sobrepanel($principal)
+                ? $principal
+                : self::oscurecer_hasta($principal, self::CONTRASTE_GRAFICO);
         }
+        $usoacento = 'panel';
         if ($acento !== null) {
+            $enlacabecera = $sobresuperficies($acento);
             $vars['--pulso-accent'] = $acento;
-            $flags[] = $tokenacento;
+            $flags[] = $enlacabecera ? 'acento' : 'acento-base';
+            $usoacento = $enlacabecera ? 'panel y cabecera' : 'panel';
         }
 
         $detalle = [];
@@ -409,6 +415,9 @@ class tema_service {
                     'contraste' => self::contraste($valor, $texto),
                     'origen' => $origen[$nombre] ?? 'pulse',
                 ];
+                if ($nombre === '--pulso-accent') {
+                    $detalle[count($detalle) - 1]['uso'] = $usoacento;
+                }
             }
         }
 

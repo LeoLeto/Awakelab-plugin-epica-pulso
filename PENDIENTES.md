@@ -5,6 +5,8 @@
 - [x] **Carta 12 — retos con la sesión del alumno** (v2.2.0, hecho en código; falta probarlo con Épica en QA cuando lo despliegue y con una cuenta de alumno real). **Contestar las 3 preguntas de §4**: (1) el enlace del reto se enseña al elegirlo, en «Mis creaciones» y en «Ver todos los retos del curso»; (2) sí queremos el `destino` de la lista del curso; (3) sí nos vale que, si el token falla, el alumno llegue al reto sin identificar. Avisarles de que firmamos con `viewanalytics` (no `createactivity`) y de que el profesorado sigue con el enlace a secas.
 - [ ] **Pasar a Chema `docs/epica_tema_claves_v2.md` y pedir que añada las claves (`cabecera`, `boton`, `burbuja`) a su catálogo y editor.** Después, ver en sanase-test el tema `#ff6a00` (cabecera `#c75300` con texto blanco) y la vista previa (`/blocks/pulso/tema_preview.php`), con un tema oscuro, uno amarillo y uno cian claro. Al desplegar v2.5.0, purgar cachés (plantilla + CSS).
 
+- [ ] **Pedir a Chema que el aviso del acento en su panel compruebe solo el 3:1 sobre blanco** (Pulse v2.5.1 ya solo exige eso; ver `CLAUDE.md` → «Colores de cada centro»).
+
 ## Pendientes técnicos
 - [x] **Privacy provider (RGPD)** (v2.3.0, hecho en código; falta verificar en sanase-test: Registro de privacidad de plugins y una exportación de datos de una persona de prueba; y ejecutar `tests/privacy/provider_test.php` en un Moodle).
 - [x] **429 `cuota-del-centro`** (v2.3.1, hecho en código): terminal a la primera; el resto de 429 reintenta con tope de 6 h; la notificación traduce los códigos. Falta verlo con un 429 real de Épica en QA.

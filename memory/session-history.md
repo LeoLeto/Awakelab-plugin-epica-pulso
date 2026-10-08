@@ -1,5 +1,13 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-08 — El acento enviado ya no depende de la cabecera (v2.5.1)
+
+Reglas en `CLAUDE.md` → «Colores de cada centro» (acento enviado). `classes/tema_service.php` (`resolver_tema`), `tema_preview.php`; sin `styles.css` ni `db/`, no hace falta purgar cachés. Lo que costó ver:
+- **La v2.5.0 pedía al acento 3:1 sobre blanco Y sobre cabecera y botón**: con cabecera apta para texto blanco (L <= ~0,18) las dos condiciones son casi incompatibles (L <= ~0,30 frente a L >= 3·Lh + 0,1); con `#c75300` no hay acento posible y casi todos se ignoraban. Ahora solo se exige el blanco del panel; el token `acento` (detalles de cabecera/`th`) queda para cuando además cumple contra ellas, y si no `acento-base`.
+- La tabla de detalle de `tema_preview.php` dice «se usa en: panel» o «panel y cabecera» (campo `uso` en `detalle`); el aviso de ignorado dice que es por no llegar a 3:1 sobre blanco.
+- **Mayúsculas y espacios, hecho**: `validar_colores()` aplica `strtolower(trim())` a `valor` y `texto` antes de la regex (que no cambia), así que `#0B93AA` y `" #0b93aa "` se aceptan y se guardan en minúsculas (antes se descartaban en silencio). La vista previa pasa por la misma función. Dos comprobaciones antiguas del arnés (mayúsculas y salto de línea final rechazados) codificaban el comportamiento anterior y se invirtieron; el `z` de la regex sigue ahí y, tras `trim()`, ya no llega ningún salto de línea.
+- **Verificado**: `php -l`; arnés de v2.5.0, 73 comprobaciones previas (2 invertidas, ver arriba) + 6 nuevas + 4 de normalización, 0 fallos: `#ff6a00`+`#0b7285` aceptado con `acento-base` y uso «panel»; `#003670`+`#0b93aa` token `acento` y «panel y cabecera»; `#0fced3` ignorado. **NO probado**: navegador ni sanase-test.
+
 ## 2026-10-08 — Cualquier color de centro se ve bien; cinco claves y vista previa (v2.5.0)
 
 Reglas en `CLAUDE.md` → «Colores de cada centro». `classes/tema_service.php` (`oscurecer_para_blanco`, `resolver_tema`), `styles.css` (variables por papel + bloque «COLORES DEL CENTRO»), `tema_preview.php` (nuevo), `docs/epica_tema_claves_v2.md` (nota para Chema). Sin `db/`; purgar cachés (CSS + plantilla). Lo que costó ver:

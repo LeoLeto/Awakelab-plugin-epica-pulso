@@ -202,6 +202,16 @@ class diagnostics {
         return self::result(self::OK, $msg);
     }
 
+    /** Modo demostración de Épica (carta 16): lo guarda sincronizar() junto al tema. */
+    public static function check_demostracion(): array {
+        require_once(__DIR__ . '/tema_service.php');
+        if (tema_service::en_demostracion()) {
+            $hasta = (int)get_config('block_pulso', 'demostracion_hasta');
+            return self::result(self::WARN, get_string('demostracion_activa', 'block_pulso', userdate($hasta)));
+        }
+        return self::result(self::OK, get_string('demostracion_inactiva', 'block_pulso'));
+    }
+
     /** Última ejecución del cron de Moodle (la más reciente de las tareas programadas). */
     public static function check_cron(): array {
         global $DB;

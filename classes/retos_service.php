@@ -29,6 +29,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/reto_error.php');
 require_once(__DIR__ . '/epica_client.php');
 require_once(__DIR__ . '/creation_quota.php');
+require_once(__DIR__ . '/tema_service.php');
 require_once(__DIR__ . '/full_text_store.php');
 require_once(__DIR__ . '/chat_pipeline.php');
 
@@ -626,6 +627,9 @@ class retos_service {
     // ----------------------------------------------------------------
 
     private static function comprobar_tope_propuestas(int $userid): void {
+        if (tema_service::en_demostracion()) {
+            return; // Carta 16: en demostración nuestros topes no cortan antes que los de Épica.
+        }
         global $DB;
         $limite = self::cfg_int('retos_max_propuestas_usuario_dia', 6);
         $usadas = $DB->count_records_select('block_pulso_reto_propuestas',
@@ -637,6 +641,9 @@ class retos_service {
     }
 
     private static function comprobar_topes_elegir(int $userid, int $courseid): void {
+        if (tema_service::en_demostracion()) {
+            return; // Carta 16: ver comprobar_tope_propuestas().
+        }
         global $DB;
         $desde = usergetmidnight(time());
 

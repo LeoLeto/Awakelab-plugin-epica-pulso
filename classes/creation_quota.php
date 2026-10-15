@@ -16,6 +16,7 @@ namespace block_pulso;
 defined('MOODLE_INTERNAL') || die();
 
 require_once(__DIR__ . '/full_text_store.php');
+require_once(__DIR__ . '/tema_service.php');
 
 class creation_quota {
 
@@ -33,6 +34,9 @@ class creation_quota {
 
     /** @var int Tope duro del campo "que quieres" (contrato con Epica). */
     const MAX_PROMPT_LENGTH = 4000;
+
+    /** «Sin tope» del cupo de sección en el formulario (demostración): el cliente solo bloquea si used >= limit. */
+    const SIN_TOPE = 1000000;
 
     /** @var int Por debajo de esto, el recurso se marca como "resultado pobre" en el desplegable. */
     const LOW_TEXT_THRESHOLD = 500;
@@ -115,7 +119,8 @@ class creation_quota {
      * ANTES de que el usuario escriba su petición -no al enviarla.
      */
     private static function attach_section_usage(array $resources, int $courseid, int $userid): array {
-        $limit = (int)self::cfg('quota_user_section_day', 2);
+        // En demostración (carta 16) no hay tope: un límite enorme hace que el cliente ni avise ni bloquee.
+        $limit = tema_service::en_demostracion() ? self::SIN_TOPE : (int)self::cfg('quota_user_section_day', 2);
 
         if ($userid <= 0) {
             foreach ($resources as &$r) {
@@ -172,6 +177,9 @@ class creation_quota {
      * @return array{allowed: bool, reason: ?string}
      */
     public static function check_general_quota(int $courseid, int $userid, bool $isteacher): array {
+        if (tema_service::en_demostracion()) {
+            return ['allowed' => true, 'reason' => null];
+        }
         $now = time();
         $midnight = usergetmidnight($now);
 
@@ -232,6 +240,9 @@ class creation_quota {
      * @return array{allowed: bool, reason: ?string}
      */
     public static function check_section_quota(int $courseid, int $userid, int $sectionnum): array {
+        if (tema_service::en_demostracion()) {
+            return ['allowed' => true, 'reason' => null];
+        }
         $limit = (int)self::cfg('quota_user_section_day', 2);
         $used = self::count_rows(
             'courseid = :courseid AND userid = :userid AND sectionnum = :sectionnum AND timecreated >= :since',

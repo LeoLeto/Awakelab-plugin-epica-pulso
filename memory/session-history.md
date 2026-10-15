@@ -1,5 +1,14 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-15 — Modo demostración de Épica (carta 16, v2.6.0)
+
+Reglas en `CLAUDE.md` → «Modo demostración». `tema_service` (`parsear_demostracion`, `en_demostracion`), `creation_quota`, `retos_service`, `diagnostics`, `diagnostico.php`, `lang`. Sin `db/` ni `amd/`: ni Notificaciones ni purgar cachés. Lo que costó ver:
+- **La puerta va DENTRO de las funciones de tope**, no en los endpoints: `check_general_quota`/`check_section_quota` los llaman `api_create_form` y `api_create_submit`, y los de Retos se llaman desde varias acciones; un solo sitio por tope cubre todos los caminos.
+- **Cupo de sección sin JS**: `sectionlimit` enorme (`SIN_TOPE`) en vez de tocar `crear.js`, que solo bloquea con `used >= limit`.
+- **`demostracion` se lee antes que el tema** para que «misma versión» o «tema null» no se la salten (son `return` tempranos).
+- **El texto de `sectionlimit` solo se pinta si `used >= limit`** (`crear.js:520`), así que `SIN_TOPE` nunca sale en pantalla.
+- **Verificado**: `php -l` y arnés con stubs (42 comprobaciones, 0 fallos): guardado, null, pasada/+30 d/basura/sin campo → 0 con tema intacto, misma versión + demo, fallo/http 0 sin tocar, expiración, sin Épica, los 8 topes con y sin demo; ampliación y chat no referencian la demo. El PHP portátil no tiene mbstring (`mb_substr` simulado). **NO probado**: contra Épica real ni sanase-test.
+
 ## 2026-10-08 — El acento enviado ya no depende de la cabecera (v2.5.1)
 
 Reglas en `CLAUDE.md` → «Colores de cada centro» (acento enviado). `classes/tema_service.php` (`resolver_tema`), `tema_preview.php`; sin `styles.css` ni `db/`, no hace falta purgar cachés. Lo que costó ver:

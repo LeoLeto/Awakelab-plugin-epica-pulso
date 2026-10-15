@@ -49,6 +49,7 @@ $checks = [
     'OpenAlex (Ampliar recurso)' => 'check_openalex',
     'Épica (local_awkepica)' => 'check_epica',
     'Colores del centro (Épica)' => 'check_tema',
+    'Modo demostración (Épica)' => 'check_demostracion',
     'Cron de Moodle' => 'check_cron',
     'Tarea de indexación' => 'check_index_task',
     'Tareas adhoc de Pulse' => 'check_adhoc',

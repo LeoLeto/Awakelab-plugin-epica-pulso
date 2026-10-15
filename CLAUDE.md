@@ -12,6 +12,7 @@
 - **Auditoría de UX, fases 1–3** — visibilidad en el RAG y `pulso_error`; Épica opcional, topes y diagnóstico; accesibilidad y móvil.
 - **Colores de cada centro (carta 11, v2.1.0; por papel v2.5.0)** — tema de Épica: sincronización, validación doble, cinco claves, superficies derivadas del principal, variables por papel, vista previa.
 - **Fase 4 (cerrada, v2.0.0)** — `styles.css`, módulos AMD, pestañas + Mustache, home, pila de Crear (paso 6), «Mis creaciones» (paso 7).
+- **Modo demostración (carta 16, v2.6.0)** — Épica suelta los cupos 24 h; qué topes nuestros se sueltan y cuáles no.
 - **Privacidad (v2.3.0)** — privacy provider (RGPD) y limpieza al borrar un curso; **borrado en Épica por persona (carta 14, v2.4.0)**: tarea adhoc, contexto de usuario como gancho, observer de `user_deleted`.
 - **Cómo se trabaja este repo con prompts** — una sesión por paso. **Bug backlog** — solo lo vivo. **Dev notes** — build de `amd/build`, purgas y Notificaciones.
 - Historial de lo que costó cada paso: `memory/session-history.md`. Plan de la fase 4: `docs/plan_fase4.md`. Instalación y despliegue: `README.md`.
@@ -1849,6 +1850,18 @@ mismas declaraciones que la versión anterior y el HTML de la plantilla es idén
   `resolver_tema` (principal claro/oscuro, cabecera explícita, acento inválido, claves desconocidas, formatos malos, el tema de
   sanase-test), equivalencia del CSS sin tema contra HEAD (script que resuelve los `var()` de las dos versiones) y `tema_preview.php`
   contra parámetros maliciosos y sin administrador.
+
+## Modo demostración (carta 16, v2.6.0)
+
+Épica puede poner un centro 24 h sin sus cupos y lo dice en `POST /api/moodle/tema` con `demostracion` (null o `{hasta: ISO 8601 UTC}`), al lado de `tema` e independiente de él. Mientras dure, nuestros topes de Épica no pueden cortar antes que los de Épica. Lógica en `classes/tema_service.php`; sin `db/` (es config del plugin), no hace falta Notificaciones.
+
+- **Se lee SIEMPRE con un 200**, justo tras comprobar el http y ANTES de cualquier salida por «misma versión», «sin tema» o error de forma del tema (`sincronizar()`). Fallo, timeout o http 0 salen antes y no tocan lo guardado. Se guarda en `demostracion_hasta` (int; 0 = no). `parsear_demostracion()`: `hasta` string que `strtotime()` entiende, > ahora y <= ahora + 7 días; si no (pasada, +7 d, basura, sin campo) → 0 y `error_log`. El tope de 7 días evita dejar a un centro sin topes por un error de Épica.
+- **`tema_service::en_demostracion()`** = `epica_client::disponible()` Y `demostracion_hasta > time()`. Se mira la hora en CADA comprobación (sin memoizar): al pasar `hasta` se vuelve al tope sin esperar a la tarea (que corre cada hora).
+- **SE SUELTAN** (la puerta está dentro de cada función, así que cubre todos los llamantes): los 5 topes de `creation_quota` (`check_general_quota`: usuario+curso, docente, curso+hora, curso+día; `check_section_quota`: usuario+sección) en `api_create_form.php` y en la revalidación de `api_create_submit.php`, y los 3 de `retos_service` (`comprobar_tope_propuestas`, `comprobar_topes_elegir`: propuestas usuario/día, elegidos usuario/día, elegidos curso/día). Los encargos se siguen INSERTANDO y CONTANDO: al acabar la demostración los topes vuelven con lo ya gastado.
+- **NO SE SUELTAN**: los topes de Ampliación (la clave de YouTube tiene ~100 búsquedas al día EN TOTAL y Épica no la paga), el limitador del chat (`chat_rate_limiter`, coste de Anthropic), los candados por usuario/recurso (evitan dobles envíos, no son cupo) y todo el manejo de los 429 de Épica (`cuota-del-centro` terminal, `cuota-agotada` con `esperaS`): si Épica dice que no, es que no. Ninguno de esos ficheros referencia `en_demostracion` y no debe.
+- **Cupo de sección del formulario sin tocar JS**: `attach_section_usage()` pone `sectionlimit = creation_quota::SIN_TOPE` (1.000.000). El cliente (`updateCreateSectionHint()`, `crear.js`) solo avisa/bloquea si `sectionused >= sectionlimit`, así que ni avisa ni bloquea. `amd/build` no cambia.
+- **Diagnóstico**: fila «Modo demostración (Épica)» en `diagnostico.php` (`diagnostics::check_demostracion()`; aviso si activo, con fecha local). Cadenas `demostracion_*` en `lang/en` y `lang/es`.
+- **Privacidad**: nada nuevo, no hay datos de persona. Contrato: `docs/epica_demostracion_carta16.md`.
 
 ## Privacidad (v2.3.0)
 

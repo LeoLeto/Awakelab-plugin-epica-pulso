@@ -189,6 +189,8 @@ $string['tema_msg_error_respuesta'] = 'Épica ha contestado de una forma inesper
 $string['tema_msg_guardado'] = 'Colores sincronizados (versión {$a}).';
 $string['tema_msg_sin_cambios'] = 'Los colores ya estaban al día (versión {$a}).';
 $string['tema_msg_borrado'] = 'Este centro ya no tiene colores en Épica: Pulse vuelve a los suyos.';
+$string['demostracion_activa'] = 'Modo demostración de Épica: activo hasta {$a}. Mientras dure, Pulse no aplica sus propios topes de Épica (creaciones y retos).';
+$string['demostracion_inactiva'] = 'Modo demostración de Épica: no activo.';
 $string['tema_msg_sin_tema'] = 'Este centro no tiene colores en Épica: Pulse usa los suyos.';
 
 // Privacy API (v2.3.0).

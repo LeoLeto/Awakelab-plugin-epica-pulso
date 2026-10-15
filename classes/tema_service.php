@@ -53,6 +53,9 @@ class tema_service {
     const ESTADO_OMITIDO = 'omitido';
     const ESTADO_ERROR = 'error';
 
+    /** Modo demostración (carta 16): `hasta` como mucho a 7 días vista. */
+    const DEMOSTRACION_MAX_S = 7 * 86400;
+
     // ----------------------------------------------------------------
     // Sincronización (tarea programada y botón de ajustes; nunca al pintar).
     // ----------------------------------------------------------------
@@ -104,6 +107,10 @@ class tema_service {
             return self::fallo('rechazo', 'tema_msg_error_rechazo');
         }
 
+        // Modo demostración (carta 16): se lee SIEMPRE con un 200, antes de cualquier salida por
+        // «misma versión» o «sin tema»: es independiente del tema. Un fallo o http 0 no llega aquí.
+        set_config('demostracion_hasta', self::parsear_demostracion($datos['demostracion'] ?? null, time()), 'block_pulso');
+
         if (!array_key_exists('tema', $datos)) {
             error_log('Pulso tema: la respuesta 200 no trae el campo «tema».');
             return self::fallo('respuesta', 'tema_msg_error_respuesta');
@@ -144,6 +151,34 @@ class tema_service {
         set_config('tema_version', $version, 'block_pulso');
         self::marcar_ok();
         return self::resultado(self::ESTADO_GUARDADO, 'tema_msg_guardado', $version);
+    }
+
+    /**
+     * `demostracion` de Épica (null o {hasta: ISO 8601 UTC}) → instante UNIX, o 0 si no hay
+     * demostración o no es utilizable (no es fecha, ya pasó, o está a más de 7 días: lo último
+     * dejaría al centro sin topes de Pulse por mucho tiempo ante un error de Épica).
+     *
+     * @param mixed $valor
+     */
+    public static function parsear_demostracion($valor, int $ahora): int {
+        if ($valor === null) {
+            return 0;
+        }
+        $hasta = is_array($valor) && isset($valor['hasta']) && is_string($valor['hasta'])
+            ? strtotime(trim($valor['hasta'])) : false;
+        if ($hasta === false || $hasta <= $ahora || $hasta > $ahora + self::DEMOSTRACION_MAX_S) {
+            error_log('Pulso tema: «demostracion» no válida (no es una fecha, ya pasó o está a más de 7 días); se ignora.');
+            return 0;
+        }
+        return (int)$hasta;
+    }
+
+    /**
+     * ¿Está el centro en modo demostración de Épica (carta 16)? La hora se mira EN CADA
+     * comprobación: al pasar `hasta` se vuelve al tope sin esperar a la tarea. Sin Épica, nunca.
+     */
+    public static function en_demostracion(): bool {
+        return epica_client::disponible() && (int)get_config('block_pulso', 'demostracion_hasta') > time();
     }
 
     private static function resultado(string $estado, string $clave, ?string $a = null): array {

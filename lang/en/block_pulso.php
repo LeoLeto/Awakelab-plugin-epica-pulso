@@ -188,6 +188,8 @@ $string['tema_msg_error_respuesta'] = 'Epica answered in an unexpected way. The 
 $string['tema_msg_guardado'] = 'Colors synchronized (version {$a}).';
 $string['tema_msg_sin_cambios'] = 'The colors are already up to date (version {$a}).';
 $string['tema_msg_borrado'] = 'This center has no colors in Epica any more: Pulse is back to its own colors.';
+$string['demostracion_activa'] = 'Epica demo mode: active until {$a}. Pulse does not enforce its own Epica quotas (creations and challenges) meanwhile.';
+$string['demostracion_inactiva'] = 'Epica demo mode: not active.';
 $string['tema_msg_sin_tema'] = 'This center has no colors in Epica: Pulse uses its own colors.';
 
 // Privacy API (v2.3.0).

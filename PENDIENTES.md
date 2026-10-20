@@ -9,6 +9,8 @@
 
 - [ ] **Probar el modo demostración en sanase-test cuando Épica lo publique en QA** (pedir a Chema que ponga el centro en demostración).
 
+- [ ] **Subir el material del curso 92 por el enlace «Material para Pulse» y mandar a Chema ~20 preguntas de contenido** (carta 17 §6 y §8; v2.7.0 hecho en código, falta probarlo contra el QA de Épica; al desplegar, Notificaciones + purgar cachés). Comprobar de paso qué `unidad` y qué `ruta` devuelve un PPTX y un DOCX real, y a qué URL apunta `epica::auth_url()`.
+
 ## Pendientes técnicos
 - [x] **Privacy provider (RGPD)** (v2.3.0, hecho en código; falta verificar en sanase-test: Registro de privacidad de plugins y una exportación de datos de una persona de prueba; y ejecutar `tests/privacy/provider_test.php` en un Moodle).
 - [x] **429 `cuota-del-centro`** (v2.3.1, hecho en código): terminal a la primera; el resto de 429 reintenta con tope de 6 h; la notificación traduce los códigos. Falta verlo con un 429 real de Épica en QA.

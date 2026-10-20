@@ -27,4 +27,14 @@ $definitions = [
         'simpledata' => false,
         'ttl' => 86400,
     ],
+    // Indice de fuentes de Epica por curso (classes/fuentes_service.php, v2.7.0): solo `version` y
+    // nº de fuentes (5 min), mas la marca «herramienta no contratada» de todo el sitio (1 h). El TTL
+    // de la definicion es el mayor; cada entrada lleva su propia marca de tiempo y fuentes_service
+    // decide cuando esta caducada.
+    'fuentesidx' => [
+        'mode' => cache_store::MODE_APPLICATION,
+        'simplekeys' => true,
+        'simpledata' => false,
+        'ttl' => 3600,
+    ],
 ];

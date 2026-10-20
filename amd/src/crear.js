@@ -1176,11 +1176,10 @@ define(['block_pulso/common'], function(C) {
         // El botón vive al pie de «Mis creaciones» (plantilla pulso-mine-historial-tpl).
         // Carta 12: los retos del alumno entran por la misma puerta, con `reto=<codigo>` o `curso=1`; el
         // `destino` lo construye el SERVIDOR (epica_historial.php), aquí solo se manda el código.
-        function pulsoPostHistorial(extra) {
-            if (cfg.isTeacher !== false || !cfg.apiHistorialUrl) return;
+        function pulsoPostNuevaPestana(url, extra) {
             const form = document.createElement('form');
             form.method = 'post';
-            form.action = cfg.apiHistorialUrl;
+            form.action = url;
             form.target = '_blank';
             form.style.display = 'none';
             [['courseid', cfg.courseid], ['sesskey', cfg.sesskey || (window.M && M.cfg && M.cfg.sesskey) || '']].concat(extra || []).forEach(function(p) {
@@ -1193,6 +1192,21 @@ define(['block_pulso/common'], function(C) {
             document.body.appendChild(form);
             form.submit();
             document.body.removeChild(form);
+        }
+
+
+        function pulsoPostHistorial(extra) {
+            if (cfg.isTeacher !== false || !cfg.apiHistorialUrl) return;
+            pulsoPostNuevaPestana(cfg.apiHistorialUrl, extra);
+        }
+
+
+        // «Material para Pulse» (carta 17): solo profesorado (la UI no es control de acceso; fuentes_puente.php
+        // exige viewanalytics y sesskey). Mismo patron que el historial: POST target=_blank en el propio clic, el
+        // token lo firma y lo pinta el servidor, nunca este JS.
+        function pulsoAbrirFuentes() {
+            if (cfg.isTeacher !== true || !cfg.apiFuentesUrl) return;
+            pulsoPostNuevaPestana(cfg.apiFuentesUrl, []);
         }
 
 
@@ -1242,6 +1256,7 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoCreateEnter = pulsoCreateEnter;
     C.fn.pulsoSyncPolling = pulsoSyncPolling;
     C.fn.pulsoAbrirHistorial = pulsoAbrirHistorial;
+    C.fn.pulsoAbrirFuentes = pulsoAbrirFuentes;
     C.fn.pulsoAbrirReto = pulsoAbrirReto;
     C.fn.pulsoRetoCodigoValido = pulsoRetoCodigoValido;
     C.fn.pulsoAbrirRetosCurso = pulsoAbrirRetosCurso;

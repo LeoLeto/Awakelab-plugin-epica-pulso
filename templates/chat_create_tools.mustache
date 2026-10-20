@@ -87,6 +87,21 @@
             </button>
         </li>
 {{/epica}}
+{{! «Material para Pulse» (carta 17): solo profesorado con Epica. No es una creacion ni abre una pantalla de la pila: abre Epica en pestana nueva. }}
+{{#isteacher}}{{#epica}}
+        <li>
+            <button type="button" class="pulso-tool" data-pulso-action="pulsoAbrirFuentes">
+                <span class="pulso-tool-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                </span>
+                <span class="pulso-tool-text">
+                    <span class="pulso-tool-title">Material para Pulse<span aria-hidden="true"> ↗</span></span>
+                    <span class="pulso-tool-sub">Sube apuntes y vídeos para que Pulse los use al responder<span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></span>
+                </span>
+                <svg class="pulso-tool-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </li>
+{{/epica}}{{/isteacher}}
 </ul>
 {{#epica}}
 <div class="pulso-mine-wrap">

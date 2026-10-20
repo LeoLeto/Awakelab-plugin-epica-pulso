@@ -23,6 +23,7 @@ require_once(__DIR__ . '/anthropic_connector.php');
 require_once(__DIR__ . '/system_prompt_designer.php');
 require_once(__DIR__ . '/rag_retriever.php');
 require_once(__DIR__ . '/pulso_error.php');
+require_once(__DIR__ . '/fuentes_service.php');
 
 class chat_pipeline {
 
@@ -627,6 +628,35 @@ class chat_pipeline {
             'context' => $rag_result['context'] ?? '',
             'diagnostics' => $rag_result['diagnostics'] ?? []
         ];
+    }
+
+    /**
+     * Fuentes de Épica (carta 17, v2.7.0): fragmentos del material que el profesorado subió a Épica,
+     * con su cita, para el bloque DINÁMICO del system (nunca el base cacheado ni el historial).
+     *
+     * Solo en el camino que va al LLM: los endpoints la llaman DESPUÉS de write_close() y de la ruta
+     * directa, nunca en la negativa por rol. FALLA ABIERTO: ante cualquier fallo, sin fragmentos y el
+     * chat sigue con su RAG.
+     *
+     * @param int $courseid
+     * @param string $user_query Pregunta actual.
+     * @param array $history Historial preparado (la pregunta actual no está dentro).
+     * @return array{searched: bool, context: string} `searched` = la búsqueda llegó a contestar (aunque
+     *         vacía): permite pedir al modelo que diga «no está» en vez de contestar de memoria.
+     */
+    public static function get_fuentes(int $courseid, string $user_query, array $history): array {
+        $nada = ['searched' => false, 'context' => ''];
+        try {
+            if (!epica_client::disponible()) {
+                return $nada;
+            }
+            $consulta = fuentes_service::construir_consulta($user_query, $history);
+            $r = fuentes_service::buscar($courseid, $consulta);
+            return ['searched' => $r['hecha'], 'context' => fuentes_service::formatear($r['fragmentos'])];
+        } catch (Throwable $e) {
+            error_log('Pulso fuentes: ' . get_class($e));
+            return $nada;
+        }
     }
 
     /**

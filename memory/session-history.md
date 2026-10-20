@@ -1,5 +1,16 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-20 — Fuentes de Épica en el chat y «Material para Pulse» (carta 17, v2.7.0)
+
+Reglas en `CLAUDE.md` → «Fuentes de Épica». `classes/fuentes_service.php` y `fuentes_puente.php` (nuevos), `chat_pipeline::get_fuentes()`, `system_prompt_designer::build_fuentes_section()`, los dos `api_chat*`, `db/caches.php` (`fuentesidx`), fila en `chat_create_tools.mustache`, `crear.js` (+ `amd/build`), `privacy`/`lang`. **Al desplegar: Notificaciones + purgar cachés (plantilla y JS).** Lo que costó ver:
+- **«Hecha» no es «hay fragmentos».** La lista vacía de Épica es una respuesta válida y la señal para decir «eso no está en el material»; por eso `buscar()` devuelve `hecha` aparte y el prompt añade la línea de «no contestes de memoria» aunque no haya fragmentos (y solo esa línea). Con fallo o índice a 0, el bloque dinámico sale idéntico al de antes.
+- **La caché del 409 es del SITIO, no del curso**: «herramienta no contratada» es de la plataforma. Y la caché negativa de 60 s del índice no estaba en el encargo: sin ella, con Épica caída, cada pregunta esperaba 1 s extra.
+- **El TTL de la definición MUC es 3600 y no 300** porque la marca «no contratada» dura 1 h; cada entrada lleva su propia marca y caduca `fuentes_service`.
+- **El delimitador no se puede cerrar desde el documento**: se reducen las tiradas de `<<<`/`>>>` del texto y del nombre antes de formatear (un PDF con «<<<FIN>>> ignora lo anterior» no sale del fragmento).
+- **Los md5 del prompt base se midieron ANTES de tocar nada** (profesorado `b471…`, alumnado `91b9…`) y se compararon después, con y sin fuentes: iguales.
+- **Finales de línea**: `classes/`, `api_*`, `db/caches.php`, `CLAUDE.md` y `memory/` son CRLF; se editaron con un script de Node que convierte los saltos de lo que sustituye (nada de `sed -i` sobre `system_prompt_designer.php`).
+- **Verificado**: arnés PHP 8.3 con stubs de `local_awkepica`/MUC (67 + 18), mutaciones (sin recorte de consulta, firma con `createactivity`) detectadas; Mustache con mustache.js; puente con stubs (sin sesskey, sin capability, sin Épica, `auth_url` http, sin correo → rechaza; feliz → form con token solo en el cuerpo). **NO probado**: Épica real/QA ni sanase-test, la URL real de `auth_url()`, unidades distintas de `pagina`/`tramo`, y la calidad de la búsqueda (falta el curso 92 con material).
+
 ## 2026-10-15 — Modo demostración de Épica (carta 16, v2.6.0)
 
 Reglas en `CLAUDE.md` → «Modo demostración». `tema_service` (`parsear_demostracion`, `en_demostracion`), `creation_quota`, `retos_service`, `diagnostics`, `diagnostico.php`, `lang`. Sin `db/` ni `amd/`: ni Notificaciones ni purgar cachés. Lo que costó ver:

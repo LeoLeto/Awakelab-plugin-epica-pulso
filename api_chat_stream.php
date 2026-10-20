@@ -227,11 +227,17 @@ try {
 
     // Bloques (no string): el prompt base va marcado con cache_control para que
     // Anthropic lo sirva de caché en vez de recobrarlo entero en cada mensaje.
+    // Material subido a Épica (v2.7.0): solo aquí, en el camino al LLM y tras write_close() — ni la ruta
+    // directa ni la negativa por rol llegan. Falla abierto (sin fragmentos) y va al bloque dinámico.
+    $fuentes = chat_pipeline::get_fuentes($courseid, $user_query, $history);
+    pulso_sse_ping();
+
     $system_prompt = system_prompt_designer::generate_system_blocks(
         $course_context,
         $rag_context,
         $isteacher,
-        $user_query
+        $user_query,
+        $fuentes
     );
 
     $connector = new anthropic_connector();

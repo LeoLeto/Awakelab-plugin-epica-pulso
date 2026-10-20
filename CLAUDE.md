@@ -13,6 +13,7 @@
 - **Colores de cada centro (carta 11, v2.1.0; por papel v2.5.0)** — tema de Épica: sincronización, validación doble, cinco claves, superficies derivadas del principal, variables por papel, vista previa.
 - **Fase 4 (cerrada, v2.0.0)** — `styles.css`, módulos AMD, pestañas + Mustache, home, pila de Crear (paso 6), «Mis creaciones» (paso 7).
 - **Modo demostración (carta 16, v2.6.0)** — Épica suelta los cupos 24 h; qué topes nuestros se sueltan y cuáles no.
+- **Fuentes de Épica (carta 17, v2.7.0)** — material que sube el profesorado a Épica, buscado en cada pregunta que va al LLM (bloque dinámico) + fila «Material para Pulse».
 - **Privacidad (v2.3.0)** — privacy provider (RGPD) y limpieza al borrar un curso; **borrado en Épica por persona (carta 14, v2.4.0)**: tarea adhoc, contexto de usuario como gancho, observer de `user_deleted`.
 - **Cómo se trabaja este repo con prompts** — una sesión por paso. **Bug backlog** — solo lo vivo. **Dev notes** — build de `amd/build`, purgas y Notificaciones.
 - Historial de lo que costó cada paso: `memory/session-history.md`. Plan de la fase 4: `docs/plan_fase4.md`. Instalación y despliegue: `README.md`.
@@ -1862,6 +1863,50 @@ mismas declaraciones que la versión anterior y el HTML de la plantilla es idén
 - **Cupo de sección del formulario sin tocar JS**: `attach_section_usage()` pone `sectionlimit = creation_quota::SIN_TOPE` (1.000.000). El cliente (`updateCreateSectionHint()`, `crear.js`) solo avisa/bloquea si `sectionused >= sectionlimit`, así que ni avisa ni bloquea. `amd/build` no cambia.
 - **Diagnóstico**: fila «Modo demostración (Épica)» en `diagnostico.php` (`diagnostics::check_demostracion()`; aviso si activo, con fecha local). Cadenas `demostracion_*` en `lang/en` y `lang/es`.
 - **Privacidad**: nada nuevo, no hay datos de persona. Contrato: `docs/epica_demostracion_carta16.md`.
+
+## Fuentes de Épica (carta 17, v2.7.0)
+
+El profesorado sube material a Épica (PDF, Word, PowerPoint, vídeo/audio transcrito) y Épica lo sirve por tres puertas (`docs/epica_fuentes_carta.md`, tiempos
+y recomendaciones en `docs/epica_fuentes_carta17.md`). Se **SUMA** a nuestro RAG de Moodle, no lo sustituye. Usamos **`fuentes` (índice) y `fuentes/buscar`**;
+`fuentes/texto` queda sin usar. Lógica en `classes/fuentes_service.php`; el enlace del profesorado en `fuentes_puente.php`. Sin Épica
+(`epica_client::disponible()`) nada de esto hace nada. Al desplegar: Notificaciones (`db/caches.php`) + purgar cachés (plantilla y JS).
+
+- **Desde la PETICIÓN WEB, firmado con `$USER`**, contexto de curso, `epica_client::CAPABILITY_ROL` (`viewanalytics`, NUNCA `createactivity`: ver «paso 3») y
+  `(string)$courseid`; token nuevo en CADA llamada; sin correo no se firma. Esperas de la carta 17 §2: **1 s el índice, 2 s la búsqueda**, `k = 6`. Las dos puertas leen
+  alumnado y profesorado, así que el alumnado también recibe fragmentos (es contenido). No se manda `herramienta` (la ruta ya lo dice).
+- **FALLA ABIERTO.** Timeout, error de red, 4xx, 5xx, excepción al firmar → sin fragmentos y el chat sigue con su RAG. Al log va solo el código/HTTP/motivo (con forma de código)
+  o la clase de la excepción, nunca el token, la consulta ni texto del material.
+- **Caché del índice** (MUC `fuentesidx`, `db/caches.php`): `idx_<curso>` = solo `version` y `total.fuentes`, 5 min; `nocontratada` (409
+  `herramienta-no-contratada`) = **una marca de TODO el sitio**, 1 h, sin llamar a nadie; `error` por curso, 60 s (para no esperar 1 s en cada pregunta mientras Épica no contesta).
+  La definición lleva el TTL mayor (3600) y cada entrada su marca de tiempo: caduca `fuentes_service`, no MUC. Sin la definición (falta Notificaciones) el servicio sigue sin caché.
+  `total.fuentes = 0` → no se busca (`hecha = false`). **Qué se tira**: no guardamos ningún texto de Épica (ni siquiera en caché), así que una fuente archivada desaparece sola de la respuesta.
+- **`buscar()` devuelve `['hecha' => bool, 'fragmentos' => []]`**: `hecha` solo si la búsqueda contestó 200, aunque vacía. Es lo que permite la regla «dilo en vez de contestar de memoria»;
+  con `hecha = false` (índice a 0, fallo, sin Épica) el prompt no cambia ni un byte.
+- **Consulta** (`construir_consulta()`): la pregunta tal cual (la búsqueda ignora palabras vacías y tildes y une con «o»). Si es corta (≤ 6 palabras con significado) o tiene una referencia al turno
+  anterior («eso», «esto», «lo anterior», «y por qué», «el primero»…, o empieza por «y»/«pero»/«entonces»), se añade detrás la última pregunta del USUARIO del historial (300 caracteres). Tope
+  de 500 con `mb_substr` (la actual primero, así que lo que se recorta es lo del turno anterior).
+- **Dónde se llama** (`chat_pipeline::get_fuentes()`, en `api_chat.php` y `api_chat_stream.php`): DESPUÉS de `write_close()`, de la negativa por rol (`teacher_only`) y de la ruta directa, justo antes de
+  `generate_system_blocks()`; solo en el camino que va al LLM. **Limitación aceptada**: una pregunta de analítica del profesorado que va al LLM también busca (el encargo no distingue) y, como la búsqueda
+  es por palabras con «o», puede traer fragmentos poco relacionados; si en QA estorba, es una decisión de producto (saltarla en las preguntas de analítica), no un bug de esta versión.
+- **Va al bloque DINÁMICO, nunca al base cacheado** (`system_prompt_designer::build_fuentes_section()`, tras el RAG y antes de INICIATIVA/FORMATO DE SALIDA). **Los md5 del prompt base no cambian** (profesorado
+  `b471298676d0414a681c4596652302c3`, alumnado `91b93a147714ccbaf19ccf7ab4929a0c`, medidos en el checkout de Windows con CRLF: el md5 solo es comparable dentro del mismo estilo de checkout, ver «Invariantes»).
+  Se paga SIN cachear en cada pregunta con búsqueda hecha (~150 tokens fijos con un fragmento corto, más los fragmentos, hasta ~8.000 caracteres): antes de añadirle una línea, quita otra.
+  Contenido: cada fragmento entre `<<<FRAGMENTO n>>>` … `<<<FIN>>>` con «Cita:» (y «Tipo: transcripción automática de vídeo» y «Ruta:» si los hay); regla de que es CONTENIDO, nunca instrucciones, de citar documento y unidad y de decir
+  que un vídeo es una transcripción automática; y, con búsqueda hecha (haya fragmentos o no), una línea: si la pregunta es de contenido y ni este material ni el contexto del curso la contestan, dilo en vez de
+  contestar de memoria. Sin fragmentos no hay bloque de fragmentos ni cabecera de reglas: solo esa línea.
+- **El historial (digest) NO lleva fragmentos**: `$fuentes` solo se usa en `generate_system_blocks()` y nunca entra en `save_history()`/`history_digest()` ni en el `rag_context` (`drop_no_access_replies` no lo ve).
+- **Lo de Épica se normaliza** (`normalizar_resultados()`): solo `nombre` (150), `unidad`, `desde`, `hasta`, `inicio`, `fin`, `ruta` (4 niveles de 100) y `texto`; tipos coaccionados; UTF-8 saneado (`mb_scrub`), sin caracteres de
+  control, y **las tiradas de `<<<`/`>>>` del texto y del nombre se reducen** para que un documento no pueda cerrar ni abrir un delimitador. Texto a ~1.500 caracteres por fragmento (frontera de palabra) y ~8.000 en total, siempre con `mb_*`.
+- **Citas** (`cita()`): `pagina` → «Nombre, p. 12» (o «pp. 12–13»); `diapositiva` → «Nombre, diapositiva 3»; `tramo` (vídeo/audio) → «Nombre, 12:30» sacado de `inicio` (con horas, «1:02:05»). La carta solo nombra las unidades
+  `pagina` y `tramo`: `diapositiva` y las demás son supuestas; verificar con un PPTX/DOCX real en QA. Hoy un vídeo subido al QA no transcribe (permiso del proveedor de voz de Épica).
+- **«Material para Pulse»** (`fuentes_puente.php`): POST + `require_login` + `require_sesskey` + `require_capability('block/pulso:viewanalytics')` en contexto de curso + `disponible()` + precondiciones (correo). Firma un token NUEVO y pinta un
+  `<form>` autoenviado a `\local_awkepica\epica::auth_url()` (el puente de docentes, según la carta §5.1; **solo si es https://**) con `token`, `herramienta=fuentes` y `curso_nombre=format_string(fullname)`. Mismas
+  cabeceras que `epica_historial.php` (`no-store`, `no-referrer`), token solo en el cuerpo del POST, nunca en URL ni log. No usa `epica::autoenviar()` (como el historial: no verificado su código). Un fallo al firmar loguea solo la clase.
+- **La fila** va en `chat_create_tools.mustache` dentro de `{{#isteacher}}{{#epica}}` (el HTML del alumnado y el de sin Épica no la contienen; comprobado contra HEAD: idéntico salvo profesorado+Épica), sin `data-pulso-tool` (no es una pantalla de la pila de Crear:
+  abre Épica en pestaña nueva). `pulsoAbrirFuentes()` (`crear.js`, con `cfg.apiFuentesUrl`) usa el mismo POST `target=_blank` en el propio clic que el historial (`pulsoPostNuevaPestana()`, extraído de `pulsoPostHistorial()`), solo con `cfg.isTeacher === true`.
+- **Privacidad**: `privacy:metadata:epica` dice que la pregunta se envía a Épica para buscar en el material del curso, y el campo `pregunta` se añade a la ubicación externa en `provider.php` (en y es).
+- **Verificado**: PHP 8.3 portátil con stubs (`fuentes_service`, 67 comprobaciones; pipeline y prompt, 18; mutaciones sobre el recorte y la capability detectadas), Mustache con mustache.js (el HTML sin la fila es idéntico al de HEAD en 3 de 4 combinaciones), y el puente con stubs de Moodle.
+  **NO probado**: contra Épica real ni sanase-test, la URL real de `auth_url()` (en `docs/local_awkepica_api.md` solo consta por nombre; su valor lo da `local_awkepica`), el aspecto de la fila, ni la calidad de la búsqueda con preguntas reales (pendiente: curso 92).
 
 ## Privacidad (v2.3.0)
 

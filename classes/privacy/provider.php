@@ -109,6 +109,7 @@ class provider implements
             'peticion' => 'privacy:metadata:epica:peticion',
             'grupo' => 'privacy:metadata:epica:grupo',
             'intento' => 'privacy:metadata:epica:intento',
+            'pregunta' => 'privacy:metadata:epica:pregunta',
         ], 'privacy:metadata:epica');
 
         // NO se declaran, a propósito:

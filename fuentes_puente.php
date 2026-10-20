@@ -4,8 +4,8 @@
  * apuntes, documentos y vídeos que Pulse usa al responder.
  *
  * Firma un token NUEVO de docente y devuelve una página mínima que autoenvía un <form method="post"> a
- * epica::auth_url() (el puente de docentes de local_awkepica) con token, herramienta=fuentes y
- * curso_nombre. El token viaja en el CUERPO de un POST del navegador: nunca en una URL, nunca en un log,
+ * epica_client::endpoint('/api/auth/moodle') (el puente de docentes del Épica de Pulse) con token,
+ * herramienta=fuentes y curso_nombre. El token viaja en el CUERPO de un POST del navegador: nunca en una URL, nunca en un log,
  * nunca por el JS de Pulse. Mismo patrón y mismas cabeceras que epica_historial.php.
  *
  * Solo profesorado: abre la pantalla donde se sube y se archiva, y Épica exige `docente` en ese puente.
@@ -73,12 +73,9 @@ if ($motivo !== null) {
 }
 
 try {
-    // El puente de docentes. Solo https://: el token no puede viajar sin cifrar.
-    $urlpuente = method_exists('\local_awkepica\epica', 'auth_url') ? (string)\local_awkepica\epica::auth_url() : '';
-    if (stripos($urlpuente, 'https://') !== 0 || !parse_url($urlpuente, PHP_URL_HOST)) {
-        error_log('Pulso fuentes: la URL del puente de local_awkepica no es https:// o no existe.');
-        pulso_fuentes_page('Material para Pulse', '<p>' . s(epica_client::MENSAJE_NO_DISPONIBLE) . '</p>', 503);
-    }
+    // El puente de docentes, sobre el epica_base_url de Pulse (endpoint() exige https://: el token
+    // no puede viajar sin cifrar). Nunca epica::auth_url(), que apunta al Épica de local_awkepica.
+    $urlpuente = epica_client::endpoint('/api/auth/moodle');
     // Token nuevo justo ahora: vale 120 s y un solo uso.
     $token = \local_awkepica\epica::firmar_por($user, $context, epica_client::CAPABILITY_ROL, (string)$course->id);
 } catch (\Throwable $e) {

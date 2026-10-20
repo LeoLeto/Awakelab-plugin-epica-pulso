@@ -1,5 +1,11 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-20 — El puente de Fuentes va al Épica de Pulse (v2.7.1)
+
+Reglas en `CLAUDE.md` → «Fuentes de Épica». Solo `fuentes_puente.php` (PHP: ni Notificaciones ni purgar cachés). Lo que costó ver:
+- **`epica::auth_url()` sale del ajuste de `local_awkepica`** (producción), no de nuestro `epica_base_url` (QA): en sanase-test el profesor acababa en la portada de producción. Ahora `epica_client::endpoint('/api/auth/moodle')`, como el historial con `/api/auth/alumno`; la comprobación https propia sobraba (`endpoint()` lanza si no es https y cae en el `catch` ya existente).
+- **Verificado**: stubs del puente con base QA → `https://entorno-qa-2.awakelab.world/api/auth/moodle` y los rechazos de siempre (sin sesskey, sin capability, sin Épica, sin correo, GET); base con barra final sin doble barra; base http o vacía → el `endpoint()` lanza antes de firmar y la persona ve el mensaje genérico (con el PHP portátil 8.3). **NO probado**: contra el Épica real.
+
 ## 2026-10-20 — Fuentes de Épica en el chat y «Material para Pulse» (carta 17, v2.7.0)
 
 Reglas en `CLAUDE.md` → «Fuentes de Épica». `classes/fuentes_service.php` y `fuentes_puente.php` (nuevos), `chat_pipeline::get_fuentes()`, `system_prompt_designer::build_fuentes_section()`, los dos `api_chat*`, `db/caches.php` (`fuentesidx`), fila en `chat_create_tools.mustache`, `crear.js` (+ `amd/build`), `privacy`/`lang`. **Al desplegar: Notificaciones + purgar cachés (plantilla y JS).** Lo que costó ver:

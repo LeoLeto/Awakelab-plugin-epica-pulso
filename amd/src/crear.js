@@ -1225,7 +1225,7 @@ define(['block_pulso/common'], function(C) {
         // código de la forma que fija el servidor (que lo vuelve a validar); el token lo firma el servidor.
         function pulsoAbrirFactoria(borrador) {
             if (cfg.isTeacher !== true || !cfg.apiFuentesUrl) return;
-            if (typeof borrador !== 'string' || !/^[A-Za-z0-9]{16,64}$/.test(borrador)) return;
+            if (typeof borrador !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(borrador)) return;
             pulsoPostNuevaPestana(cfg.apiFuentesUrl, [['herramienta', 'factoria'], ['borrador', borrador]]);
         }
 

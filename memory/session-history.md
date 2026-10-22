@@ -1,5 +1,14 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-22 — «Respuesta inesperada» de factoria/borrador: diagnóstico y borrador con - y _ (v2.8.1)
+
+Reglas en `CLAUDE.md` → «Factoría desde Pulse». `classes/presentacion_service.php`, `classes/epica_puente.php`, `amd/src/{crear,presentacion}.js` (+ `amd/build`), `lang`. **Al desplegar: purgar cachés (JS)**, porque el cliente también valida el código del borrador; sin `db/`. Lo que costó ver:
+- **La causa NO está confirmada.** En sanase-test «Preparar presentación» daba `empty` («algo inesperado») con recurso y con tema: es el camino de `leer_creado()` (201/200 cuyo `borrador` no casa con la regex). Sospecha principal: Épica devuelve un código con `-` o `_` (base64url) y la regex solo admitía alfanuméricos. Se admiten (`^[A-Za-z0-9_-]{16,64}\z`, en servidor, puente y los dos sitios del cliente) y, con el diagnóstico nuevo, la siguiente prueba dirá si era eso u otra cosa.
+- **Diagnóstico sin valores** (`resumir_respuesta()`): HTTP, errno, motivo (solo con forma de código), claves de primer nivel de `datos` (las raras salen como `?`), tipo y longitud de `borrador`, si casó la regex y bytes del cuerpo. Va al `error_log` y como `detail` del `pulso_error` en TODOS los caminos genéricos (`respuesta-inesperada`, `otro`, `cuerpo-incompleto`…); `detail` solo lo ve quien tiene viewanalytics/site:config. Nunca token, contenido, tema, valor del borrador ni la `traza` de Épica.
+- **Motivos de token → `config` (503)**: `token-*`, `firma-*`, `plataforma-*`, `iss-*`, `jti-*`, `secreto-*`, `reusado`, `caducado`… y cualquier 401 sin otro motivo conocido. Texto «no está bien configurada. Avisa a quien administre Moodle», con el motivo en log y `detail`. Los nombres exactos de Épica no están en el contrato: si salen otros en el log, añadirlos a `es_motivo_de_token()`.
+- **Se acepta 200 además de 201** (el contrato dice 201; con un borrador válido no hay razón para rechazar un 200).
+- **Verificado** (PHP 8.3 portátil con stubs): servicio 195 comprobaciones (cada forma de borrador raro con su resumen, 200/201, `-`/`_`, motivos de token con 400/401/403, `detail` solo con permiso, ausencia de valores/token/traza en log y detail); endpoint 19, pila 43, puente sin cambios. **NO probado**: contra el Épica real.
+
 ## 2026-10-22 — «Presentación»: la Factoría de Épica empezada en Pulse (carta 18, v2.8.0)
 
 Reglas en `CLAUDE.md` → «Factoría desde Pulse». `classes/presentacion_service.php`, `classes/epica_puente.php` y `api_presentacion.php` (nuevos), `amd/src/presentacion.js` (+ `amd/build`), `fuentes_puente.php` (ahora envoltorio), fila en `chat_create_tools.mustache`, `crear.js`, `chat.js`, `api_create_form.php`, `settings.php`, `lang`, `styles.css`. **Al desplegar: purgar cachés (plantilla, JS y CSS); sin `db/`.** Lo que costó ver:

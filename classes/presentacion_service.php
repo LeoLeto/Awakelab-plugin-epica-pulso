@@ -317,11 +317,36 @@ class presentacion_service {
             throw $transitorio;
         }
         [$http, $datos] = epica_client::normalize_response($respuesta);
+        $resumen = self::resumir_respuesta($respuesta, $http, $datos);
 
-        if ($http === 201) {
-            return self::leer_creado($datos);
+        // El contrato dice 201; un 200 con un borrador de forma válida también vale (no cambia nada para quien llama).
+        if ($http === 201 || $http === 200) {
+            return self::leer_creado($datos, $resumen);
         }
-        throw self::traducir_error($http, $datos);
+        throw self::traducir_error($http, $datos, $resumen);
+    }
+
+    /**
+     * Resumen SIN VALORES de la respuesta de Épica, para el log y para `detail` (que solo ve quien tiene
+     * viewanalytics o site:config): HTTP, errno, motivo (si tiene forma de código), claves de primer nivel de
+     * `datos`, tipo y longitud de `borrador`, si casó la regex y la longitud del cuerpo. Nunca el token, el
+     * contenido, el tema ni el valor del borrador.
+     */
+    public static function resumir_respuesta(array $respuesta, int $http, array $datos): string {
+        $motivo = isset($datos['motivo']) && is_string($datos['motivo']) && preg_match(self::MOTIVO_REGEX, $datos['motivo'])
+            ? $datos['motivo'] : '(sin motivo)';
+        $claves = [];
+        foreach (array_slice(array_keys($datos), 0, 15) as $k) {
+            // Las claves son de Épica: solo las que parecen nombres de campo.
+            $claves[] = (is_string($k) && preg_match('/^[A-Za-z0-9_.-]{1,32}\z/', $k)) ? $k : '?';
+        }
+        $b = array_key_exists('borrador', $datos) ? $datos['borrador'] : null;
+        $tipo = array_key_exists('borrador', $datos) ? gettype($b) : 'ausente';
+        $largo = is_string($b) ? (string)strlen($b) : '-';
+        $casa = epica_puente::borrador_valido($b) ? 'si' : 'no';
+        return 'HTTP ' . $http . ' errno ' . (int)($respuesta['errno'] ?? 0) . ' motivo ' . $motivo
+            . ' claves [' . implode(',', $claves) . '] borrador tipo ' . $tipo . ' longitud ' . $largo
+            . ' regex ' . $casa . ' cuerpo ' . strlen((string)($respuesta['crudo'] ?? '')) . ' bytes';
     }
 
     /**
@@ -329,11 +354,11 @@ class presentacion_service {
      *
      * @throws pulso_error respuesta-inesperada
      */
-    private static function leer_creado(array $datos): array {
+    private static function leer_creado(array $datos, string $resumen): array {
         $borrador = $datos['borrador'] ?? null;
         if (!epica_puente::borrador_valido($borrador)) {
-            error_log('Pulso presentacion: respuesta-inesperada (borrador con forma rara)');
-            throw new pulso_error('empty', get_string('pres_err_respuesta', 'block_pulso'), 502);
+            error_log('Pulso presentacion: respuesta-inesperada: ' . $resumen);
+            throw new pulso_error('empty', get_string('pres_err_respuesta', 'block_pulso'), 502, $resumen);
         }
         $forma = ($datos['forma'] ?? '') === 'tema' ? 'tema' : 'contenido';
         $caduca = null;
@@ -346,31 +371,49 @@ class presentacion_service {
         return ['borrador' => $borrador, 'caduca' => $caduca, 'forma' => $forma];
     }
 
+    /** ¿Es un fallo del token (firma, caducidad, reuso, plataforma)? Es de configuración, no de la persona. */
+    private static function es_motivo_de_token(string $motivo, int $http): bool {
+        if (preg_match('/^(token|firma|plataforma|iss|jti|secreto)(-|\z)/', $motivo)) {
+            return true;
+        }
+        if (in_array($motivo, ['reusado', 'reuso', 'caducado', 'expirado', 'no-autorizado', 'no-autenticado'], true)) {
+            return true;
+        }
+        // Un 401 sin otro motivo conocido es siempre el token.
+        return $http === 401;
+    }
+
     /** Traduce un error de Épica por `motivo` (carta 18 §2), nunca por su texto. */
-    private static function traducir_error(int $http, array $datos): pulso_error {
+    private static function traducir_error(int $http, array $datos, string $resumen): pulso_error {
         $motivo = (string)($datos['motivo'] ?? '');
-        // Al log solo código, HTTP y motivo (con forma de código): nunca token, contenido ni tema.
-        error_log('Pulso presentacion: HTTP ' . $http . ' '
-            . (preg_match(self::MOTIVO_REGEX, $motivo) ? $motivo : '(sin motivo)'));
+        if (!preg_match(self::MOTIVO_REGEX, $motivo)) {
+            $motivo = '';
+        }
+        // Al log solo el resumen sin valores: nunca token, contenido ni tema.
+        error_log('Pulso presentacion: ' . $resumen);
 
         switch ($motivo) {
             case 'rol-sin-permiso':
-                return new pulso_error('access', get_string('pres_err_rol', 'block_pulso'), 403);
+                return new pulso_error('access', get_string('pres_err_rol', 'block_pulso'), 403, $resumen);
             case 'encargo-ambiguo':
             case 'cuerpo-incompleto':
                 // Fallo nuestro (mandamos los dos campos, o ninguno): nada que la persona pueda arreglar.
-                return new pulso_error('unknown', get_string('pres_err_generico', 'block_pulso'), 502);
+                return new pulso_error('unknown', get_string('pres_err_generico', 'block_pulso'), 502, $resumen);
             case 'material-excesivo':
-                return new pulso_error('bad_request', get_string('pres_err_excesivo', 'block_pulso'));
+                return new pulso_error('bad_request', get_string('pres_err_excesivo', 'block_pulso'), 400, $resumen);
             case 'cuota-agotada':
                 // Retry-After no llega por pedir(): Épica lo repite en el cuerpo como `esperaS`.
                 $espera = epica_client::retry_after($datos);
                 return new pulso_error('quota',
-                    get_string('pres_err_cuota', 'block_pulso', self::formatear_espera($espera)), 429);
+                    get_string('pres_err_cuota', 'block_pulso', self::formatear_espera($espera)), 429, $resumen);
             case 'herramienta-no-contratada':
-                return new pulso_error('unavailable', get_string('pres_err_nocontratada', 'block_pulso'), 409);
+                return new pulso_error('unavailable', get_string('pres_err_nocontratada', 'block_pulso'), 409, $resumen);
         }
-        return new pulso_error('unknown', get_string('pres_err_otro', 'block_pulso'), 502);
+        if (self::es_motivo_de_token($motivo, $http)) {
+            // Error de configuración (secreto, plataforma, reloj del servidor): la persona no puede arreglarlo.
+            return new pulso_error('config', get_string('pres_err_config', 'block_pulso'), 503, $resumen);
+        }
+        return new pulso_error('unknown', get_string('pres_err_otro', 'block_pulso'), 502, $resumen);
     }
 
     /** «N minutos» (redondeado hacia arriba) para el texto del 429. */

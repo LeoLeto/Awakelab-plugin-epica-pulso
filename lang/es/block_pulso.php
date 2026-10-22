@@ -142,6 +142,7 @@ $string['pres_err_generico'] = 'No hemos podido preparar la presentación. Inté
 $string['pres_err_excesivo'] = 'El contenido de la presentación es demasiado largo. Prueba con un recurso más corto o con un tema.';
 $string['pres_err_cuota'] = 'Has preparado varias presentaciones seguidas y la Factoría te pide un respiro. Podrás seguir en {$a}.';
 $string['pres_err_nocontratada'] = 'La Factoría no está contratada en este centro.';
+$string['pres_err_config'] = 'La conexión con la Factoría no está bien configurada. Avisa a quien administre Moodle.';
 $string['pres_err_otro'] = 'La Factoría no ha podido atender la petición. Inténtalo de nuevo más tarde.';
 $string['pres_err_tope_dia'] = 'Has llegado al límite de {$a} presentaciones de hoy. Podrás seguir mañana.';
 $string['pres_err_en_curso'] = 'Ya estás preparando una presentación. Espera a que termine.';

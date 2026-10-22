@@ -141,6 +141,7 @@ $string['pres_err_generico'] = 'We could not prepare the presentation. Try again
 $string['pres_err_excesivo'] = 'The presentation content is too long. Try a shorter resource or a topic.';
 $string['pres_err_cuota'] = 'You have prepared several presentations in a row and the Factory asks you to take a break. You can continue in {$a}.';
 $string['pres_err_nocontratada'] = 'The Factory is not contracted at this centre.';
+$string['pres_err_config'] = 'The connection to the Factory is not configured properly. Tell your Moodle administrator.';
 $string['pres_err_otro'] = 'The Factory could not handle the request. Try again later.';
 $string['pres_err_tope_dia'] = 'You have reached the limit of {$a} presentations for today. You can continue tomorrow.';
 $string['pres_err_en_curso'] = 'You are already preparing a presentation. Wait for it to finish.';

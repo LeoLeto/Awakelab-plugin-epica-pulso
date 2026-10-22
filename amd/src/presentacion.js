@@ -46,7 +46,7 @@ define(['block_pulso/common'], function(C) {
     var pulsoPresLastParams = null;
 
     function pulsoPresBorradorValido(codigo) {
-        return typeof codigo === 'string' && /^[A-Za-z0-9]{16,64}$/.test(codigo);
+        return typeof codigo === 'string' && /^[A-Za-z0-9_-]{16,64}$/.test(codigo);
     }
 
 

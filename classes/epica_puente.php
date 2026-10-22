@@ -41,8 +41,8 @@ class epica_puente {
     /** Herramientas que admite el puente (lista cerrada). */
     const HERRAMIENTAS = ['fuentes', 'factoria'];
 
-    /** Forma del código de borrador que devuelve la Factoría (carta 18 §2). */
-    const BORRADOR_REGEX = '/^[A-Za-z0-9]{16,64}\z/';
+    /** Forma del código de borrador que devuelve la Factoría (carta 18 §2: 32 alfanuméricos de ejemplo; se admiten - y _ por si es base64url). */
+    const BORRADOR_REGEX = '/^[A-Za-z0-9_-]{16,64}\z/';
 
     /** Ruta del puente de docentes en Épica. */
     const RUTA = '/api/auth/moodle';

@@ -27,9 +27,9 @@ use block_pulso\creation_quota;
 use block_pulso\pulso_error;
 
 $courseid = required_param('courseid', PARAM_INT);
-// 'ampliacion' y 'retos' no pasan por los cupos de encargos de Epica (cada una tiene
+// 'ampliacion', 'retos' y 'presentacion' no pasan por los cupos de encargos de Epica (cada una tiene
 // sus propios topes en su endpoint); cualquier otro valor = flujo de siempre.
-$skipquota = in_array(optional_param('tool', '', PARAM_ALPHA), ['ampliacion', 'retos'], true);
+$skipquota = in_array(optional_param('tool', '', PARAM_ALPHA), ['ampliacion', 'retos', 'presentacion'], true);
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -54,7 +54,13 @@ try {
     $userid = (int)$USER->id;
     $isteacher = chat_pipeline::user_can_view_analytics($courseid);
 
-    // Ampliacion y Retos tienen sus propios topes (api_ampliacion.php / api_retos.php): no se comprueba ni bloquea el cupo de encargos.
+    // «Presentacion» (carta 18) es solo del profesorado: el formulario no se abre al alumnado.
+    if (optional_param('tool', '', PARAM_ALPHA) === 'presentacion' && !$isteacher) {
+        throw new pulso_error('access', '', 403);
+    }
+
+    // Ampliacion, Retos y Presentacion tienen sus propios topes (api_ampliacion.php / api_retos.php /
+    // api_presentacion.php): no se comprueba ni bloquea el cupo de encargos.
     $quota = $skipquota
         ? ['allowed' => true, 'reason' => '']
         : creation_quota::check_general_quota($courseid, $userid, $isteacher);

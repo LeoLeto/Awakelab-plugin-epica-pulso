@@ -45,6 +45,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $retos_url = $CFG->wwwroot . '/blocks/pulso/api_retos.php';
     $historial_url = $CFG->wwwroot . '/blocks/pulso/epica_historial.php';
     $fuentes_url = $CFG->wwwroot . '/blocks/pulso/fuentes_puente.php';
+    $presentacion_url = $CFG->wwwroot . '/blocks/pulso/api_presentacion.php';
 
     // Leer la versión directamente de version.php (no de la BD) para que el
     // badge del header refleje siempre el código desplegado, incluso antes
@@ -79,6 +80,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         'apiRetosUrl' => $retos_url,
         'apiHistorialUrl' => $historial_url,
         'apiFuentesUrl' => $fuentes_url,
+        'apiPresentacionUrl' => $presentacion_url,
         'sesskey' => $pulso_sesskey,
         'isTeacher' => !empty($isteacher),
         'epicaAvailable' => (bool)$epicaavailable,

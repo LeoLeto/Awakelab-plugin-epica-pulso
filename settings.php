@@ -289,6 +289,16 @@ if ($ADMIN->fulltree) {
     $pulsonum('retos_max_elegidos_curso_dia', 40);
 
     // ============================================================
+    // Presentaciones de la Factoria (Epica): tope propio (v2.8.0)
+    // ============================================================
+    $settings->add(new admin_setting_heading(
+        'block_pulso/presentacion_heading',
+        get_string('presentacion_heading', 'block_pulso'),
+        get_string('presentacion_heading_desc', 'block_pulso')
+    ));
+    $pulsonum('presentacion_max_dia_docente', 10);
+
+    // ============================================================
     // Ciclo con Epica: dónde apuntar y modo de ensayo (v1.19.0)
     // ============================================================
     $settings->add(new admin_setting_heading(

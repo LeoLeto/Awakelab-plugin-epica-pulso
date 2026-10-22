@@ -60,7 +60,7 @@ define(['block_pulso/common'], function(C) {
         // Vacía = la lista de herramientas (#pulso-create-root). Con elementos, el último es la
         // pantalla visible en #pulso-create-panel. Solo hay dos niveles:
         //   [formulario(tool)]                 profundidad 1   (o [mine]: «Mis creaciones»)
-        //   [formulario(tool), detalle]        profundidad 2; detalle = status | retos | amp
+        //   [formulario(tool), detalle]        profundidad 2; detalle = status | retos | amp | pres
         //   [mine, detalle]                    detalle = status | retos (una creación o propuesta abierta)
         // Los tres «detalle» son del mismo nivel: pasar de uno a otro (o entre dos estados de
         // la misma herramienta, p. ej. Retos: espera → seis retos → reto elegido) REEMPLAZA, no
@@ -69,7 +69,7 @@ define(['block_pulso/common'], function(C) {
         // vuelve a pintar (el formulario vuelve a pedir el cupo, que habrá cambiado).
         let pulsoCreateStack = [];
 
-        const PULSO_CREATE_TOOLS = ['infografia', 'gamificacion', 'ampliacion', 'retos'];
+        const PULSO_CREATE_TOOLS = ['infografia', 'gamificacion', 'ampliacion', 'retos', 'presentacion'];
 
         function pulsoCreateNormTool(tool) {
             return PULSO_CREATE_TOOLS.indexOf(tool) >= 0 ? tool : 'infografia';
@@ -166,6 +166,12 @@ define(['block_pulso/common'], function(C) {
             retos: {
                 panelTitle: 'Crear reto',
                 submitLabel: 'Proponer retos'
+            },
+            // Presentación (Factoría de Épica, vía api_presentacion.php, solo profesorado): recurso O tema,
+            // así que tampoco hay textos de "sin recursos".
+            presentacion: {
+                panelTitle: 'Crear presentación',
+                submitLabel: 'Preparar presentación'
             }
         };
 
@@ -288,7 +294,7 @@ define(['block_pulso/common'], function(C) {
 
 
         function pulsoCreateSetTool(tool) {
-            pulsoCreateTool = (tool === 'gamificacion' || tool === 'ampliacion' || tool === 'retos') ? tool : 'infografia';
+            pulsoCreateTool = (tool === 'gamificacion' || tool === 'ampliacion' || tool === 'retos' || tool === 'presentacion') ? tool : 'infografia';
             const titleEl = document.getElementById('pulso-create-title');
             if (titleEl) titleEl.textContent = PULSO_CREATE_TOOL_LABELS[pulsoCreateTool].panelTitle;
         }
@@ -341,7 +347,7 @@ define(['block_pulso/common'], function(C) {
             const params = new URLSearchParams();
             params.set('courseid', cfg.courseid);
             params.set('sesskey', cfg.sesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
-            if (pulsoCreateTool === 'ampliacion' || pulsoCreateTool === 'retos') params.set('tool', pulsoCreateTool);
+            if (pulsoCreateTool === 'ampliacion' || pulsoCreateTool === 'retos' || pulsoCreateTool === 'presentacion') params.set('tool', pulsoCreateTool);
 
             fetch(cfg.apiCreateFormUrl + '?' + params.toString(), { credentials: 'same-origin' })
                 .then(function(r) { return r.json(); })
@@ -354,8 +360,8 @@ define(['block_pulso/common'], function(C) {
                         renderCreateNotice(data.quota_message || 'Has alcanzado el límite de creaciones.');
                         return;
                     }
-                    // Retos sigue siendo usable sin recursos: queda la opción de solo tema.
-                    if ((!data.resources || data.resources.length === 0) && pulsoCreateTool !== 'retos') {
+                    // Retos y Presentación siguen siendo usables sin recursos: queda la opción de solo tema.
+                    if ((!data.resources || data.resources.length === 0) && pulsoCreateTool !== 'retos' && pulsoCreateTool !== 'presentacion') {
                         renderCreateNoResources(data.noresourcesreason);
                         return;
                     }
@@ -427,6 +433,10 @@ define(['block_pulso/common'], function(C) {
 
             if (pulsoCreateTool === 'retos') {
                 C.fn.renderRetosForm(resources);
+                return;
+            }
+            if (pulsoCreateTool === 'presentacion') {
+                C.fn.renderPresentacionForm(resources);
                 return;
             }
 
@@ -1210,6 +1220,16 @@ define(['block_pulso/common'], function(C) {
         }
 
 
+        // «Abrir en la Factoría» (carta 18): mismo puente que «Material para Pulse» (fuentes_puente.php) con
+        // `herramienta=factoria` y el código del borrador como campo del POST. Solo profesorado y solo un
+        // código de la forma que fija el servidor (que lo vuelve a validar); el token lo firma el servidor.
+        function pulsoAbrirFactoria(borrador) {
+            if (cfg.isTeacher !== true || !cfg.apiFuentesUrl) return;
+            if (typeof borrador !== 'string' || !/^[A-Za-z0-9]{16,64}$/.test(borrador)) return;
+            pulsoPostNuevaPestana(cfg.apiFuentesUrl, [['herramienta', 'factoria'], ['borrador', borrador]]);
+        }
+
+
         // Los tres sitios son acciones de clic: los argumentos del evento (cadenas o null) no se usan como params.
         function pulsoAbrirHistorial() {
             pulsoPostHistorial([]);
@@ -1257,6 +1277,7 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoSyncPolling = pulsoSyncPolling;
     C.fn.pulsoAbrirHistorial = pulsoAbrirHistorial;
     C.fn.pulsoAbrirFuentes = pulsoAbrirFuentes;
+    C.fn.pulsoAbrirFactoria = pulsoAbrirFactoria;
     C.fn.pulsoAbrirReto = pulsoAbrirReto;
     C.fn.pulsoRetoCodigoValido = pulsoRetoCodigoValido;
     C.fn.pulsoAbrirRetosCurso = pulsoAbrirRetosCurso;

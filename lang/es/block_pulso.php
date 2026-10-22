@@ -125,6 +125,27 @@ $string['retos_max_elegidos_usuario_dia_desc'] = 'Máximo de retos que un mismo 
 $string['retos_max_elegidos_curso_dia'] = 'Retos elegidos por curso y día';
 $string['retos_max_elegidos_curso_dia_desc'] = 'Máximo de retos elegidos en un mismo curso al día, entre todas las personas. Mantenlo muy por debajo del límite diario de todo el centro en Épica.';
 
+// === Presentación de la Factoría (Épica): tope propio y textos (carta 18, v2.8.0) ===
+$string['presentacion_heading'] = 'Presentaciones (Factoría de Épica) — tope diario propio';
+$string['presentacion_heading_desc'] = 'El profesorado prepara el contenido de una presentación en Pulse y lo termina en la Factoría de Épica. El tope se comprueba ANTES de llamar a Claude y a Épica. Épica añade el suyo: 10 borradores cada 10 minutos por persona.';
+$string['presentacion_max_dia_docente'] = 'Presentaciones por docente y día';
+$string['presentacion_max_dia_docente_desc'] = 'Máximo de borradores de presentación que una misma persona puede preparar al día, sumando todos los cursos. 0 = sin límite.';
+$string['pres_err_titulo'] = 'El título puede tener como máximo {$a} caracteres.';
+$string['pres_err_diapositivas'] = 'El número de diapositivas tiene que estar entre {$a->min} y {$a->max}.';
+$string['pres_err_tema'] = 'Escribe un tema de entre {$a->min} y {$a->max} caracteres.';
+$string['pres_err_sin_texto'] = 'Ese recurso ya no está disponible o no tiene texto aprovechable para una presentación. Elige otro o escribe un tema.';
+$string['pres_err_haiku'] = 'No hemos podido preparar el contenido de la presentación a partir de ese recurso. Vuelve a intentarlo o escribe un tema.';
+$string['pres_err_transitorio'] = 'La Factoría no responde ahora mismo. Inténtalo de nuevo en unos segundos.';
+$string['pres_err_respuesta'] = 'La Factoría ha contestado algo inesperado. Inténtalo de nuevo en un momento.';
+$string['pres_err_rol'] = 'Solo el profesorado puede preparar presentaciones.';
+$string['pres_err_generico'] = 'No hemos podido preparar la presentación. Inténtalo de nuevo en un momento.';
+$string['pres_err_excesivo'] = 'El contenido de la presentación es demasiado largo. Prueba con un recurso más corto o con un tema.';
+$string['pres_err_cuota'] = 'Has preparado varias presentaciones seguidas y la Factoría te pide un respiro. Podrás seguir en {$a}.';
+$string['pres_err_nocontratada'] = 'La Factoría no está contratada en este centro.';
+$string['pres_err_otro'] = 'La Factoría no ha podido atender la petición. Inténtalo de nuevo más tarde.';
+$string['pres_err_tope_dia'] = 'Has llegado al límite de {$a} presentaciones de hoy. Podrás seguir mañana.';
+$string['pres_err_en_curso'] = 'Ya estás preparando una presentación. Espera a que termine.';
+
 // === Ciclo con Épica: firmar, encargar, sondear, recoger (v1.19.0) ===
 $string['task_epica_ciclo_adhoc'] = 'Un paso del ciclo de creación con Épica (Pulse AI)';
 $string['epica_heading'] = 'Integración con Épica — ciclo de creación';
@@ -221,7 +242,7 @@ $string['privacy:metadata:anthropic:coursecontext'] = 'El contenido del curso. S
 $string['privacy:metadata:openai'] = 'OpenAI solo crea los embeddings de la búsqueda del chat (RAG).';
 $string['privacy:metadata:openai:question'] = 'El texto de la pregunta, para encontrar el contenido del curso relevante.';
 $string['privacy:metadata:openai:coursecontent'] = 'El contenido del curso, cuando se indexa.';
-$string['privacy:metadata:epica'] = 'Las creaciones, los retos y el historial del alumnado los genera el servicio Épica. Con cada petición se envían los datos de abajo. Al borrar los datos de una persona en Moodle, se pide a Épica que borre su historial, sus copias, sus sesiones y sus respuestas a retos. No se borran los retos que eligió (son de la clase) ni su bitácora de entradas, que se borra sola a los 90 días. Además, con cada pregunta al chat de un curso con material subido a Épica se envía el texto de la pregunta para buscar en ese material.';
+$string['privacy:metadata:epica'] = 'Las creaciones, los retos y el historial del alumnado los genera el servicio Épica. Con cada petición se envían los datos de abajo. Al borrar los datos de una persona en Moodle, se pide a Épica que borre su historial, sus copias, sus sesiones y sus respuestas a retos. No se borran los retos que eligió (son de la clase) ni su bitácora de entradas, que se borra sola a los 90 días. Además, con cada pregunta al chat de un curso con material subido a Épica se envía el texto de la pregunta para buscar en ese material. Y al preparar una presentación de la Factoría se envía a Épica el resumen del recurso del curso o el tema escrito por el profesorado.';
 $string['privacy:metadata:epica:sub'] = 'El identificador de Moodle de la persona.';
 $string['privacy:metadata:epica:email'] = 'El correo electrónico de la persona.';
 $string['privacy:metadata:epica:nombre'] = 'El nombre completo de la persona.';

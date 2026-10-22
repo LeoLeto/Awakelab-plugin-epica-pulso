@@ -1,5 +1,15 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-22 — «Presentación»: la Factoría de Épica empezada en Pulse (carta 18, v2.8.0)
+
+Reglas en `CLAUDE.md` → «Factoría desde Pulse». `classes/presentacion_service.php`, `classes/epica_puente.php` y `api_presentacion.php` (nuevos), `amd/src/presentacion.js` (+ `amd/build`), `fuentes_puente.php` (ahora envoltorio), fila en `chat_create_tools.mustache`, `crear.js`, `chat.js`, `api_create_form.php`, `settings.php`, `lang`, `styles.css`. **Al desplegar: purgar cachés (plantilla, JS y CSS); sin `db/`.** Lo que costó ver:
+- **El puente no se copió**: la lógica de `fuentes_puente.php` pasó a `epica_puente::abrir()` con la herramienta como lista cerrada. `fuentes_puente.php` sin `herramienta` se comporta igual que antes (misma salida, mismo orden de campos).
+- **El tope va antes de Haiku y el candado antes del tope**: Haiku es lo que cuesta, y el doble clic no puede gastar tope ni dos llamadas. El candado se libera en `finally`; sin caché o sin candado el tope falla abierto.
+- **Con recurso nunca va `tema` y sin recurso nunca `contenido`**: Épica rechaza los dos a la vez (`encargo-ambiguo`) y eso es un fallo nuestro, no de la persona.
+- **El borrador solo vive en memoria del cliente**: nunca en URL, storage ni DOM; el tope propio y la cuota de Épica (10 borradores cada 10 min) se gastan aunque la persona salga del panel antes de abrirlo.
+- **Finales de línea**: el repo mezcla CRLF (`classes/`, `api_*`, `CLAUDE.md`, `memory/`) y LF; las ediciones se hicieron con un script que respeta el de cada fichero.
+- **Verificado**: servicio 91, endpoint 19 (+ sin Épica), puente 15 casos, plantilla (alumnado/sin Épica idénticos a HEAD) y pila 43 con jsdom; mutaciones detectadas. **NO probado**: contra el Épica real (Épica subió la puerta al QA el 22-10-2026; falta probarla ahí), el aspecto del formulario ni la calidad del esquema de Haiku con recursos reales.
+
 ## 2026-10-20 — El puente de Fuentes va al Épica de Pulse (v2.7.1)
 
 Reglas en `CLAUDE.md` → «Fuentes de Épica». Solo `fuentes_puente.php` (PHP: ni Notificaciones ni purgar cachés). Lo que costó ver:

@@ -21,7 +21,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_pulso/retos', 'block_pulso/ampliacion'], function(C) {
+define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_pulso/retos', 'block_pulso/ampliacion', 'block_pulso/presentacion'], function(C) {
     'use strict';
 
     var S = C.S;

@@ -11,6 +11,9 @@
 
 - [ ] **Subir el material del curso 92 por el enlace «Material para Pulse» y mandar a Chema ~20 preguntas de contenido** (carta 17 §6 y §8; v2.7.0 hecho en código, falta probarlo contra el QA de Épica; al desplegar, Notificaciones + purgar cachés). Comprobar de paso qué `unidad` y qué `ruta` devuelve un PPTX y un DOCX real, y a qué URL apunta `epica::auth_url()`.
 
+- [ ] **Probar con Chema el recorrido del profesor de «Presentación»** (carta 18, v2.8.0 hecho en código; Épica subió `factoria/borrador` al QA el 22-10-2026; falta probarlo ahí): preparar una presentación con recurso y con tema, abrirla en la Factoría (debe arrancar en el paso del estilo con el aviso «El contenido llega de Pulse»), un borrador caducado, un 429 y un centro sin la Factoría contratada. Contestarle las 4 preguntas de §8: el sobre nos vale; mandamos `contenido` con recurso y `tema` sin él; en dos pasos (borrador desde el chat y botón aparte); y sí queremos saber qué presentación salió. Al desplegar, purgar cachés (plantilla, JS y CSS).
+- [ ] **«Mis creaciones» de presentaciones**, cuando Épica dé la puerta que diga qué presentación salió de un borrador (carta 18 §6/§8.4).
+
 ## Pendientes técnicos
 - [x] **Privacy provider (RGPD)** (v2.3.0, hecho en código; falta verificar en sanase-test: Registro de privacidad de plugins y una exportación de datos de una persona de prueba; y ejecutar `tests/privacy/provider_test.php` en un Moodle).
 - [x] **429 `cuota-del-centro`** (v2.3.1, hecho en código): terminal a la primera; el resto de 429 reintenta con tope de 6 h; la notificación traduce los códigos. Falta verlo con un 429 real de Épica en QA.

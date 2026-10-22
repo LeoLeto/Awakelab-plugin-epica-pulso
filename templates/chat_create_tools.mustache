@@ -87,6 +87,21 @@
             </button>
         </li>
 {{/epica}}
+{{! «Presentación» (carta 18): solo profesorado con Epica. Es una pantalla de la pila de Crear (formulario → detalle); el borrador se abre en la Factoria de Epica. }}
+{{#isteacher}}{{#epica}}
+        <li>
+            <button type="button" class="pulso-tool" data-pulso-action="openCreatePanel" data-pulso-arg="presentacion" data-pulso-tool="presentacion">
+                <span class="pulso-tool-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </span>
+                <span class="pulso-tool-text">
+                    <span class="pulso-tool-title">Presentación</span>
+                    <span class="pulso-tool-sub">Crea una presentación a partir de un recurso o de un tema</span>
+                </span>
+                <svg class="pulso-tool-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </li>
+{{/epica}}{{/isteacher}}
 {{! «Material para Pulse» (carta 17): solo profesorado con Epica. No es una creacion ni abre una pantalla de la pila: abre Epica en pestana nueva. }}
 {{#isteacher}}{{#epica}}
         <li>

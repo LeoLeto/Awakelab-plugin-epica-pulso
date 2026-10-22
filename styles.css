@@ -831,7 +831,9 @@
 }
 
 .pulso-create-field select,
-.pulso-create-field textarea {
+.pulso-create-field textarea,
+.pulso-create-field input[type="text"],
+.pulso-create-field input[type="number"] {
     width: 100%;
     box-sizing: border-box;
     padding: 10px 12px;
@@ -844,7 +846,9 @@
 }
 
 .pulso-create-field select:focus,
-.pulso-create-field textarea:focus {
+.pulso-create-field textarea:focus,
+.pulso-create-field input[type="text"]:focus,
+.pulso-create-field input[type="number"]:focus {
     outline: 2px solid transparent; /* visible en modo de alto contraste */
     border-color: var(--pulso-accent);
     box-shadow: 0 0 0 2px var(--pulso-accent);

@@ -413,7 +413,34 @@ class presentacion_service {
             // Error de configuración (secreto, plataforma, reloj del servidor): la persona no puede arreglarlo.
             return new pulso_error('config', get_string('pres_err_config', 'block_pulso'), 503, $resumen);
         }
+        // Excepción (Épica, 22-10-2026): ante un 4xx con un motivo que no traducimos, el `error` de Épica es el texto
+        // para la persona (p. ej. un campo mal rellenado). Saneado aquí y escapado al pintarlo en el cliente.
+        if ($http >= 400 && $http < 500) {
+            $texto = self::sanear_error_epica($datos['error'] ?? null);
+            if ($texto !== null) {
+                return new pulso_error('bad_request', $texto, 400, $resumen);
+            }
+        }
         return new pulso_error('unknown', get_string('pres_err_otro', 'block_pulso'), 502, $resumen);
+    }
+
+    /**
+     * Texto de `datos['error']` de Épica listo para enseñar: sin etiquetas, sin caracteres de control (los saltos
+     * de línea pasan a espacio), UTF-8 sano y <= 300 caracteres (mb_substr).
+     *
+     * @param mixed $error
+     * @return string|null null si no es una cadena o no queda texto.
+     */
+    public static function sanear_error_epica($error): ?string {
+        if (!is_string($error)) {
+            return null;
+        }
+        $s = \mb_scrub($error, 'UTF-8');
+        $s = strip_tags($s);
+        $s = preg_replace('/[\x00-\x1F\x7F]+/u', ' ', $s) ?? '';
+        $s = trim(preg_replace('/\s+/u', ' ', $s) ?? '');
+        $s = trim(mb_substr($s, 0, 300, 'UTF-8'));
+        return $s === '' ? null : $s;
     }
 
     /** «N minutos» (redondeado hacia arriba) para el texto del 429. */

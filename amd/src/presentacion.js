@@ -220,27 +220,68 @@ define(['block_pulso/common'], function(C) {
         formData.append('courseid', cfg.courseid);
         formData.append('cmid', String(params.cmid));
         formData.append('tema', params.tema);
-        formData.append('titulo', params.titulo);
-        formData.append('diapositivas', params.diapositivas);
+        // Lo opcional vacío no se manda: el servidor ya lo acepta ausente y el POST queda limpio.
+        if (params.titulo !== '') formData.append('titulo', params.titulo);
+        if (params.diapositivas !== '') formData.append('diapositivas', params.diapositivas);
 
+        // Se lee el cuerpo como texto y se interpreta aparte: `r.json()` fallaba igual con una página de login,
+        // un 504 de proxy o un fallo de red, y todo salía como «no se ha podido conectar». El segundo argumento
+        // de `then` (no un `catch` al final) recoge SOLO los fallos de red: un error al pintar no se disfraza de red.
         fetch(cfg.apiPresentacionUrl, { method: 'POST', credentials: 'same-origin', body: formData })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                if (token !== S.pulsoAmpToken) return; // la persona ya salió de esta pantalla
-                if (data && data.success && pulsoPresBorradorValido(data.borrador)) {
-                    pulsoPresBorrador = data.borrador;
-                    renderPresentacionDone(data);
-                } else {
-                    const code = data && data.error_code;
-                    renderPresentacionError(
-                        (data && data.message) || 'No se ha podido preparar la presentación. Inténtalo de nuevo.',
-                        code === 'busy' || code === 'network');
-                }
+            .then(function(r) {
+                return r.text().then(function(text) {
+                    return {
+                        status: r.status,
+                        ctype: (r.headers && r.headers.get('content-type')) || '',
+                        url: r.url || '',
+                        text: text
+                    };
+                });
             })
-            .catch(function() {
+            .then(function(res) {
+                if (token !== S.pulsoAmpToken) return; // la persona ya salió de esta pantalla
+                let data = null;
+                try {
+                    data = JSON.parse(res.text);
+                } catch (e) {
+                    data = null;
+                }
+                if (data && typeof data === 'object' && !Array.isArray(data) && 'success' in data) {
+                    if (data.success && pulsoPresBorradorValido(data.borrador)) {
+                        pulsoPresBorrador = data.borrador;
+                        renderPresentacionDone(data);
+                    } else {
+                        const code = data.error_code;
+                        renderPresentacionError(
+                            (typeof data.message === 'string' && data.message)
+                                || 'No se ha podido preparar la presentación. Inténtalo de nuevo.',
+                            code === 'busy' || code === 'network');
+                    }
+                    return;
+                }
+                // Ni JSON ni con la forma del endpoint: solo estado y content-type al log, nunca el cuerpo.
+                C.pulsoLog('Pulse presentación: respuesta no válida, status', res.status, 'content-type', res.ctype);
+                const raro = pulsoPresRespuestaRara(res);
+                renderPresentacionError(raro.message, raro.retryable);
+            }, function() {
                 if (token !== S.pulsoAmpToken) return;
                 renderPresentacionError('No se ha podido conectar para preparar la presentación. Inténtalo de nuevo.', true);
             });
+    }
+
+
+    // Texto según lo que llegó cuando NO es la respuesta JSON del endpoint.
+    function pulsoPresRespuestaRara(res) {
+        const esHtml = /html/i.test(res.ctype) || /^\s*<(!doctype|html)/i.test(res.text);
+        const pareceLogin = /\/login\//.test(res.url)
+            || (esHtml && /type=["']?password|id=["']?loginbtn|name=["']?logintoken/i.test(res.text));
+        if (res.status === 401 || res.status === 403 || pareceLogin) {
+            return { message: 'Tu sesión de Moodle ha caducado. Recarga la página y vuelve a intentarlo.', retryable: false };
+        }
+        if (res.status === 502 || res.status === 503 || res.status === 504) {
+            return { message: 'El servidor ha tardado demasiado en responder. Inténtalo de nuevo en un momento.', retryable: true };
+        }
+        return { message: 'No se ha podido preparar la presentación. Inténtalo de nuevo.', retryable: false };
     }
 
 

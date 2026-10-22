@@ -1,5 +1,13 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-22 — Errores de «Presentación» que dicen la causa real (v2.8.2)
+
+Reglas en `CLAUDE.md` → «Factoría desde Pulse». `classes/presentacion_service.php` (`traducir_error`, `sanear_error_epica`), `amd/src/presentacion.js` (+ `amd/build`). **Al desplegar: purgar cachés (JS)**; sin `db/`. Lo que costó ver:
+- **El «No se ha podido conectar» era un cajón de sastre**: `r.json()` rechaza con cualquier cuerpo que no sea JSON (login caducado, 504 de proxy, fatal de PHP en HTML) y el `.catch` lo pintaba como fallo de red. Chema lo vio con un tema sin título ni diapositivas; no se reproduce (sanase-test: 200 y borrador válido), así que la causa sigue sin conocerse. Ahora solo `fetch`/lectura rechazados son «conectar»; el resto se explica por status, y con `pulsoDebug` queda en consola status y content-type (nunca el cuerpo).
+- **El segundo argumento de `then`, no un `catch` final**: con `catch` al final, un error al pintar la pantalla se habría disfrazado otra vez de fallo de red.
+- **`datos.error` de Épica solo para 4xx con motivo NO traducido** (acuerdo con Épica, 22-10-2026): el motivo conocido o de token manda siempre nuestro texto. Saneado (`strip_tags`, control → espacio, `mb_scrub`, 300 con `mb_substr`) y escapado en el cliente. Un 5xx sigue siendo transitorio; un 4xx sin `error` utilizable, el genérico.
+- **Verificado**: PHP 8.3 portátil con stubs (25 comprobaciones: los casos de v2.8.1 intactos; 400/422 con motivo desconocido y `error` con HTML, saltos de línea, 1.000 caracteres, UTF-8 inválido, sin `error`, no cadena, vacío; 5xx y 3xx; motivos traducidos y de token conservan nuestro texto; `detail` sin el texto de Épica) y jsdom (30: red caída, login HTML 200 por URL y por contenido, 401/403, 502/503/504, 500 HTML, JSON sin `success`, cuerpo vacío, JSON de error escapado, JSON correcto, `FormData` sin vacíos, `pulsoDebug` sin cuerpo; contra el `presentacion.js` anterior fallan 23). **NO probado**: contra el Épica real.
+
 ## 2026-10-22 — «Respuesta inesperada» de factoria/borrador: diagnóstico y borrador con - y _ (v2.8.1)
 
 Reglas en `CLAUDE.md` → «Factoría desde Pulse». `classes/presentacion_service.php`, `classes/epica_puente.php`, `amd/src/{crear,presentacion}.js` (+ `amd/build`), `lang`. **Al desplegar: purgar cachés (JS)**, porque el cliente también valida el código del borrador; sin `db/`. Lo que costó ver:

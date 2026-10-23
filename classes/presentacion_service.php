@@ -46,8 +46,13 @@ class presentacion_service {
 
     const RUTA = '/api/moodle/factoria/borrador';
 
-    /** Presupuesto de tiempo de la parte de Haiku (s), como Ampliación. */
-    const TIME_BUDGET_S = 45;
+    /**
+     * Presupuesto de tiempo de la parte de Haiku (s). Más que el de Ampliación (45): un esquema de hasta
+     * MAX_TOKENS tokens puede pasar de los 25 s que `send_fast_query()` da por defecto a cada intento
+     * (cURL 28 → `network`), así que aquí el intento solo lo acota lo que queda del presupuesto. Cabe en
+     * el `core_php_time_limit::raise(120)` del endpoint (60 s de Haiku + Épica).
+     */
+    const TIME_BUDGET_S = 60;
 
     /** Texto del recurso que se manda a Haiku (caracteres, con mb_substr). */
     const TEXT_CHARS = 60000;
@@ -144,7 +149,7 @@ class presentacion_service {
 
             if ($cmid > 0) {
                 $forma = 'contenido';
-                $contenido = self::esquema_desde_recurso($courseid, $cmid, $campos['diapositivas']);
+                $contenido = self::esquema_desde_recurso($courseid, $userid, $cmid, $campos['diapositivas']);
                 $titulofinal = $campos['titulo'] !== '' ? $campos['titulo'] : self::titulo_de($contenido);
                 $cuerpo = ['contenido' => $contenido];
             } else {
@@ -178,7 +183,7 @@ class presentacion_service {
      *
      * @throws pulso_error
      */
-    private static function esquema_desde_recurso(int $courseid, int $cmid, ?int $diapositivas): string {
+    private static function esquema_desde_recurso(int $courseid, int $userid, int $cmid, ?int $diapositivas): string {
         // Mismo criterio de visibilidad que el resto de lectores del texto completo.
         if (!course_visibility::cm_visible($courseid, $cmid)) {
             throw new pulso_error('bad_request', get_string('pres_err_sin_texto', 'block_pulso'));
@@ -193,8 +198,23 @@ class presentacion_service {
             . "Texto del recurso:\n"
             . mb_substr(trim((string)$res['texto']), 0, self::TEXT_CHARS, 'UTF-8');
 
-        self::$deadline = microtime(true) + self::TIME_BUDGET_S;
-        $raw = (new anthropic_connector())->send_fast_query($system, $user, self::MAX_TOKENS, self::$deadline);
+        $inicio = microtime(true);
+        self::$deadline = $inicio + self::TIME_BUDGET_S;
+        try {
+            $raw = (new anthropic_connector())->send_fast_query(
+                $system, $user, self::MAX_TOKENS, self::$deadline, self::TIME_BUDGET_S);
+        } catch (\moodle_exception $e) {
+            // Fallo de Haiku (tiempo, red, 429/529, clave…): sin Épica de por medio y sin culpa de la persona,
+            // así que se le devuelve la unidad del tope diario y se le deja reintentar. Al log solo duración,
+            // código y HTTP: nunca el texto del recurso ni el mensaje de la API.
+            self::liberar_tope($userid);
+            $debug = (string)($e->debuginfo ?? '');
+            $http = preg_match('/^HTTP (\d{3})/', $debug, $m) ? $m[1] : '-';
+            $lento = preg_match('/timed out|presupuesto/i', $debug) ? 'si' : 'no';
+            error_log('Pulso presentacion: Haiku fallo tras ' . round(microtime(true) - $inicio, 1)
+                . ' s (codigo ' . $e->errorcode . ', HTTP ' . $http . ', tiempo agotado ' . $lento . ')');
+            throw new pulso_error('busy', get_string('pres_err_haiku_lento', 'block_pulso'), 503);
+        }
 
         $md = self::validar_esquema($raw);
         if ($md === null) {
@@ -482,6 +502,27 @@ class presentacion_service {
             $cache->set($key, ['day' => $day, 'n' => $n + 1]);
         } catch (\Throwable $e) {
             // Nunca romper la herramienta por un fallo del store de caché.
+        }
+    }
+
+    /**
+     * Devuelve la unidad que reservó `reservar_tope()` cuando el fallo fue de Haiku (antes de llamar a Épica):
+     * la persona no ha gastado nada y reintentar no debe costarle otra. Decisión aceptada: un Haiku que falla
+     * en bucle cuesta algo de dinero sin tope, pero el candado por usuario impide la concurrencia y el fallo
+     * es raro; pagar el tope por un error nuestro es peor. Los fallos de Épica NO devuelven la unidad (el
+     * cupo de Épica sí se pudo gastar) ni la salida de Haiku con forma inválida (Haiku sí produjo y costó).
+     * Falla ABIERTO y en silencio, como `reservar_tope()`.
+     */
+    private static function liberar_tope(int $userid): void {
+        try {
+            $cache = \cache::make('block_pulso', self::CACHE_AREA);
+            $key = 'pres_u' . $userid;
+            $state = $cache->get($key);
+            if (is_array($state) && ($state['day'] ?? '') === date('Ymd') && (int)($state['n'] ?? 0) > 0) {
+                $cache->set($key, ['day' => $state['day'], 'n' => (int)$state['n'] - 1]);
+            }
+        } catch (\Throwable $e) {
+            // Nunca romper el aviso de error por un fallo del store de caché.
         }
     }
 

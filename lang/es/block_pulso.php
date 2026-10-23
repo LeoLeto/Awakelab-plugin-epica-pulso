@@ -135,6 +135,7 @@ $string['pres_err_diapositivas'] = 'El número de diapositivas tiene que estar e
 $string['pres_err_tema'] = 'Escribe un tema de entre {$a->min} y {$a->max} caracteres.';
 $string['pres_err_sin_texto'] = 'Ese recurso ya no está disponible o no tiene texto aprovechable para una presentación. Elige otro o escribe un tema.';
 $string['pres_err_haiku'] = 'No hemos podido preparar el contenido de la presentación a partir de ese recurso. Vuelve a intentarlo o escribe un tema.';
+$string['pres_err_haiku_lento'] = 'Preparar el contenido del recurso está tardando más de lo normal. Inténtalo de nuevo en un momento.';
 $string['pres_err_transitorio'] = 'La Factoría no responde ahora mismo. Inténtalo de nuevo en unos segundos.';
 $string['pres_err_respuesta'] = 'La Factoría ha contestado algo inesperado. Inténtalo de nuevo en un momento.';
 $string['pres_err_rol'] = 'Solo el profesorado puede preparar presentaciones.';

@@ -1,5 +1,13 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-23 — El esquema de Haiku de «Presentación» ya no se corta a los 25 s (v2.8.3)
+
+Reglas en `CLAUDE.md` → «Factoría desde Pulse» (Presupuesto de Haiku). `classes/anthropic_connector.php` (`send_fast_query`), `classes/presentacion_service.php`, `amd/src/presentacion.js` (+ `amd/build`), `lang`. **Al desplegar: purgar cachés (JS y cadenas nuevas)**; sin `db/`. Lo que costó ver:
+- **El 503 `network` a los 25,1 s no era Épica**: el presupuesto de 45 s era un espejismo porque cada intento de `send_fast_query()` tenía el tope fijo de 25 s. Ahora el tope por intento es un parámetro (25 por defecto, así Ampliación no cambia ni un byte) y Presentación lo sube a 60.
+- **Un fallo de Haiku ahora es `busy` con texto propio y devuelve la unidad del tope**; la salida con forma inválida y los fallos de Épica no la devuelven (razones en CLAUDE.md).
+- **Trampa de la sesión**: al escribir los parches con un script de shell se perdieron las barras invertidas de los nombres con namespace (moodle_exception, cache, Throwable y el d{3} de una regex) y el código habría fallado en silencio dentro del namespace; lo cazó el arnés (el catch no capturaba nada). Tras parchear PHP con scripts, mirar las barras invertidas del diff.
+- **Verificado** (PHP 8.3 portátil con stubs; 15 comprobaciones): Haiku de 30 s pasa y el intento sale con ~60 s (con el tope de 25 reproduce el cURL 28); timeout real → `busy` 503, texto nuevo, tope devuelto, log sin texto del recurso; error de API → `busy` con HTTP en el log y sin el mensaje de la API; salida inválida → `empty` y tope gastado; devolución sin tocar el contador de otro día; Ampliación a 25 con y sin deadline y 9–10 con deadline corto; sin margen sigue lanzando «presupuesto agotado». La mutación (quitar el tope por intento) falla 3 comprobaciones. **NO probado**: contra Haiku ni Épica reales, ni el límite de tiempo de producción (proxy/FPM).
+
 ## 2026-10-22 — Errores de «Presentación» que dicen la causa real (v2.8.2)
 
 Reglas en `CLAUDE.md` → «Factoría desde Pulse». `classes/presentacion_service.php` (`traducir_error`, `sanear_error_epica`), `amd/src/presentacion.js` (+ `amd/build`). **Al desplegar: purgar cachés (JS)**; sin `db/`. Lo que costó ver:

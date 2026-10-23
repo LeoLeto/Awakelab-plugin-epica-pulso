@@ -401,6 +401,9 @@ class anthropic_connector {
      * @param string $system_prompt
      * @param string $user_message
      * @param int $max_tokens
+     * @param float|null $deadline Presupuesto de tiempo total (microtime); acota cada intento a lo que queda.
+     * @param int $attempt_cap Tope en segundos de CADA intento (25 por defecto: Ampliacion no cambia). La
+     *                         presentacion lo sube porque un esquema de 4000 tokens puede pasar de 25 s.
      * @return string Texto de la respuesta.
      * @throws \moodle_exception
      */
@@ -408,7 +411,8 @@ class anthropic_connector {
         string $system_prompt,
         string $user_message,
         int $max_tokens = 300,
-        ?float $deadline = null
+        ?float $deadline = null,
+        int $attempt_cap = 25
     ): string {
         global $CFG;
 
@@ -428,13 +432,13 @@ class anthropic_connector {
         while (true) {
             // Con $deadline (presupuesto de tiempo de la ampliación) cada intento se acota
             // a lo que queda, y sin margen para una llamada útil no se empieza otra.
-            $timeout = 25;
+            $timeout = $attempt_cap;
             if ($deadline !== null) {
                 $left = $deadline - microtime(true);
                 if ($left < 3) {
                     throw new \moodle_exception('error_api_connection', 'block_pulso', '', 'presupuesto de tiempo agotado');
                 }
-                $timeout = (int)max(3, min(25, floor($left)));
+                $timeout = (int)max(3, min($attempt_cap, floor($left)));
             }
 
             $curl = new \curl();

@@ -212,7 +212,7 @@ define(['block_pulso/common'], function(C) {
 
         body.innerHTML = '<div class="pulso-amp-loading" role="status">'
             + '<span class="pulso-typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>'
-            + '<span>' + (params.cmid > 0 ? 'Preparando el contenido de la presentación… puede tardar unos segundos.'
+            + '<span>' + (params.cmid > 0 ? 'Preparando el contenido de la presentación… puede tardar hasta un minuto.'
                 : 'Preparando el borrador…') + '</span></div>';
 
         const formData = new FormData();

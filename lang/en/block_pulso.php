@@ -134,6 +134,7 @@ $string['pres_err_diapositivas'] = 'The number of slides must be between {$a->mi
 $string['pres_err_tema'] = 'Write a topic between {$a->min} and {$a->max} characters long.';
 $string['pres_err_sin_texto'] = 'That resource is no longer available or has no usable text for a presentation. Choose another one or write a topic.';
 $string['pres_err_haiku'] = 'We could not prepare the presentation content from that resource. Try again or write a topic.';
+$string['pres_err_haiku_lento'] = 'Preparing the resource content is taking longer than usual. Try again in a moment.';
 $string['pres_err_transitorio'] = 'The Factory is not responding right now. Try again in a few seconds.';
 $string['pres_err_respuesta'] = 'The Factory returned something unexpected. Try again in a moment.';
 $string['pres_err_rol'] = 'Only teaching staff can prepare presentations.';

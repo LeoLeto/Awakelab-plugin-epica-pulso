@@ -326,6 +326,29 @@ recurso por nombre y nº de preguntas de un cuestionario.
   una sección que obliga a responder con el temario (y permite al profesorado UNA
   sola línea de contexto analítico; al alumno, ninguna).
 
+- **«Resúmeme la unidad/tema/sección N» es contenido de una SECCIÓN, no ficha ni listado** (v2.9.1; en Refactika «hazme un pequeño
+  resumen de la unidad 1» devolvió la ficha de la etiqueta «Unidad 1. Fundamentos…» sin pasar por el LLM). `rag_retriever::section_for_summary()`
+  exige verbo de resumen/explicación (`has_summary_verb()`: resume, resumen, explícame, de qué trata, qué se ve/aprendo en…) + una sección
+  visible señalada (palabra tema/unidad/bloque/sección/módulo/apartado resuelta por `find_matching_section_for_query()`, o el nombre literal de
+  la sección), y se mira en `resolve_direct_course_query()` justo después de `is_course_about_query()`, ANTES de cualquier resolutor: **la ruta
+  directa devuelve `null`** y nunca una etiqueta o recurso (la etiqueta salía por `resolve_direct_label_in_section_query()` con la sección ya
+  casada). **Gana el recurso** si la pregunta cita por completo el nombre de una actividad visible («resume MIC Tema 2»); las etiquetas genéricas
+  tipo «Unidad 1» y el nombre de la propia sección no cuentan. El listado («qué hay en el tema 2») no lleva verbo de resumen y no cambia.
+  - **Contexto al LLM** (`chat_pipeline::get_section_summary()` → `rag_retriever::build_section_summary_context()` → 6.º parámetro de
+    `generate_system_blocks()`, sección `build_section_summary_section()` del bloque **dinámico**; el md5 del base no cambia): texto de los
+    recursos VISIBLES de la sección (`block_pulso_full_text` usable=1, SCORM incluido; sin fila, los fragmentos de ESE cmid), 24.000 caracteres
+    repartidos (máx. 8.000 por recurso, `mb_substr`), cada uno entre `<<<RECURSO n …>>>`…`<<<FIN>>>` (se reducen las tiradas `<<<`/`>>>` del texto).
+    Regla: resume solo con ese material y cita los recursos. Falla abierto (sin material → el chat sigue con su RAG).
+  - **Sin texto legible en NINGÚN recurso** pero con recursos indexados `usable=0` (SCORM, PDF escaneado): respuesta determinista
+    (`section_without_text_answer()`, sin LLM) que lo dice, lista los recursos y lleva el enlace de `build_activity_link()`. Es la única
+    excepción a «null»: no hay nada que resumir y no merece una llamada. Si hay algo de texto y algún `usable=0`, va al LLM con la línea
+    «no se ha podido leer: …» y se le obliga a avisarlo.
+  - `build_direct_query()` trata «tema/unidad/bloque N» como sección concreta (`$mentionsSection`): «resúmeme este tema» no arrastra un recurso del historial.
+  - `isSummaryIntent` de `resolve_direct_resource_query()` casa también «resume», «resúmeme», «resúmelo/la/los/las» (antes solo «resumen/resumir»: «resume MIC Tema 2»
+    devolvía la ficha de metadatos). **Pendiente:** los `isSummaryIntent` de `resolve_direct_quiz_in_section_query()` y `resolve_direct_resource_in_section_query()` siguen sin «resume».
+  - **Dentro de un `namespace`, `catch (Throwable`/`Exception` y `new moodle_exception` van SIEMPRE con `\`**: sin barra apuntan a `block_pulso\Throwable` (no existe) y el catch no casa con
+    nada, sin error. Los endpoints de la raíz y `chat_simple_view.php` no tienen namespace y no lo necesitan.
+
 ## Conversación proactiva — dos caminos, y el defecto es callarse (v1.15.0)
 
 El chat ofrece el siguiente paso útil cuando aporta. La decisión de producto, que es lo
@@ -390,10 +413,10 @@ sección X`, `Secciones del curso`) se resuelven ANTES de la rama de documento.
 
 ## Bug backlog
 
-Los seis bugs de la evaluación de jul-2026 están arreglados (estado real y su historia en `memory/session-history.md`). Lo único
-vivo: el modo «resumen/explicación de unidad» acotado al SCORM actual (P55/P56 de `Pulso_AI_matriz_evaluacion.xlsx`; el texto del SCORM
-ya se indexa desde v2.9.0, ver «SCORM»; no hay ruta directa para `scorm`: lo contesta el LLM con los fragmentos). Pendientes de otras fases: ver la entrada de cierre de
-la fase 4 en `memory/session-history.md`.
+Los seis bugs de la evaluación de jul-2026 están arreglados (estado real y su historia en `memory/session-history.md`). El modo
+«resumen/explicación de unidad» (P55/P56 de `Pulso_AI_matriz_evaluacion.xlsx`) quedó resuelto en v2.9.1 (ver «Enrutado»; texto del SCORM
+desde v2.9.0, ver «SCORM»); **falta confirmarlo con un SCORM real de Refactika** (curso 50), no solo con paquetes sintéticos. Pendientes de otras
+fases: ver la entrada de cierre de la fase 4 en `memory/session-history.md`.
 
 ## Enlaces directos a actividades (v1.11.0)
 

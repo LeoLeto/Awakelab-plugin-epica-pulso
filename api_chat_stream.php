@@ -231,13 +231,16 @@ try {
     // directa ni la negativa por rol llegan. Falla abierto (sin fragmentos) y va al bloque dinámico.
     $fuentes = chat_pipeline::get_fuentes($courseid, $user_query, $history);
     pulso_sse_ping();
+    // Resumen de una sección (v2.9.1): texto de sus recursos, bloque dinámico; falla abierto.
+    $section_summary = chat_pipeline::get_section_summary($courseid, $user_query);
 
     $system_prompt = system_prompt_designer::generate_system_blocks(
         $course_context,
         $rag_context,
         $isteacher,
         $user_query,
-        $fuentes
+        $fuentes,
+        $section_summary
     );
 
     $connector = new anthropic_connector();

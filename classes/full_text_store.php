@@ -176,6 +176,44 @@ class full_text_store {
     }
 
     /**
+     * Filas de texto completo de unos módulos concretos, aprovechables o no.
+     *
+     * Es lo que lee el resumen de una sección (v2.9.1): hace falta ver también las
+     * filas `usable = 0` (un SCORM sin texto) para poder decir que no se han podido
+     * leer. Quien llame debe filtrar por visibilidad ANTES de pasar los cmid.
+     *
+     * @param int $courseid
+     * @param int[] $cmids course_modules.id (> 0)
+     * @return array cmid => object{cmid, module_type, module_name, texto, usable}
+     */
+    public static function get_rows_for_cmids(int $courseid, array $cmids): array {
+        global $DB;
+
+        $cmids = array_values(array_filter(array_map('intval', $cmids), function ($id) {
+            return $id > 0;
+        }));
+        if (empty($cmids) || !self::table_exists()) {
+            return [];
+        }
+
+        list($insql, $params) = $DB->get_in_or_equal($cmids, SQL_PARAMS_NAMED, 'cm');
+        $params['courseid'] = $courseid;
+        $rows = $DB->get_records_select(
+            'block_pulso_full_text',
+            "courseid = :courseid AND cmid $insql",
+            $params,
+            'cmid ASC',
+            'id, cmid, module_type, module_name, texto, usable'
+        );
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int)$row->cmid] = $row;
+        }
+        return $out;
+    }
+
+    /**
      * ¿Tiene este curso AL MENOS una fila indexada, aprovechable o no?
      *
      * Distingue, para el desplegable de "enviar a Epica", entre un curso que

@@ -78,7 +78,18 @@ class rag_retriever {
             return null;
         }
 
-        $isSectionQuery = self::is_explicit_section_query($q);
+        // «Resúmeme la unidad 1» / «explícame el tema 2» / «de qué trata la sección X»
+        // (v2.9.1): es una pregunta de CONTENIDO de una sección. Nunca se responde con la
+        // ficha de una etiqueta o un recurso de nombre parecido ni con el listado: va al
+        // LLM con el texto de la sección (build_section_summary_context). Única excepción
+        // determinista: si NINGÚN recurso de la sección tiene texto legible, se dice sin
+        // pasar por el modelo y con el enlace al recurso.
+        $summarySection = self::section_for_summary($courseid, $q);
+        if ($summarySection !== null) {
+            return self::section_without_text_answer($courseid, $summarySection);
+        }
+
+        $isSectionQuery =self::is_explicit_section_query($q);
         $isResourceIntent = self::is_resource_query($q);
         $isCourseNameQuery = (bool)preg_match('/c[oó]mo\s+se\s+llama\s+este\s+curso|nombre\s+del\s+curso|nombre\s+de\s+este\s+curso/u', $q);
         $isSectionCountQuery = (bool)preg_match('/cu[aá]ntas?\s+secciones|n[uú]mero\s+de\s+secciones|total\s+de\s+secciones/u', $q);
@@ -381,7 +392,9 @@ class rag_retriever {
     private static function resolve_direct_resource_query(int $courseid, string $query): ?array {
         global $DB;
 
-        $isSummaryIntent = (bool)preg_match('/resumen|resumir|s[ií]ntesis|sintesis|resum[eé]n|de\s+qu[eé]\s+va|de\s+qu[eé]\s+trata/u', $query);
+        // "resume", "resúmeme", "resúmelo/la/los/las" también (v2.9.1: antes solo "resumen/resumir", y
+        // "resume MIC Tema 2" devolvía la ficha de metadatos en vez del contenido).
+        $isSummaryIntent = (bool)preg_match('/resumen|resumir|\bres[uú]me(me|lo|la|los|las)?\b|s[ií]ntesis|sintesis|resum[eé]n|de\s+qu[eé]\s+va|de\s+qu[eé]\s+trata/u', $query);
         // Regla: si la pregunta nombra un recurso Y pide algo de su CONTENIDO, la
         // respuesta de solo-metadatos no vale. Los metadatos quedan para las
         // preguntas de identificación ("¿qué es X?", "¿en qué formato está?") y de
@@ -1983,6 +1996,318 @@ class rag_retriever {
             '|res[uú]me(me)?\s+(este\s+|el\s+)?curso/u',
             $query
         );
+    }
+
+    /**
+     * Tope de caracteres del texto de una sección que viaja al LLM, repartido entre sus
+     * recursos. Se paga SIN cachear en cada pregunta de resumen de sección.
+     */
+    const SECTION_SUMMARY_MAX_CHARS = 24000;
+
+    /** Tope por recurso dentro de ese reparto. */
+    const SECTION_SUMMARY_MAX_PER_RESOURCE = 8000;
+
+    /**
+     * ¿La pregunta pide RESUMIR o EXPLICAR algo (verbo de resumen/explicación)?
+     * Solo el verbo: que la referencia sea a una sección lo decide section_for_summary().
+     * El listado ("qué hay en el tema 2") no lleva ninguno de estos verbos.
+     *
+     * @param string $query Consulta ya en minúsculas
+     * @return bool
+     */
+    public static function has_summary_verb(string $query): bool {
+        return (bool)preg_match(
+            '/\bres[uú]me(me|nos)?\b|\bresumen\b|\bresumir\b|\bs[ií]ntesis\b|\bsintetiza(me)?\b' .
+            '|\bexpl[ií]ca(me|nos)?\b|\bexplicaci[oó]n\b' .
+            '|de\s+qu[eé]\s+(se\s+)?(trata|va|habla)' .
+            '|qu[eé]\s+(se\s+)?(ve|vemos|veo|trata|aprende|aprendo|aprendemos|cubre|aborda|explica|estudia|estudiamos)\s+en' .
+            '|qu[eé]\s+voy\s+a\s+(aprender|estudiar|ver)\s+en/u',
+            $query
+        );
+    }
+
+    /**
+     * Sección (visible para el usuario) cuyo RESUMEN/EXPLICACIÓN pide la pregunta, o null.
+     *
+     * Exige verbo de resumen + que la pregunta señale una sección: una palabra de sección
+     * (tema/unidad/bloque/sección N…) o el nombre literal de una sección. Y gana el RECURSO
+     * si la pregunta nombra por completo una actividad ("resume MIC Tema 2"): ahí la
+     * referencia a la sección es parte del nombre de otra cosa. Los nombres genéricos tipo
+     * «Unidad 1» y el de la propia sección no cuentan como actividad nombrada.
+     *
+     * @param int $courseid
+     * @param string $q Consulta ya en minúsculas
+     * @return object|null Registro de course_sections
+     */
+    private static function section_for_summary(int $courseid, string $q) {
+        global $DB;
+
+        if (!self::has_summary_verb($q)) {
+            return null;
+        }
+
+        $sections = $DB->get_records('course_sections', ['course' => $courseid], 'section ASC', 'id, section, name, summary, visible');
+        if (!$sections) {
+            return null;
+        }
+        $realSections = [];
+        foreach ($sections as $section) {
+            if ((int)$section->section === 0) {
+                continue;
+            }
+            if (!course_visibility::section_visible($courseid, (int)$section->section)) {
+                continue;
+            }
+            $realSections[] = $section;
+        }
+
+        $matched = self::find_matching_section_for_query($realSections, $q);
+        if ($matched === null) {
+            return null;
+        }
+
+        $sectionname = mb_strtolower(trim((string)$matched->name), 'UTF-8');
+        $hasRef = (bool)preg_match('/\b(secci[oó]n|secciones|apartado|tema|unidad|bloque|m[oó]dulo)\b/u', $q);
+        if (!$hasRef) {
+            // Sin palabra de sección, solo vale el nombre literal de la sección.
+            if ($sectionname === '' || !preg_match('/(?<![\pL\pN])' . preg_quote($sectionname, '/') . '(?![\pL\pN])/ui', $q)) {
+                return null;
+            }
+        }
+
+        if (self::query_names_activity($courseid, $q, $sectionname)) {
+            return null;
+        }
+
+        return $matched;
+    }
+
+    /**
+     * ¿Cita la pregunta, con su nombre COMPLETO, una actividad visible que no sea una
+     * etiqueta genérica de sección («Unidad 1») ni la propia sección?
+     *
+     * @param int $courseid
+     * @param string $q
+     * @param string $sectionname Nombre de la sección candidata, en minúsculas
+     * @return bool
+     */
+    private static function query_names_activity(int $courseid, string $q, string $sectionname): bool {
+        if (!function_exists('\get_fast_modinfo')) {
+            return false;
+        }
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+        } catch (\Throwable $e) {
+            return false;
+        }
+        foreach ($modinfo->get_cms() as $cm) {
+            if (empty($cm->uservisible)) {
+                continue;
+            }
+            $name = mb_strtolower(trim((string)$cm->name), 'UTF-8');
+            if ($name === '' || $name === $sectionname) {
+                continue;
+            }
+            if (preg_match('/^(secci[oó]n|apartado|tema|unidad|bloque|m[oó]dulo)\s*\d{1,2}[.:]?$/u', $name)) {
+                continue;
+            }
+            if (preg_match('/(?<![\pL\pN])' . preg_quote($name, '/') . '(?![\pL\pN])/ui', $q)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Material de una sección para resumirla: texto de sus recursos VISIBLES y los que no
+     * se han podido leer.
+     *
+     * Texto: `block_pulso_full_text` con usable=1 (incluye SCORM desde v2.9.0); si un módulo
+     * no tiene fila, sus fragmentos RAG (`block_pulso_content_chunks`) de ESE cmid. Todo pasa
+     * por course_visibility (uservisible por módulo). `unreadable` = módulos con fila
+     * usable=0 (p. ej. un SCORM o un PDF escaneado) y sin fragmentos de respaldo.
+     *
+     * @param int $courseid
+     * @param object $section Registro de course_sections
+     * @return array{texts: array, unreadable: array} texts: [{cmid, modname, name, text}],
+     *         unreadable: [{cmid, modname, name}]
+     */
+    private static function section_summary_material(int $courseid, $section): array {
+        global $DB;
+
+        $out = ['texts' => [], 'unreadable' => []];
+        if (!function_exists('\get_fast_modinfo')) {
+            return $out;
+        }
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+        } catch (\Throwable $e) {
+            return $out;
+        }
+        $sectionnum = (int)$section->section;
+        if (empty($modinfo->sections[$sectionnum])) {
+            return $out;
+        }
+
+        $cmids = [];
+        foreach ($modinfo->sections[$sectionnum] as $cmid) {
+            if (isset($modinfo->cms[$cmid]) && !empty($modinfo->cms[$cmid]->uservisible)) {
+                $cmids[] = (int)$cmid;
+            }
+        }
+        if (empty($cmids)) {
+            return $out;
+        }
+
+        try {
+            $rows = full_text_store::get_rows_for_cmids($courseid, $cmids);
+        } catch (\Throwable $e) {
+            error_log('Pulso section summary: ' . get_class($e));
+            return $out;
+        }
+
+        foreach ($cmids as $cmid) {
+            $cm = $modinfo->cms[$cmid];
+            $row = $rows[$cmid] ?? null;
+            $text = '';
+            if ($row !== null && !empty($row->usable)) {
+                $text = trim((string)$row->texto);
+            } else if ($row === null) {
+                // Sin fila de texto completo (índice anterior a v1.17): los fragmentos de ESE
+                // módulo. Con una fila usable=0 NO se mira: sus fragmentos son el aviso de fallo.
+                try {
+                    $chunks = $DB->get_records_select(
+                        'block_pulso_content_chunks',
+                        'courseid = :courseid AND cmid = :cmid',
+                        ['courseid' => $courseid, 'cmid' => $cmid],
+                        'chunk_index ASC, id ASC',
+                        'id, chunk_text'
+                    );
+                    foreach ($chunks as $chunk) {
+                        $text .= "\n" . $chunk->chunk_text;
+                    }
+                    $text = trim($text);
+                } catch (\Throwable $e) {
+                    $text = '';
+                }
+            }
+
+            $name = trim((string)$cm->name);
+            if ($text !== '') {
+                $out['texts'][] = ['cmid' => $cmid, 'modname' => (string)$cm->modname, 'name' => $name, 'text' => $text];
+            } else if ($row !== null) {
+                $out['unreadable'][] = ['cmid' => $cmid, 'modname' => (string)$cm->modname, 'name' => $name];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Respuesta determinista cuando NINGÚN recurso de la sección tiene texto legible pero sí
+     * hay recursos indexados sin texto (p. ej. un SCORM con usable=0): se dice, con el
+     * enlace del primero, en vez de inventar o dar metadatos. En cualquier otro caso devuelve
+     * null y la pregunta va al LLM.
+     *
+     * @param int $courseid
+     * @param object $section
+     * @return array|null
+     */
+    private static function section_without_text_answer(int $courseid, $section): ?array {
+        $material = self::section_summary_material($courseid, $section);
+        if (!empty($material['texts']) || empty($material['unreadable'])) {
+            return null;
+        }
+
+        $title = trim((string)$section->name);
+        if ($title === '') {
+            $title = 'Seccion ' . (int)$section->section;
+        }
+        $first = $material['unreadable'][0];
+
+        $lines = ['Seccion: ' . $title];
+        $lines[] = 'No he podido leer el texto de los recursos de esta seccion, asi que no puedo resumirla sin inventar:';
+        foreach ($material['unreadable'] as $item) {
+            $lines[] = '- [' . $item['modname'] . '] ' . $item['name'];
+        }
+        $lines[] = 'Es habitual en paquetes interactivos (SCORM) y en PDFs escaneados: su contenido no se puede leer automaticamente. '
+            . 'Puedes abrirlo desde el enlace o preguntarme por otro recurso de la seccion.';
+
+        $result = [
+            'type' => 'text',
+            'title' => 'Resumen de la sección ' . $title,
+            'summary' => 'No he podido leer el contenido de esta sección.',
+            'content' => implode("\n", $lines),
+        ];
+
+        return self::attach_activity_link(
+            $result,
+            $courseid,
+            $first['modname'],
+            $first['cmid'],
+            $first['name'],
+            $first['modname'] === 'scorm' ? 'Paquete SCORM' : 'Recurso'
+        );
+    }
+
+    /**
+     * Material de la sección cuyo resumen se pide, para el bloque DINÁMICO del system
+     * (nunca el base cacheado). Vacío si la pregunta no es de resumen de sección o la
+     * sección no tiene nada indexado.
+     *
+     * @param int $courseid
+     * @param string $query
+     * @return array{} | array{title: string, number: int, material: string, unreadable: string[]}
+     */
+    public static function build_section_summary_context(int $courseid, string $query): array {
+        $q = mb_strtolower(trim($query), 'UTF-8');
+        if (self::is_course_about_query($q)) {
+            return [];
+        }
+        $section = self::section_for_summary($courseid, $q);
+        if ($section === null) {
+            return [];
+        }
+
+        $material = self::section_summary_material($courseid, $section);
+        $title = trim((string)$section->name);
+        if ($title === '') {
+            $title = 'Seccion ' . (int)$section->section;
+        }
+
+        $count = count($material['texts']);
+        $budget = $count > 0
+            ? min(self::SECTION_SUMMARY_MAX_PER_RESOURCE, (int)floor(self::SECTION_SUMMARY_MAX_CHARS / $count))
+            : 0;
+
+        $blocks = [];
+        foreach ($material['texts'] as $i => $item) {
+            $text = mb_substr($item['text'], 0, $budget, 'UTF-8');
+            if (mb_strlen($item['text'], 'UTF-8') > $budget) {
+                $text .= '…';
+            }
+            // El texto es material, no instrucciones: un documento no puede abrir ni cerrar un delimitador.
+            $text = preg_replace('/[<>]{3,}/u', '', $text);
+            $name = preg_replace('/[<>]{3,}/u', '', $item['name']);
+            $blocks[] = '<<<RECURSO ' . ($i + 1) . ' [' . $item['modname'] . ': ' . $name . ']>>>' . "\n" . $text . "\n" . '<<<FIN>>>';
+        }
+
+        $summary = trim(strip_tags((string)$section->summary));
+        if ($summary !== '') {
+            array_unshift($blocks, 'Descripcion de la seccion: ' . mb_substr(preg_replace('/\s+/u', ' ', $summary), 0, 1500, 'UTF-8'));
+        }
+
+        $unreadable = [];
+        foreach ($material['unreadable'] as $item) {
+            $unreadable[] = '[' . $item['modname'] . '] ' . $item['name'];
+        }
+
+        return [
+            'title' => $title,
+            'number' => (int)$section->section,
+            'material' => implode("\n", $blocks),
+            'unreadable' => $unreadable,
+        ];
     }
 
     /**

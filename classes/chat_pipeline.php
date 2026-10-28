@@ -631,6 +631,25 @@ class chat_pipeline {
     }
 
     /**
+     * Material de la sección cuyo resumen/explicación pide la pregunta («resúmeme la unidad 1»,
+     * v2.9.1), para el bloque DINÁMICO del system. Solo en el camino que va al LLM (la ruta
+     * directa ya devolvió null para esta intención). Falla abierto: sin material, el chat sigue
+     * con su RAG de siempre.
+     *
+     * @param int $courseid
+     * @param string $user_query
+     * @return array Vacío si no aplica; si no, title/number/material/unreadable (ver rag_retriever).
+     */
+    public static function get_section_summary(int $courseid, string $user_query): array {
+        try {
+            return rag_retriever::build_section_summary_context($courseid, $user_query);
+        } catch (\Throwable $e) {
+            error_log('Pulso section summary: ' . get_class($e));
+            return [];
+        }
+    }
+
+    /**
      * Fuentes de Épica (carta 17, v2.7.0): fragmentos del material que el profesorado subió a Épica,
      * con su cita, para el bloque DINÁMICO del system (nunca el base cacheado ni el historial).
      *
@@ -653,7 +672,7 @@ class chat_pipeline {
             $consulta = fuentes_service::construir_consulta($user_query, $history);
             $r = fuentes_service::buscar($courseid, $consulta);
             return ['searched' => $r['hecha'], 'context' => fuentes_service::formatear($r['fragmentos'])];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('Pulso fuentes: ' . get_class($e));
             return $nada;
         }
@@ -987,7 +1006,8 @@ class chat_pipeline {
             || (bool)preg_match('/\bresum/u', $qnorm)
         );
         // No usar history hint cuando el usuario ya especifica una sección concreta.
-        $mentionsSection = (bool)preg_match('/\bsecci[oó]n\s+\d+|\bseccion\s+\d+|\ben\s+la\s+secci[oó]n|\ben\s+la\s+seccion/u', $qnorm);
+        // v2.9.1: "tema/unidad/bloque N" también es una sección concreta ("resúmeme la unidad 1").
+        $mentionsSection = (bool)preg_match('/\bsecci[oó]n\s+\d+|\bseccion\s+\d+|\ben\s+la\s+secci[oó]n|\ben\s+la\s+seccion|\b(tema|unidad|bloque|apartado|m[oó]dulo)\s+\d{1,2}\b/u', $qnorm);
         // No usar history hint cuando el usuario ya nombra un recurso concreto: "archivo spark", "pdf tema2", "resource spark", etc.
         $alreadyNamesResource = (bool)preg_match(
             '/\b(pdf|archivo|documento|recurso|resource)\s+(?!que\b|este\b|ese\b|esta\b|esa\b|del\b|de\b|la\b|el\b|las\b|los\b|un\b|una\b|anterior\b|previo\b|pasado\b|mismo\b)\S+/u',

@@ -1,5 +1,12 @@
 # Historial de sesiones — block_pulso
 
+## 2026-10-28 — Texto de los paquetes SCORM: html, Rise y Storyline (v2.9.0)
+
+Reglas en `CLAUDE.md` → «SCORM». `classes/scorm_extractor.php` (nuevo), `classes/content_extractor.php` (`extract_scorm`, y `is_extracted_text_useful` pasa a `public`). Sin `db/`. Lo que costó ver:
+- **El backlog estaba desfasado**: `extract_module()` ya tenía `scorm` desde `da3cda5` (HTML del manifiesto), solo que sin Rise/Storyline, sin topes de bytes ni tiempo y con el mensaje de la excepción metido en el fragmento. Esta versión lo sustituye, no lo añade.
+- **«El resumen de unidad de la v2.8.4» no existe en el repo** (HEAD era 2.8.3; no hay rama ni commit). El punto 4 del encargo se queda en lo que sí se podía hacer: el aviso «no puedo leerlo» sale solo si la fila es `usable=0`, porque es el propio fragmento de aviso. No hay ruta directa para `scorm`; lo contesta el LLM con los fragmentos.
+- **Trampas**: un delimitador `#` en una regex que contenía `[#.]` (warning silencioso y el filtro de Rise no filtraba); `$bad»` en una cadena PHP se lee como nombre de variable (los bytes ≥ 0x80 son válidos en identificadores) y hay que escribir `{$bad}`; el PHP portátil no trae `mbstring` activado (`-d extension_dir=C:/phpl/php/ext -d extension=mbstring`).
+- **Verificado** con paquetes sintéticos (50 comprobaciones, ver CLAUDE.md). **NO probado con un SCORM real**: los formatos de Rise y Storyline están escritos de memoria. Pendiente: pasar el primer SCORM real de Refactika (curso 50) y ajustar si sale `scorm: sin texto`.
 ## 2026-10-23 — El esquema de Haiku de «Presentación» ya no se corta a los 25 s (v2.8.3)
 
 Reglas en `CLAUDE.md` → «Factoría desde Pulse» (Presupuesto de Haiku). `classes/anthropic_connector.php` (`send_fast_query`), `classes/presentacion_service.php`, `amd/src/presentacion.js` (+ `amd/build`), `lang`. **Al desplegar: purgar cachés (JS y cadenas nuevas)**; sin `db/`. Lo que costó ver:

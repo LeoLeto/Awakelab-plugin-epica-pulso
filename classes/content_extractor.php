@@ -604,11 +604,13 @@ class content_extractor {
     }
 
     /**
-     * Texto de un paquete SCORM (clase scorm_extractor). Dos salidas distintas:
-     *  - sin ficheros descomprimidos (paquete externo o sin subir): se SALTA el módulo (return [])
-     *    con el motivo en el log, igual que un módulo sin extractor;
-     *  - paquete sin texto aprovechable: fila usable=0 (como un PDF escaneado) y un fragmento que
-     *    avisa de que no se puede leer, para que el chat lo diga en vez de inventar.
+     * Texto de un paquete SCORM (clase scorm_extractor). Sin texto aprovechable SIEMPRE deja fila
+     * usable=0 (como un PDF escaneado) y un fragmento que avisa de que no se puede leer, para que el
+     * chat lo diga en vez de inventar y Crear lo muestre como no disponible (v2.10.1; antes un paquete
+     * sin ficheros se saltaba sin fila). `extraido_por` dice por qué:
+     *  - «scorm: remoto (host)» / «scorm: remoto»: el contenido se carga de otro servidor (scormnext…);
+     *  - «scorm: sin contenido»: ningún fichero de texto descomprimido en Moodle;
+     *  - «scorm: sin texto»: local, pero sin texto aprovechable (o error al procesarlo).
      */
     private function extract_scorm(int $cmid, int $instance): array {
         global $DB;
@@ -624,6 +626,7 @@ class content_extractor {
         $extractedby = 'scorm: sin texto';
         $usable = false;
         $text = '';
+        $reasonText = 'no se ha extraído texto de él';
 
         try {
             $context = \context_module::instance($cmid);
@@ -634,9 +637,18 @@ class content_extractor {
                 error_log('Pulso SCORM cmid=' . $cmid . ': ' . $note);
             }
             if ($res['reason'] === 'no_files') {
-                error_log('Pulso SCORM cmid=' . $cmid . ' omitido: sin ficheros de texto descomprimidos '
-                    . '(paquete externo o sin contenido)');
-                return [];
+                error_log('Pulso SCORM cmid=' . $cmid . ': sin ficheros de texto descomprimidos '
+                    . '(paquete externo o sin contenido); fila usable=0');
+                $extractedby = 'scorm: sin contenido';
+                $reasonText = 'el paquete no tiene contenido de texto descomprimido en Moodle';
+            } else if ($res['reason'] === 'remote') {
+                // Solo el host, ya validado por scorm_extractor (nombre de host en minúsculas), nunca la URL.
+                $host = (string)($res['host'] ?? '');
+                if ($host !== '' && !preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}\z/', $host)) {
+                    $host = '';
+                }
+                $extractedby = $host !== '' ? 'scorm: remoto (' . $host . ')' : 'scorm: remoto';
+                $reasonText = 'su contenido está alojado fuera de Moodle' . ($host !== '' ? ' (en ' . $host . ')' : '');
             }
             if ($res['text'] !== '') {
                 $literal = $res['text'];
@@ -650,8 +662,9 @@ class content_extractor {
         }
 
         if (!$usable) {
-            $text = $scorm->name . "\n\nAVISO: este recurso es un paquete SCORM interactivo y no se ha podido leer "
-                . 'su contenido (no se ha extraído texto de él). No inventes lo que contiene: dilo así.';
+            $text = $scorm->name . "\n\nAVISO: este recurso es un paquete SCORM interactivo y Pulse no puede leer "
+                . 'su contenido (' . $reasonText . '). No inventes lo que contiene: dilo así y, si la misma unidad '
+                . 'tiene otro material con texto (por ejemplo un manual), remite a él.';
         }
 
         return $this->chunk_text($text, $cmid, 'scorm', $scorm->name, $extractedby, $usable, $literal);

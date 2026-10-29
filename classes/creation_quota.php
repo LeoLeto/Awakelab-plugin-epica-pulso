@@ -75,6 +75,51 @@ class creation_quota {
     }
 
     /**
+     * Paquetes SCORM que el desplegable enseña como «no disponible» (v2.10.1): indexados sin texto
+     * (usable = 0) y VISIBLES para el usuario (mismo criterio que filter_visible(): un SCORM oculto no
+     * se nombra). Solo informativo: NO forma parte de get_resources_context()['resources'], que es contra
+     * lo que los endpoints recalculan el cmid, así que un SCORM sin texto nunca se acepta al enviar.
+     *
+     * @return array [{cmid, name, moduletypelabel, sectionnum, reason: 'external'|'notext'}]
+     */
+    public static function get_unavailable_resources(int $courseid): array {
+        // Información accesoria: si falla, el formulario sigue sin los marcados (falla abierto).
+        try {
+            $raw = full_text_store::get_unusable_scorm($courseid);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        if (empty($raw) || !function_exists('\get_fast_modinfo')) {
+            return [];
+        }
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($raw as $cmid => $info) {
+            try {
+                $cm = $modinfo->get_cm($cmid);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (empty($cm) || empty($cm->uservisible)) {
+                continue;
+            }
+            $out[] = [
+                'cmid' => $cmid,
+                'name' => trim((string)$cm->name),
+                'moduletypelabel' => self::module_type_label('scorm'),
+                'sectionnum' => (int)($cm->sectionnum ?? 0),
+                'reason' => strpos($info['extraido_por'], 'scorm: remoto') === 0 ? 'external' : 'notext',
+            ];
+        }
+        return $out;
+    }
+
+    /**
      * Filtra por get_fast_modinfo()->uservisible: sin esto, un alumno vería en
      * el desplegable el nombre de un recurso oculto o restringido -y el
      * nombre ya es información.

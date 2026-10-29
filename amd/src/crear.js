@@ -360,6 +360,8 @@ define(['block_pulso/common'], function(C) {
                         renderCreateNotice(data.quota_message || 'Has alcanzado el límite de creaciones.');
                         return;
                     }
+                    // SCORM sin texto (solo informativos, v2.10.1): se marcan en el desplegable, nunca se eligen.
+                    S.pulsoCreateUnavailable = Array.isArray(data.unavailable) ? data.unavailable : [];
                     // Retos y Presentación siguen siendo usables sin recursos: queda la opción de solo tema.
                     if ((!data.resources || data.resources.length === 0) && pulsoCreateTool !== 'retos' && pulsoCreateTool !== 'presentacion') {
                         renderCreateNoResources(data.noresourcesreason);
@@ -419,7 +421,12 @@ define(['block_pulso/common'], function(C) {
                 'no_usable': labels.noUsableReason,
                 'no_visible': 'No tienes acceso a ningún recurso indexado de este curso.'
             };
-            renderCreateNotice(messages[reason] || labels.noResourcesDefault);
+            let text = messages[reason] || labels.noResourcesDefault;
+            // Hay SCORM pero ninguno se puede usar: se dice por qué (textContent: nada de HTML).
+            if (Array.isArray(S.pulsoCreateUnavailable) && S.pulsoCreateUnavailable.length) {
+                text += ' Los paquetes interactivos (SCORM) de este curso no se pueden usar: su contenido está alojado fuera de Moodle.';
+            }
+            renderCreateNotice(text);
         }
 
 
@@ -440,13 +447,13 @@ define(['block_pulso/common'], function(C) {
                 return;
             }
 
-            let optionsHtml = '';
-            resources.forEach(function(r) {
+            const optionsHtml = C.pulsoResourceOptionsHtml(resources, function(r) {
                 const flag = r.lowtext ? ' — texto escaso, resultado limitado' : '';
-                optionsHtml += '<option value="' + r.cmid + '">'
+                return '<option value="' + r.cmid + '">'
                     + escapeHtmlText(r.moduletypelabel) + ': ' + escapeHtmlText(r.name) + escapeHtmlText(flag)
                     + '</option>';
             });
+            const unavailableNote = C.pulsoUnavailableNoteHtml();
 
             // El formato es solo de las infografías (CLAUDE.md, paso 3): un
             // juego no lleva ese campo, ni en el formulario ni en el envío.
@@ -468,6 +475,7 @@ define(['block_pulso/common'], function(C) {
                     + '<div class="pulso-create-field">'
                     + '<label for="pulso-create-resource">Recurso</label>'
                     + '<select id="pulso-create-resource">' + optionsHtml + '</select>'
+                    + unavailableNote
                     + '</div>'
                     + '<button type="button" class="pulso-create-submit" id="pulso-create-submit-btn" data-pulso-action="submitAmpliacion">'
                     + escapeHtmlText(labels.submitLabel) + '</button>';
@@ -479,6 +487,7 @@ define(['block_pulso/common'], function(C) {
                 + '<label for="pulso-create-resource">Recurso</label>'
                 + '<select id="pulso-create-resource">' + optionsHtml + '</select>'
                 + '<div class="pulso-create-hint" id="pulso-create-section-hint"></div>'
+                + unavailableNote
                 + '</div>'
                 + '<div class="pulso-create-field">'
                 + '<label for="pulso-create-prompt">' + escapeHtmlText(labels.promptLabel) + '</label>'

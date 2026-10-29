@@ -23,6 +23,7 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/anthropic_connector.php');
 require_once(__DIR__ . '/epica_client.php');
 require_once(__DIR__ . '/ampliacion_service.php');
+require_once(__DIR__ . '/full_text_store.php');
 
 class diagnostics {
 
@@ -244,6 +245,38 @@ class diagnostics {
             . ($s['warned'] > 0 ? " ({$s['warned']} con la última descarga fallida: se conserva el texto anterior)" : '')
             . '. Saltados: ' . ($parts ? implode('; ', $parts) : 'ninguno') . '.';
         return self::result(($problems > 0 || $s['warned'] > 0) ? self::WARN : self::OK, $msg);
+    }
+
+    /**
+     * SCORM que Pulse no puede leer (v2.10.1), por curso y causa: remotos (contenido alojado fuera de
+     * Moodle), sin contenido descomprimido y sin texto. Salen en Crear como «no disponibles».
+     */
+    public static function check_scorm(): array {
+        global $DB;
+
+        $byCourse = full_text_store::count_unusable_scorm_by_course();
+        if (empty($byCourse)) {
+            return self::result(self::OK, 'SCORM: ningún paquete indexado sin texto legible.');
+        }
+
+        $totals = ['remote' => 0, 'nocontent' => 0, 'notext' => 0];
+        $lines = [];
+        foreach ($byCourse as $courseid => $n) {
+            foreach ($totals as $k => $_) {
+                $totals[$k] += $n[$k];
+            }
+            if (count($lines) < 15) {
+                $short = $DB->get_field('course', 'shortname', ['id' => $courseid]);
+                $lines[] = 'curso ' . $courseid . ($short ? ' (' . s($short) . ')' : '') . ': '
+                    . $n['remote'] . ' remotos, ' . $n['nocontent'] . ' sin contenido, ' . $n['notext'] . ' sin texto';
+            }
+        }
+        $more = count($byCourse) > 15 ? ' … y ' . (count($byCourse) - 15) . ' cursos más' : '';
+        $msg = 'SCORM sin texto legible: ' . $totals['remote'] . ' remotos (contenido alojado fuera de Moodle), '
+            . $totals['nocontent'] . ' sin contenido en Moodle, ' . $totals['notext'] . ' sin texto, en '
+            . count($byCourse) . ' cursos. En Crear salen como «no disponibles» y el chat lo explica. '
+            . implode('; ', $lines) . $more . '.';
+        return self::result(self::WARN, $msg);
     }
 
     /** Última ejecución del cron de Moodle (la más reciente de las tareas programadas). */

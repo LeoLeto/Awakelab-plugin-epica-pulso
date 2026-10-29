@@ -38,6 +38,21 @@ class scorm_extractor {
     /** Presupuesto de tiempo por paquete, en segundos. */
     const TIME_BUDGET_S = 30;
 
+    /** Máx. scripts (js/json) que se leen, además de las páginas, para buscar el host de un paquete remoto. */
+    const REMOTE_SCAN_FILES = 20;
+
+    /** Máx. bytes que se leen de cada uno de esos scripts. */
+    const REMOTE_SCAN_BYTES = 256 * 1024;
+
+    /** Hosts que NO indican contenido remoto: espacios de nombres del estándar, CDN de librerías, fuentes y vídeo. */
+    const REMOTE_IGNORE_HOSTS = [
+        'w3.org', 'imsglobal.org', 'adlnet.org', 'adlnet.gov', 'ieee.org', 'purl.org', 'apache.org',
+        'schemas.microsoft.com', 'microsoft.com', 'googleapis.com', 'gstatic.com', 'google.com',
+        'googletagmanager.com', 'google-analytics.com', 'cloudflare.com', 'jsdelivr.net', 'unpkg.com',
+        'jquery.com', 'bootstrapcdn.com', 'fontawesome.com', 'youtube.com', 'youtube-nocookie.com',
+        'youtu.be', 'ytimg.com', 'vimeo.com', 'example.com',
+    ];
+
     /** Claves de JSON que nunca son texto para una persona (Rise). */
     const JSON_DENY_KEYS = [
         'id', 'type', 'url', 'src', 'href', 'key', 'family', 'variant', 'style', 'color', 'backgroundcolor',
@@ -64,8 +79,9 @@ class scorm_extractor {
 
     /**
      * @param array $files stored_file[] (cualquier orden); se ignoran directorios y binarios.
-     * @return array ['text'=>string, 'method'=>'rise'|'storyline'|'html'|'', 'notes'=>string[], 'reason'=>string]
-     *               reason: '' si hay texto; 'no_files' (paquete vacío/externo) o 'no_text'.
+     * @return array ['text'=>string, 'method'=>'rise'|'storyline'|'html'|'', 'notes'=>string[], 'reason'=>string, 'host'=>string]
+     *               reason: '' si hay texto; 'no_files' (paquete vacío/externo), 'remote' (el contenido
+     *               se carga desde otro servidor; 'host' = ese host validado, '' si no se identifica) o 'no_text'.
      */
     public function extract(array $files): array {
         $this->deadline = microtime(true) + self::TIME_BUDGET_S;
@@ -88,8 +104,7 @@ class scorm_extractor {
             $lower[mb_strtolower($rel)] = $rel;
         }
         if (empty($byPath)) {
-            return $this->result('', '', 'no_files');
-        }
+            return $this->result('', '', 'no_files');        }
 
         $manifestpath = null;
         foreach ($byPath as $rel => $file) {
@@ -100,6 +115,7 @@ class scorm_extractor {
         }
 
         $ordered = [];
+        $xml = '';
         if ($manifestpath !== null) {
             $xml = $this->read($byPath[$manifestpath], 2 * 1024 * 1024);
             $ordered = $this->launch_order($xml, $byPath, $lower);
@@ -158,11 +174,97 @@ class scorm_extractor {
             return $this->result($text, 'html');
         }
 
+        // Sin texto: ¿el contenido vive fuera de Moodle (paquete «remoto», p. ej. scormnext)?
+        $host = $this->remote_host($xml, $pages, $byPath);
+        if ($host !== '') {
+            $this->notes[] = 'paquete remoto: contenido alojado en ' . $host;
+            return $this->result('', '', 'remote', $host);
+        }
+        if ($this->is_wrapper_only($ordered)) {
+            $this->notes[] = 'paquete remoto: solo wrapper/redirect, sin host identificable';
+            return $this->result('', '', 'remote');
+        }
+
         return $this->result('', '', 'no_text');
     }
 
-    private function result(string $text, string $method, string $reason = ''): array {
-        return ['text' => $text, 'method' => $method, 'notes' => $this->notes, 'reason' => $reason];
+    private function result(string $text, string $method, string $reason = '', string $host = ''): array {
+        return ['text' => $text, 'method' => $method, 'notes' => $this->notes, 'reason' => $reason, 'host' => $host];
+    }
+
+    // ----------------------------------------------------------------
+    // Paquetes remotos (el contenido se carga desde otro servidor)
+    // ----------------------------------------------------------------
+
+    /**
+     * Host externo al que apuntan el manifiesto, las páginas de lanzamiento y los scripts de un
+     * paquete SIN texto: el que más veces aparece, ya validado (nombre de host en minúsculas, con
+     * punto y TLD de letras; sin IP). '' si ninguno. Solo se mira el host: nunca la URL entera.
+     */
+    private function remote_host(string $manifest, array $pages, array $byPath): string {
+        $sources = [$manifest];
+        foreach ($pages as $html) {
+            $sources[] = $html;
+        }
+        $extra = 0;
+        foreach ($byPath as $rel => $file) {
+            if (isset($pages[$rel]) || !preg_match('/\.(js|json)$/i', $rel)) {
+                continue;
+            }
+            if ($extra >= self::REMOTE_SCAN_FILES || $this->out_of_budget()) {
+                break;
+            }
+            $sources[] = $this->read($file, self::REMOTE_SCAN_BYTES);
+            $extra++;
+        }
+
+        $counts = [];
+        foreach ($sources as $src) {
+            if ($src === '') {
+                continue;
+            }
+            // «https://host», «https:\/\/host» (JSON/JS escapado) y http.
+            if (!preg_match_all('#https?:(?:\\\\?/){2}([A-Za-z0-9](?:[A-Za-z0-9.-]{0,250}[A-Za-z0-9])?)#', $src, $m)) {
+                continue;
+            }
+            foreach ($m[1] as $host) {
+                $host = strtolower($host);
+                if ($this->is_remote_host_candidate($host)) {
+                    $counts[$host] = ($counts[$host] ?? 0) + 1;
+                }
+            }
+        }
+        if (empty($counts)) {
+            return '';
+        }
+        arsort($counts);
+        return (string)array_key_first($counts);
+    }
+
+    /** Nombre de host plausible y que no sea un espacio de nombres, un CDN de librerías ni un vídeo. */
+    private function is_remote_host_candidate(string $host): bool {
+        if (strlen($host) > 253 || !preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/', $host)) {
+            return false;
+        }
+        foreach (self::REMOTE_IGNORE_HOSTS as $ignored) {
+            if ($host === $ignored || substr($host, -strlen($ignored) - 1) === '.' . $ignored) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** ¿Todas las páginas de lanzamiento son un wrapper/redirect/proxy (sin contenido propio)? */
+    private function is_wrapper_only(array $ordered): bool {
+        if (empty($ordered)) {
+            return false;
+        }
+        foreach ($ordered as $rel) {
+            if (!preg_match('/(wrapper|redirect|proxy)/i', basename($rel))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private function out_of_budget(): bool {

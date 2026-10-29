@@ -141,6 +141,67 @@ class full_text_store {
     }
 
     /**
+     * Paquetes SCORM indexados SIN texto aprovechable (usable = 0) de un curso (v2.10.1): los que
+     * Crear enseña como «no disponible» y el chat explica sin LLM. Quien llame filtra por
+     * visibilidad ANTES de enseñar nada (el nombre ya es información).
+     *
+     * @param int $courseid
+     * @return array cmid => ['module_name' => string, 'extraido_por' => string]
+     */
+    public static function get_unusable_scorm(int $courseid): array {
+        global $DB;
+
+        if (!self::table_exists()) {
+            return [];
+        }
+        $rows = $DB->get_records_select(
+            'block_pulso_full_text',
+            "courseid = :courseid AND usable = 0 AND cmid > 0 AND module_type = 'scorm'",
+            ['courseid' => $courseid],
+            'module_name ASC',
+            'cmid, module_name, extraido_por'
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int)$row->cmid] = [
+                'module_name' => (string)$row->module_name,
+                'extraido_por' => (string)$row->extraido_por,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Cuántos SCORM sin texto hay por curso y por causa (diagnóstico). Causa: 'remote'
+     * («scorm: remoto…»), 'nocontent' («scorm: sin contenido») o 'notext' (el resto).
+     *
+     * @return array courseid => ['remote' => int, 'nocontent' => int, 'notext' => int]
+     */
+    public static function count_unusable_scorm_by_course(): array {
+        global $DB;
+
+        if (!self::table_exists()) {
+            return [];
+        }
+        $rows = $DB->get_records_select(
+            'block_pulso_full_text',
+            "usable = 0 AND cmid > 0 AND module_type = 'scorm'",
+            [],
+            'courseid ASC, cmid ASC',
+            'id, courseid, extraido_por'
+        );
+        $out = [];
+        foreach ($rows as $row) {
+            $by = (string)$row->extraido_por;
+            $kind = strpos($by, 'scorm: remoto') === 0 ? 'remote' : ($by === 'scorm: sin contenido' ? 'nocontent' : 'notext');
+            $cid = (int)$row->courseid;
+            $out[$cid] = $out[$cid] ?? ['remote' => 0, 'nocontent' => 0, 'notext' => 0];
+            $out[$cid][$kind]++;
+        }
+        return $out;
+    }
+
+    /**
      * Texto completo aprovechable de UN recurso, para construir el envío a
      * Epica (paso 3). Devuelve null si no hay fila, si no es aprovechable
      * (usable=0, p.ej. un PDF escaneado) o si la tabla no existe todavía —

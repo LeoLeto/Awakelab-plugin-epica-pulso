@@ -223,18 +223,19 @@ define(['block_pulso/common'], function(C) {
             const body = document.getElementById('pulso-create-body');
             if (!body) return;
 
-            let optionsHtml = '<option value="0">Sin recurso, solo un tema</option>';
-            resources.forEach(function(r) {
-                const flag = r.lowtext ? ' — texto escaso, resultado limitado' : '';
-                optionsHtml += '<option value="' + r.cmid + '">'
-                    + escapeHtmlText(r.moduletypelabel) + ': ' + escapeHtmlText(r.name) + escapeHtmlText(flag)
-                    + '</option>';
-            });
+            const optionsHtml = '<option value="0">Sin recurso, solo un tema</option>'
+                + C.pulsoResourceOptionsHtml(resources, function(r) {
+                    const flag = r.lowtext ? ' — texto escaso, resultado limitado' : '';
+                    return '<option value="' + r.cmid + '">'
+                        + escapeHtmlText(r.moduletypelabel) + ': ' + escapeHtmlText(r.name) + escapeHtmlText(flag)
+                        + '</option>';
+                });
 
             body.innerHTML = ''
                 + '<div class="pulso-create-field">'
                 + '<label for="pulso-create-resource">Recurso</label>'
                 + '<select id="pulso-create-resource" data-retos-action>' + optionsHtml + '</select>'
+                + C.pulsoUnavailableNoteHtml()
                 + '</div>'
                 + '<div class="pulso-create-field">'
                 + '<label for="pulso-retos-tema">Tema (opcional)</label>'

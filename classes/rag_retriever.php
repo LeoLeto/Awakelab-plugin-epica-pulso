@@ -464,6 +464,16 @@ class rag_retriever {
             $collections[$typeName] = course_visibility::filter_instances($courseid, $typeName, $records);
         }
 
+        // v2.10.1: los SCORM que Pulse NO puede leer (usable=0) se emparejan al final y se contestan sin LLM
+        // diciéndolo. Los legibles no entran (los contesta el LLM con sus fragmentos, como siempre) ni una
+        // pregunta de analítica de curso (nota media…: no es de contenido).
+        if (!$isAnalyticsIntent) {
+            $unreadableScorm = self::unreadable_scorm_records($courseid);
+            if (!empty($unreadableScorm)) {
+                $collections['scormunreadable'] = $unreadableScorm;
+            }
+        }
+
         // Fase 1: match EXACTO (nombre completo e inequivoco) en todos los tipos.
         $matched = null;
         $matchedType = null;
@@ -501,6 +511,11 @@ class rag_retriever {
 
         if ($matched === null) {
             return null;
+        }
+
+        // ----- SCORM sin texto legible (v2.10.1) -----
+        if ($matchedType === 'scormunreadable') {
+            return self::build_scorm_unreadable_answer($courseid, $matched, $query);
         }
 
         // ----- Quiz / Assign path -----
@@ -832,6 +847,138 @@ class rag_retriever {
         }
 
         return $bestRecord;
+    }
+
+    /**
+     * SCORM indexados sin texto aprovechable (usable=0) y VISIBLES para el usuario, con la forma de
+     * un registro de tabla de módulo (->id instancia, ->name) para el matcher por nombre. Se omiten los
+     * de nombre genérico («Unidad 1»): como match exacto se tragarían «resume el manual de la unidad 1»,
+     * que es del recurso con texto o de la sección (section_for_summary).
+     *
+     * @return object[] cmid => {id, cmid, name, extraido_por, sectionnum}
+     */
+    private static function unreadable_scorm_records(int $courseid): array {
+        if (!function_exists('\get_fast_modinfo')) {
+            return [];
+        }
+        try {
+            $rows = full_text_store::get_unusable_scorm($courseid);
+            if (empty($rows)) {
+                return [];
+            }
+            $modinfo = \get_fast_modinfo($courseid);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($rows as $cmid => $row) {
+            try {
+                $cm = $modinfo->get_cm($cmid);
+            } catch (\Throwable $e) {
+                continue;
+            }
+            if (empty($cm) || empty($cm->uservisible) || $cm->modname !== 'scorm') {
+                continue;
+            }
+            $name = trim((string)$cm->name);
+            if ($name === '' || preg_match('/^(secci[oó]n|apartado|tema|unidad|bloque|m[oó]dulo)\s*\d{1,2}[.:]?$/ui', $name)) {
+                continue;
+            }
+            $out[$cmid] = (object)[
+                'id' => (int)$cm->instance,
+                'cmid' => (int)$cmid,
+                'name' => $name,
+                'extraido_por' => $row['extraido_por'],
+                'sectionnum' => (int)($cm->sectionnum ?? 0),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Nombres de los recursos con TEXTO (usable=1, visibles) de la misma sección que un módulo: la
+     * alternativa que se ofrece cuando el módulo (un SCORM remoto) no se puede leer. Máx. 3.
+     *
+     * @return string[]
+     */
+    private static function section_text_alternatives(int $courseid, int $cmid): array {
+        if (!function_exists('\get_fast_modinfo')) {
+            return [];
+        }
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+            $sectionnum = (int)($modinfo->get_cm($cmid)->sectionnum ?? 0);
+            $peers = [];
+            foreach (($modinfo->sections[$sectionnum] ?? []) as $peerid) {
+                if ((int)$peerid !== $cmid && isset($modinfo->cms[$peerid]) && !empty($modinfo->cms[$peerid]->uservisible)) {
+                    $peers[] = (int)$peerid;
+                }
+            }
+            if (empty($peers)) {
+                return [];
+            }
+            $rows = full_text_store::get_rows_for_cmids($courseid, $peers);
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $names = [];
+        foreach ($peers as $peerid) {
+            $row = $rows[$peerid] ?? null;
+            if ($row === null || empty($row->usable) || trim((string)$row->texto) === '') {
+                continue;
+            }
+            $name = trim((string)$modinfo->cms[$peerid]->name);
+            if ($name !== '') {
+                $names[] = $name;
+            }
+            if (count($names) >= 3) {
+                break;
+            }
+        }
+        return $names;
+    }
+
+    /**
+     * Respuesta determinista (sin LLM) cuando la pregunta nombra un SCORM que Pulse no puede leer:
+     * lo dice, con el motivo, el enlace al SCORM y —si la misma sección tiene un recurso con
+     * texto— la sugerencia de preguntar por él con su nombre (así el matcher lo encuentra).
+     */
+    private static function build_scorm_unreadable_answer(int $courseid, object $scorm, string $query): array {
+        $name = trim((string)$scorm->name);
+        $by = (string)$scorm->extraido_por;
+
+        if (strpos($by, 'scorm: remoto') === 0) {
+            $host = preg_match('/^scorm: remoto \(([a-z0-9.-]+)\)\z/', $by, $m) ? $m[1] : '';
+            $why = 'es un paquete interactivo cuyo contenido esta alojado fuera de Moodle' . ($host !== '' ? ' (en ' . $host . ')' : '')
+                . ', y desde Pulse no puedo acceder a el.';
+        } else if ($by === 'scorm: sin contenido') {
+            $why = 'es un paquete interactivo y Moodle no tiene guardado su contenido de texto, asi que no puedo leerlo.';
+        } else {
+            $why = 'es un paquete interactivo y no he podido extraer texto de su contenido.';
+        }
+
+        $lines = ['Paquete SCORM: ' . $name];
+        $lines[] = 'No puedo leer su contenido: ' . $why . ' No voy a inventar lo que contiene.';
+
+        $alts = self::section_text_alternatives($courseid, (int)$scorm->cmid);
+        if (!empty($alts)) {
+            $quoted = array_map(function($n) { return '"' . $n . '"'; }, $alts);
+            $lines[] = 'En la misma seccion si puedo leer: ' . implode(', ', $quoted) . '.';
+            $lines[] = 'Pregunta por el, por ejemplo: "Resume ' . $alts[0] . '".';
+        } else {
+            $lines[] = 'No hay otro material con texto en la misma seccion; puedes abrir el paquete desde el enlace.';
+        }
+
+        $result = [
+            'type' => 'text',
+            'title' => 'SCORM: ' . $name,
+            'summary' => 'No puedo leer el contenido de este paquete SCORM.',
+            'content' => implode("\n", $lines),
+        ];
+
+        return self::attach_activity_link($result, $courseid, 'scorm', (int)$scorm->cmid, $name, 'Paquete SCORM', $query);
     }
 
     /**

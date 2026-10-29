@@ -28,6 +28,8 @@ define([], function() {
     var cfg = {};
     var fn = {};
     S.pulsoCreateResources = [];
+    // SCORM sin texto del formulario abierto (solo informativos: nunca elegibles).
+    S.pulsoCreateUnavailable = [];
     S.pulsoAmpToken = 0;
     S.pulsoRetosPollTimer = null;
     S.pulsoRetosRefreshTimer = null;
@@ -114,6 +116,52 @@ define([], function() {
             return div.innerHTML;
         }
 
+    // SCORM sin texto que el servidor manda aparte (`unavailable`, v2.10.1). Salen en el desplegable
+    // de recursos de TODAS las herramientas como <option disabled> al final de su sección, y nunca
+    // son seleccionables (value vacío: ni siquiera podrían leerse como cmid).
+    function pulsoUnavailableOption(u) {
+        var why = u.reason === 'external' ? 'contenido interactivo externo' : 'sin texto legible';
+        return '<option value="" disabled>' + escapeHtmlText(u.moduletypelabel || 'SCORM') + ': '
+            + escapeHtmlText(u.name) + escapeHtmlText(' — no disponible: ' + why) + '</option>';
+    }
+
+
+    // Opciones del desplegable: las de los recursos usables (renderOne(r) → <option>) y, tras el último
+    // de cada sección, los no disponibles de esa sección; los de secciones sin recursos, al final.
+    function pulsoResourceOptionsHtml(resources, renderOne) {
+        var un = Array.isArray(S.pulsoCreateUnavailable) ? S.pulsoCreateUnavailable : [];
+        var bySection = {};
+        un.forEach(function(u) {
+            var k = String(parseInt(u.sectionnum, 10) || 0);
+            (bySection[k] = bySection[k] || []).push(u);
+        });
+        var last = {};
+        (resources || []).forEach(function(r, i) { last[String(parseInt(r.sectionnum, 10) || 0)] = i; });
+
+        var html = '';
+        (resources || []).forEach(function(r, i) {
+            html += renderOne(r);
+            var k = String(parseInt(r.sectionnum, 10) || 0);
+            if (last[k] === i && bySection[k]) {
+                bySection[k].forEach(function(u) { html += pulsoUnavailableOption(u); });
+                delete bySection[k];
+            }
+        });
+        Object.keys(bySection).forEach(function(k) {
+            bySection[k].forEach(function(u) { html += pulsoUnavailableOption(u); });
+        });
+        return html;
+    }
+
+
+    // Nota bajo el desplegable si hay algún SCORM marcado (texto de ≥ 0.75rem por la clase de pista).
+    function pulsoUnavailableNoteHtml() {
+        if (!Array.isArray(S.pulsoCreateUnavailable) || !S.pulsoCreateUnavailable.length) return '';
+        return '<div class="pulso-create-hint" id="pulso-create-unavailable-note">'
+            + 'Los paquetes interactivos (SCORM) marcados no se pueden usar: su contenido está alojado fuera de Moodle. '
+            + 'Usa el manual de la unidad.</div>';
+    }
+
     // Delegacion de eventos: sustituye a los onclick/oninput/onkeyup en linea.
     // Los elementos llevan data-pulso-action|input|keyup="nombre" y data-pulso-arg / data-pulso-arg2.
     var EVENT_ATTRS = {click: 'data-pulso-action', input: 'data-pulso-input', keyup: 'data-pulso-keyup'};
@@ -147,6 +195,8 @@ define([], function() {
         escapeHtml: escapeHtml,
         pulsoEscapeAttr: pulsoEscapeAttr,
         pulsoAmpIsHttps: pulsoAmpIsHttps,
+        pulsoResourceOptionsHtml: pulsoResourceOptionsHtml,
+        pulsoUnavailableNoteHtml: pulsoUnavailableNoteHtml,
         escapeHtmlText: escapeHtmlText
     };
 });

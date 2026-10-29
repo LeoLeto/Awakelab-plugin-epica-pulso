@@ -77,6 +77,8 @@ try {
         $ctx = creation_quota::get_resources_context($courseid, $userid, !$skipquota);
         $response['resources'] = $ctx['resources'];
         $response['noresourcesreason'] = $ctx['reason'];
+        // SCORM sin texto: solo para enseñarlos como «no disponibles» (v2.10.1); no son recursos elegibles.
+        $response['unavailable'] = creation_quota::get_unavailable_resources($courseid);
     }
 
     echo json_encode($response, JSON_UNESCAPED_UNICODE);

@@ -53,6 +53,7 @@ $checks = [
     'Cron de Moodle' => 'check_cron',
     'Tarea de indexación' => 'check_index_task',
     'PDF enlazados (mod_url)' => 'check_url_pdf',
+    'SCORM sin texto legible' => 'check_scorm',
     'Tareas adhoc de Pulse' => 'check_adhoc',
 ];
 

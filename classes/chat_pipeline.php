@@ -1444,6 +1444,7 @@ class chat_pipeline {
         $isQuizAnswer = (bool)preg_match('/^Cuestionario:/i', $answerTitle);
         $isAssignAnswer = (bool)preg_match('/^Tarea:/i', $answerTitle);
         $isForumAnswer = (bool)preg_match('/^Foro:/i', $answerTitle);
+        $isScormAnswer = (bool)preg_match('/^SCORM:/i', $answerTitle);
         $isGenericActivity = (bool)preg_match('/^(Página|URL|Libro|Carpeta|Glosario|Wiki|Encuesta|Feedback|Lección):/i', $answerTitle);
         $name = self::direct_answer_activity_name($answerTitle, $isDocumentAnswer);
 
@@ -1474,6 +1475,16 @@ class chat_pipeline {
                 '¿De qué se está hablando en ' . $ref . '?',
                 '¿Qué materiales del curso se relacionan con ' . $ref . '?',
                 '¿Cuántos alumnos han participado en ' . $ref . '?'
+            ];
+        }
+        // SCORM sin texto legible (v2.10.1): ninguna sugerencia vuelve a nombrarlo salvo la de acceso
+        // (las demás volverían a entrar por el matcher y repetirían el mismo aviso).
+        if ($isScormAnswer) {
+            $ref = $name !== '' ? '"' . $name . '"' : 'este paquete';
+            return [
+                '¿Cómo accedo a ' . $ref . '?',
+                '¿Qué materiales hay para estudiar en el curso?',
+                '¿Qué contenidos hay dentro de una sección concreta?'
             ];
         }
         if ($isGenericActivity) {
@@ -1556,7 +1567,7 @@ class chat_pipeline {
         }
 
         $patterns = [
-            '/^(?:Cuestionario|Tarea|Foro|Página|URL|Libro|Carpeta|Glosario|Wiki|Encuesta|Feedback|Lección)\s*:\s*(.+)$/ui',
+            '/^(?:Cuestionario|Tarea|Foro|Página|URL|Libro|Carpeta|Glosario|Wiki|Encuesta|Feedback|Lección|SCORM)\s*:\s*(.+)$/ui',
             '/^Resumen del recurso\s+(.+)$/ui',
             '/^Recurso\s+(.+)$/ui',
         ];

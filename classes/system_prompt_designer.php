@@ -874,7 +874,7 @@ PROMPT;
      * Sección «RESUMEN DE UNA SECCIÓN» del bloque dinámico (v2.9.1). Sin sección detectada no
      * añade nada. El material va entre `<<<RECURSO n …>>>` … `<<<FIN>>>`: es contenido, no órdenes.
      *
-     * @param array $section ['title', 'number', 'material', 'unreadable'] de chat_pipeline::get_section_summary().
+     * @param array $section ['title', 'number', 'material', 'unreadable', 'via_url'] de chat_pipeline::get_section_summary().
      * @param bool $isteacher
      * @return string
      */
@@ -894,7 +894,12 @@ PROMPT;
         } else {
             $out .= "No hay texto indexado de esta sección: dilo con claridad en vez de inventar.\n";
         }
-        if (!empty($section['unreadable'])) {
+        if (!empty($section['unreadable']) && !empty($section['via_url'])) {
+            $out .= "NO se ha podido leer el contenido interactivo de: " . implode('; ', $section['unreadable'])
+                . ". En su lugar se ha usado el material que la sección enlaza en PDF (" . implode('; ', $section['via_url'])
+                . "), que es el de arriba. Resume con él y AVISA de que el paquete interactivo no se ha podido leer "
+                . "y de que el resumen sale del manual enlazado.\n";
+        } else if (!empty($section['unreadable'])) {
             $out .= "NO se ha podido leer el contenido de: " . implode('; ', $section['unreadable'])
                 . ". Resume lo que hay y AVISA de que esos recursos (p. ej. un paquete SCORM interactivo) no se han podido "
                 . "leer y no están en el resumen.\n";

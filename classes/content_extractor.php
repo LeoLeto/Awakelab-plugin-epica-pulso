@@ -58,6 +58,9 @@ class content_extractor {
      */
     private array $fulltexts = [];
 
+    /** Descargador de PDF enlazados desde módulos URL (v2.10.0); solo existe durante extract_course_content(). */
+    private ?url_pdf_extractor $urlpdf = null;
+
     /** Cache de proceso para no invocar `pdftotext -v` en cada PDF de un curso. */
     private static ?string $pdftotextversion = null;
 
@@ -74,6 +77,7 @@ class content_extractor {
         global $DB;
 
         $this->fulltexts = [];
+        $this->urlpdf = new url_pdf_extractor($this, $courseid);
         $chunks = [];
 
         // Include course-level metadata and section structure so RAG can answer
@@ -103,6 +107,13 @@ class content_extractor {
                     ' mod=' . $cm->modname . ' due to error: ' . $e->getMessage());
             }
         }
+
+        try {
+            $this->urlpdf->finish();
+        } catch (\Throwable $e) {
+            error_log('Pulso URL-PDF: no se pudo guardar el estado del curso ' . $courseid . ': ' . get_class($e));
+        }
+        $this->urlpdf = null;
 
         return $chunks;
     }
@@ -299,6 +310,8 @@ class content_extractor {
                 return $this->extract_resource($cmid, $instance);
             case 'scorm':
                 return $this->extract_scorm($cmid, $instance);
+            case 'url':
+                return $this->extract_url($cmid, $instance);
             default:
                 return [];
         }
@@ -643,6 +656,46 @@ class content_extractor {
 
         return $this->chunk_text($text, $cmid, 'scorm', $scorm->name, $extractedby, $usable, $literal);
     }
+
+    /**
+     * PDF enlazado desde un módulo URL de un dominio de confianza (clase url_pdf_extractor).
+     * Salidas: sin dominio de confianza, URL de otro host o descarga fallida → se SALTA el módulo
+     * (return [], motivo en el log); PDF sin texto → fila usable=0 y fragmento de aviso (como un PDF
+     * escaneado); con texto → fila y fragmentos con el cmid del módulo URL.
+     */
+    private function extract_url(int $cmid, int $instance): array {
+        global $DB;
+
+        if ($this->urlpdf === null) {
+            return []; // Solo se descarga dentro de extract_course_content() (cron).
+        }
+        $url = $DB->get_record('url', ['id' => $instance], 'name, externalurl');
+        if (!$url) {
+            return [];
+        }
+
+        $res = $this->urlpdf->process($cmid, (string)$url->externalurl);
+        if ($res === null) {
+            return [];
+        }
+
+        if ($res['status'] === 'indexado' && $res['text'] !== '') {
+            // Literal (Épica): solo el texto del PDF; el nombre del módulo va solo en $text (fragmentos).
+            return $this->chunk_text(
+                $url->name . "\n\n" . $res['text'],
+                $cmid,
+                'url',
+                $url->name,
+                url_pdf_extractor::EXTRACTED_PREFIX . ' (' . $res['method'] . ')',
+                true,
+                $res['text']
+            );
+        }
+
+        $text = $url->name . "\n\nAVISO: este recurso enlaza a un PDF y no se ha podido leer su texto "
+            . '(puede estar escaneado o protegido). No inventes lo que contiene: dilo así.';
+        return $this->chunk_text($text, $cmid, 'url', $url->name, 'url: sin texto', false, '');
+    }
     // ----------------------------------------------------------------
     // Chunking helpers
     // ----------------------------------------------------------------
@@ -799,8 +852,30 @@ class content_extractor {
      */
     private function extract_pdf_text(\stored_file $file): array {
         $tmpin = tempnam(sys_get_temp_dir(), 'pulso_pdf_in_');
+        if (!$tmpin) {
+            return ['text' => '', 'method' => ''];
+        }
+
+        try {
+            $file->copy_content_to($tmpin);
+            return $this->extract_pdf_file($tmpin);
+        } catch (\Throwable $e) {
+            return ['text' => '', 'method' => ''];
+        } finally {
+            @unlink($tmpin);
+        }
+    }
+
+    /**
+     * Las tres estrategias de extracción sobre un PDF ya en disco (ver extract_pdf_text()). Lo usan
+     * también los PDF enlazados desde módulos URL (url_pdf_extractor).
+     *
+     * @param string $tmpin Ruta del PDF; la borra quien la creó.
+     * @return array ['text' => string, 'method' => string] method='' si ninguna estrategia sirvio.
+     */
+    public function extract_pdf_file(string $tmpin): array {
         $tmpout = tempnam(sys_get_temp_dir(), 'pulso_pdf_out_');
-        if (!$tmpin || !$tmpout) {
+        if (!$tmpout) {
             return ['text' => '', 'method' => ''];
         }
 
@@ -808,8 +883,6 @@ class content_extractor {
         $txtout = $tmpout . '.txt';
 
         try {
-            $file->copy_content_to($tmpin);
-
             // (a) Libreria PHP pura (sin dependencia de shell).
             $librarytext = $this->try_parse_pdf_with_php_library($tmpin);
             if ($this->is_extracted_text_useful($librarytext)) {
@@ -844,7 +917,6 @@ class content_extractor {
         } catch (\Throwable $e) {
             return ['text' => '', 'method' => ''];
         } finally {
-            @unlink($tmpin);
             @unlink($tmpout);
             @unlink($txtout);
         }

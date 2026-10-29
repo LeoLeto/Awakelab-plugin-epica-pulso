@@ -212,6 +212,40 @@ class diagnostics {
         return self::result(self::OK, get_string('demostracion_inactiva', 'block_pulso'));
     }
 
+    /**
+     * PDF enlazados desde módulos URL de dominios de confianza (v2.10.0): cuántos se indexaron y
+     * cuántos se saltaron, por motivo. Los enlaces a hosts fuera de la lista son lo normal en un curso:
+     * se cuentan pero no avisan.
+     */
+    public static function check_url_pdf(): array {
+        $domains = url_pdf_extractor::allowed_domains();
+        if (!$domains) {
+            return self::result(self::OK, 'PDF enlazados (mod_url): desactivado (lista de dominios de confianza vacía).');
+        }
+        $dom = implode(', ', $domains);
+        $s = url_pdf_extractor::summarize();
+        if ($s['courses'] === 0) {
+            return self::result(self::OK, "PDF enlazados (mod_url): dominios de confianza {$dom}. Aún no ha pasado la "
+                . 'indexación por ningún curso con esta función (se hace en la próxima pasada de la tarea de indexación).');
+        }
+
+        $parts = [];
+        $problems = 0;
+        foreach (url_pdf_extractor::REASON_LABELS as $code => $label) {
+            $n = (int)($s['reasons'][$code] ?? 0);
+            if ($n > 0) {
+                $parts[] = "{$label}: {$n}";
+                if ($code !== 'host') {
+                    $problems += $n;
+                }
+            }
+        }
+        $msg = "PDF enlazados (mod_url): dominios de confianza {$dom}. Indexados: {$s['indexed']}"
+            . ($s['warned'] > 0 ? " ({$s['warned']} con la última descarga fallida: se conserva el texto anterior)" : '')
+            . '. Saltados: ' . ($parts ? implode('; ', $parts) : 'ninguno') . '.';
+        return self::result(($problems > 0 || $s['warned'] > 0) ? self::WARN : self::OK, $msg);
+    }
+
     /** Última ejecución del cron de Moodle (la más reciente de las tareas programadas). */
     public static function check_cron(): array {
         global $DB;

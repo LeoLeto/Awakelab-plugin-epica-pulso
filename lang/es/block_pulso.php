@@ -216,6 +216,13 @@ $string['demostracion_activa'] = 'Modo demostración de Épica: activo hasta {$a
 $string['demostracion_inactiva'] = 'Modo demostración de Épica: no activo.';
 $string['tema_msg_sin_tema'] = 'Este centro no tiene colores en Épica: Pulse usa los suyos.';
 
+// PDF enlazados desde módulos URL (v2.10.0).
+$string['url_dominios_heading'] = 'PDF enlazados desde módulos URL';
+$string['url_dominios_heading_desc'] = 'Los módulos URL que apuntan a un PDF de uno de estos hosts los descarga la tarea de indexación (nunca el chat) y se indexan como cualquier otro recurso.';
+$string['url_dominios_confianza'] = 'Dominios de confianza para PDF enlazados';
+$string['url_dominios_confianza_desc'] = 'Un nombre de host por línea (sin esquema, ruta ni puerto), p. ej. media.awakelab.world. El host tiene que coincidir exactamente y por https. Vacío = desactivado.';
+$string['err_url_dominios'] = 'No es un nombre de host válido: {$a}. Usa solo nombres de host, uno por línea (sin https://, ni ruta, ni direcciones IP).';
+
 // Privacy API (v2.3.0).
 $string['privacy:metadata:block_pulso_encargos'] = 'Creaciones (infografías y juegos) que una persona ha pedido generar a Pulse.';
 $string['privacy:metadata:block_pulso_ampliaciones'] = 'Ampliaciones de recursos (vídeos y artículos). La fila es una caché compartida del curso; solo es personal quién la generó.';

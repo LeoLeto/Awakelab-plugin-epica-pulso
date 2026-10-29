@@ -67,7 +67,7 @@ function block_pulso_pluginfile($course, $cm, $context, $filearea, $args, $force
  * delete_course() (lib de cursos), con los datos del curso aún en pie.
  *
  * Borra todas las filas del curso en TODAS las tablas del plugin y sus ajustes por curso
- * (enabled_course_N, lastindexqueue_N). Los ficheros (encargo/juego) los borra Moodle con el
+ * (enabled_course_N, lastindexqueue_N, urlpdfcache_N). Los ficheros (encargo/juego) los borra Moodle con el
  * contexto del curso: no se tocan aquí. Cada tabla en su try/catch; ante un fallo, error_log y NO
  * se lanza nada: un fallo nuestro no puede bloquear el borrado de un curso.
  *
@@ -99,7 +99,7 @@ function block_pulso_pre_course_delete($course) {
         }
     }
 
-    foreach (['enabled_course_', 'lastindexqueue_'] as $prefix) {
+    foreach (['enabled_course_', 'lastindexqueue_', 'urlpdfcache_'] as $prefix) {
         try {
             unset_config($prefix . $courseid, 'block_pulso');
         } catch (\Throwable $e) {

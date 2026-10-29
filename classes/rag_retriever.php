@@ -2257,7 +2257,7 @@ class rag_retriever {
      *
      * @param int $courseid
      * @param string $query
-     * @return array{} | array{title: string, number: int, material: string, unreadable: string[]}
+     * @return array{} | array{title: string, number: int, material: string, unreadable: string[], via_url: string[]}
      */
     public static function build_section_summary_context(int $courseid, string $query): array {
         $q = mb_strtolower(trim($query), 'UTF-8');
@@ -2302,11 +2302,30 @@ class rag_retriever {
             $unreadable[] = '[' . $item['modname'] . '] ' . $item['name'];
         }
 
+        // v2.10.0: un paquete interactivo (SCORM) sin texto y, en la misma sección, un PDF enlazado
+        // (módulo URL) que sí se leyó: el resumen sale del PDF y hay que decirlo.
+        $viaurl = [];
+        $scormunreadable = false;
+        foreach ($material['unreadable'] as $item) {
+            if ($item['modname'] === 'scorm') {
+                $scormunreadable = true;
+                break;
+            }
+        }
+        if ($scormunreadable) {
+            foreach ($material['texts'] as $item) {
+                if ($item['modname'] === 'url') {
+                    $viaurl[] = '[url] ' . preg_replace('/[<>]{3,}/u', '', $item['name']);
+                }
+            }
+        }
+
         return [
             'title' => $title,
             'number' => (int)$section->section,
             'material' => implode("\n", $blocks),
             'unreadable' => $unreadable,
+            'via_url' => $viaurl,
         ];
     }
 
@@ -3606,6 +3625,7 @@ class rag_retriever {
         // proposito, la siguiente consulta debe poder reencolar la indexacion
         // sin esperar la ventana de INDEX_REQUEST_THROTTLE.
         unset_config('lastindexqueue_' . $courseid, 'block_pulso');
+        unset_config(url_pdf_extractor::CACHE_PREFIX . $courseid, 'block_pulso');
         full_text_store::delete_course_texts($courseid);
         if (!self::rag_table_exists()) {
             return;

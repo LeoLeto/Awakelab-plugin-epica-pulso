@@ -277,6 +277,30 @@ if ($ADMIN->fulltree) {
     $pulsonum('ampliacion_ttl_dias', 30);
 
     // ============================================================
+    // PDF enlazados desde módulos URL de dominios de confianza (v2.10.0)
+    // ============================================================
+    $settings->add(new admin_setting_heading(
+        'block_pulso/url_dominios_heading',
+        get_string('url_dominios_heading', 'block_pulso'),
+        get_string('url_dominios_heading_desc', 'block_pulso')
+    ));
+    $urldominios = new admin_setting_configtextarea(
+        'block_pulso/url_dominios_confianza',
+        get_string('url_dominios_confianza', 'block_pulso'),
+        get_string('url_dominios_confianza_desc', 'block_pulso'),
+        \block_pulso\url_pdf_extractor::DEFAULT_DOMAINS,
+        PARAM_RAW,
+        '40',
+        '4'
+    );
+    if (method_exists($urldominios, 'set_validate_function')) {
+        $urldominios->set_validate_function(function ($value) {
+            return \block_pulso\url_pdf_extractor::validate_domains_setting((string)$value);
+        });
+    }
+    $settings->add($urldominios);
+
+    // ============================================================
     // Retos de Epica: topes propios (v1.26.0)
     // ============================================================
     $settings->add(new admin_setting_heading(

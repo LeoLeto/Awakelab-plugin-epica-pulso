@@ -215,6 +215,13 @@ $string['demostracion_activa'] = 'Epica demo mode: active until {$a}. Pulse does
 $string['demostracion_inactiva'] = 'Epica demo mode: not active.';
 $string['tema_msg_sin_tema'] = 'This center has no colors in Epica: Pulse uses its own colors.';
 
+// PDFs linked from URL modules (v2.10.0).
+$string['url_dominios_heading'] = 'PDFs linked from URL modules';
+$string['url_dominios_heading_desc'] = 'URL modules pointing to a PDF on one of these hosts are downloaded by the indexing task (never by the chat) and indexed like any other resource.';
+$string['url_dominios_confianza'] = 'Trusted domains for linked PDFs';
+$string['url_dominios_confianza_desc'] = 'One host name per line (no scheme, path or port), e.g. media.awakelab.world. The host must match exactly, over https. Empty = disabled.';
+$string['err_url_dominios'] = 'Not a valid host name: {$a}. Use only host names, one per line (no https://, no path, no IP addresses).';
+
 // Privacy API (v2.3.0).
 $string['privacy:metadata:block_pulso_encargos'] = 'Creations (infographics and games) a person asked Pulse to generate.';
 $string['privacy:metadata:block_pulso_ampliaciones'] = 'Resource expansions (videos and articles). The row is a cache shared by the course; only who generated it is personal.';

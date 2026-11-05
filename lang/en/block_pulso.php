@@ -214,6 +214,7 @@ $string['tema_msg_borrado'] = 'This center has no colors in Epica any more: Puls
 $string['demostracion_activa'] = 'Epica demo mode: active until {$a}. Pulse does not enforce its own Epica quotas (creations and challenges) meanwhile.';
 $string['demostracion_inactiva'] = 'Epica demo mode: not active.';
 $string['tema_msg_sin_tema'] = 'This center has no colors in Epica: Pulse uses its own colors.';
+$string['tema_msg_logo_error'] = 'The centre logo could not be updated (it could not be downloaded or does not meet the requirements: https on the Épica host, PNG/JPEG/WebP up to 200 KB, 96 to 512 px and nearly square). The previous one is kept; see the server log for details.';
 
 // PDFs linked from URL modules (v2.10.0).
 $string['url_dominios_heading'] = 'PDFs linked from URL modules';

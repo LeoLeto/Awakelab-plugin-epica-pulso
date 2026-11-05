@@ -62,6 +62,8 @@
     --pulso-own-bg: #003670;                   /* fondo: mensajes que escribe la persona */
     --pulso-own-text: #FFFFFF;                 /* texto encima de --pulso-own-bg */
     --pulso-accent: #0B93AA;                   /* acento: iconos, bordes, foco (no texto) */
+    --pulso-mine-bg: #FFFFFF;                  /* fondo del botón «Mis creaciones» (solo con el token «creaciones»; v2.13.0) */
+    --pulso-mine-text: #27334F;                /* texto/iconos encima de --pulso-mine-bg */
     --pulso-slate: #34547A;                     /* texto secundario */
     --pulso-muted: #3B6996;                     /* texto terciario / hints */
     --pulso-cyan-soft: #D9FBFF;                 /* fondo del bloque de siguiente paso */
@@ -97,6 +99,16 @@
     height: 30px;
     display: block;
     pointer-events: none;
+}
+
+/* Logo del centro (v2.13.0): sobre una placa blanca, para que se vea sea cual sea su color y el de la cabecera.
+   Un logo con fondo propio no se nota; uno transparente y oscuro tampoco desaparece sobre la cabecera. */
+.pulso-logo-centro {
+    box-sizing: border-box;
+    padding: 2px;
+    border-radius: 8px;
+    background: #ffffff;
+    object-fit: contain;
 }
 
 .pulso-chat-bubble:hover {
@@ -617,7 +629,7 @@
 .pulso-idea {
     width: 100%;
     padding: 9px 12px;
-    background: #ffffff;
+    background: var(--pulso-bg);
     border: 1px solid var(--pulso-line);
     border-radius: 10px;
     color: var(--pulso-ink);
@@ -2876,6 +2888,103 @@ a.pulso-retos-open {
 
 .pulso-chat-container[data-pulso-tema~="acento"] .pulso-table th.is-sorted {
     border-bottom-color: var(--pulso-accent);
+}
+
+/* «Mis creaciones» con el color del centro (v2.13.0): solo con el token «creaciones» (el centro lo mandó); sin él el
+   botón es el de siempre. Fondo = --pulso-mine-bg y todo lo de dentro en --pulso-mine-text (>= 4,5:1 garantizado
+   por tema_service). El foco sigue siendo el acento, FUERA del botón (offset), porque sobre el color del centro
+   no se garantiza. */
+.pulso-chat-container[data-pulso-tema~="creaciones"] .pulso-mine-btn {
+    background: var(--pulso-mine-bg);
+    color: var(--pulso-mine-text);
+    border-color: var(--pulso-mine-bg);
+}
+
+.pulso-chat-container[data-pulso-tema~="creaciones"] .pulso-mine-btn:hover {
+    background: var(--pulso-mine-bg);
+    filter: brightness(1.12);
+}
+
+.pulso-chat-container[data-pulso-tema~="creaciones"] .pulso-mine-btn:focus-visible {
+    outline-offset: 2px;
+}
+
+.pulso-chat-container[data-pulso-tema~="creaciones"] .pulso-mine-btn .pulso-tool-title,
+.pulso-chat-container[data-pulso-tema~="creaciones"] .pulso-mine-btn .pulso-tool-sub,
+.pulso-chat-container[data-pulso-tema~="creaciones"] .pulso-mine-btn .pulso-tool-chevron {
+    color: var(--pulso-mine-text);
+}
+
+.pulso-chat-container[data-pulso-tema~="creaciones"] .pulso-mine-btn-icon {
+    background: rgba(255, 255, 255, 0.18);
+    background: color-mix(in srgb, var(--pulso-mine-text) 14%, transparent);
+    color: var(--pulso-mine-text);
+}
+
+/* FONDO del centro (v2.13.0): las píldoras y etiquetas con el texto en su propio color usan un tinte rgba() que se
+   compone sobre el fondo del panel. Con un fondo del centro (token «fondo») el tinte quedaría peor que hoy (el éxito ya
+   da 4,37:1 sobre blanco), así que se fija OPACO, calculado sobre blanco: el mismo contraste de siempre sea cual sea el
+   fondo. Cada valor = el rgba() de su regla compuesto sobre #ffffff. */
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-amp-tag {
+    background: #e2efeb;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-amp-tag-lang {
+    background: #ebeef2;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-retos-chip {
+    background: #ebeef2;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-reto-diff {
+    background: #ebeef2;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-reto-diff.ok {
+    background: #e2efeb;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-reto-diff.warn {
+    background: #efe9db;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-reto-diff.danger {
+    background: #f6e5e4;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-activity-badge.resource {
+    background: #e2efeb;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-activity-badge.label {
+    background: #f1ece0;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-activity-badge.page,
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-activity-badge.book,
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-activity-badge.wiki {
+    background: #e7eaef;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-result-box {
+    background: #e7f2ee;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-status-pill.success {
+    background: #ddece7;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-status-pill.danger {
+    background: #f4e1e0;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-status-pill.warning {
+    background: #efe9db;
+}
+
+.pulso-chat-container[data-pulso-tema~="fondo"] .pulso-status-pill.neutral {
+    background: #ebeef2;
 }
 
 /* ========== MÓVIL: pantalla completa ========== */

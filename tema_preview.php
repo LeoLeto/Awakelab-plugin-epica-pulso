@@ -29,13 +29,15 @@ $PAGE->set_pagelayout('admin');
 $PAGE->set_title('Vista previa de los colores del centro');
 $PAGE->set_heading('Vista previa de los colores del centro');
 
-/** Las cinco claves del formulario, con su explicación. */
+/** Las siete claves del formulario (v2.13.0: fondo y creaciones), con su explicación. */
 $claves = [
     'principal' => 'Principal (marca; de él se deriva lo que falte)',
     'cabecera' => 'Cabecera (cabecera y burbuja flotante)',
     'boton' => 'Botón (botones de acción, filtros activos, tablas)',
     'burbuja' => 'Burbuja (mensajes de quien escribe)',
     'acento' => 'Acento (foco, bordes, iconos)',
+    'fondo' => 'Fondo (del panel; se ACLARA si el texto no se lee, nunca se oscurece)',
+    'creaciones' => 'Creaciones (botón «Mis creaciones»; no se deriva del principal)',
 ];
 
 // --- Colores a probar: los de la URL (validados) o, si no hay ninguno, los guardados. ---
@@ -55,10 +57,21 @@ foreach ($claves as $clave => $etiqueta) {
     }
     $probados[$clave] = ['valor' => $crudo];
 }
+// Texto opcional del botón «Mis creaciones» (para probar un texto que no se lee): pasa por la misma validación.
+$textocreaciones = strtolower((string)optional_param('creaciones_texto', '', PARAM_RAW_TRIMMED));
+if ($textocreaciones !== '' && isset($probados['creaciones'])) {
+    if (preg_match(tema_service::RE_COLOR, $textocreaciones)) {
+        $probados['creaciones']['texto'] = $textocreaciones;
+    } else {
+        $avisos[] = 'El texto de «creaciones» («' . mb_substr($textocreaciones, 0, 24, 'UTF-8')
+            . '») no tiene la forma #rrggbb y se ha ignorado.';
+    }
+}
 $colores = $haypeticion ? tema_service::validar_colores($probados) : tema_service::leer();
 $res = tema_service::resolver_tema($colores);
 $hayTema = !empty($res['vars']);
 
+$logoguardado = tema_service::logo_para_pintar();
 $isotipo = function (bool $claro) use ($OUTPUT): string {
     return $OUTPUT->image_url($claro ? 'isotipo-claro' : 'isotipo-oscuro', 'block_pulso')->out(false);
 };
@@ -66,16 +79,23 @@ $isotipo = function (bool $claro) use ($OUTPUT): string {
 /**
  * Una maqueta estática. $style y $flags solo salen de resolver_tema() (hex validados o calculados).
  */
-function pulso_prev_mock(string $titulo, string $style, string $flags, string $isotipourl): string {
+function pulso_prev_mock(string $titulo, string $style, string $flags, string $isotipourl, string $logourl = ''): string {
     $attr = $style !== '' ? ' style="' . s($style) . '" data-pulso-tema="' . s($flags) . '"' : '';
     $svg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
         . '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
     $h = '<div class="pulso-prev-col"><h3>' . s($titulo) . '</h3>';
+    // Con logo del centro se usa en cabecera y burbuja (como la plantilla real); si no, el isotipo.
+    $imgburbuja = $logourl !== ''
+        ? '<img class="pulso-logo-centro" src="' . s($logourl) . '" alt="Logotipo (maqueta)">'
+        : '<img src="' . s($isotipourl) . '" alt="">';
+    $imgcabecera = $logourl !== ''
+        ? '<img class="pulso-header-logo pulso-logo-centro" src="' . s($logourl) . '" alt="Logotipo (maqueta)">'
+        : '<img class="pulso-header-logo" src="' . s($isotipourl) . '" alt="">';
     $h .= '<button type="button" class="pulso-chat-bubble"' . $attr . ' tabindex="-1" aria-label="Burbuja flotante (maqueta)">'
-        . '<img src="' . s($isotipourl) . '" alt=""></button>';
+        . $imgburbuja . '</button>';
     $h .= '<div class="pulso-chat-container" role="group" aria-label="Maqueta: ' . s($titulo) . '"' . $attr . '>';
     $h .= '<div class="pulso-chat-header"><div class="pulso-header-top"><div class="pulso-header-brand">'
-        . '<img class="pulso-header-logo" src="' . s($isotipourl) . '" alt="">'
+        . $imgcabecera
         . '<div><h2>Pulse AI <span class="pulso-version-badge">v0.0.0</span></h2>'
         . '<span class="pulso-header-sub"><span class="pulso-status-dot"></span>Asistente del curso</span></div></div>'
         . '<div class="header-controls"><button type="button" class="header-btn" tabindex="-1" aria-label="Botón de cabecera (maqueta)">'
@@ -98,6 +118,11 @@ function pulso_prev_mock(string $titulo, string $style, string $flags, string $i
         . '<span class="pulso-step-badge">Paso 1</span>'
         . '<button type="button" class="pulso-send-btn" tabindex="-1" aria-label="Enviar (maqueta)">' . $svg . '</button>'
         . '<span class="pulso-prev-focus">Elemento con foco</span></div>';
+    // Botón «Mis creaciones», con las clases reales (lleva el token «creaciones» si el centro lo mandó).
+    $h .= '<div class="pulso-mine-wrap" style="margin:0 16px 16px"><button type="button" class="pulso-mine-btn" tabindex="-1">'
+        . '<span class="pulso-mine-btn-icon" aria-hidden="true">' . $svg . '</span>'
+        . '<span class="pulso-tool-text"><span class="pulso-tool-title">Mis creaciones</span>'
+        . '<span class="pulso-tool-sub">Tus infografías, juegos y retos de este curso</span></span></button></div>';
     $h .= '</div></div></div>';
     return $h;
 }
@@ -111,7 +136,11 @@ $nombresvar = [
     '--pulso-header-bg' => 'Cabecera y burbuja flotante',
     '--pulso-action-bg' => 'Botones de acción, filtros activos, tablas',
     '--pulso-own-bg' => 'Burbuja propia',
-    '--pulso-accent' => 'Acento (contraste frente al blanco del panel)',
+    '--pulso-accent' => 'Acento (contraste frente al fondo del panel)',
+    '--pulso-bg' => 'Fondo del panel (peor texto fijo de Pulse encima)',
+    '--pulso-surface' => 'Superficie derivada (más clara que el fondo; peor texto fijo encima)',
+    '--pulso-surface-2' => 'Superficie 2 derivada (más clara que el fondo; peor texto fijo encima)',
+    '--pulso-mine-bg' => 'Botón «Mis creaciones»',
 ];
 
 echo $OUTPUT->header();
@@ -146,6 +175,10 @@ foreach ($claves as $clave => $etiqueta) {
         . '<input type="text" id="pulso-prev-' . s($clave) . '" name="' . s($clave) . '" value="' . s($valor) . '" '
         . 'placeholder="#rrggbb" maxlength="7" size="9" pattern="#[0-9a-fA-F]{6}" autocomplete="off"></div>';
 }
+$tc = isset($probados['creaciones']['texto']) ? $probados['creaciones']['texto'] : '';
+echo '<div class="mb-2"><label for="pulso-prev-creaciones_texto">Texto de «creaciones» (opcional; si no se lee o falta, se calcula)</label> '
+    . '<input type="text" id="pulso-prev-creaciones_texto" name="creaciones_texto" value="' . s($tc) . '" '
+    . 'placeholder="#rrggbb" maxlength="7" size="9" pattern="#[0-9a-fA-F]{6}" autocomplete="off"></div>';
 echo '<button type="submit" class="btn btn-primary">Probar estos colores</button> ';
 echo html_writer::link(new moodle_url('/blocks/pulso/tema_preview.php'), 'Ver el tema guardado', ['class' => 'btn btn-secondary']);
 echo '</fieldset></form>';
@@ -154,7 +187,7 @@ foreach ($avisos as $aviso) {
 }
 if ($res['ignorados']) {
     echo $OUTPUT->notification('Ignorado por contraste insuficiente: ' . s(implode(', ', $res['ignorados']))
-        . ' (no llega a 3:1 sobre el blanco del panel). Se usa el acento derivado del principal, o el de Pulse si no hay principal.', 'notifywarning');
+        . ' (no llega a 3:1 sobre el fondo del panel). Se usa el acento derivado del principal, o el de Pulse si no hay principal.', 'notifywarning');
 }
 
 echo html_writer::tag('p', $haypeticion
@@ -169,9 +202,21 @@ echo pulso_prev_mock(
     'Con los colores del centro',
     $hayTema ? tema_service::css_de($res['vars']) : '',
     $hayTema ? implode(' ', $res['flags']) : '',
-    $isotipo($hayTema && $res['isotipoclaro'])
+    $isotipo($hayTema && $res['isotipoclaro']),
+    $logoguardado
 );
 echo '</div>';
+
+// --- Logo guardado (solo se ve; no se sube desde aquí: lo descarga la sincronización). ---
+echo $OUTPUT->heading('Logo del centro', 3);
+if ($logoguardado !== '') {
+    echo html_writer::tag('p', 'Logo guardado, versión ' . s((string)get_config('block_pulso', 'tema_logo_version'))
+        . '. Se usa en la cabecera y la burbuja de la maqueta de la derecha (y del chat real).');
+    echo '<p><img class="pulso-logo-centro" style="width:96px;height:96px;border:1px solid #ccc" src="' . s($logoguardado)
+        . '" alt="Logo guardado del centro"></p>';
+} else {
+    echo html_writer::tag('p', 'No hay logo guardado: Pulse usa el isotipo de Awakelab.');
+}
 
 // --- Variables resueltas. ---
 echo $OUTPUT->heading('Variables resueltas', 3);
@@ -187,9 +232,10 @@ if (!$hayTema) {
         $cumple = $fila['contraste'] >= $minimo;
         $table->data[] = [
             s($fila['var']),
-            s(($nombresvar[$fila['var']] ?? '') . (isset($fila['uso']) ? ' — se usa en: ' . $fila['uso'] : '')),
+            s(($nombresvar[$fila['var']] ?? '') . (isset($fila['uso']) ? ' — se usa en: ' . $fila['uso'] : '')
+                . (isset($fila['nota']) ? ' — ' . $fila['nota'] : '')),
             '<span class="pulso-prev-sw" style="background:' . s($fila['valor']) . '"></span>' . s($fila['valor']),
-            s($fila['texto']) . ($fila['var'] === '--pulso-accent' ? ' (panel)' : ''),
+            s($fila['texto']) . ($fila['var'] === '--pulso-accent' ? ' (fondo del panel)' : ''),
             s(number_format($fila['contraste'], 2, ',', '')) . ':1 ' . ($cumple ? '✓' : '✗ (mín. '
                 . number_format($minimo, 1, ',', '') . ')'),
             s($etiquetasorigen[$fila['origen']] ?? $fila['origen']),

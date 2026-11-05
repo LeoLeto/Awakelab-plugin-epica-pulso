@@ -24,6 +24,8 @@
 
     Context variables required for this template:
     * isotipo - URL del isotipo (pix/isotipo-oscuro; isotipo-claro si el color de centro es claro)
+    * logourl - URL de pluginfile del logo del centro (carta 11 ampliada); vacío = se usa el isotipo
+    * logoalt - texto alternativo del logo (nombre del sitio o «Logotipo»)
     * hastema - true solo si Épica manda un tema válido (colores del centro, carta 11)
     * temastyle - variables por papel (--pulso-header-*, --pulso-action-*, --pulso-own-*, --pulso-accent) ya resueltas y validadas (solo con hastema)
     * temaflags - tokens de las claves EFECTIVAS: principal, cabecera, boton, burbuja, acento o acento-base (solo con hastema)
@@ -53,14 +55,14 @@
 
 <!-- Botón circular flotante -->
 <button class="pulso-chat-bubble" id="pulso-chat-bubble"{{#hastema}} style="{{temastyle}}" data-pulso-tema="{{temaflags}}"{{/hastema}} data-pulso-action="toggleChat" title="Pulse AI — Asistente del curso" aria-label="Abrir el asistente Pulse AI" aria-expanded="false" aria-controls="pulso-chat-container">
-    <img src="{{isotipo}}" alt="" aria-hidden="true">
+    {{#logourl}}<img class="pulso-logo-centro" src="{{logourl}}" alt="{{logoalt}}">{{/logourl}}{{^logourl}}<img src="{{isotipo}}" alt="" aria-hidden="true">{{/logourl}}
 </button>
 
 <div class="pulso-chat-container" id="pulso-chat-container"{{#hastema}} style="{{temastyle}}" data-pulso-tema="{{temaflags}}"{{/hastema}} role="region" aria-label="Pulse AI">
     <div class="pulso-chat-header" id="pulso-chat-header">
         <div class="pulso-header-top">
             <div class="pulso-header-brand">
-                <img class="pulso-header-logo" src="{{isotipo}}" alt="" aria-hidden="true">
+                {{#logourl}}<img class="pulso-header-logo pulso-logo-centro" src="{{logourl}}" alt="{{logoalt}}">{{/logourl}}{{^logourl}}<img class="pulso-header-logo" src="{{isotipo}}" alt="" aria-hidden="true">{{/logourl}}
                 <div>
                     <h2>Pulse AI{{#showversion}} <span class="pulso-version-badge">{{release}}</span>{{/showversion}}</h2>
                     <span class="pulso-header-sub"><span class="pulso-status-dot" aria-hidden="true"></span>Asistente del curso</span>

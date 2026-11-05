@@ -1,5 +1,14 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-05 — Fondo, botón «Mis creaciones» y logo del centro (v2.13.0)
+
+Reglas en `CLAUDE.md` → «Colores de cada centro» (último subapartado). `classes/tema_service.php`, `tema_preview.php`, `chat_simple_view.php`, `templates/chat.mustache`, `lib.php` (rama de sistema en `block_pulso_pluginfile`), `styles.css`, `lang`. **Al desplegar: purgar cachés (plantilla + CSS)**; sin `db/`. Lo que costó ver:
+- **Aclarar el fondo es casi todo o nada**: con el texto fijo y oscuro, `--pulso-muted` exige L >= 0,8, así que cualquier fondo oscuro acaba pálido. Tres intentos: (1) superficies más OSCURAS que el fondo y 4,5:1 solo para muted → estados y muted sobre surface-2 bajaban a 3,7–4,0 (hueco rechazado); (2) exigir 4,5:1 contra surface-2 → todos los fondos acababan casi blancos; (3) **superficies más CLARAS que el fondo** (30 % / 60 % hacia blanco) y exigir 4,5:1 sobre el fondo a los siete textos fijos: si cumple en el fondo cumple en las superficies. Sin `fondo` no se emite ninguna superficie y quedan las de siempre.
+- **Las píldoras tintadas fueron el cuarto hueco**: su texto va sobre un `rgba()` de su propio color; incluirlas en el criterio de aclarado devolvía todos los fondos a blanco (el éxito ya da 4,37 sobre su tinte en blanco, en HEAD). Se resolvió en CSS: con el token `fondo` esos 15 fondos pasan a opacos calculados sobre blanco (mismo contraste que hoy).
+- **El acento por defecto también tenía que medirse**: con un fondo gris-azul el cian de Pulse (3,64:1 sobre blanco) cae a 2,86; sin un caso nuevo en `resolver_tema()` nadie lo oscurecía porque nunca se emitía.
+- **Trampa de la sesión (otra vez)**: los scripts de parcheo escritos por heredoc de shell perdieron la barra invertida de `\z` y `\.` en dos regex (`RE_LOGO_VERSION` y las de `lib.php`): sin ellas `z` era literal y ningún logo con versión válida se aceptaba. Lo cazaron las pruebas del logo; se corrigió con la herramienta de edición. Tras parchear PHP por shell, mirar las regex del diff.
+- **Verificado**: ver la lista en CLAUDE.md (714 + 66 + 8; barrido de 1.500 fondos: peor texto 4,500, peor acento 3,075). **NO probado** en navegador ni contra Épica; la ubicación de `logo` en el JSON del tema (hermana de `colores`) es un supuesto, y falta comprobar en Moodle real que `pluginfile.php` sirva un fichero del contexto de sistema de este bloque.
+
 ## 2026-11-05 — Retos que ya tiene una unidad (v2.12.0)
 
 Reglas en `CLAUDE.md` → «Retos — paso 3». `classes/retos_service.php` (`unidad_de_cmid`, `retos_de_unidad`, `unidad`, `curso($unidad)`), `api_retos.php` (`accion=unidad`), `epica_historial.php` (`reto` + `cmid`), `amd/src/{retos,crear}.js` (+ `amd/build`), `styles.css` (`a.pulso-reto-card`). **Al desplegar: purgar cachés (JS + CSS)**; sin `db/`. Lo que costó ver:

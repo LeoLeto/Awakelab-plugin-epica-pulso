@@ -215,6 +215,7 @@ $string['tema_msg_borrado'] = 'Este centro ya no tiene colores en Épica: Pulse 
 $string['demostracion_activa'] = 'Modo demostración de Épica: activo hasta {$a}. Mientras dure, Pulse no aplica sus propios topes de Épica (creaciones y retos).';
 $string['demostracion_inactiva'] = 'Modo demostración de Épica: no activo.';
 $string['tema_msg_sin_tema'] = 'Este centro no tiene colores en Épica: Pulse usa los suyos.';
+$string['tema_msg_logo_error'] = 'El logo del centro no se ha podido actualizar (no se pudo descargar o no cumple los requisitos: https del host de Épica, PNG/JPEG/WebP de hasta 200 KB, entre 96 y 512 px y casi cuadrado). Se mantiene el anterior; el detalle está en el registro del servidor.';
 
 // PDF enlazados desde módulos URL (v2.10.0).
 $string['url_dominios_heading'] = 'PDF enlazados desde módulos URL';

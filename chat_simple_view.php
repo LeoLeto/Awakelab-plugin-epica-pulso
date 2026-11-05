@@ -67,6 +67,18 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     require_once(__DIR__ . '/classes/tema_service.php');
     $tema = \block_pulso\tema_service::para_pintar();
 
+    // Texto alternativo del logo del centro: nombre del sitio o «Logotipo».
+    $logourl = (string)($tema['logo'] ?? '');
+    $logoalt = 'Logotipo';
+    if ($logourl !== '') {
+        try {
+            $sitename = trim(format_string(get_site()->shortname));
+            $logoalt = $sitename !== '' ? $sitename : 'Logotipo';
+        } catch (Throwable $e) {
+            $logoalt = 'Logotipo';
+        }
+    }
+
     // La configuracion que antes viajaba en variables globales window.* va al modulo AMD
     // (amd/src/chat.js). Solo para adaptar la UI: el servidor decide que datos se devuelven.
     $PAGE->requires->js_call_amd('block_pulso/chat', 'init', [[
@@ -116,7 +128,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // Con un color de centro CLARO (texto de marca negro) la cabecera y la burbuja llevan el isotipo
         // para fondo claro: el oscuro (blanco) no se vería.
         'isotipo' => $OUTPUT->image_url(!empty($tema['isotipoclaro']) ? 'isotipo-claro' : 'isotipo-oscuro', 'block_pulso')->out(false),
-        'hastema' => !empty($tema),
+        'hastema' => !empty($tema['style']),
+        // Logo del centro (v2.13.0): URL de pluginfile ya validada; vacío = isotipo de Awakelab. Con logo,
+        // la regla de isotipoclaro no aplica (el logo lleva su propia placa blanca en el CSS).
+        'logourl' => $logourl,
+        'logoalt' => $logourl !== '' ? $logoalt : '',
         'temastyle' => $tema['style'] ?? '',
         'temaflags' => $tema['flags'] ?? '',
         'isteacher' => !empty($isteacher),

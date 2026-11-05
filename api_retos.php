@@ -7,6 +7,7 @@
  *   elegir     courseid + propuesta + (reto | propio)
  *   refrescar  courseid + codigo
  *   curso      courseid
+ *   unidad     courseid + cmid                 (retos que ya tiene su unidad; solo lee)
  *   mis_retos  courseid                        (sin llamar a Epica)
  *
  * A diferencia de las laminas y los juegos, Retos se llama desde la peticion
@@ -98,6 +99,11 @@ try {
 
         case 'curso':
             $resultado = retos_service::curso($user, $courseid);
+            break;
+
+        case 'unidad':
+            // Retos que ya tiene la unidad de un recurso (carta 22 §3). Solo lee; sin cupo propio.
+            $resultado = retos_service::unidad($user, $courseid, required_param('cmid', PARAM_INT));
             break;
 
         case 'mis_retos':

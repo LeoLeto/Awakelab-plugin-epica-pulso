@@ -1412,6 +1412,10 @@ a.pulso-amp-card:hover {
     transition: border-color 0.15s, box-shadow 0.2s;
 }
 
+a.pulso-reto-card {
+    text-decoration: none;
+}
+
 .pulso-reto-card:hover:not(:disabled) {
     border-color: var(--pulso-accent);
     box-shadow: 0 2px 8px rgba(1, 25, 50, 0.12);

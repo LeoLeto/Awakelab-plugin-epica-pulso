@@ -15,6 +15,9 @@
  * construido SIEMPRE aquí con una de tres formas cerradas: /mis-recursos,
  * /reto/<codigo> o /reto/curso/<llave>. Nada del navegador llega al destino tal cual.
  *
+ * Carta 22: `reto` + `cmid` también abre un reto ya existente en la unidad de ese recurso, si el código
+ * está en la lista de retos/curso de esa unidad (calculada aquí, nunca la del navegador).
+ *
  * Orden: POST → autenticar → sesskey → createactivity → check_enabled →
  * profesorado → precondiciones → firmar.
  *
@@ -81,9 +84,27 @@ function pulso_historial_resolver_destino(int $courseid, \stdClass $user): strin
     $reto = optional_param('reto', '', PARAM_RAW_TRIMMED);
     if ($reto !== '') {
         // Solo un reto elegido por ESTE usuario en ESTE curso; uno ajeno o inexistente no abre nada.
-        if (preg_match('~^[A-Za-z0-9_-]{8,64}\z~', $reto) === 1
-                && $DB->record_exists('block_pulso_retos', ['codigo' => $reto, 'courseid' => $courseid, 'userid' => (int)$user->id])) {
+        if (preg_match('~^[A-Za-z0-9_-]{8,64}\z~', $reto) !== 1) {
+            return $historial;
+        }
+        if ($DB->record_exists('block_pulso_retos', ['codigo' => $reto, 'courseid' => $courseid, 'userid' => (int)$user->id])) {
             return '/reto/' . $reto;
+        }
+        // Carta 22: un reto que ya existía en la unidad de un recurso (de otra persona de la clase). Solo si
+        // el servidor lo ve en la lista de ESA unidad: recalcula el cmid, llama a retos/curso con su unidad y
+        // construye /reto/<codigo> únicamente si el código aparece. Cualquier fallo → historial.
+        $cmid = optional_param('cmid', 0, PARAM_INT);
+        if ($cmid > 0) {
+            try {
+                $lista = \block_pulso\retos_service::retos_de_unidad($user, $courseid, $cmid);
+                foreach ($lista['retos'] as $r) {
+                    if ($r['codigo'] === $reto) {
+                        return '/reto/' . $reto;
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('Pulso historial: retos de la unidad no disponibles: ' . get_class($e));
+            }
         }
         return $historial;
     }

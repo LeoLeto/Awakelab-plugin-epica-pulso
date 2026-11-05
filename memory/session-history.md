@@ -1,5 +1,14 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-05 — Retos que ya tiene una unidad (v2.12.0)
+
+Reglas en `CLAUDE.md` → «Retos — paso 3». `classes/retos_service.php` (`unidad_de_cmid`, `retos_de_unidad`, `unidad`, `curso($unidad)`), `api_retos.php` (`accion=unidad`), `epica_historial.php` (`reto` + `cmid`), `amd/src/{retos,crear}.js` (+ `amd/build`), `styles.css` (`a.pulso-reto-card`). **Al desplegar: purgar cachés (JS + CSS)**; sin `db/`. Lo que costó ver:
+- **Heredar la unidad en «proponer otros» sin columna nueva**: bastaba derivarla del `cmid` que la propuesta ya guarda; añadir `unidad` a la tabla habría exigido `install.xml` + `upgrade.php` para un dato recalculable. Coste aceptado: si el recurso cambió de sección, se manda la actual.
+- **`cm_info->section` es el id de la sección; `->sectionnum` es el orden.** El encargo pide el id: ojo a no mezclarlos (la prueba comprueba que no sale el número de orden).
+- **Fallar abierto en el cliente exige guarda de token**: la comprobación de unidad corre ANTES del proponer, así que una respuesta tardía tras «Volver» que siguiera al proponer gastaría cupo sin que nadie lo pidiera. Mutación comprobada: sin la guarda fallan 2 pruebas (src y build).
+- **El destino del alumno se valida dos veces por lista, no por pertenencia**: un reto de la unidad es de otra persona de la clase, así que no hay fila suya; la única prueba posible es que el servidor lo vea en la lista de ESA unidad (cmid recalculado). Un reto propio sigue sin llamar a Épica.
+- **Verificado** (fuera del repo; PHP 8.3 portátil con stubs + jsdom sobre `src` y `build`): servicio 25 (unidad = id de sección, no del cliente ni nº de orden; proponer/otros/elegir con y sin unidad; `unidad` con lista vacía/llena/503/429/400, enlace http/otro host/userinfo y otra unidad descartados, cmid ajeno sin llamar, sin escribir en `block_pulso_retos`; `curso()` sin unidad igual que antes); resolutor del historial 7 (propio, de la unidad, ajeno → historial, sin/0 cmid, fallo, forma rara); cliente 56 (28 × src/build: sin recurso, vacía, error, red, lista de profesor con escape, alumno por índice sin código en el DOM, «Quiero uno nuevo» con los mismos params, tardía tras Volver, doble clic). **NO probado**: contra el Épica real (carta 22 ya está en el QA), el aspecto de la pantalla en navegador ni el tipo exacto de `unidad` que devuelve (se compara como texto).
+
 ## 2026-11-05 — «Mis proyectos en Épica» para el profesorado (v2.11.0)
 
 Reglas en `CLAUDE.md` → «Historial del profesorado en Épica». `classes/epica_puente.php` (`historial` en la lista cerrada, campos mínimos), `templates/chat.mustache`, `amd/src/crear.js` (+ `amd/build`). **Al desplegar: purgar cachés (plantilla + JS)**; sin `db/`. Lo que costó ver:

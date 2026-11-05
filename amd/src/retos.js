@@ -263,7 +263,97 @@ define(['block_pulso/common'], function(C) {
             const params = {};
             if (cmid > 0) params.cmid = String(cmid);
             if (tema) params.tema = tema;
+            // Con recurso, primero se mira si su unidad ya tiene retos (carta 22 §3); sin recurso, como siempre.
+            if (cmid > 0) {
+                pulsoRetosComprobarUnidad(params, cmid);
+                return;
+            }
             pulsoRetosEnviarProponer(params, 'pulso-retos-propose-btn');
+        }
+
+
+        // «Retos que ya tiene la unidad»: solo lee y falla ABIERTO. Sin retos, o con cualquier error, se sigue al
+        // proponer de siempre (nunca se bloquea ni se avisa: es un extra). Con retos, una pantalla (mismo detalle
+        // `retos` de la pila) que deja abrir uno o pedir uno nuevo con los MISMOS parámetros.
+        let pulsoRetosUnidadList = [];
+        let pulsoRetosUnidadCmid = 0;
+        let pulsoRetosUnidadParams = null;
+
+        function pulsoRetosComprobarUnidad(params, cmid) {
+            if (pulsoRetosBusy) return;
+            pulsoRetosSetBusy(true);
+            const token = S.pulsoAmpToken;
+            const btn = document.getElementById('pulso-retos-propose-btn');
+            const label = btn ? btn.textContent : '';
+            if (btn) btn.textContent = 'Comprobando…';
+            pulsoRetosBanner('');
+
+            pulsoRetosCall('unidad', { cmid: String(cmid) }).then(function(d) {
+                if (token !== S.pulsoAmpToken) return; // el usuario ya salió de esta pantalla
+                pulsoRetosSetBusy(false);
+                if (btn) btn.textContent = label;
+                const alumno = pulsoRetosUnidadAlumno();
+                const lista = (d && d.ok && Array.isArray(d.retos) ? d.retos : []).filter(function(r) {
+                    return r && typeof r.titulo === 'string' && r.titulo !== ''
+                        && (alumno ? C.fn.pulsoRetoCodigoValido(r.codigo) : pulsoAmpIsHttps(r.enlace));
+                });
+                if (!lista.length) {
+                    pulsoRetosEnviarProponer(params, 'pulso-retos-propose-btn');
+                    return;
+                }
+                pulsoRetosUnidadList = lista;
+                pulsoRetosUnidadCmid = cmid;
+                pulsoRetosUnidadParams = params;
+                pulsoRetosRenderUnidad();
+            });
+        }
+
+
+        // Alumnado (carta 12): se abre con su sesión de Épica por nuestro endpoint; el profesorado, con el enlace.
+        function pulsoRetosUnidadAlumno() {
+            return cfg.isTeacher === false && !!cfg.apiHistorialUrl;
+        }
+
+
+        function pulsoRetosRenderUnidad() {
+            const body = document.getElementById('pulso-create-body');
+            if (!body) return;
+            C.fn.pulsoCreateEnter('retos', 'retos');
+            const alumno = pulsoRetosUnidadAlumno();
+            let html = '<div class="pulso-retos">'
+                + '<div id="pulso-retos-msg" class="pulso-retos-msg"></div>'
+                + '<div class="pulso-retos-doc-title">Ya hay retos en esta unidad</div>'
+                + '<div class="pulso-create-hint">Estos retos ya existen. Abre uno o pide uno nuevo.</div>';
+            pulsoRetosUnidadList.forEach(function(r, i) {
+                const diff = pulsoRetosDiff(r.dificultad);
+                const minutos = Number(r.minutos) || 0;
+                const inner = '<span class="pulso-reto-top"><span class="pulso-reto-title">' + escapeHtmlText(r.titulo) + '</span></span>'
+                    + '<span class="pulso-reto-meta">'
+                    + (diff ? '<span class="pulso-reto-diff ' + diff.cls + '">' + escapeHtmlText(diff.label) + '</span>' : '')
+                    + (minutos > 0 ? '<span class="pulso-reto-min">' + minutos + ' min</span>' : '')
+                    + '</span>'
+                    + '<span class="pulso-reto-cta">Abrir este reto' + PULSO_NEWTAB_SR + '</span>';
+                html += alumno
+                    ? '<button type="button" class="pulso-reto-card" data-retos-action data-pulso-action="pulsoRetosAbrirUnidad" data-pulso-arg="' + i + '">' + inner + '</button>'
+                    : '<a class="pulso-reto-card" href="' + pulsoEscapeAttr(r.enlace) + '" target="_blank" rel="noopener noreferrer">' + inner + '</a>';
+            });
+            html += '<button type="button" class="pulso-create-secondary" id="pulso-retos-unit-new-btn" data-retos-action data-pulso-action="pulsoRetosNuevoUnidad">Quiero uno nuevo</button>'
+                + '</div>';
+            body.innerHTML = html;
+        }
+
+
+        // Alumnado: el código no viaja a ningún atributo salvo el índice; el servidor valida contra la lista de la unidad.
+        function pulsoRetosAbrirUnidad(i) {
+            const r = pulsoRetosUnidadList[parseInt(i, 10)];
+            if (r) C.fn.pulsoAbrirRetoUnidad(r.codigo, pulsoRetosUnidadCmid);
+        }
+
+
+        // «Quiero uno nuevo»: el proponer de siempre con los mismos parámetros (gasta cupo, como antes).
+        function pulsoRetosNuevoUnidad() {
+            if (!pulsoRetosUnidadParams) { C.fn.openCreatePanel('retos'); return; }
+            pulsoRetosEnviarProponer(pulsoRetosUnidadParams, 'pulso-retos-unit-new-btn');
         }
 
 
@@ -691,6 +781,8 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoRetosToggleIdea = pulsoRetosToggleIdea;
     C.fn.pulsoRetosOwnCount = pulsoRetosOwnCount;
     C.fn.pulsoRetosElegirPropio = pulsoRetosElegirPropio;
+    C.fn.pulsoRetosAbrirUnidad = pulsoRetosAbrirUnidad;
+    C.fn.pulsoRetosNuevoUnidad = pulsoRetosNuevoUnidad;
 
     return {};
 });

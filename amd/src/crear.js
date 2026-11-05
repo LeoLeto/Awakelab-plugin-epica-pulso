@@ -1266,6 +1266,14 @@ define(['block_pulso/common'], function(C) {
         }
 
 
+        // Reto que YA existía en la unidad de un recurso (carta 22): `reto` + `cmid`; el servidor comprueba que el
+        // código está en la lista de esa unidad y construye el destino.
+        function pulsoAbrirRetoUnidad(codigo, cmid) {
+            cmid = parseInt(cmid, 10) || 0;
+            if (pulsoRetoCodigoValido(codigo) && cmid > 0) pulsoPostHistorial([['reto', codigo], ['cmid', String(cmid)]]);
+        }
+
+
         function pulsoAbrirRetosCurso() {
             pulsoPostHistorial([['curso', '1']]);
         }
@@ -1299,6 +1307,7 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoAbrirProyectos = pulsoAbrirProyectos;
     C.fn.pulsoAbrirFactoria = pulsoAbrirFactoria;
     C.fn.pulsoAbrirReto = pulsoAbrirReto;
+    C.fn.pulsoAbrirRetoUnidad = pulsoAbrirRetoUnidad;
     C.fn.pulsoRetoCodigoValido = pulsoRetoCodigoValido;
     C.fn.pulsoAbrirRetosCurso = pulsoAbrirRetosCurso;
     C.fn.submitCreate = submitCreate;

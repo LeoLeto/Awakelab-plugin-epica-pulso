@@ -100,6 +100,11 @@ class retos_service {
             $cuerpo['propuesta'] = (string)$padre->epica_propuesta;
             // La nueva propuesta hereda recurso y tema: es la misma fuente.
             $cmidfila = $padre->cmid !== null ? (int)$padre->cmid : null;
+            // Y la unidad: se deriva del cmid ya guardado (sin columna nueva); sin recurso, no se manda.
+            $unidad = $cmidfila !== null ? self::unidad_de_cmid($courseid, $cmidfila) : '';
+            if ($unidad !== '') {
+                $cuerpo['unidad'] = $unidad;
+            }
             $tema = (string)$padre->tema;
             $padreid = (int)$padre->id;
         } else if ($cmid > 0) {
@@ -115,6 +120,11 @@ class retos_service {
             $cuerpo['alumno'] = self::sobre_alumno($courseid, $user, $cmid);
             if ($tema !== '') {
                 $cuerpo['tema'] = $tema; // Con material, el tema acota dentro de él.
+            }
+            // Unidad = id de la sección del cmid YA recalculado (nunca del cliente).
+            $unidad = self::unidad_de_cmid($courseid, $cmid);
+            if ($unidad !== '') {
+                $cuerpo['unidad'] = $unidad;
             }
             $cmidfila = $cmid;
             $espera = epica_client::espera_larga(); // Lleva material.
@@ -300,6 +310,11 @@ class retos_service {
 
         $course = get_course($courseid);
         $cuerpo = ['propuesta' => (string)$row->epica_propuesta];
+        // Unidad del recurso de la propuesta (Épica, sin ella, usa la de la propuesta; así es explícita).
+        $unidad = $row->cmid !== null ? self::unidad_de_cmid($courseid, (int)$row->cmid) : '';
+        if ($unidad !== '') {
+            $cuerpo['unidad'] = $unidad;
+        }
         if ($reto !== '') {
             $cuerpo['reto'] = $reto;
         } else {
@@ -415,11 +430,12 @@ class retos_service {
     // ----------------------------------------------------------------
 
     /** La pagina de retos del curso (Épica) y su lista, sin nada más. Sin curso → lista vacía. */
-    public static function curso(\stdClass $user, int $courseid): array {
+    public static function curso(\stdClass $user, int $courseid, string $unidad = ''): array {
         self::asegurar_tablas();
 
         $course = get_course($courseid);
-        [$http, $datos] = self::llamar(self::RUTA_CURSO, [], $user, $course);
+        // Con `unidad` Épica filtra a los retos de esa unidad (carta 22 §3); sin ella, todos como siempre.
+        [$http, $datos] = self::llamar(self::RUTA_CURSO, $unidad !== '' ? ['unidad' => $unidad] : [], $user, $course);
         if ($http !== 200) {
             throw self::traducir_error($http, $datos);
         }
@@ -444,15 +460,85 @@ class retos_service {
                 'icono' => self::texto_corto($r['icono'] ?? '', 30),
                 'origen' => self::texto_corto($r['origen'] ?? '', 20),
                 'creado' => self::texto_corto($r['creado'] ?? '', 40),
+                'unidad' => self::texto_corto($r['unidad'] ?? '', 64),
             ];
         }
 
         return [
             'enlace' => self::enlace_epica($datos['enlace'] ?? ''),
             'titulo' => self::texto_corto($datos['titulo'] ?? '', 255),
+            'unidad' => self::texto_corto($datos['unidad'] ?? '', 64),
             'total' => max(count($retos), (int)($datos['total'] ?? 0)),
             'retos' => $retos,
         ];
+    }
+
+    // ----------------------------------------------------------------
+    // 5b. unidad (carta 22 §3): retos que ya tiene la unidad de un recurso
+    // ----------------------------------------------------------------
+
+    /**
+     * Retos que YA existen en la unidad (sección) de un recurso, de cualquier persona de la clase.
+     * Solo lee (retos/curso con `unidad`): no gasta cupo ni escribe nada, y NO guarda estos retos en
+     * block_pulso_retos (no son elecciones de esta persona). El cmid se recalcula contra
+     * get_resources_context(): visible y con texto; la unidad sale de él, nunca del cliente.
+     * La usan accion=unidad y epica_historial.php (que valida con ella que un código es de la unidad).
+     *
+     * @return array{retos: array} codigo, titulo, dificultad, minutos, enlace (validado)
+     */
+    public static function retos_de_unidad(\stdClass $user, int $courseid, int $cmid): array {
+        if (self::recurso_disponible($courseid, (int)$user->id, $cmid) === null) {
+            throw new reto_error('recurso-no-disponible', 'Ese recurso ya no está disponible para crear retos con Pulse.');
+        }
+        $unidad = self::unidad_de_cmid($courseid, $cmid);
+        if ($unidad === '') {
+            return ['retos' => []];
+        }
+        $lista = self::curso($user, $courseid, $unidad);
+        // Épica anterior a la carta 22 ignora `unidad` y devuelve TODOS los retos del curso sin ella: si la
+        // respuesta no trae la unidad en la raíz y coincidente (como texto), no se puede fiar → vacío.
+        if ($lista['unidad'] === '' || $lista['unidad'] !== $unidad) {
+            return ['retos' => []];
+        }
+        $out = [];
+        foreach ($lista['retos'] as $r) {
+            // Y cada reto debe traer SU unidad y ser esta: sin ella o con otra, se descarta.
+            if ($r['unidad'] !== $unidad) {
+                continue;
+            }
+            $out[] = [
+                'codigo' => $r['codigo'],
+                'titulo' => $r['titulo'],
+                'dificultad' => $r['dificultad'],
+                'minutos' => $r['minutos'],
+                'enlace' => $r['enlace'],
+            ];
+            if (count($out) >= self::MIS_RETOS_MAX) {
+                break;
+            }
+        }
+        return ['retos' => $out];
+    }
+
+    /** accion=unidad: lo anterior, con el candado de siempre (misma petición que proponer/elegir no a la vez). */
+    public static function unidad(\stdClass $user, int $courseid, int $cmid): array {
+        return self::con_candado($user, $courseid, function() use ($user, $courseid, $cmid) {
+            return self::retos_de_unidad($user, $courseid, $cmid);
+        });
+    }
+
+    /**
+     * Id de la sección (course_sections.id, NO el número de orden) del módulo, como texto; '' si no se
+     * puede saber. Falla abierto: sin unidad, Épica trata la petición como siempre.
+     */
+    private static function unidad_de_cmid(int $courseid, int $cmid): string {
+        try {
+            $cm = \get_fast_modinfo($courseid)->get_cm($cmid);
+            $id = (int)($cm->section ?? 0); // cm_info->section es el id de la sección; ->sectionnum, el orden.
+            return $id > 0 ? (string)$id : '';
+        } catch (\Throwable $e) {
+            return '';
+        }
     }
 
     // ----------------------------------------------------------------

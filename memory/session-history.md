@@ -1,5 +1,12 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-05 — «Mis proyectos en Épica» para el profesorado (v2.11.0)
+
+Reglas en `CLAUDE.md` → «Historial del profesorado en Épica». `classes/epica_puente.php` (`historial` en la lista cerrada, campos mínimos), `templates/chat.mustache`, `amd/src/crear.js` (+ `amd/build`). **Al desplegar: purgar cachés (plantilla + JS)**; sin `db/`. Lo que costó ver:
+- **Un alumno no llega a firmar por `require_capability`**, no por una comprobación nueva: el encargo pedía «403 nuestro sin firmar» y ya era así; se dejó probado.
+- **Dos puertas distintas con nombres parecidos**: el historial del alumno va por `epica_historial.php` (`/api/auth/alumno`) y el del profesorado por el puente de docentes (`apiFuentesUrl`). Reutilizar `pulsoPostHistorial` habría exigido `isTeacher === false`.
+- **Verificado** (fuera del repo): puente con stubs de Moodle en PHP 8.3 (14: docente firma con `viewanalytics` y curso, solo `token`+`herramienta`, alumno sin firmar, herramienta fuera de lista/vacía 400, sin Épica 503, GET 405, fuentes y factoría sin cambios); plantilla con mustache.js en rol × Épica contra HEAD (11: solo profesorado+Épica cambia, y quitando el bloque nuevo es idéntica); JS con jsdom sobre `src` y `build` (16). **NO probado**: contra el Épica real (303 a «Mis proyectos») ni el aspecto del botón en navegador (reusa `.pulso-historial-link`).
+
 ## 2026-10-29 — SCORM que Pulse no puede leer: avisados en Crear y en el chat (v2.10.1)
 
 Reglas en `CLAUDE.md` → «SCORM». `classes/scorm_extractor.php` (`remote_host`), `classes/content_extractor.php` (`extract_scorm`), `classes/full_text_store.php`, `classes/creation_quota.php`, `api_create_form.php`, `classes/rag_retriever.php`, `classes/chat_pipeline.php`, `classes/diagnostics.php` + `diagnostico.php`, `amd/src/{common,crear,retos,presentacion}.js` (+ `amd/build`). **Al desplegar: purgar cachés (JS) y reindexar los cursos con SCORM**; sin `db/`. Lo que costó ver:

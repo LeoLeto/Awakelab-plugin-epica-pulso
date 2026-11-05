@@ -39,7 +39,7 @@ require_once(__DIR__ . '/epica_client.php');
 class epica_puente {
 
     /** Herramientas que admite el puente (lista cerrada). */
-    const HERRAMIENTAS = ['fuentes', 'factoria'];
+    const HERRAMIENTAS = ['fuentes', 'factoria', 'historial'];
 
     /** Forma del código de borrador que devuelve la Factoría (carta 18 §2: 32 alfanuméricos de ejemplo; se admiten - y _ por si es base64url). */
     const BORRADOR_REGEX = '/^[A-Za-z0-9_-]{16,64}\z/';
@@ -59,9 +59,13 @@ class epica_puente {
      * @return string
      */
     public static function texto_abriendo(string $herramienta): string {
-        return $herramienta === 'factoria'
-            ? 'Abriendo la Factoría en Épica…'
-            : 'Abriendo el material para Pulse en Épica…';
+        if ($herramienta === 'factoria') {
+            return 'Abriendo la Factoría en Épica…';
+        }
+        if ($herramienta === 'historial') {
+            return 'Abriendo tus proyectos en Épica…';
+        }
+        return 'Abriendo el material para Pulse en Épica…';
     }
 
     /**
@@ -74,6 +78,10 @@ class epica_puente {
      * @return array<string, string>
      */
     public static function campos(string $herramienta, string $cursonombre, string $borrador = ''): array {
+        // `historial` («Mis proyectos», carta 19) no lleva nada más que el token y la herramienta.
+        if ($herramienta === 'historial') {
+            return ['herramienta' => $herramienta];
+        }
         $campos = ['herramienta' => $herramienta, 'curso_nombre' => $cursonombre];
         if ($herramienta === 'factoria') {
             $campos['borrador'] = $borrador;

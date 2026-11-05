@@ -256,6 +256,15 @@
                     </div>
                 </template>
                 {{/epica}}{{/isteacher}}
+                {{! Lo mismo para el profesorado con Épica: «Mis proyectos» (carta 19). }}
+                {{#isteacher}}{{#epica}}
+                <template id="pulso-mine-proyectos-tpl">
+                    <div class="pulso-mine-historial">
+                        <button type="button" class="pulso-historial-link" data-pulso-action="pulsoAbrirProyectos">Mis proyectos en Épica<span aria-hidden="true"> ↗</span><span class="pulso-sr-only"> (se abre en una pestaña nueva)</span></button>
+                        <p class="pulso-create-hint">Ahí está lo que has creado o publicado en Épica. Lo que creas desde el chat de Pulse está en esta lista.</p>
+                    </div>
+                </template>
+                {{/epica}}{{/isteacher}}
             </div>
 
             <div class="pulso-create-panel" id="pulso-create-panel" hidden>

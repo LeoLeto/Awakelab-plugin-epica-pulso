@@ -982,9 +982,11 @@ define(['block_pulso/common'], function(C) {
         // Plantilla inerte (<template>) del pie de historial: solo existe en el HTML del alumnado con Épica
         // ({{^isteacher}}{{#epica}}), así que quien no debe verlo no la recibe. La UI no es control de
         // acceso (lo es epica_historial.php); el chequeo de cfg es una segunda red.
+        // Profesorado: «Mis proyectos en Épica» (carta 19), plantilla `pulso-mine-proyectos-tpl` ({{#isteacher}}{{#epica}}).
         function pulsoMineHistorialHtml() {
-            if (cfg.isTeacher !== false || cfg.epicaAvailable === false) return '';
-            const tpl = document.getElementById('pulso-mine-historial-tpl');
+            if (cfg.epicaAvailable === false) return '';
+            if (cfg.isTeacher !== true && cfg.isTeacher !== false) return '';
+            const tpl = document.getElementById(cfg.isTeacher ? 'pulso-mine-proyectos-tpl' : 'pulso-mine-historial-tpl');
             return tpl ? tpl.innerHTML : '';
         }
 
@@ -1229,6 +1231,14 @@ define(['block_pulso/common'], function(C) {
         }
 
 
+        // «Mis proyectos en Épica» (carta 19): mismo puente de docentes con `herramienta=historial`. Solo profesorado;
+        // epica_puente exige viewanalytics y sesskey y firma el token (nunca este JS).
+        function pulsoAbrirProyectos() {
+            if (cfg.isTeacher !== true || !cfg.apiFuentesUrl) return;
+            pulsoPostNuevaPestana(cfg.apiFuentesUrl, [['herramienta', 'historial']]);
+        }
+
+
         // «Abrir en la Factoría» (carta 18): mismo puente que «Material para Pulse» (fuentes_puente.php) con
         // `herramienta=factoria` y el código del borrador como campo del POST. Solo profesorado y solo un
         // código de la forma que fija el servidor (que lo vuelve a validar); el token lo firma el servidor.
@@ -1286,6 +1296,7 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoSyncPolling = pulsoSyncPolling;
     C.fn.pulsoAbrirHistorial = pulsoAbrirHistorial;
     C.fn.pulsoAbrirFuentes = pulsoAbrirFuentes;
+    C.fn.pulsoAbrirProyectos = pulsoAbrirProyectos;
     C.fn.pulsoAbrirFactoria = pulsoAbrirFactoria;
     C.fn.pulsoAbrirReto = pulsoAbrirReto;
     C.fn.pulsoRetoCodigoValido = pulsoRetoCodigoValido;

@@ -1,5 +1,15 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-12 — Un recurso nombrado se contesta con su contenido, también el PDF de un mod_url (v2.13.1)
+
+Reglas en `CLAUDE.md` → «Enrutado» (dos viñetas nuevas). Solo `classes/rag_retriever.php` (`resource_question_intent`, `resource_has_readable_text`, `build_linked_pdf_answer`, las dos rutas de recurso y dos regex). **Al desplegar: nada** (solo PHP; sin `db/`, plantillas, CSS ni JS). Lo que costó ver:
+- **El fallo era de clasificación, no de lectura**: en sanase-test (SANS0001) «háblame de Metodología… Sampieri», «y Metodología…?» y la sugerencia de Pulse «¿Puedes explicarme con más detalle el contenido de "…"?» devolvían la ficha, mientras «según el documento de metodología…» citaba el PDF sin problema. El defecto de la rama de recurso era la ficha, así que todo fraseo fuera de las listas acababa ahí. Ampliar listas no basta: se invierte el defecto (`none` → resumen si hay texto legible) y las listas solo eligen entre resumen y contenido.
+- **Una sugerencia determinista que no se reconoce como contenido es un bucle**: la ficha ofrece «explicarme… el contenido de X», y esa frase volvía a la ficha. Las dos sugerencias de la rama de documento están ahora en las pruebas.
+- **«Manual unidad N» de Refactika ganaba al resumen de sección y perdía su texto**: nombrado entero, `section_for_summary()` cede al recurso (regla de v2.9.1) y el mod_url caía en `build_generic_activity_answer()`. Se contesta con la fila de `block_pulso_full_text` (literal, sin descargar nada). Preguntar por la unidad («resúmeme la unidad 1») ya funcionaba por el resumen de sección.
+- **«¿Qué es lo más importante de X?» era identificación** por la regex `qué es (el|la…)?\s*\w`: ahora excluye «lo» y «más».
+- **Dentro de una sección, el «único PDF» no se resume si no se nombra**: lo eligió la sección, no la pregunta.
+- **Verificado** (PHP 8.3.36 portátil, fuera del repo, `rag_retriever.php` real con stubs de BD, modinfo, File API, `full_text_store` y visibilidad): 25 comprobaciones —las cuatro frases del chat real, las dos sugerencias, resumen explícito, «qué es lo más importante», ubicación/acceso/identificación/formato siguen en ficha, PDF sin texto en ficha, mod_url con PDF (resumen, contenido, nombre a secas, enlace a `mod/url`, título que reconoce `build_direct_followups`), mod_url oculto/sin texto/sin PDF en ficha, y tres de la ruta de sección—. **La misma batería contra v2.13.0 da 12 fallos**, que son los del chat. `php -l` limpio. **NO probado**: `resolve_direct_course_query()` entera (la interacción con `section_for_summary()` se razona, no se ejecutó), la respuesta del modelo con el texto (`summarize_document_text`/`answer_document_question` no se tocan) ni en sanase-test/Refactika.
+
 ## 2026-11-05 — Fondo, botón «Mis creaciones» y logo del centro (v2.13.0)
 
 Reglas en `CLAUDE.md` → «Colores de cada centro» (último subapartado). `classes/tema_service.php`, `tema_preview.php`, `chat_simple_view.php`, `templates/chat.mustache`, `lib.php` (rama de sistema en `block_pulso_pluginfile`), `styles.css`, `lang`. **Al desplegar: purgar cachés (plantilla + CSS)**; sin `db/`. Lo que costó ver:

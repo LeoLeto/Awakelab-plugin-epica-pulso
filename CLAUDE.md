@@ -305,6 +305,26 @@ recurso por nombre y nº de preguntas de un cuestionario.
   hay", "de qué habla", "según el documento"— se abre el documento
   (`content_mode`). Si no hay texto extraíble, se dice explícitamente en vez de
   devolver metadatos que parecen una respuesta.
+- **Sin intención reconocible, el contenido, no la ficha** (v2.13.1; en sanase-test, curso SANS0001,
+  «háblame de Metodología de la Investigación Sampieri», «y Metodología…?» y la sugerencia del propio
+  Pulse «¿Puedes explicarme con más detalle el contenido de "…"?» devolvían nombre, archivo y tipo de un
+  PDF indexado). La intención la decide **una sola función**, `resource_question_intent()` —`summary` >
+  `identification` > `content` > `none`—, en las dos rutas de recurso (por nombre y dentro de una
+  sección, que discrepaban: la segunda no conocía «resume»). **`none` se resume si el recurso tiene texto
+  legible** (`resource_has_readable_text()`: manda `usable` de `block_pulso_full_text`; sin fila, el texto
+  reunido), y solo cae en la ficha si no lo tiene. Dentro de una sección, solo si la pregunta **nombra** el
+  recurso: el «único PDF de la sección» se cogió por la sección y ahí la ficha sigue siendo lo prudente.
+  Cuidado al añadir sugerencias deterministas: **su texto vuelve a entrar por el pipeline** y tiene que
+  caer en contenido; las de la rama de documento («explicarme… el contenido de», «mostrarme el siguiente
+  apartado de») están cubiertas por las reglas de v2.13.1. «qué es lo/más …» ya no es identificación.
+- **El PDF de un mod_url se contesta como un PDF del curso** (v2.13.1, `build_linked_pdf_answer()`). Un
+  «Manual unidad N» de Refactika nombrado por completo ganaba al resumen de sección (es una actividad
+  visible citada entera) y acababa en `build_generic_activity_answer()`: nombre y enlace, con el texto ya
+  indexado desde v2.10.0. Ahora, si la fila de `block_pulso_full_text` es `usable` y su `extraido_por`
+  empieza por `url_pdf_extractor::EXTRACTED_PREFIX`, devuelve `summary_mode`/`content_mode` con el texto
+  literal de la fila (6.000 / 7.000 caracteres), título `Resumen del recurso X` o `X` y enlace «Ir a
+  enlace». **Solo lee lo indexado**: descargar sigue siendo cosa del cron. Identificación/ubicación, o sin
+  texto, sigue la ficha del enlace.
 - Las **stopwords del matcher difuso** incluyen ya las genéricas de nombre de
   recurso (`material`, `recurso`, `documento`, `archivo`, `contenido`, `unidad`…):
   un PDF llamado "MATERIAL 1" no puede engancharse por la palabra "material" de la
@@ -347,7 +367,7 @@ recurso por nombre y nº de preguntas de un cuestionario.
     «no se ha podido leer: …» y se le obliga a avisarlo.
   - `build_direct_query()` trata «tema/unidad/bloque N» como sección concreta (`$mentionsSection`): «resúmeme este tema» no arrastra un recurso del historial.
   - `isSummaryIntent` de `resolve_direct_resource_query()` casa también «resume», «resúmeme», «resúmelo/la/los/las» (antes solo «resumen/resumir»: «resume MIC Tema 2»
-    devolvía la ficha de metadatos). **Pendiente:** los `isSummaryIntent` de `resolve_direct_quiz_in_section_query()` y `resolve_direct_resource_in_section_query()` siguen sin «resume».
+    devolvía la ficha de metadatos). **Pendiente:** el `isSummaryIntent` de `resolve_direct_quiz_in_section_query()` sigue sin «resume» (el de `resolve_direct_resource_in_section_query()` lo tiene desde v2.13.1, por `resource_question_intent()`).
   - **Dentro de un `namespace`, `catch (Throwable`/`Exception` y `new moodle_exception` van SIEMPRE con `\`**: sin barra apuntan a `block_pulso\Throwable` (no existe) y el catch no casa con
     nada, sin error. Los endpoints de la raíz y `chat_simple_view.php` no tienen namespace y no lo necesitan.
 

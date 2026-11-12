@@ -7,6 +7,7 @@
 - **Anthropic API constraints** — lo que rechaza la API y cómo se evita.
 - **Invariantes que NO se pueden romper** — UTF-8, RAG fuera de la petición, cmid sintéticos, caché del prompt, historial sin JSON, sesskey.
 - **Modo alumno** — dos capabilities, tres capas. **Enrutado** — sección vs recurso vs metadatos. **Conversación proactiva** — `next_step`.
+- **Prompts preestablecidos (v2.14.0)** — sugerencias al escribir, panel de opciones y home; el chat manda `preset` + `preset_params` y el servidor monta la pregunta y el encargo.
 - **Enlaces directos (v1.11)** y **Tema claro (v1.16)** — botón «Ir a…»; paleta y contraste.
 - **Épica** — pasos 1, 3 y 4 (bloque Crear, ciclo adhoc, panel de estado), **Gamificación** 1–4, **Ampliación** 1–2, **Retos** 1–2, **QA general**, **Historial del alumno**.
 - **Auditoría de UX, fases 1–3** — visibilidad en el RAG y `pulso_error`; Épica opcional, topes y diagnóstico; accesibilidad y móvil.
@@ -57,6 +58,8 @@ but the `$plugin->version` bump is still mandatory every time.
     conversación + cuadro de texto; Crear = lista de herramientas → formulario → detalle (pila), más «Mis creaciones».
   - El chat envía a `api_chat_stream.php` por fetch + SSE (streaming de tokens con vista previa progresiva del JSON parcial) y cae a
     `api_chat.php` (XHR/JSON) solo ante fallo de red, 404 o 405 (ver «Auditoría fase 1»).
+  - **Desde v2.14.0 la home es el catálogo de prompts preestablecidos** (ver «Prompts preestablecidos»): lo de abajo describe la home
+    anterior y vale por sus reglas (qué se oculta al primer mensaje, `clearConversation()`, `showCapabilities()`).
   - **Home corta por rol** (`#pulso-home`, v1.37.0: 4 tarjetas destacadas + «Ver más ideas», ver «Fase 4 — Home corta»): cada
     tarjeta/idea inyecta una pregunta completa en lenguaje natural en el pipeline — las nuevas deben apuntar a intenciones de
     analítica o estructurales, no a palabras sueltas, para no repetir el fallo del matcher de actividades (backlog #2). La home se
@@ -432,6 +435,69 @@ prompt no cubre el otro:
 Y un desempate de la misma tanda: **un listado no es un material**. El nombre de una
 sección ("RECURSOS") mete "recurso" en `qnorm`, así que los listados (`Contenido de la
 sección X`, `Secciones del curso`) se resuelven ANTES de la rama de documento.
+
+## Prompts preestablecidos (v2.14.0)
+
+El chat se orienta a prompts cerrados. Tres piezas que usan el MISMO catálogo, `classes/chat_presets.php` (`definitions()`), que es
+la fuente única —el cliente no tiene ninguna lista propia—:
+
+- **Sugerencias al escribir** (`amd/src/presets.js`): al teclear «hazme un resu» sale una lista (`#pulso-preset-suggest`, `role="listbox"`,
+  el cuadro de texto es un `combobox`) con «Haz un resumen de una unidad»… Emparejamiento local, sin LLM ni red: minúsculas sin tildes,
+  fuera las palabras vacías (`STOP`) y los números, y **todas** las palabras que quedan tienen que casar con la etiqueta (2 puntos) o con
+  `keywords` (1) —igual, por prefijo, o por raíz ≥5—. Una frase larga y libre no sugiere nada, a propósito. **Enter sin opción resaltada
+  envía texto libre**: la lista nunca secuestra el Enter; flecha abajo + Enter (o clic) elige. Escape cierra la lista, no el chat.
+- **Panel de opciones** (`#pulso-preset-panel`, encima del cuadro de texto y **fuera del `<form>`**): un desplegable por parámetro. Los ids
+  del curso (`section`, `resource`, `quiz`, `activity`) salen de `api_presets.php` → `chat_presets::course_options()`, ya filtrados por
+  `uservisible`; `resource` solo lista módulos con fila `usable=1` en `block_pulso_full_text`. Los de valores fijos están en `CHOICES`.
+  Un prompt sin parámetros se envía al elegirlo. «unidad 2» tecleado deja la unidad 2 preseleccionada.
+- **Home**: `chat_presets::home_groups()` → sección `{{#presetgroups}}` de `templates/chat.mustache`. Sustituye a las tarjetas y a «Ver más
+  ideas» (sus funciones `toggleIdeas`/`pulsoSetIdeas` siguen en `chat.js`, inertes: comprueban que el nodo exista).
+
+**Lo que viaja y quién manda.** `buildChatFormData()` añade `preset` (id) y `preset_params` (JSON); `user_query` lleva solo el texto que
+se ve en la burbuja. Los dos endpoints llaman a `chat_presets::from_request()` después de permisos y `check_enabled()` y **antes** del tope
+de ritmo: si hay `preset`, **`$user_query` pasa a ser la pregunta canónica que monta el servidor** (es la que se contesta y la que entra
+en el historial) y lo que mandó el cliente se ignora. `resolve()` revalida todo: el prompt existe, es del rol (`teacher` → 403 `access`
+a un alumno), cada id es de este curso y visible (si no, 400 `bad_request`), los valores fijos fuera de lista caen en su defecto y el
+texto libre (`topic`) se limpia (una línea, sin `<>«»"`, 120 caracteres con `mb_substr`). **La UI no es un control de acceso.**
+
+**Dos modos**, y la diferencia es la regla que hay que respetar:
+
+- **`material`** (resumen de unidad/recurso, explicar un concepto, preguntas de repaso, esquema, glosario): va **siempre al LLM** con el
+  texto de la sección o del recurso **elegido por su id** (`rag_retriever::build_summary_context_for_section()` /
+  `…_for_resource()`, que comparten `summary_context_from()` con el resumen de sección de v2.9.1: mismo material, mismos delimitadores
+  `<<<RECURSO n>>>`, mismo aviso de ilegibles; un recurso solo se lleva los 24.000 caracteres enteros). Se **salta la ruta directa**
+  (contestaría con una ficha o un listado al reconocer el nombre) y **el detector de pregunta de profesor** (la canónica lleva el nombre de
+  una unidad, que puede sonar a analítica; lo que se manda es contenido de una lista ya filtrada). El encargo —extensión, formato, tipo de
+  pregunta— va en el **bloque dinámico**: `generate_system_blocks()` tiene un 7.º parámetro `$preset_task` y
+  `build_section_summary_section()` cambia su cabecera por «ENCARGO: …». **El prompt base no cambia ni un byte** (md5 igual que en
+  v2.13.1, y el bloque dinámico sin preset también). A `generate_system_blocks()` se le pasa `''` como `$user_query` en este modo, para
+  que la regla de «de qué trata el curso» no se dispare por el nombre de una unidad.
+- **`query`** (estructura y analítica): una pregunta canónica que entra por el **pipeline de siempre**. Las que no llevan parámetros son
+  las preguntas que ya ofrecía la home; las que llevan meten el **nombre real** de la sección o actividad (el matcher lo necesita) entre
+  comillas dobles, quitando las que tuviera el nombre.
+
+**El encargo no inventa campos**: fija `type` y la forma de `data` con claves que `format.js` ya pinta —`{paragraph}` para texto;
+tarjetas con título `name`/`idea`/`tema` y cuerpo `descripcion`/`definicion`/`texto`—. Un formato nuevo tiene que pasar la pregunta de
+«Conversación proactiva»: ¿está en el esquema, lo autoriza el formato y lo pinta el frontend?
+
+**Añadir un prompt** = una entrada en `definitions()` (+ su rama en `material_task()` o `parametrized_query()` si lleva parámetros).
+El cliente, la home y las sugerencias lo recogen solos. Un parámetro nuevo de valores fijos va en `CHOICES`; uno que sea un id del curso
+necesita además su lista en `course_options()` y su entrada en `COURSE_PARAMS` de `presets.js`.
+
+**«Reintentar» y el respaldo XHR** reenvían el mismo prompt porque `S.pulsoPresetByMessage` lo guarda por el texto de la burbuja; se vacía
+con «Nueva conversación». `api_presets.php` se pide una vez (primer foco o primera elección) y **falla en silencio**: sin catálogo el chat
+es de texto libre, y un botón de la home avisa por lector de pantalla y deja el foco en el cuadro.
+
+**Al desplegar: purgar cachés** (plantilla + CSS + JS). Sin `db/`. Textos en castellano en el código, como el resto de la plantilla (sin
+claves de `lang/` nuevas).
+
+**Verificado** (fuera del repo): `php -l` en todo lo tocado; **87** comprobaciones PHP con `chat_presets`, `rag_retriever` y
+`system_prompt_designer` reales sobre un Moodle simulado (catálogo por rol, opciones visibles, las seis resoluciones de material, diez
+formas de pedir lo que no se puede, canónicas, `from_request`, bloque dinámico) y md5 del prompt base y del dinámico sin preset idénticos
+a HEAD; **40 × 2** en jsdom con la plantilla real, sobre `src` y sobre `build` (sugerencias, teclado, panel, lo que se envía, reintento,
+home, escape del concepto, sin catálogo); y una pasada visual en navegador con el servidor simulado. **NO probado**: en un Moodle real
+(sanase-test), la respuesta del modelo a cada encargo (longitudes, que respete `type`/`data`), ni cómo enrutan las canónicas de
+`info_actividad` y `resultados_cuestionario`, que son frases nuevas por el pipeline de texto.
 
 ## Bug backlog
 

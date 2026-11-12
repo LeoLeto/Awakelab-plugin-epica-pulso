@@ -1,5 +1,16 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-12 — Prompts preestablecidos: sugerencias al escribir, panel de opciones y home (v2.14.0)
+
+Reglas en `CLAUDE.md` → «Prompts preestablecidos». Nuevos: `classes/chat_presets.php`, `api_presets.php`, `amd/src/presets.js`. Tocados: `api_chat.php`, `api_chat_stream.php`, `classes/rag_retriever.php` (`summary_context_from` y las dos entradas por id), `classes/system_prompt_designer.php` (7.º parámetro), `chat_simple_view.php`, `templates/chat.mustache` (home y zona del cuadro de texto), `amd/src/chat.js`, `styles.css`, `amd/build`. **Al desplegar: purgar cachés (plantilla + CSS + JS)**; sin `db/`. Decidido con Chema antes de empezar: catálogo de cuatro grupos (resúmenes, estudio, estructura, analítica solo profesorado), desplegable = unidad + ajustes con valores por defecto, envío estructurado al servidor, y la home pasa a ser el catálogo con el texto libre intacto. Lo que costó ver:
+- **El resumen de sección de v2.9.1 ya era el 80 % del trabajo**: mismo material, mismos delimitadores. Lo que faltaba era entrar por id en vez de por el matcher, así que se partió `build_section_summary_context()` en la detección (texto libre) y `summary_context_from()` (común). Un recurso suelto reutiliza la sección filtrada a su cmid.
+- **Un prompt de material tiene que saltarse dos cosas que el texto libre necesita**: la ruta directa (reconoce el nombre de la unidad y contesta con ficha o listado) y `is_teacher_only_query()` (el nombre de una unidad puede sonar a analítica). La seguridad no baja: el id se revalida contra `uservisible` y el contexto del alumno sigue sin analítica.
+- **`$user_query` vacío a `generate_system_blocks()` en modo material**: si no, una unidad llamada «…del curso» dispara la regla de «de qué trata el curso» encima del encargo.
+- **Enter no se secuestra**: la lista de sugerencias se abre sin opción resaltada; solo flecha abajo + Enter elige. El teclado de `presets.js` se registra antes que el Enter de `chat.js` (`pulsoPresetsBoot()` va justo tras el `submit`) y corta con `stopImmediatePropagation()`.
+- **`chat_presets.php` se carga al pintar el chat en cada página del curso** (la home): por eso `rag_retriever` y `full_text_store` se cargan dentro de los métodos que los usan y no arriba.
+- **Trampas de la sesión**: no hay Python en la máquina (los parches de varios ficheros se hicieron con Node, exigiendo coincidencia única y conservando CRLF); el PHP portátil no carga `mbstring` solo (`-d extension_dir=… -d extension=mbstring`); y el build marca como modificados los `.min.js` que no cambian solo por finales de línea (`git diff --stat` dice la verdad).
+- **Verificado y NO probado**: ver el final de la sección de `CLAUDE.md`. Lo que falta es todo lo que pide un Moodle delante y un modelo de verdad.
+
 ## 2026-11-12 — Un recurso nombrado se contesta con su contenido, también el PDF de un mod_url (v2.13.1)
 
 Reglas en `CLAUDE.md` → «Enrutado» (dos viñetas nuevas). Solo `classes/rag_retriever.php` (`resource_question_intent`, `resource_has_readable_text`, `build_linked_pdf_answer`, las dos rutas de recurso y dos regex). **Al desplegar: nada** (solo PHP; sin `db/`, plantillas, CSS ni JS). Lo que costó ver:

@@ -26,6 +26,7 @@ require_once(__DIR__ . '/classes/system_prompt_designer.php');
 require_once(__DIR__ . '/classes/rag_retriever.php');
 require_once(__DIR__ . '/classes/chat_pipeline.php');
 require_once(__DIR__ . '/classes/chat_rate_limiter.php');
+require_once(__DIR__ . '/classes/chat_presets.php');
 
 use block_pulso\chat_pipeline;
 use block_pulso\chat_rate_limiter;
@@ -87,6 +88,15 @@ try {
     // T2.6.1: Verificar si Pulso está habilitado para este curso.
     chat_pipeline::check_enabled($courseid);
 
+    // Prompt preestablecido (v2.14.0): si llega 'preset', la pregunta NO es el texto del cliente sino
+    // la canónica que monta el servidor con parámetros validados (rol y visibilidad incluidos). Un
+    // prompt o un parámetro que no vale es un 400 antes de gastar cupo, contexto o tokens.
+    $preset = \block_pulso\chat_presets::from_request($courseid, $isteacher);
+    $presetmaterial = $preset !== null && $preset['mode'] === 'material';
+    if ($preset !== null) {
+        $user_query = $preset['query'];
+    }
+
     // Tope por persona (minuto y día), ANTES de contexto, RAG y Anthropic.
     chat_rate_limiter::check((int)$USER->id);
 
@@ -95,7 +105,9 @@ try {
 
     // Modo alumno: las preguntas de analítica se cortan AQUÍ, antes de leer
     // contexto, RAG o llamar a Anthropic. Ni un dato ni un token.
-    if (!$isteacher && chat_pipeline::is_teacher_only_query($user_query)) {
+    // (Un prompt de material no pasa por el detector: su texto lleva el nombre de una unidad, que puede
+    // sonar a analítica, y lo que se manda es contenido elegido de una lista ya filtrada.)
+    if (!$isteacher && !$presetmaterial && chat_pipeline::is_teacher_only_query($user_query)) {
         $refusal = chat_pipeline::teacher_only_refusal($user_query);
         echo json_encode([
             'success' => true,
@@ -141,8 +153,12 @@ try {
     // 2. RUTA DIRECTA (respuestas resueltas desde Moodle)
     // ============================================================
 
-    $qinfo = chat_pipeline::build_direct_query($user_query, $history);
-    $direct = chat_pipeline::resolve_direct_answer($courseid, $user_query, $qinfo);
+    // Un prompt de material va SIEMPRE al LLM con su material (ver api_chat_stream.php).
+    $direct = null;
+    if (!$presetmaterial) {
+        $qinfo = chat_pipeline::build_direct_query($user_query, $history);
+        $direct = chat_pipeline::resolve_direct_answer($courseid, $user_query, $qinfo);
+    }
 
     if ($direct !== null) {
         $history = chat_pipeline::save_history($courseid, $history, $user_query, $direct['answer']);
@@ -177,15 +193,19 @@ try {
     // directa ni la negativa por rol llegan. Falla abierto (sin fragmentos) y va al bloque dinámico.
     $fuentes = chat_pipeline::get_fuentes($courseid, $user_query, $history);
     // Resumen de una sección (v2.9.1): texto de sus recursos, bloque dinámico; falla abierto.
-    $section_summary = chat_pipeline::get_section_summary($courseid, $user_query);
+    // Con un prompt preestablecido de material (v2.14.0) el material ya viene elegido por su id.
+    $section_summary = $presetmaterial
+        ? $preset['material']
+        : chat_pipeline::get_section_summary($courseid, $user_query);
 
     $system_prompt = system_prompt_designer::generate_system_blocks(
         $course_context,
         $rag_context,
         $isteacher,
-        $user_query,
+        $presetmaterial ? '' : $user_query,
         $fuentes,
-        $section_summary
+        $section_summary,
+        $presetmaterial ? $preset['instructions'] : ''
     );
 
     $connector = new anthropic_connector();

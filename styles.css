@@ -3087,3 +3087,183 @@ a.pulso-retos-open {
     }
 }
 
+/* ========== PROMPTS PREESTABLECIDOS (v2.14.0) ==========
+   Lista de sugerencias mientras se escribe y panel de opciones, los dos encima del cuadro de texto.
+   Solo variables --pulso-*: valen para el tema de siempre y para el de cada centro. */
+
+.pulso-preset-home-hint {
+    margin: 0 0 4px;
+    font-family: var(--pulso-font);
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--pulso-slate);
+}
+
+.pulso-preset-idea {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pulso-preset-idea-more,
+.pulso-preset-option-more {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--pulso-slate);
+    background: var(--pulso-surface);
+}
+
+.pulso-preset-suggest {
+    margin: 0 0 10px;
+    padding: 4px;
+    list-style: none;
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    background: var(--pulso-bg);
+    box-shadow: 0 6px 18px rgba(1, 25, 50, 0.10);
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.pulso-preset-suggest[hidden],
+.pulso-preset-panel[hidden],
+.pulso-preset-error[hidden] {
+    display: none;
+}
+
+.pulso-preset-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    font-family: var(--pulso-font);
+    font-size: 0.86rem;
+    line-height: 1.35;
+    color: var(--pulso-ink);
+    cursor: pointer;
+}
+
+.pulso-preset-option:hover,
+.pulso-preset-option.is-active {
+    background: var(--pulso-surface-2);
+}
+
+.pulso-preset-option.is-active {
+    box-shadow: inset 0 0 0 2px var(--pulso-accent);
+}
+
+.pulso-preset-panel {
+    margin: 0 0 10px;
+    padding: 12px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    background: var(--pulso-surface);
+    max-height: 46vh;
+    overflow-y: auto;
+}
+
+.pulso-preset-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.pulso-preset-title {
+    margin: 0;
+    font-family: var(--pulso-font);
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--pulso-ink);
+}
+
+.pulso-preset-title:focus {
+    outline: none;
+}
+
+.pulso-preset-close {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 5px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 8px;
+    background: var(--pulso-bg);
+    color: var(--pulso-slate);
+    cursor: pointer;
+}
+
+.pulso-preset-close svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.pulso-preset-close:focus-visible,
+.pulso-preset-send:focus-visible,
+.pulso-preset-idea:focus-visible {
+    outline: 2px solid var(--pulso-accent);
+    outline-offset: 2px;
+}
+
+.pulso-preset-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0 10px;
+}
+
+/* El primer campo (unidad, recurso, actividad) y el concepto ocupan la fila entera. */
+.pulso-preset-fields > :first-child,
+.pulso-preset-fields > .pulso-preset-empty {
+    grid-column: 1 / -1;
+}
+
+.pulso-preset-fields .pulso-create-field {
+    margin-bottom: 10px;
+    min-width: 0;
+}
+
+.pulso-preset-fields .pulso-create-field select,
+.pulso-preset-fields .pulso-create-field input[type="text"] {
+    background: var(--pulso-bg);
+}
+
+.pulso-preset-empty,
+.pulso-preset-error {
+    margin: 0 0 10px;
+    font-family: var(--pulso-font);
+    font-size: 0.84rem;
+    line-height: 1.4;
+    color: var(--pulso-ink);
+}
+
+.pulso-preset-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.pulso-preset-send {
+    padding: 9px 18px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text);
+    font-family: var(--pulso-font);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pulso-preset-send[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}

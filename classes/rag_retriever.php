@@ -2526,15 +2526,86 @@ class rag_retriever {
             return [];
         }
 
+        return self::summary_context_from($courseid, $section, 0);
+    }
+
+    /**
+     * Lo mismo, pero con la sección elegida POR SU ID (prompts preestablecidos, v2.14.0): no hay
+     * pregunta que interpretar ni nombre que emparejar. Vacío si la sección no es de este curso, es la
+     * general (0) o este usuario no la ve.
+     *
+     * @param int $courseid
+     * @param int $sectionid course_sections.id
+     * @return array Como build_section_summary_context().
+     */
+    public static function build_summary_context_for_section(int $courseid, int $sectionid): array {
+        global $DB;
+
+        $section = $DB->get_record('course_sections', ['id' => $sectionid, 'course' => $courseid], 'id, section, name, summary, visible');
+        if (!$section || (int)$section->section === 0 || !course_visibility::section_visible($courseid, (int)$section->section)) {
+            return [];
+        }
+        return self::summary_context_from($courseid, $section, 0);
+    }
+
+    /**
+     * Material de UN recurso elegido por su cmid (prompts preestablecidos, v2.14.0), con la misma
+     * forma que el de una sección más `resource => true`. Al ser uno solo, se lleva el presupuesto
+     * entero. Vacío si el módulo no es de este curso o este usuario no lo ve.
+     *
+     * @param int $courseid
+     * @param int $cmid
+     * @return array
+     */
+    public static function build_summary_context_for_resource(int $courseid, int $cmid): array {
+        global $DB;
+
+        if (!course_visibility::cm_visible($courseid, $cmid)) {
+            return [];
+        }
+        try {
+            $cm = \get_fast_modinfo($courseid)->get_cm($cmid);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $section = $DB->get_record('course_sections', ['id' => (int)$cm->section, 'course' => $courseid], 'id, section, name, summary, visible');
+        if (!$section) {
+            return [];
+        }
+        $context = self::summary_context_from($courseid, $section, $cmid);
+        $name = trim((string)$cm->name);
+        $context['title'] = $name !== '' ? preg_replace('/[<>]{3,}/u', '', $name) : $context['title'];
+        $context['resource'] = true;
+        return $context;
+    }
+
+    /**
+     * Arma el contexto de resumen de una sección ya elegida. Con $onlycmid > 0 se queda solo con
+     * ese módulo (y sin la descripción de la sección, que no es suya).
+     *
+     * @param int $courseid
+     * @param object $section Registro de course_sections
+     * @param int $onlycmid 0 = toda la sección
+     * @return array{title: string, number: int, material: string, unreadable: string[], via_url: string[]}
+     */
+    private static function summary_context_from(int $courseid, $section, int $onlycmid): array {
         $material = self::section_summary_material($courseid, $section);
+        if ($onlycmid > 0) {
+            $only = function(array $item) use ($onlycmid): bool {
+                return (int)$item['cmid'] === $onlycmid;
+            };
+            $material['texts'] = array_values(array_filter($material['texts'], $only));
+            $material['unreadable'] = array_values(array_filter($material['unreadable'], $only));
+        }
         $title = trim((string)$section->name);
         if ($title === '') {
             $title = 'Seccion ' . (int)$section->section;
         }
 
         $count = count($material['texts']);
+        $perresource = $onlycmid > 0 ? self::SECTION_SUMMARY_MAX_CHARS : self::SECTION_SUMMARY_MAX_PER_RESOURCE;
         $budget = $count > 0
-            ? min(self::SECTION_SUMMARY_MAX_PER_RESOURCE, (int)floor(self::SECTION_SUMMARY_MAX_CHARS / $count))
+            ? min($perresource, (int)floor(self::SECTION_SUMMARY_MAX_CHARS / $count))
             : 0;
 
         $blocks = [];
@@ -2549,7 +2620,7 @@ class rag_retriever {
             $blocks[] = '<<<RECURSO ' . ($i + 1) . ' [' . $item['modname'] . ': ' . $name . ']>>>' . "\n" . $text . "\n" . '<<<FIN>>>';
         }
 
-        $summary = trim(strip_tags((string)$section->summary));
+        $summary = $onlycmid > 0 ? '' : trim(strip_tags((string)$section->summary));
         if ($summary !== '') {
             array_unshift($blocks, 'Descripcion de la seccion: ' . mb_substr(preg_replace('/\s+/u', ' ', $summary), 0, 1500, 'UTF-8'));
         }

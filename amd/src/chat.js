@@ -21,7 +21,7 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_pulso/retos', 'block_pulso/ampliacion', 'block_pulso/presentacion'], function(C) {
+define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_pulso/retos', 'block_pulso/ampliacion', 'block_pulso/presentacion', 'block_pulso/presets'], function(C) {
     'use strict';
 
     var S = C.S;
@@ -468,8 +468,33 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             addMessage(message, 'user');
             input.value = '';
             updateCharCount();
+            C.fn.pulsoPresetHide(); // la lista de prompts sugeridos era para lo que se acaba de enviar
 
             dispatchMessage(message);
+        }
+
+
+        // Prompt preestablecido (v2.14.0, presets.js): en la conversación se ve `text`, pero lo que
+        // decide la respuesta son el id y los parámetros, que viajan aparte y el servidor valida.
+        // Se guardan por texto para que «Reintentar» y el respaldo XHR reenvíen lo mismo.
+        function pulsoSendPreset(text, preset) {
+            if (pulsoSending) return false;
+            if (navigator.onLine === false) {
+                pulsoSetOffline(true);
+                return false;
+            }
+            S.pulsoPresetByMessage = S.pulsoPresetByMessage || {};
+            S.pulsoPresetByMessage[text] = preset;
+
+            pulsoSelectTab('ask', { focus: false });
+            setHomeVisible(false);
+            addMessage(text, 'user');
+            const input = document.getElementById('pulso-input');
+            if (input) input.value = '';
+            updateCharCount();
+
+            dispatchMessage(text);
+            return true;
         }
 
 
@@ -497,6 +522,12 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             formData.append('conversation_history', JSON.stringify(S.conversationHistory || []));
             // Obligatorio: los endpoints validan con require_sesskey().
             formData.append('sesskey', cfg.sesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+            // Prompt preestablecido: el servidor ignora `user_query` y monta la pregunta con esto.
+            const preset = S.pulsoPresetByMessage && S.pulsoPresetByMessage[message];
+            if (preset && preset.id) {
+                formData.append('preset', preset.id);
+                formData.append('preset_params', JSON.stringify(preset.params || {}));
+            }
             return formData;
         }
 
@@ -1401,6 +1432,8 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             showLoading(false);
             setHomeVisible(true);
             pulsoSetIdeas(false); // la home vuelve plegada
+            C.fn.pulsoPresetReset(); // sin lista de sugerencias ni panel de opciones a medias
+            S.pulsoPresetByMessage = {};
             pulsoSelectTab('ask', { focus: false }); // el botón de la cabecera también se ve desde Crear
 
             const bubble = document.getElementById('pulso-chat-bubble');
@@ -1556,6 +1589,10 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
             var chatForm = document.getElementById('pulso-chat-form');
             if (chatForm) chatForm.addEventListener('submit', sendMessage);
 
+            // Prompts preestablecidos: su teclado se registra ANTES que el Enter de más abajo (con una
+            // sugerencia resaltada, Enter la elige en vez de enviar lo tecleado).
+            C.fn.pulsoPresetsBoot();
+
             // Ajustar posicion de burbuja cuando cambia el estado del cajon de bloques.
             updateBubblePositionByDrawerState();
             window.addEventListener('resize', updateBubblePositionByDrawerState);
@@ -1681,6 +1718,7 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
     C.fn.pulsoCopyQuestion = pulsoCopyQuestion;
     C.fn.showCapabilities = showCapabilities;
     C.fn.askPreset = askPreset;
+    C.fn.pulsoSendPreset = pulsoSendPreset;
     C.fn.toggleIdeas = toggleIdeas;
     C.fn.toggleMic = toggleMic;
 

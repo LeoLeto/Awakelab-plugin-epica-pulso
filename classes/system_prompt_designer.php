@@ -892,6 +892,9 @@ PROMPT;
             // siguen siendo los de siempre (no se autoriza ningún campo nuevo).
             if (!empty($section['resource'])) {
                 $what = "del recurso «" . $section['title'] . "»";
+            } else if (!empty($section['course'])) {
+                // Resumen del curso (v2.16.1): el material es el de todas sus unidades.
+                $what = "de las unidades del curso «" . $section['title'] . "»";
             } else if (!empty($section['unit'])) {
                 // Unidad de aprendizaje (v2.16.0): no es una sección de Moodle, no lleva su número.
                 $what = "de la unidad «" . $section['title'] . "»";

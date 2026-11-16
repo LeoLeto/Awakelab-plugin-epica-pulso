@@ -49,6 +49,9 @@ class unit_map {
     /** Módulos que nunca son miembro de una unidad: separan o adornan, no se estudian. */
     const NON_MEMBER_MODS = ['label', 'subsection'];
 
+    /** Tipos que las REGLAS nunca meten en una unidad (el modelo sí puede decidir sobre ellos). */
+    const RULES_SKIP_MODS = ['feedback', 'survey', 'questionnaire', 'customcert', 'certificate'];
+
     /** «Unidad 3», «Tema 2:», «Módulo 1.», «UD 4»… al principio de un nombre. */
     const RE_UNIT_HEADING = '/^\s*(unidad(\s+did[aá]ctica)?|tema|m[oó]dulo|bloque|lecci[oó]n|cap[ií]tulo|u\.?\s?d\.?)\s*\d{1,2}(?!\d)/iu';
 
@@ -271,6 +274,11 @@ class unit_map {
                         $segments[] = ['title' => self::clean_title($cm['name']), 'cmids' => []];
                         $current = count($segments) - 1;
                     }
+                    continue;
+                }
+                // Encuestas de calidad y diplomas no son de ninguna unidad aunque cuelguen de la última
+                // (en sanase-test el «Cuestionario para la evaluación de la calidad» salía en el Módulo 3).
+                if (in_array($cm['modname'], self::RULES_SKIP_MODS, true)) {
                     continue;
                 }
                 if ($current >= 0) {

@@ -489,6 +489,31 @@ lo que no se puede—, md5 del prompt base y del dinámico sin encargo idéntico
 **NO probado**: el criterio del modelo con un curso real (qué unidades saca en Refactika o SANS0001), el cron en un Moodle de verdad,
 la actualización de la base ni el coste real de la llamada.
 
+### Ajustes tras probarlo en sanase-test (v2.16.1)
+
+Probado el 2026-11-16 en el curso 183 (IFCT0049, todo dentro de una sección «Curso» con etiquetas «Módulo 1/2/3»; mapa por reglas,
+el cron aún no había pasado) llamando a `api_chat_stream.php` con cada prompt. Lo que salió y lo que se cambió:
+
+- **Bien tal cual**: resumen de unidad y de recurso, preguntas de repaso, esquema, explicar un concepto, listado de una unidad,
+  ficha y resultados de un cuestionario, ficha de una tarea, panorama, alumnos en riesgo y estado de entregas.
+- **Tres prompts pasan a modo `direct`** (contados desde Moodle, sin LLM), porque por texto el modelo solo ve los fragmentos
+  recuperados: «¿Qué secciones tiene el curso?» contestaba «Curso» y «Diplomas» → ahora es **«¿Qué unidades tiene el curso?»**
+  (`unidades_curso`, del mapa); «¿Qué cuestionarios hay?» y «¿Qué tareas hay?» decían 1 de 3 → `course_modules_listing()`, con la
+  unidad de cada uno. **Regla: lo que es contar o listar la estructura no se le pregunta al modelo.**
+- **«Haz un resumen del curso»** hablaba de «dos módulos» en un curso de tres: si hay unidades con texto va como material de TODAS
+  (repartido) con la lista de unidades en el encargo; sin unidades o sin texto, la pregunta de siempre.
+- **Más texto y mejor repartido** (`rag_retriever::share_budget()`, `PRESET_SUMMARY_MAX_CHARS` = 48.000): a partes iguales el documento
+  principal se quedaba en 8.000 caracteres y un glosario salió con UN término. Ahora lo que no usa un recurso corto pasa a los largos.
+  Solo en los prompts preestablecidos; el resumen de sección por texto libre no cambia.
+- **«Sin acceder»** ya no tiene desplegable de periodo: el contexto de analítica solo trae 7 días de accesos, y «un mes» no se podía
+  contestar.
+- **Desplegable de recurso**: agrupado por unidad (había tres «Documento de aprendizaje» bajo «Curso») y solo material de estudio
+  (`CONTENT_MODS`): una tarea o un cuestionario tienen texto indexado, pero no son algo que resumir.
+- **Reglas**: encuestas de calidad y diplomas (`RULES_SKIP_MODS`) no entran en ninguna unidad.
+
+Sin cambios de `db/` ni de JS respecto a v2.16.0. **Pendiente de ver con un Moodle delante**: el mapa hecho por el modelo (hasta que
+corra el cron los títulos son los de las etiquetas, «Módulo 1» a secas) y cómo queda el glosario con el reparto nuevo.
+
 ## Prompts preestablecidos (v2.14.0)
 
 > Desde v2.16.0 el parámetro de unidad se llama `unit` y es una clave del mapa de unidades (ver la sección de arriba), no el id de una

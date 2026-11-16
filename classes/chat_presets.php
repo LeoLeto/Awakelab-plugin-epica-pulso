@@ -52,7 +52,6 @@ class chat_presets {
         'level' => ['Nivel', ['sencillo' => 'Sencillo', 'normal' => 'Normal', 'avanzado' => 'Avanzado'], 'normal'],
         'count' => ['Número de preguntas', ['5' => '5 preguntas', '10' => '10 preguntas'], '5'],
         'qtype' => ['Tipo de pregunta', ['test' => 'Tipo test', 'abiertas' => 'Respuesta abierta', 'vf' => 'Verdadero o falso'], 'test'],
-        'period' => ['Sin acceder desde hace', ['semana' => 'Más de una semana', 'dossemanas' => 'Más de dos semanas', 'mes' => 'Más de un mes'], 'semana'],
     ];
 
     /**
@@ -105,23 +104,20 @@ class chat_presets {
                 'params' => ['unit'],
                 'keywords' => 'que contiene actividades recursos materiales lista tema seccion',
             ],
-            'secciones_curso' => [
-                'group' => 'estructura', 'label' => '¿Qué secciones tiene el curso?', 'mode' => 'query',
+            'unidades_curso' => [
+                'group' => 'estructura', 'label' => '¿Qué unidades tiene el curso?', 'mode' => 'direct',
                 'params' => [],
-                'keywords' => 'unidades temas bloques estructura indice',
-                'query' => '¿Qué secciones tiene el curso?',
+                'keywords' => 'secciones temas modulos bloques estructura indice temario',
             ],
             'cuestionarios_curso' => [
-                'group' => 'estructura', 'label' => '¿Qué cuestionarios hay en el curso?', 'mode' => 'query',
+                'group' => 'estructura', 'label' => '¿Qué cuestionarios hay en el curso?', 'mode' => 'direct',
                 'params' => [],
                 'keywords' => 'examenes test evaluaciones lista',
-                'query' => '¿Qué cuestionarios hay en el curso?',
             ],
             'tareas_curso' => [
-                'group' => 'estructura', 'label' => '¿Qué tareas hay en el curso?', 'mode' => 'query',
+                'group' => 'estructura', 'label' => '¿Qué tareas hay en el curso?', 'mode' => 'direct',
                 'params' => [],
                 'keywords' => 'entregas trabajos deberes lista',
-                'query' => '¿Qué tareas hay en el curso?',
             ],
             'info_actividad' => [
                 'group' => 'estructura', 'label' => 'Fechas e instrucciones de una actividad', 'mode' => 'query',
@@ -141,9 +137,12 @@ class chat_presets {
                 'query' => '¿Qué estudiantes están en riesgo?',
             ],
             'alumnos_inactivos' => [
-                'group' => 'analitica', 'label' => '¿Qué alumnos llevan tiempo sin acceder?', 'mode' => 'query', 'teacher' => true,
-                'params' => ['period'],
-                'keywords' => 'estudiantes inactivos no entran sin conectarse acceso dias',
+                // Sin desplegable de periodo (v2.16.1): el contexto de analítica solo trae los accesos de
+                // los últimos 7 días, así que «dos semanas» o «un mes» no se podían contestar.
+                'group' => 'analitica', 'label' => '¿Qué alumnos llevan más de una semana sin acceder?', 'mode' => 'query', 'teacher' => true,
+                'params' => [],
+                'keywords' => 'estudiantes inactivos no entran sin conectarse acceso dias tiempo',
+                'query' => '¿Qué alumnos llevan más de una semana sin acceder?',
             ],
             'resultados_cuestionario' => [
                 'group' => 'analitica', 'label' => 'Resultados de un cuestionario', 'mode' => 'query', 'teacher' => true,
@@ -258,9 +257,13 @@ class chat_presets {
         // las de las reglas de estructura. Ya vienen filtradas por lo que ve este usuario.
         $map = unit_map::for_user($courseid);
         $out['unitsource'] = $map['source'];
+        $unitof = []; // cmid => título de su unidad, para agrupar los demás desplegables
         foreach ($map['units'] as $unit) {
             if (count($out['units']) < self::MAX_OPTIONS) {
                 $out['units'][] = ['id' => $unit['key'], 'num' => $unit['num'], 'label' => $unit['title']];
+            }
+            foreach ($unit['cmids'] as $cmid) {
+                $unitof[(int)$cmid] = $unit['title'];
             }
         }
 
@@ -298,11 +301,16 @@ class chat_presets {
             if ($name === '') {
                 continue;
             }
-            $group = $sectionnames[(int)$cm->sectionnum] ?? '';
+            // Agrupado por unidad si es de alguna (en sanase-test un curso tenía tres «Documento de
+            // aprendizaje» bajo la misma sección «Curso», indistinguibles); si no, por su sección.
+            $group = $unitof[$cmid] ?? ($sectionnames[(int)$cm->sectionnum] ?? '');
             $modname = (string)$cm->modname;
 
+            // «Resumen de un recurso» es de material de estudio: una tarea o un cuestionario también
+            // tienen texto indexado (su enunciado), pero no son algo que resumir.
             $row = $rows[$cmid] ?? null;
-            if ($row !== null && !empty($row->usable) && count($out['resources']) < self::MAX_OPTIONS) {
+            if ($row !== null && !empty($row->usable) && in_array($modname, unit_map::CONTENT_MODS, true)
+                    && count($out['resources']) < self::MAX_OPTIONS) {
                 $out['resources'][] = ['id' => $cmid, 'label' => $name, 'group' => $group];
             }
             if ($modname === 'quiz' && count($out['quizzes']) < self::MAX_OPTIONS) {
@@ -397,9 +405,56 @@ class chat_presets {
         }
 
         if ($def['mode'] === 'direct') {
+            if ($id === 'cuestionarios_curso' || $id === 'tareas_curso') {
+                $out['query'] = $def['label'];
+                $out['direct'] = self::course_modules_listing($courseid, $id === 'tareas_curso' ? 'assign' : 'quiz');
+                return $out;
+            }
+            if ($unit === null) {
+                $out['query'] = '¿Qué unidades tiene el curso?';
+                $out['direct'] = self::course_units_listing($courseid);
+                return $out;
+            }
             $out['query'] = '¿Qué hay en la unidad «' . $unit['title'] . '»?';
             $out['direct'] = self::unit_listing($courseid, $unit);
             return $out;
+        }
+
+        // Resumen del curso (v2.16.1): si hay unidades con texto, se resume con el material de TODAS,
+        // repartido, y con la lista de unidades delante. Por texto («¿De qué trata este curso?») el
+        // modelo solo veía los fragmentos recuperados: en sanase-test habló de «dos módulos» en un
+        // curso de tres. Sin unidades o sin texto, sigue la pregunta de siempre.
+        if ($id === 'resumen_curso') {
+            require_once(__DIR__ . '/unit_map.php');
+            require_once(__DIR__ . '/rag_retriever.php');
+            $cmids = [];
+            $titles = [];
+            foreach (unit_map::for_user($courseid)['units'] as $u) {
+                $cmids = array_merge($cmids, $u['cmids']);
+                $titles[] = $u['title'];
+            }
+            try {
+                $coursename = trim((string)\format_string(\get_course($courseid)->fullname));
+            } catch (\Throwable $e) {
+                $coursename = '';
+            }
+            $material = empty($cmids) ? [] : rag_retriever::build_summary_context_for_cms(
+                $courseid, $cmids, $coursename !== '' ? $coursename : 'Curso');
+            if (trim((string)($material['material'] ?? '')) !== '') {
+                // Lo ilegible de un curso entero sería una lista larga que no ayuda al resumen.
+                $material['unreadable'] = [];
+                $material['via_url'] = [];
+                $material['course'] = true;
+                $material['preset'] = true;
+                $out['mode'] = 'material';
+                $out['material'] = $material;
+                $out['query'] = 'Haz un resumen del curso.';
+                $out['instructions'] = 'Resume el curso: primero, en un párrafo, de qué trata; después, unidad por unidad y en su '
+                    . 'orden, qué se estudia en cada una. Sus unidades son ' . count($titles) . ': ' . implode('; ', $titles) . '. '
+                    . 'No te dejes ninguna ni inventes otras; si de alguna no hay material, dilo. Extensión: unas 250 palabras. '
+                    . 'Formato: "type":"text" y en "data" un objeto {"paragraph":"…"} por párrafo.';
+                return $out;
+            }
         }
 
         if ($def['mode'] === 'material') {
@@ -493,7 +548,8 @@ class chat_presets {
             case 'esquema_unidad':
                 $query = 'Haz un esquema de ' . $scope . '.';
                 $task = 'Haz un esquema de ' . $scope . ', en el orden del material. '
-                    . 'Formato: "type":"list" y en "data" un objeto {"tema":"apartado","descripcion":"sus subpuntos, separados por punto y coma"} por apartado (hasta 10).';
+                    . 'Formato: "type":"list" y en "data" un objeto {"tema":"apartado","descripcion":"sus subpuntos, separados por punto y coma"} por apartado (hasta 10). '
+                    . 'Ningún apartado con "descripcion" vacía: si no tiene subpuntos, di en una frase de qué trata.';
                 break;
 
             case 'glosario_unidad':
@@ -501,7 +557,8 @@ class chat_presets {
                 $query = 'Haz un glosario de ' . $scope . '.';
                 $task = 'Haz un glosario con los términos clave de ' . $scope . ', por orden alfabético. '
                     . 'Formato: "type":"list" y en "data" un objeto {"name":"término","definicion":"definición según el material, en una o dos frases"} por término (hasta 10). '
-                    . 'Solo términos que el material define o usa; no añadas definiciones de memoria.';
+                    . 'Elige los términos y conceptos propios del tema que el material usa, aunque no los presente como '
+                    . 'definición: define cada uno con lo que el material dice de él. No añadas términos ni definiciones de memoria.';
                 break;
         }
 
@@ -526,10 +583,6 @@ class chat_presets {
             case 'resultados_cuestionario':
                 return '¿Cuáles son los resultados del cuestionario "' . self::visible_cm_name($courseid, $v['quiz'], ['quiz'])
                     . '": nota media, número de intentos y cuántos alumnos aprobaron?';
-
-            case 'alumnos_inactivos':
-                $periods = ['semana' => 'una semana', 'dossemanas' => 'dos semanas', 'mes' => 'un mes'];
-                return '¿Qué alumnos llevan más de ' . $periods[$v['period']] . ' sin acceder?';
         }
         throw new pulso_error('bad_request');
     }
@@ -552,6 +605,84 @@ class chat_presets {
             'type' => 'text',
             'title' => 'Contenido de la unidad ' . $unit['title'],
             'summary' => 'Esto es lo que hay en la unidad.',
+            'content' => implode("\n", $lines),
+        ];
+        return [
+            'answer' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'schema_data' => $payload,
+            'followup_questions' => [],
+        ];
+    }
+
+    /**
+     * Las unidades del curso, desde el mapa de unidades y sin LLM (v2.16.1). Sustituye a «¿Qué
+     * secciones tiene el curso?», que por texto contestaba con las secciones de Moodle: en un curso
+     * con todo dentro de una sección «Curso» la respuesta era «Curso» y «Diplomas».
+     *
+     * @param int $courseid
+     * @return array{answer: string, schema_data: array, followup_questions: array}
+     */
+    private static function course_units_listing(int $courseid): array {
+        require_once(__DIR__ . '/unit_map.php');
+        $units = unit_map::for_user($courseid)['units'];
+        if (empty($units)) {
+            $lines = ['No he encontrado unidades con material en este curso.'];
+        } else {
+            $lines = ['Unidades del curso: ' . count($units)];
+            foreach ($units as $unit) {
+                $n = count($unit['cmids']);
+                $lines[] = '- ' . $unit['title'] . ' (' . $n . ($n === 1 ? ' actividad o recurso' : ' actividades y recursos') . ')';
+            }
+        }
+        $payload = [
+            'type' => 'text',
+            'title' => 'Unidades del curso',
+            'summary' => 'Estas son las unidades del curso.',
+            'content' => implode("\n", $lines),
+        ];
+        return [
+            'answer' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'schema_data' => $payload,
+            'followup_questions' => [],
+        ];
+    }
+
+    /**
+     * Cuestionarios o tareas del curso, contados desde Moodle y sin LLM (v2.16.1). Por texto, el
+     * modelo contestaba con lo que hubiera en los fragmentos recuperados: en sanase-test dijo
+     * «1 cuestionario» y «1 tarea» en un curso con tres de cada.
+     *
+     * @param int $courseid
+     * @param string $modname 'quiz' o 'assign'
+     * @return array{answer: string, schema_data: array, followup_questions: array}
+     */
+    private static function course_modules_listing(int $courseid, string $modname): array {
+        require_once(__DIR__ . '/unit_map.php');
+        $unitof = [];
+        foreach (unit_map::for_user($courseid)['units'] as $unit) {
+            foreach ($unit['cmids'] as $cmid) {
+                $unitof[(int)$cmid] = $unit['title'];
+            }
+        }
+        $plural = $modname === 'assign' ? 'Tareas' : 'Cuestionarios';
+        $items = [];
+        try {
+            foreach (\get_fast_modinfo($courseid)->get_cms() as $cm) {
+                $name = trim((string)$cm->name);
+                if (!empty($cm->uservisible) && (string)$cm->modname === $modname && $name !== '') {
+                    $items[] = '- ' . $name . (isset($unitof[(int)$cm->id]) ? ' — ' . $unitof[(int)$cm->id] : '');
+                }
+            }
+        } catch (\Throwable $e) {
+            $items = [];
+        }
+        $lines = empty($items)
+            ? ['No hay ' . mb_strtolower($plural, 'UTF-8') . ' visibles en este curso.']
+            : array_merge([$plural . ' del curso: ' . count($items)], $items);
+        $payload = [
+            'type' => 'text',
+            'title' => $plural . ' del curso',
+            'summary' => empty($items) ? 'No he encontrado ninguno.' : 'Esto es lo que hay en el curso.',
             'content' => implode("\n", $lines),
         ];
         return [

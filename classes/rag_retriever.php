@@ -2628,6 +2628,35 @@ class rag_retriever {
         return $context;
     }
 
+    /** Tope total del material de un prompt preestablecido (unidad o recurso elegido). */
+    const PRESET_SUMMARY_MAX_CHARS = 48000;
+
+    /**
+     * Reparte un presupuesto de caracteres entre textos de distinta longitud: cada uno recibe lo que
+     * necesita mientras quepa, y lo que sobra de los cortos se lo llevan los largos a partes iguales.
+     *
+     * @param int[] $lengths Longitud de cada texto
+     * @param int $total Presupuesto total
+     * @return int[] Presupuesto de cada texto, en el mismo orden
+     */
+    public static function share_budget(array $lengths, int $total): array {
+        $order = array_keys($lengths);
+        usort($order, function($a, $b) use ($lengths) {
+            return $lengths[$a] <=> $lengths[$b];
+        });
+        $budgets = [];
+        $left = max(0, $total);
+        $pending = count($order);
+        foreach ($order as $i) {
+            $share = (int)floor($left / $pending);
+            $budgets[$i] = min((int)$lengths[$i], $share);
+            $left -= $budgets[$i];
+            $pending--;
+        }
+        ksort($budgets);
+        return $budgets;
+    }
+
     /**
      * Arma el contexto de resumen de una sección ya elegida. Con $onlycmid > 0 se queda solo con
      * ese módulo (y sin la descripción de la sección, que no es suya).
@@ -2638,6 +2667,7 @@ class rag_retriever {
      * @return array{title: string, number: int, material: string, unreadable: string[], via_url: string[]}
      */
     private static function summary_context_from(int $courseid, $section, int $onlycmid, ?array $material = null): array {
+        $explicit = $material !== null; // material de una unidad elegida, no de una sección detectada en el texto
         $material = $material ?? self::section_summary_material($courseid, $section);
         if ($onlycmid > 0) {
             $only = function(array $item) use ($onlycmid): bool {
@@ -2653,12 +2683,26 @@ class rag_retriever {
 
         $count = count($material['texts']);
         $perresource = $onlycmid > 0 ? self::SECTION_SUMMARY_MAX_CHARS : self::SECTION_SUMMARY_MAX_PER_RESOURCE;
-        $budget = $count > 0
+        $evenbudget = $count > 0
             ? min($perresource, (int)floor(self::SECTION_SUMMARY_MAX_CHARS / $count))
             : 0;
+        // Prompts preestablecidos (unidad o recurso elegido de una lista, v2.16.1): el reparto a partes
+        // iguales dejaba el documento principal de la unidad en 8.000 caracteres —el índice y poco más—
+        // mientras el enunciado de una tarea no gastaba ni mil (en sanase-test un glosario salió con un
+        // solo término). Aquí lo que no usa un recurso corto pasa a los largos, y el total es mayor.
+        // El resumen de sección por texto libre (v2.9.1) no cambia.
+        $budgets = null;
+        if ($count > 0 && ($explicit || $onlycmid > 0)) {
+            $lengths = [];
+            foreach ($material['texts'] as $item) {
+                $lengths[] = mb_strlen($item['text'], 'UTF-8');
+            }
+            $budgets = self::share_budget($lengths, self::PRESET_SUMMARY_MAX_CHARS);
+        }
 
         $blocks = [];
         foreach ($material['texts'] as $i => $item) {
+            $budget = $budgets !== null ? $budgets[$i] : $evenbudget;
             $text = mb_substr($item['text'], 0, $budget, 'UTF-8');
             if (mb_strlen($item['text'], 'UTF-8') > $budget) {
                 $text .= '…';

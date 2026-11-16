@@ -1,5 +1,14 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-16 — Ajustes tras probar los prompts en sanase-test (v2.16.1)
+
+Reglas en `CLAUDE.md` → «Unidades de aprendizaje» → «Ajustes tras probarlo en sanase-test». `classes/chat_presets.php`, `classes/rag_retriever.php`, `classes/unit_map.php`, `classes/system_prompt_designer.php`. **Al desplegar: nada** (solo PHP). Lo que costó ver:
+- **Probar contra el endpoint, no contra la interfaz**: con la sesión de Chema abierta en el navegador se llamó a `api_chat_stream.php` con `preset` + `preset_params` y se leyó el evento `final`. Diecisiete prompts en diez minutos; la interfaz ya estaba cubierta por jsdom. El tope por minuto del chat salta con cuatro seguidas: espaciar.
+- **Todo lo que era «listar la estructura» por el LLM estaba mal**, y no por los prompts nuevos: eran las preguntas de la home de siempre. El modelo contesta con los fragmentos RAG que le llegan y cuenta lo que ve.
+- **El reparto a partes iguales castiga justo al recurso que importa**: en una unidad con un PDF largo, una tarea y un cuestionario, los tres recibían 8.000 caracteres y dos no gastaban ni mil.
+- **Trampa de la sesión**: otra vez un heredoc de shell se comió barras invertidas (`\b`, `\r`, `\n`) al parchear el arnés. Los parches con barras se escriben a fichero con la herramienta de escritura.
+- **Verificado**: 90 comprobaciones PHP + 12 × 2 jsdom + md5 del prompt base idéntico. **NO probado**: los arreglos de esta versión en sanase (hay que reinstalar) ni el mapa del modelo.
+
 ## 2026-11-16 — Unidades de aprendizaje detectadas por el modelo, con reglas de respaldo (v2.16.0)
 
 Reglas en `CLAUDE.md` → «Unidades de aprendizaje». Nuevo: `classes/unit_map.php`. Tocados: `db/install.xml`, `db/upgrade.php`, `db/events.php`, `classes/observer.php`, las dos tareas de indexación, `classes/rag_retriever.php`, `classes/system_prompt_designer.php`, `classes/chat_presets.php`, los dos endpoints de chat, `amd/src/presets.js` (+ build). **Al desplegar: Notificaciones + purgar cachés.** Lo pidió Chema tras ver el desplegable de v2.14: «unidad = sección de Moodle» no quedaba bien. Lo que costó ver:

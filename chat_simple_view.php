@@ -140,6 +140,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // la regla de isotipoclaro no aplica (el logo lleva su propia placa blanca en el CSS).
         'logourl' => $logourl,
         'logoalt' => $logourl !== '' ? $logoalt : '',
+        // Ilustración de «Crear» (v2.15.0): URL de pluginfile ya validada; vacío = sin ilustración.
+        'ilustracionurl' => (string)($tema['ilustracion'] ?? ''),
         'temastyle' => $tema['style'] ?? '',
         'temaflags' => $tema['flags'] ?? '',
         'isteacher' => !empty($isteacher),

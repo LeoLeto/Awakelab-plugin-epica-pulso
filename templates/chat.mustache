@@ -26,9 +26,10 @@
     * isotipo - URL del isotipo (pix/isotipo-oscuro; isotipo-claro si el color de centro es claro)
     * logourl - URL de pluginfile del logo del centro (carta 11 ampliada); vacío = se usa el isotipo
     * logoalt - texto alternativo del logo (nombre del sitio o «Logotipo»)
+    * ilustracionurl - URL de pluginfile de la ilustración decorativa de «Crear» (v2.15.0); vacío = sin ilustración
     * hastema - true solo si Épica manda un tema válido (colores del centro, carta 11)
     * temastyle - variables por papel (--pulso-header-*, --pulso-action-*, --pulso-own-*, --pulso-accent) ya resueltas y validadas (solo con hastema)
-    * temaflags - tokens de las claves EFECTIVAS: principal, cabecera, boton, burbuja, acento o acento-base (solo con hastema)
+    * temaflags - tokens de las claves EFECTIVAS: principal, cabecera, boton, burbuja, acento o acento-base, fondo, oscuro, creaciones, tarjeta, pestana (solo con hastema)
     * isteacher - true con block/pulso:viewanalytics (profesorado); false = version de alumno
     * cancreate - true con block/pulso:createactivity: hay pestana «Crear»
     * epica - true si local_awkepica esta disponible: infografia, juego, retos e historial
@@ -172,11 +173,15 @@
     </div>
 
     {{#cancreate}}
-    <div class="pulso-tabpanel" id="pulso-panel-crear" role="tabpanel" aria-labelledby="pulso-tab-crear" hidden>
+    <div class="pulso-tabpanel" id="pulso-panel-crear" role="tabpanel" aria-labelledby="pulso-tab-crear"{{#ilustracionurl}} data-pulso-ilustracion{{/ilustracionurl}} hidden>
         <div class="pulso-chat-messages" id="pulso-crear-scroll">
             <div class="pulso-create-root" id="pulso-create-root">
                 <h3 class="pulso-create-root-title" id="pulso-create-root-title" tabindex="-1">¿Qué quieres crear?</h3>
                 {{> block_pulso/chat_create_tools}}
+                {{! Ilustración del centro (v2.15.0): decorativa, a la derecha de la lista. Solo con sitio para ella (styles.css). }}
+                {{#ilustracionurl}}
+                <img class="pulso-ilustracion" src="{{ilustracionurl}}" alt="" aria-hidden="true">
+                {{/ilustracionurl}}
                 {{! El pie de «Mis creaciones» (historial en Épica) solo existe en el HTML del alumnado con Épica: el JS lo copia de esta plantilla inerte al pintar esa pantalla. }}
                 {{^isteacher}}{{#epica}}
                 <template id="pulso-mine-historial-tpl">

@@ -32,7 +32,7 @@ defined('MOODLE_INTERNAL') || die();
 function block_pulso_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
     global $DB, $USER;
 
-    // Logo del centro (carta 11 ampliada, v2.13.0): contexto de SISTEMA, filearea «tema», itemid 0. Lo guarda
+    // Logo del centro (carta 11 ampliada, v2.13.0) e ilustración de «Crear» (v2.15.0, ilustracion.<ext>): contexto de SISTEMA, filearea «tema», itemid 0. Lo guarda
     // tema_service::sincronizar() (nunca se enlaza a Épica desde la página). Acceso: cualquier usuario con
     // sesión. La URL es /<itemid 0>/<version>/logo.<ext>: la versión solo sirve para que el navegador
     // cachee con URL inmutable; aquí se ignora y se sirve el fichero guardado.
@@ -42,7 +42,7 @@ function block_pulso_pluginfile($course, $cm, $context, $filearea, $args, $force
         $filename = array_pop($args);
         if ((string)$itemid !== '0' || count($args) !== 1 || !preg_match('/^[A-Za-z0-9._-]{1,64}\z/', (string)$args[0])
                 || preg_match('/^\.+\z/', (string)$args[0])
-                || !preg_match('/^logo\.(png|jpg|webp)\z/', (string)$filename)) {
+                || !preg_match('/^(logo|ilustracion)\.(png|jpg|webp)\z/', (string)$filename)) {
             send_file_not_found();
         }
         $file = get_file_storage()->get_file($context->id, 'block_pulso', 'tema', 0, '/', $filename);

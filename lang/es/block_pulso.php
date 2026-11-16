@@ -216,6 +216,7 @@ $string['demostracion_activa'] = 'Modo demostración de Épica: activo hasta {$a
 $string['demostracion_inactiva'] = 'Modo demostración de Épica: no activo.';
 $string['tema_msg_sin_tema'] = 'Este centro no tiene colores en Épica: Pulse usa los suyos.';
 $string['tema_msg_logo_error'] = 'El logo del centro no se ha podido actualizar (no se pudo descargar o no cumple los requisitos: https del host de Épica, PNG/JPEG/WebP de hasta 200 KB, entre 96 y 512 px y casi cuadrado). Se mantiene el anterior; el detalle está en el registro del servidor.';
+$string['tema_msg_ilustracion_error'] = 'La ilustración del centro no se ha podido actualizar (no se pudo descargar o no cumple los requisitos: https del host de Épica, PNG/JPEG/WebP de hasta 400 KB, entre 160 y 1600 px por lado y como mucho cuatro veces más larga que ancha). Se mantiene la anterior; el detalle está en el registro del servidor.';
 
 // PDF enlazados desde módulos URL (v2.10.0).
 $string['url_dominios_heading'] = 'PDF enlazados desde módulos URL';

@@ -66,6 +66,13 @@ Cada cambio de código sube `$plugin->version` y `$plugin->release` en `version.
   Moodle cachea plantillas, CSS del tema y módulos AMD por revisión.
 - **Notificaciones** solo si cambia `db/` (esquema, capabilities, cachés, tareas, mensajes).
 
+**sanase-test se despliega solo**: cada empujón a `dev` pasa la sintaxis de PHP y lo instala allí
+(`.github/workflows/deploy-sanase-test.yml`), con copia de la carpeta, Notificaciones y purga de cachés incluidas.
+No hace falta subir un ZIP (ni funciona: ahí el plugin es un checkout de git). Si el despliegue falla, el registro
+del run de Actions dice por qué. Se niega a instalar una versión más baja que la que ya hay: Moodle no sabe bajar
+de versión, así que **`version.php` tiene que subir siempre**. `main` no se despliega solo: es lo que va a las
+plataformas de producción.
+
 ## Terceros
 
 Declarados en `thirdpartylibs.xml`:

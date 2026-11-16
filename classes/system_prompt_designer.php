@@ -890,9 +890,14 @@ PROMPT;
             // Prompt preestablecido (v2.14.0): el usuario eligió el encargo y su material de una lista.
             // El encargo manda sobre el tipo y la forma de `data`; el esquema y el formato de salida
             // siguen siendo los de siempre (no se autoriza ningún campo nuevo).
-            $what = !empty($section['resource'])
-                ? "del recurso «" . $section['title'] . "»"
-                : "de la sección «" . $section['title'] . "» (sección " . (int)$section['number'] . ")";
+            if (!empty($section['resource'])) {
+                $what = "del recurso «" . $section['title'] . "»";
+            } else if (!empty($section['unit'])) {
+                // Unidad de aprendizaje (v2.16.0): no es una sección de Moodle, no lleva su número.
+                $what = "de la unidad «" . $section['title'] . "»";
+            } else {
+                $what = "de la sección «" . $section['title'] . "» (sección " . (int)$section['number'] . ")";
+            }
             $out = "\n\n## ESTA PREGUNTA ES UN ENCARGO SOBRE EL MATERIAL DEL CURSO, NO ANALÍTICA\n";
             $out .= "ENCARGO: " . $preset_task . "\n";
             $out .= "Cúmplelo tal cual, también en \"type\" y en la forma de \"data\", y deja \"insights\" y "

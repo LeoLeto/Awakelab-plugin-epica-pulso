@@ -66,7 +66,7 @@ class chat_presets {
         return [
             'resumen_unidad' => [
                 'group' => 'resumenes', 'label' => 'Haz un resumen de una unidad', 'mode' => 'material',
-                'params' => ['section', 'length', 'format'],
+                'params' => ['unit', 'length', 'format'],
                 'keywords' => 'resume resumir resumeme sintesis tema seccion bloque modulo',
             ],
             'resumen_recurso' => [
@@ -82,27 +82,27 @@ class chat_presets {
             ],
             'explicar_concepto' => [
                 'group' => 'estudio', 'label' => 'Explícame un concepto de una unidad', 'mode' => 'material',
-                'params' => ['section', 'topic', 'level'],
+                'params' => ['unit', 'topic', 'level'],
                 'keywords' => 'explica explicar explicame aclara duda entender que es que significa tema',
             ],
             'preguntas_repaso' => [
                 'group' => 'estudio', 'label' => 'Hazme preguntas de repaso de una unidad', 'mode' => 'material',
-                'params' => ['section', 'count', 'qtype'],
+                'params' => ['unit', 'count', 'qtype'],
                 'keywords' => 'test autoevaluacion examen practicar repasar cuestionario preguntame tema',
             ],
             'esquema_unidad' => [
                 'group' => 'estudio', 'label' => 'Haz un esquema de una unidad', 'mode' => 'material',
-                'params' => ['section'],
+                'params' => ['unit'],
                 'keywords' => 'esquematiza indice mapa conceptual estructura puntos tema',
             ],
             'glosario_unidad' => [
                 'group' => 'estudio', 'label' => 'Haz un glosario de una unidad', 'mode' => 'material',
-                'params' => ['section'],
+                'params' => ['unit'],
                 'keywords' => 'terminos vocabulario definiciones conceptos clave palabras tema',
             ],
             'contenido_unidad' => [
-                'group' => 'estructura', 'label' => '¿Qué hay en una unidad?', 'mode' => 'query',
-                'params' => ['section'],
+                'group' => 'estructura', 'label' => '¿Qué hay en una unidad?', 'mode' => 'direct',
+                'params' => ['unit'],
                 'keywords' => 'que contiene actividades recursos materiales lista tema seccion',
             ],
             'secciones_curso' => [
@@ -245,11 +245,23 @@ class chat_presets {
     public static function course_options(int $courseid): array {
         require_once(__DIR__ . '/full_text_store.php');
 
-        $out = ['sections' => [], 'resources' => [], 'quizzes' => [], 'activities' => []];
+        require_once(__DIR__ . '/unit_map.php');
+
+        $out = ['units' => [], 'unitsource' => 'reglas', 'resources' => [], 'quizzes' => [], 'activities' => []];
         try {
             $modinfo = \get_fast_modinfo($courseid);
         } catch (\Throwable $e) {
             return $out;
+        }
+
+        // Unidades de aprendizaje (unit_map, v2.16.0): las que detectó el modelo al indexar o, sin mapa,
+        // las de las reglas de estructura. Ya vienen filtradas por lo que ve este usuario.
+        $map = unit_map::for_user($courseid);
+        $out['unitsource'] = $map['source'];
+        foreach ($map['units'] as $unit) {
+            if (count($out['units']) < self::MAX_OPTIONS) {
+                $out['units'][] = ['id' => $unit['key'], 'num' => $unit['num'], 'label' => $unit['title']];
+            }
         }
 
         $sectionnames = [];
@@ -260,9 +272,6 @@ class chat_presets {
             }
             $name = self::section_name($courseid, $info);
             $sectionnames[$num] = $name;
-            if (count($out['sections']) < self::MAX_OPTIONS) {
-                $out['sections'][] = ['id' => (int)$info->id, 'num' => $num, 'label' => $name];
-            }
         }
 
         $cmids = [];
@@ -362,6 +371,11 @@ class chat_presets {
                 if ($v['topic'] === '') {
                     throw new pulso_error('bad_request');
                 }
+            } else if ($name === 'unit') {
+                $v['unit'] = (string)($params['unit'] ?? '');
+                if (!preg_match('/^u\d{1,12}$/', $v['unit'])) {
+                    throw new pulso_error('bad_request');
+                }
             } else {
                 $v[$name] = (int)($params[$name] ?? 0);
                 if ($v[$name] <= 0) {
@@ -372,14 +386,26 @@ class chat_presets {
 
         $out = ['id' => $id, 'mode' => $def['mode'], 'query' => '', 'material' => [], 'instructions' => ''];
 
+        // La unidad elegida, del mapa de ESTE usuario: si no existe o no ve nada de ella, 400.
+        $unit = null;
+        if (isset($v['unit'])) {
+            require_once(__DIR__ . '/unit_map.php');
+            $unit = unit_map::find($courseid, $v['unit']);
+            if ($unit === null) {
+                throw new pulso_error('bad_request');
+            }
+        }
+
+        if ($def['mode'] === 'direct') {
+            $out['query'] = '¿Qué hay en la unidad «' . $unit['title'] . '»?';
+            $out['direct'] = self::unit_listing($courseid, $unit);
+            return $out;
+        }
+
         if ($def['mode'] === 'material') {
             require_once(__DIR__ . '/rag_retriever.php');
-            if (isset($v['section'])) {
-                $material = rag_retriever::build_summary_context_for_section($courseid, $v['section']);
-                if (!empty($material['title'])) {
-                    // El nombre que la persona eligió en el desplegable (una sección sin nombre es «Tema N»).
-                    $material['title'] = self::visible_section_name($courseid, $v['section']);
-                }
+            if ($unit !== null) {
+                $material = rag_retriever::build_summary_context_for_cms($courseid, $unit['cmids'], $unit['title']);
                 $scope = 'la unidad «' . ($material['title'] ?? '') . '»';
             } else {
                 $material = rag_retriever::build_summary_context_for_resource($courseid, $v['resource']);
@@ -494,9 +520,6 @@ class chat_presets {
      */
     private static function parametrized_query(int $courseid, string $id, array $v): string {
         switch ($id) {
-            case 'contenido_unidad':
-                return '¿Qué actividades y recursos hay en la sección ' . self::visible_section_name($courseid, $v['section']) . '?';
-
             case 'info_actividad':
                 return '¿Cuáles son las instrucciones y las fechas de "' . self::visible_cm_name($courseid, $v['activity'], ['quiz', 'assign']) . '"?';
 
@@ -509,6 +532,33 @@ class chat_presets {
                 return '¿Qué alumnos llevan más de ' . $periods[$v['period']] . ' sin acceder?';
         }
         throw new pulso_error('bad_request');
+    }
+
+    /**
+     * Listado de una unidad, montado desde Moodle sin pasar por el LLM (modo `direct`). Misma forma
+     * que la respuesta de la ruta directa: lo que guarda el historial y lo que pinta el chat.
+     *
+     * @param int $courseid
+     * @param array $unit De unit_map::find()
+     * @return array{answer: string, schema_data: array, followup_questions: array}
+     */
+    private static function unit_listing(int $courseid, array $unit): array {
+        $items = unit_map::describe($courseid, $unit['cmids']);
+        $lines = ['Unidad: ' . $unit['title'], 'Numero de actividades: ' . count($items), 'Contenidos de esta unidad:'];
+        foreach ($items as $item) {
+            $lines[] = '- [' . $item['modname'] . '] ' . ($item['name'] !== '' ? $item['name'] : 'actividad sin nombre');
+        }
+        $payload = [
+            'type' => 'text',
+            'title' => 'Contenido de la unidad ' . $unit['title'],
+            'summary' => 'Esto es lo que hay en la unidad.',
+            'content' => implode("\n", $lines),
+        ];
+        return [
+            'answer' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'schema_data' => $payload,
+            'followup_questions' => [],
+        ];
     }
 
     /**

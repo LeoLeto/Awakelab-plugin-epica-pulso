@@ -82,6 +82,8 @@ try {
     // prompt o un parámetro que no vale es un 400 antes de gastar cupo, contexto o tokens.
     $preset = \block_pulso\chat_presets::from_request($courseid, $isteacher);
     $presetmaterial = $preset !== null && $preset['mode'] === 'material';
+    // Modo `direct` (v2.16.0): la respuesta ya viene montada desde Moodle (el listado de una unidad).
+    $presetdirect = $preset !== null && $preset['mode'] === 'direct';
     if ($preset !== null) {
         $user_query = $preset['query'];
     }
@@ -156,7 +158,7 @@ try {
     // 'final') para no forzar el fallback al endpoint clásico.
     // (Un prompt de material no pasa por el detector: su texto lleva el nombre de una unidad, que puede
     // sonar a analítica, y lo que se manda es contenido elegido de una lista ya filtrada.)
-    if (!$isteacher && !$presetmaterial && chat_pipeline::is_teacher_only_query($user_query)) {
+    if (!$isteacher && !$presetmaterial && !$presetdirect && chat_pipeline::is_teacher_only_query($user_query)) {
         $refusal = chat_pipeline::teacher_only_refusal($user_query);
         pulso_sse('final', [
             'success' => true,
@@ -213,7 +215,9 @@ try {
     //    Un prompt de material va SIEMPRE al LLM con su material: la ruta directa contestaría con una
     //    ficha o un listado al reconocer el nombre de la unidad o del recurso.
     $direct = null;
-    if (!$presetmaterial) {
+    if ($presetdirect) {
+        $direct = $preset['direct'];
+    } else if (!$presetmaterial) {
         $qinfo = chat_pipeline::build_direct_query($user_query, $history);
         $direct = chat_pipeline::resolve_direct_answer($courseid, $user_query, $qinfo, $ondelta);
     }

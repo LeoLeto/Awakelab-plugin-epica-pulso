@@ -31,4 +31,16 @@ class observer {
             error_log('Pulso borrado Épica: no se pudo encolar tras user_deleted: ' . get_class($e));
         }
     }
+
+    /**
+     * Se ha borrado un curso: se borra su mapa de unidades (v2.16.0). Nunca lanza.
+     */
+    public static function course_deleted(\core\event\course_deleted $event): void {
+        try {
+            require_once(__DIR__ . '/unit_map.php');
+            unit_map::delete((int)$event->objectid);
+        } catch (\Throwable $e) {
+            error_log('Pulso unidades: no se pudo limpiar tras course_deleted: ' . get_class($e));
+        }
+    }
 }

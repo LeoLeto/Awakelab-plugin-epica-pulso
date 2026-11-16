@@ -2416,6 +2416,23 @@ class rag_retriever {
             return $out;
         }
 
+        return self::summary_material_for_cmids($courseid, $modinfo, $cmids);
+    }
+
+    /**
+     * Lo mismo para una lista de módulos YA filtrada por visibilidad (una sección, o una unidad
+     * de aprendizaje, que puede no coincidir con ninguna sección: v2.16.0).
+     *
+     * @param int $courseid
+     * @param object $modinfo course_modinfo
+     * @param int[] $cmids
+     * @return array{texts: array, unreadable: array}
+     */
+    private static function summary_material_for_cmids(int $courseid, $modinfo, array $cmids): array {
+        global $DB;
+
+        $out = ['texts' => [], 'unreadable' => []];
+
         try {
             $rows = full_text_store::get_rows_for_cmids($courseid, $cmids);
         } catch (\Throwable $e) {
@@ -2580,6 +2597,38 @@ class rag_retriever {
     }
 
     /**
+     * Material de una UNIDAD DE APRENDIZAJE (unit_map, v2.16.0): una lista de módulos que puede ser
+     * media sección o estar repartida entre varias. Misma forma que el de una sección más
+     * `unit => true`. Los módulos que este usuario no ve se descartan aquí. Vacío si no queda ninguno.
+     *
+     * @param int $courseid
+     * @param int[] $cmids En el orden del curso
+     * @param string $title Título de la unidad
+     * @return array
+     */
+    public static function build_summary_context_for_cms(int $courseid, array $cmids, string $title): array {
+        $visible = [];
+        foreach ($cmids as $cmid) {
+            if (course_visibility::cm_visible($courseid, (int)$cmid)) {
+                $visible[] = (int)$cmid;
+            }
+        }
+        if (empty($visible)) {
+            return [];
+        }
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $material = self::summary_material_for_cmids($courseid, $modinfo, $visible);
+        $section = (object)['name' => preg_replace('/[<>]{3,}/u', '', $title), 'section' => 0, 'summary' => ''];
+        $context = self::summary_context_from($courseid, $section, 0, $material);
+        $context['unit'] = true;
+        return $context;
+    }
+
+    /**
      * Arma el contexto de resumen de una sección ya elegida. Con $onlycmid > 0 se queda solo con
      * ese módulo (y sin la descripción de la sección, que no es suya).
      *
@@ -2588,8 +2637,8 @@ class rag_retriever {
      * @param int $onlycmid 0 = toda la sección
      * @return array{title: string, number: int, material: string, unreadable: string[], via_url: string[]}
      */
-    private static function summary_context_from(int $courseid, $section, int $onlycmid): array {
-        $material = self::section_summary_material($courseid, $section);
+    private static function summary_context_from(int $courseid, $section, int $onlycmid, ?array $material = null): array {
+        $material = $material ?? self::section_summary_material($courseid, $section);
         if ($onlycmid > 0) {
             $only = function(array $item) use ($onlycmid): bool {
                 return (int)$item['cmid'] === $onlycmid;
@@ -4020,6 +4069,8 @@ class rag_retriever {
         unset_config('lastindexqueue_' . $courseid, 'block_pulso');
         unset_config(url_pdf_extractor::CACHE_PREFIX . $courseid, 'block_pulso');
         full_text_store::delete_course_texts($courseid);
+        require_once(__DIR__ . '/unit_map.php');
+        unit_map::delete($courseid);
         if (!self::rag_table_exists()) {
             return;
         }

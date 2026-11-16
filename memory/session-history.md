@@ -1,5 +1,17 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-16 — Unidades de aprendizaje detectadas por el modelo, con reglas de respaldo (v2.16.0)
+
+Reglas en `CLAUDE.md` → «Unidades de aprendizaje». Nuevo: `classes/unit_map.php`. Tocados: `db/install.xml`, `db/upgrade.php`, `db/events.php`, `classes/observer.php`, las dos tareas de indexación, `classes/rag_retriever.php`, `classes/system_prompt_designer.php`, `classes/chat_presets.php`, los dos endpoints de chat, `amd/src/presets.js` (+ build). **Al desplegar: Notificaciones + purgar cachés.** Lo pidió Chema tras ver el desplegable de v2.14: «unidad = sección de Moodle» no quedaba bien. Lo que costó ver:
+- **El mapa no puede ser de un usuario**: lo hace el cron, que lo ve todo. Guardarlo filtrado habría dado al alumno el mapa del administrador o al revés; se guarda entero y `for_user()` filtra módulo a módulo.
+- **La clave no puede ser el índice ni el título**: cambian con cada análisis. `u<primer cmid>`, fijada al guardar, sobrevive a que el curso cambie y a que ese módulo se borre.
+- **«Nuevo» y «excluido a propósito» son indistinguibles sin apuntar lo que vio el análisis**: de ahí `conocidos` en el JSON guardado. Sin él, la guía didáctica que el modelo dejó fuera se colaría en la unidad vecina en la siguiente lectura.
+- **`strip_tags` se come un título con `<<<…>>>`**: «Fundamentos de la <<<teleasistencia>>>» se quedaba en «Fundamentos de la». Primero se quitan las tiradas de ángulos y luego el HTML. Lo cazó la prueba de validación.
+- **Apartar las secciones de servicio es peligroso en un curso con todo en «Recursos»**: por eso la regla solo las quita si queda alguna otra unidad.
+- **«¿Qué hay en una unidad?» dejó de poder ser una pregunta de texto**: el matcher busca una sección por nombre y una unidad puede ser media sección. Pasó a modo `direct`.
+- **Trampa de la sesión (otra vez)**: un parche con regex escrito por heredoc de shell perdió las barras invertidas (`\x00` llegó como bytes). Las regex de PHP se editan con la herramienta de edición, no por heredoc.
+- **Verificado y NO probado**: ver el final de la sección de `CLAUDE.md`.
+
 ## 2026-11-16 — Tarjetas, pestaña activa, modo oscuro e ilustración de «Crear» (v2.15.0)
 
 Reglas en `CLAUDE.md` → «Colores de cada centro» (último subapartado). `classes/tema_service.php`, `classes/diagnostics.php`, `tema_preview.php`, `chat_simple_view.php`, `templates/chat.mustache`, `lib.php`, `styles.css`, `lang`. **Al desplegar: purgar cachés (plantilla + CSS)**; sin `db/`. Necesita la migración 031 de Épica para recibir la ilustración (rama `feat/tema-del-centro` aquí; `dev` en Épica). Primera sesión con Chema como mantenedor: el contrato del tema se cambia en los dos repos a la vez, sin carta. Pedido: que un centro pueda poner Pulse como un diseño naranja/morado sobre negro con una ilustración, **todo desde Épica y nada fijo en Pulse**. Lo que costó ver:

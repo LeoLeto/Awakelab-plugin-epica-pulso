@@ -94,6 +94,10 @@ class index_course_content extends \core\task\scheduled_task {
                 mtrace("    indexed={$stats['indexed']} skipped={$stats['skipped']} deleted={$stats['deleted']} " .
                     "| texto completo: nuevo/actualizado={$stats['fulltext_stored']} " .
                     "sin cambios={$stats['fulltext_skipped']} borrados={$stats['fulltext_deleted']}");
+                // Unidades de aprendizaje (v2.16.0): con el texto ya al día. Solo llama al modelo si el
+                // curso ha cambiado desde el último análisis; nunca lanza.
+                require_once(__DIR__ . '/../unit_map.php');
+                mtrace('    unidades: ' . \block_pulso\unit_map::refresh($courseid));
             } catch (\Throwable $e) {
                 // Log error but do not halt other courses.
                 mtrace("    ERROR: " . $e->getMessage());

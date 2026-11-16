@@ -7,6 +7,7 @@
 - **Anthropic API constraints** — lo que rechaza la API y cómo se evita.
 - **Invariantes que NO se pueden romper** — UTF-8, RAG fuera de la petición, cmid sintéticos, caché del prompt, historial sin JSON, sesskey.
 - **Modo alumno** — dos capabilities, tres capas. **Enrutado** — sección vs recurso vs metadatos. **Conversación proactiva** — `next_step`.
+- **Unidades de aprendizaje (v2.16.0)** — `unit_map`: el modelo las detecta al indexar (tabla `block_pulso_unidades`), con reglas de estructura de respaldo; los prompts eligen unidad por clave, no por sección.
 - **Prompts preestablecidos (v2.14.0)** — sugerencias al escribir, panel de opciones y home; el chat manda `preset` + `preset_params` y el servidor monta la pregunta y el encargo.
 - **Enlaces directos (v1.11)** y **Tema claro (v1.16)** — botón «Ir a…»; paleta y contraste.
 - **Épica** — pasos 1, 3 y 4 (bloque Crear, ciclo adhoc, panel de estado), **Gamificación** 1–4, **Ampliación** 1–2, **Retos** 1–2, **QA general**, **Historial del alumno**.
@@ -436,7 +437,62 @@ Y un desempate de la misma tanda: **un listado no es un material**. El nombre de
 sección ("RECURSOS") mete "recurso" en `qnorm`, así que los listados (`Contenido de la
 sección X`, `Secciones del curso`) se resuelven ANTES de la rama de documento.
 
+## Unidades de aprendizaje (v2.16.0)
+
+Hasta v2.15 «unidad» era cada sección visible de Moodle. No vale cuando el curso no está montado «una sección = una unidad»:
+secciones de servicio que salían como temas, varias unidades en una sección separadas por etiquetas (Refactika), o una unidad con su
+manual en «Recursos». Desde v2.16.0 las unidades salen de `classes/unit_map.php`, que tiene **dos orígenes**:
+
+- **`modelo`**: `unit_map::refresh($courseid)` manda al modelo principal (`block_pulso/model`, una llamada, 6.000 tokens de salida)
+  el esquema del curso —secciones, etiquetas como `ENCABEZADO` sin id, y cada módulo `m<cmid> [tipo] nombre — empieza: …` con los
+  primeros 260 caracteres de su texto— y recibe `{"unidades":[{"titulo","modulos":["m12"]}]}`. **Solo corre en el cron y en la tarea
+  adhoc de indexación**, justo después de `index_course()`; nunca en la petición de chat (misma regla que el RAG). Se guarda una fila
+  por curso en `block_pulso_unidades` con la **huella** (sha1 de estructura, nombres y arranque de los textos): si la huella no
+  cambia, la siguiente pasada dice «sin cambios» y **no se vuelve a pagar**. Nunca lanza: devuelve una frase para `mtrace`.
+- **`reglas`** (`by_rules()`): cuando no hay mapa guardado —curso sin pasar por el cron, tabla aún sin crear, sin clave, API caída,
+  respuesta cortada o no válida—. Las etiquetas/subsecciones cuyo nombre empieza por «Unidad/Tema/Módulo/Bloque/Lección/Capítulo/UD N»
+  parten una sección **si hay dos o más**; una sección sin nombre propio y con una sola toma su título; solo cuenta lo que tiene
+  contenido de estudio (texto usable o un tipo de `CONTENT_MODS`); las secciones de servicio (`RE_SERVICE`: Presentación, Recursos,
+  Foro, Evaluación final…) se apartan **solo si aun así queda alguna unidad**.
+
+Reglas que no se tocan:
+
+- **Nada de lo que dice el modelo se da por bueno** (`validate()`): solo sobreviven cmid que existen en el curso, cada uno en una
+  unidad, nunca una etiqueta; títulos limpios y con tope; el orden final es el del curso. Sin ninguna unidad válida no se guarda nada.
+- **El mapa no es de ningún usuario; la visibilidad se aplica al leer** (`for_user()`): el cron ve todo el curso, y quien pregunta
+  recibe de cada unidad solo sus módulos `uservisible`. Una unidad sin ninguno no existe para él (400 si manda su clave).
+- **La clave de una unidad es `u<cmid de su primer módulo>` y se fija al guardar**: no cambia aunque ese módulo se borre después. Es lo
+  que viaja en `preset_params.unit`; `resolve()` la valida por forma y la busca en el mapa de ESE usuario.
+- **Entre dos pasadas del cron el mapa se pone al día solo** (`stored_units()`): los módulos borrados se quitan y los nuevos se suman
+  a la unidad de su vecino de sección. Los que el modelo dejó fuera a propósito (`conocidos`) siguen fuera.
+- **El material de una unidad es una lista de cmid**, no una sección: `rag_retriever::build_summary_context_for_cms()` (comparte
+  `summary_material_for_cmids()` y `summary_context_from()` con el resumen de sección; el camino de texto libre de v2.9.1 no cambia).
+  El bloque dinámico dice «de la unidad «X»» sin número de sección. **El prompt base sigue sin cambiar** (md5 comprobado).
+- **«¿Qué hay en una unidad?» es modo `direct`**: `chat_presets::unit_listing()` monta la respuesta desde Moodle y los endpoints la
+  devuelven como una de la ruta directa, sin LLM. Ya no se puede resolver como pregunta de texto: una unidad puede no ser una sección.
+- La tabla no guarda datos personales (no entra en el privacy provider). Se borra con `delete_course_index()` y con el evento
+  `course_deleted` (`observer::course_deleted`).
+
+**Lo que NO cambia todavía**: el texto libre («resúmeme la unidad 2» tecleado) sigue resolviéndose contra las secciones de Moodle
+(`section_for_summary()`), no contra el mapa; el desplegable de «recurso» sigue agrupado por sección; y Retos sigue mandando a Épica
+el id de la sección como `unidad` (carta 22).
+
+**Al desplegar**: **Notificaciones** (tabla nueva y evento nuevo) y **purgar cachés** (JS). El mapa de cada curso aparece cuando pase
+el cron de indexación; para no esperar, en el servidor:
+`php admin/cli/scheduled_task.php --execute='\block_pulso\task\index_course_content'` (cada curso escribe una línea `unidades: …`).
+
+**Verificado** (fuera del repo, PHP 8.3 portátil con `mbstring` y Moodle simulado; `unit_map`, `chat_presets`, `rag_retriever` y
+`system_prompt_designer` reales): 76 comprobaciones —reglas sobre un curso con sección de servicio, dos unidades en una sección, una
+sin nombre y una oculta; validación de una respuesta con ids inventados, etiquetas, repetidos y basura; huella y «sin cambios»; curso
+cambiado entre pasadas; API caída, respuesta cortada, mala y sin clave; mapa ilegible; los prompts sobre el mapa y diez formas de pedir
+lo que no se puede—, md5 del prompt base y del dinámico sin encargo idénticos a HEAD, y 12 × 2 en jsdom (`src` y `build`).
+**NO probado**: el criterio del modelo con un curso real (qué unidades saca en Refactika o SANS0001), el cron en un Moodle de verdad,
+la actualización de la base ni el coste real de la llamada.
+
 ## Prompts preestablecidos (v2.14.0)
+
+> Desde v2.16.0 el parámetro de unidad se llama `unit` y es una clave del mapa de unidades (ver la sección de arriba), no el id de una
+> sección: donde este apartado dice `section`, léase `unit`.
 
 El chat se orienta a prompts cerrados. Tres piezas que usan el MISMO catálogo, `classes/chat_presets.php` (`definitions()`), que es
 la fuente única —el cliente no tiene ninguna lista propia—:

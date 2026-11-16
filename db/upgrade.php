@@ -483,5 +483,26 @@ function xmldb_block_pulso_upgrade($oldversion) {
         upgrade_block_savepoint(true, 2026100706, 'pulso');
     }
 
+    if ($oldversion < 2026111602) {
+        // v2.16.0: mapa de unidades de aprendizaje por curso (classes/unit_map.php). Nace vacia: cada
+        // curso se rellena la proxima vez que el cron lo indexe, y hasta entonces valen las reglas.
+        $table = new xmldb_table('block_pulso_unidades');
+        if (!$dbman->table_exists($table)) {
+            $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+            $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('mapa', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null);
+            $table->add_field('huella', XMLDB_TYPE_CHAR, '40', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('modelo', XMLDB_TYPE_CHAR, '100', null, XMLDB_NOTNULL, null, '');
+            $table->add_field('unidades', XMLDB_TYPE_INTEGER, '5', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+            $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+            $table->add_index('uniq_courseid', XMLDB_INDEX_UNIQUE, ['courseid']);
+            $dbman->create_table($table);
+        }
+
+        upgrade_block_savepoint(true, 2026111602, 'pulso');
+    }
+
     return true;
 }

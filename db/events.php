@@ -14,4 +14,9 @@ $observers = [
         'eventname' => '\core\event\user_deleted',
         'callback'  => '\block_pulso\observer::user_deleted',
     ],
+    [
+        // Curso borrado: su mapa de unidades ya no es de nadie (v2.16.0).
+        'eventname' => '\core\event\course_deleted',
+        'callback'  => '\block_pulso\observer::course_deleted',
+    ],
 ];

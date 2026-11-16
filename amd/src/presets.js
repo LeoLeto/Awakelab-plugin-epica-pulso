@@ -49,7 +49,7 @@ define(['block_pulso/common'], function(C) {
 
     // Etiqueta de cada parámetro que es un id del curso, lista de la que sale y aviso si está vacía.
     var COURSE_PARAMS = {
-        section: {label: 'Unidad', list: 'sections', empty: 'Este curso no tiene unidades visibles.'},
+        unit: {label: 'Unidad', list: 'units', empty: 'No he encontrado unidades con material en este curso.'},
         resource: {label: 'Recurso', list: 'resources', empty: 'Todavía no hay recursos con texto legible en este curso.'},
         quiz: {label: 'Cuestionario', list: 'quizzes', empty: 'Este curso no tiene cuestionarios visibles.'},
         activity: {label: 'Actividad', list: 'activities', empty: 'Este curso no tiene tareas ni cuestionarios visibles.'}
@@ -263,7 +263,7 @@ define(['block_pulso/common'], function(C) {
         if (!m) return null;
         var n = parseInt(m[1], 10);
         var hit = null;
-        (data.options.sections || []).forEach(function(s) {
+        (data.options.units || []).forEach(function(s) {
             if (parseInt(s.num, 10) === n) hit = s.id;
         });
         return hit;
@@ -298,7 +298,7 @@ define(['block_pulso/common'], function(C) {
             }
             return '<div class="pulso-create-field"><label for="' + id + '">' + esc(def.label) + '</label>'
                 + '<select id="' + id + '" data-pulso-preset-param="' + name + '">'
-                + optionsHtml(items, name === 'section' ? typedSectionId() : null) + '</select></div>';
+                + optionsHtml(items, name === 'unit' ? typedSectionId() : null) + '</select></div>';
         }
         if (name === 'topic') {
             return '<div class="pulso-create-field"><label for="' + id + '">Concepto</label>'

@@ -3156,6 +3156,17 @@ a.pulso-retos-open {
     color: #ff9a90;
 }
 
+/* ========== LOGO DEL CENTRO EN LOS AVATARES (v2.16.3) ==========
+   Con el token «logo» (hay logo del centro), el avatar de cada respuesta y el de la home llevan el logo en vez del
+   isotipo de Awakelab, sobre el color de la cabecera: es donde el centro ya ha visto que se lee (la vista previa de
+   /admin lo pinta ahí). La URL llega en --pulso-logo, validada en tema_service::para_pintar(). Va DETRÁS del bloque
+   «MODO OSCURO», que fija el disco de los avatares a #003670: el `background` de aquí lo sustituye entero. */
+.pulso-chat-container[data-pulso-tema~="logo"] .pulso-home-avatar,
+.pulso-chat-container[data-pulso-tema~="logo"] .pulso-message.ai::before {
+    background: var(--pulso-header-bg) var(--pulso-logo) center / 64% no-repeat;
+    border-color: transparent;
+}
+
 /* ========== ILUSTRACIÓN DEL CENTRO EN «CREAR» (v2.15.0) ==========
    Decorativa (alt vacío): abajo a la derecha de la lista de herramientas, que deja libre ese hueco. Solo cuando el
    panel de Crear tiene sitio (container query sobre el área que hace scroll); en un panel estrecho o en el móvil no

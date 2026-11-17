@@ -1,5 +1,9 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-17 — El logo del centro también en los avatares del chat (v2.16.3)
+
+Pedido por Chema: el avatar de las respuestas seguía siendo el isotipo de Awakelab aunque el centro tuviera logo. `classes/tema_service.php` (`para_pintar()`: `--pulso-logo` y token `logo`, con la URL validada), `styles.css` (bloque nuevo tras MODO OSCURO), `version.php`. **Al desplegar: purgar cachés (CSS)**. Lo que costó ver: los avatares son un `::before` y un fondo, así que el logo solo puede llegarles como variable CSS dentro del `style`; por eso la URL de pluginfile se exige con una forma cerrada antes de meterla en `url("…")`. El disco es el color de la cabecera, que es donde el centro ya ha comprobado que su logo se lee. Verificado: `para_pintar()` con solo logo, con logo y colores y sin logo, y en navegador con la plantilla y el CSS reales (los dos avatares con el logo sobre la cabecera; sin el token, el isotipo de siempre).
+
 ## 2026-11-17 — Logo sin placa blanca y sin insignia de versión en el chat (v2.16.2)
 
 Pedido por Chema antes de pasar a producción. `styles.css` (`.pulso-logo-centro` sin fondo, relleno ni esquinas; fuera las dos reglas de `.pulso-version-badge`), `templates/chat.mustache` y `chat_simple_view.php` (fuera `showversion` y `release`), `tema_preview.php` (la maqueta sin insignia) y `diagnostico.php` (ahora dice la versión desplegada, leída de `version.php`: es donde se comprueba qué build corre). **Al desplegar: purgar cachés (plantilla + CSS)**; sin `db/`. En Épica, la vista previa del logo en `/admin` también deja de pintar la placa. Sin la placa, un logo oscuro y transparente sobre una cabecera oscura no se ve: se acepta, porque lo elige el centro y la vista previa de Épica lo enseña sobre su cabecera antes de subirlo.

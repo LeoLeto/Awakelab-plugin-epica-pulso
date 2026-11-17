@@ -1166,6 +1166,14 @@ class tema_service {
             error_log('Pulso tema: no se pudo leer lo guardado: ' . get_class($e));
             return [];
         }
+        // El logo también va DENTRO del chat (v2.16.3): en el avatar de cada respuesta y en el de la home, que
+        // son un `::before` y un fondo, así que solo pueden leerlo como variable CSS. La URL de pluginfile va en
+        // `url("…")` dentro del `style`, y por eso se exige una forma cerrada: sin comillas, paréntesis,
+        // espacios ni barras invertidas no puede cerrar el `url()` ni la declaración.
+        if ($logo !== '' && preg_match('#\Ahttps?://[A-Za-z0-9._~:/%@+=-]+\z#', $logo)) {
+            $res['vars']['--pulso-logo'] = 'url("' . $logo . '")';
+            $res['flags'][] = 'logo';
+        }
         if (!$res['vars'] && $logo === '' && $ilustracion === '') {
             return [];
         }

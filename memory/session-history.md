@@ -1,5 +1,9 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-17 — El chat se abre arriba (v2.17.1)
+
+Pedido por Chema: al abrir Pulse el primer vistazo tiene que estar arriba; abajo del todo, solo para las respuestas. Solo `amd/src/chat.js` (`toggleChat()`), su build y `version.php`. **Al desplegar: purgar cachés** (JS). Verificado en un navegador de verdad con la plantilla, el CSS y el build reales (jsdom no calcula scroll): sin conversación abre con `scrollTop` 0 sobre 1.441 px de home; con un mensaje en el registro, al reabrir va al final (1.586 de 1.586). **NO probado** en sanase.
+
 ## 2026-11-17 — Aviso de unidades sin rastrear, con su botón a Fuentes de Épica (v2.17.0)
 
 Pedido por Chema: si al indexar hay unidades sin contenido rastreable (solo SCORM), avisar al profesorado con un botón por unidad a Fuentes de Épica, y que Fuentes distinga por unidad. Reglas en `CLAUDE.md` → «Unidades sin rastrear». Archivos: `api_unidades_sin_rastrear.php` (nuevo), `classes/unit_map.php` (`untracked()`), `classes/fuentes_service.php` (unidades del índice, `textos_de_unidad()`, `no_contratada()`), `classes/epica_puente.php` + `fuentes_puente.php` (la unidad), `classes/chat_presets.php` + `classes/rag_retriever.php` (el material extra en los prompts de unidad), `amd/src/presets.js`, `crear.js`, `chat.js`, `templates/chat.mustache`, `chat_simple_view.php`, `styles.css`, `version.php`. **Al desplegar: purgar cachés** (JS y CSS); sin tablas nuevas. **Y antes, la migración 032 de Épica**: sin ella el botón entra en el curso entero y lo subido no queda en la unidad.

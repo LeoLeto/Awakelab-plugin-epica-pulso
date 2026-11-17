@@ -513,6 +513,14 @@ el cron aún no había pasado) llamando a `api_chat_stream.php` con cada prompt.
 Sin cambios de `db/` ni de JS respecto a v2.16.0. **Pendiente de ver con un Moodle delante**: el mapa hecho por el modelo (hasta que
 corra el cron los títulos son los de las etiquetas, «Módulo 1» a secas) y cómo queda el glosario con el reparto nuevo.
 
+### El chat se abre arriba (v2.17.1)
+
+- **Al abrir el chat, el primer vistazo es arriba**: saludo, aviso de unidades y prompts. Hasta aquí `toggleChat()`
+  llamaba siempre a `pulsoScrollToEnd()`, y con la home larga (prompts + aviso) se abría enseñando el final del
+  catálogo. Ahora va al final **solo si `#pulso-messages` ya tiene mensajes** en esta página —entonces lo que
+  importa es la última respuesta—; si no, `scrollTop = 0` y se borra el `data-pulso-stick`. Los demás
+  `pulsoScrollToEnd()` (llegan mensajes, escribiendo, streaming) no cambian: abajo del todo es para las respuestas.
+
 ### Unidades sin rastrear (v2.17.0)
 
 Al indexar, una unidad puede quedarse sin texto: su material es un SCORM que no se deja, vídeos o enlaces. El

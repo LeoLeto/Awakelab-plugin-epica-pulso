@@ -1285,8 +1285,18 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                     else if (activeTab) activeTab.focus();
                 }, 100);
 
-                // Scroll al final de los mensajes
-                pulsoScrollToEnd();
+                // v2.17.1: el primer vistazo es ARRIBA (saludo, aviso y prompts). Abajo del todo solo se va
+                // cuando ya hay conversación en esta página: entonces lo que importa es la última respuesta.
+                const log = document.getElementById('pulso-messages');
+                if (log && log.children.length > 0) {
+                    pulsoScrollToEnd();
+                } else {
+                    const scroller = document.getElementById('pulso-scroll');
+                    if (scroller) {
+                        scroller.removeAttribute('data-pulso-stick');
+                        scroller.scrollTop = 0;
+                    }
+                }
 
                 // v2.17.0: el aviso de unidades sin rastrear (profesorado) se pide la primera vez que se abre.
                 if (C.fn.pulsoUntrackedLoad) C.fn.pulsoUntrackedLoad();

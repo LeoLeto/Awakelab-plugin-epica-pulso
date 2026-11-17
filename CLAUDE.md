@@ -513,6 +513,47 @@ el cron aún no había pasado) llamando a `api_chat_stream.php` con cada prompt.
 Sin cambios de `db/` ni de JS respecto a v2.16.0. **Pendiente de ver con un Moodle delante**: el mapa hecho por el modelo (hasta que
 corra el cron los títulos son los de las etiquetas, «Módulo 1» a secas) y cómo queda el glosario con el reparto nuevo.
 
+### Unidades sin rastrear (v2.17.0)
+
+Al indexar, una unidad puede quedarse sin texto: su material es un SCORM que no se deja, vídeos o enlaces. El
+profesorado lo ve en la home del chat —un aviso con **un botón por unidad** que entra en Fuentes de Épica para
+esa unidad— y lo que suba ahí lo usa Pulse para esa unidad. El lado de Épica es su migración 032
+(`awk-epica/docs/fuentes.md` §18): una fuente de curso puede llevar `unidad_curso`, que **solo etiqueta**.
+
+- **Qué es «sin rastrear»** (`unit_map::untracked()`): una unidad del mapa cuyos módulos de **contenido**
+  (`CONTENT_MODS`) ya pasó el indexador —tienen fila en `full_text_store`— y **ninguno** salió con texto. No se
+  calcula aparte: sale del último indexado. Tareas, cuestionarios y foros **no cuentan**, ni a favor ni en
+  contra (su enunciado no es el material de la unidad). Lo que el cron aún no ha visto **no se avisa**, y un
+  curso sin indexar tampoco.
+- **El aviso** lo pide `presets.js` a `api_unidades_sin_rastrear.php` **la primera vez que se abre el chat**,
+  no al pintar la página: es lo único de la home que pregunta a Épica. Ese endpoint resta las unidades que ya
+  tienen material en Épica (`fuentes_service::unidades_con_material()`, el `unidad_curso` del índice, con su
+  caché de 5 min) y contesta lista vacía al alumnado, sin Épica o con Fuentes sin contratar. **Si Épica no
+  contesta, se avisa de lo que dice Moodle**: mejor un aviso de más que esconder una unidad sin material.
+  `cfg.apiUnidadesUrl` va vacío para el alumnado y sin Épica, y la caja solo existe en `{{#isteacher}}`.
+- **La ✕** guarda en `localStorage` (`pulso:untracked:<curso>`) la lista de claves que había: si cambia, vuelve.
+- **El botón** (`crear.js` → `pulsoAbrirFuentesUnidad`) manda **solo la clave** al puente de siempre
+  (`fuentes_puente.php`, `unidad=u<cmid>`). `epica_puente::unidad()` la valida (`^u\d{1,12}$`), comprueba con
+  `unit_map::find()` que es una unidad que **esta persona ve**, y pone el **título del servidor**; nunca el
+  del navegador. Viajan a Épica `unidad` y `unidad_nombre`, fuera de la firma como `curso_nombre`. Una clave
+  que no cuadra entra en Fuentes del curso entero.
+- **Los prompts de unidad** (resumen, esquema, repaso, concepto) llevan además el material extra de esa
+  unidad: `fuentes_service::textos_de_unidad()` pide por `fuentes/texto` hasta 4 fuentes y 40.000
+  caracteres, **por tramos** si una fuente es larga (calculado con los caracteres del índice), y
+  `rag_retriever::build_summary_context_for_cms()` las mete como un recurso más (`[material extra: …]`).
+  Falla abierto. La búsqueda del chat libre no cambia: ya buscaba en todo el curso.
+- **Al indexar, la lista entera de unidades va a Épica** (`fuentes_service::sincronizar_unidades()`, llamada en
+  las dos tareas de indexado después de `unit_map::refresh()`): `POST /api/moodle/fuentes/unidades` con
+  `unit_map::for_sync()` —**todas** las unidades del mapa, sin mirar a ningún usuario, ocultas incluidas, con
+  `clave`, `nombre` y `sin_texto`—. Así en `/fuentes` de Épica se elige cualquier unidad para subir material,
+  no solo la del aviso. Firma el **administrador del sitio** con el contexto del curso (como `tema_service`), y
+  se manda solo si la lista cambió desde la última vez (huella en la caché `fuentesidx`, `unisync_<curso>`) o
+  una vez al día. Nunca lanza: lo que pasó sale en el registro de la tarea. Épica la aplica entera o nada
+  (400 `unidades-invalidas`); su contrato, `awk-epica/docs/fuentes.md` §18.6.
+- **La clave es la de `unit_map`** (`u` + primer módulo, fija al guardar el mapa). Si el mapa del modelo
+  cambia la clave de una unidad, lo subido para la vieja sigue siendo material del curso —Épica no pierde
+  nada— pero esa unidad vuelve a salir en el aviso hasta que alguien lo pase a la nueva desde `/fuentes`.
+
 ### Fechas de una actividad y fuera el glosario (v2.16.4)
 
 - **«Fechas e instrucciones de una actividad» pasa a modo `direct`** (`chat_presets::activity_info()`). Por texto caía en

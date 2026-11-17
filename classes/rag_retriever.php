@@ -2604,9 +2604,11 @@ class rag_retriever {
      * @param int $courseid
      * @param int[] $cmids En el orden del curso
      * @param string $title Título de la unidad
+     * @param array $extra Material extra de Épica subido para esta unidad (v2.17.0): [{nombre, texto}] de
+     *                     fuentes_service::textos_de_unidad(). Va detrás de lo de Moodle, como un recurso más.
      * @return array
      */
-    public static function build_summary_context_for_cms(int $courseid, array $cmids, string $title): array {
+    public static function build_summary_context_for_cms(int $courseid, array $cmids, string $title, array $extra = []): array {
         $visible = [];
         foreach ($cmids as $cmid) {
             if (course_visibility::cm_visible($courseid, (int)$cmid)) {
@@ -2622,6 +2624,12 @@ class rag_retriever {
             return [];
         }
         $material = self::summary_material_for_cmids($courseid, $modinfo, $visible);
+        foreach ($extra as $item) {
+            if (is_array($item) && trim((string)($item['texto'] ?? '')) !== '') {
+                $material['texts'][] = ['cmid' => 0, 'modname' => 'material extra', 'name' => (string)($item['nombre'] ?? 'Documento'),
+                    'text' => trim((string)$item['texto'])];
+            }
+        }
         $section = (object)['name' => preg_replace('/[<>]{3,}/u', '', $title), 'section' => 0, 'summary' => ''];
         $context = self::summary_context_from($courseid, $section, 0, $material);
         $context['unit'] = true;

@@ -47,6 +47,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $fuentes_url = $CFG->wwwroot . '/blocks/pulso/fuentes_puente.php';
     $presentacion_url = $CFG->wwwroot . '/blocks/pulso/api_presentacion.php';
     $presets_url = $CFG->wwwroot . '/blocks/pulso/api_presets.php';
+    $unidades_url = $CFG->wwwroot . '/blocks/pulso/api_unidades_sin_rastrear.php';
 
     // La versión ya no se enseña en la cabecera del chat (v2.16.2): está en diagnostico.php.
 
@@ -90,6 +91,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         'apiFuentesUrl' => $fuentes_url,
         'apiPresentacionUrl' => $presentacion_url,
         'apiPresetsUrl' => $presets_url,
+        // v2.17.0: el aviso de unidades sin rastrear (solo profesorado y solo con Épica).
+        'apiUnidadesUrl' => ($isteacher && $epicaavailable) ? $unidades_url : '',
         'sesskey' => $pulso_sesskey,
         'isTeacher' => !empty($isteacher),
         'epicaAvailable' => (bool)$epicaavailable,

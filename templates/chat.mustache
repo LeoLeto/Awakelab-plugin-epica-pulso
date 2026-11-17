@@ -104,6 +104,9 @@
                     <span>¿Qué puede hacer Pulse?<span class="pulso-home-help-sub">Descúbrelo en 10 segundos</span></span>
                 </button>
 
+                {{! Unidades sin rastrear (v2.17.0): lo rellena presets.js con api_unidades_sin_rastrear.php. Solo profesorado. }}
+                {{#isteacher}}<div class="pulso-untracked" id="pulso-untracked" role="region" aria-label="Unidades que Pulse no puede leer" hidden></div>{{/isteacher}}
+
                 {{! Catálogo de prompts preestablecidos (v2.14.0): lo arma chat_presets::home_groups() para el rol de quien mira. }}
                 <div class="pulso-home-section">
                     <div class="pulso-home-section-head">

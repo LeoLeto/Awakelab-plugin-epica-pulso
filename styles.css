@@ -3487,3 +3487,135 @@ a.pulso-retos-open {
     opacity: 0.55;
     cursor: not-allowed;
 }
+
+/* ========== UNIDADES SIN RASTREAR (v2.17.0) ==========
+   Aviso de la home, solo para el profesorado: las unidades que Pulse no puede leer, con un botón por unidad
+   que lleva a Fuentes de Épica. Ámbar como el resto de avisos; el botón, con el color de acción del centro. */
+
+.pulso-untracked {
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(138, 97, 0, 0.35);
+    background: rgba(138, 97, 0, 0.07);
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+}
+
+.pulso-untracked[hidden] {
+    display: none;
+}
+
+.pulso-untracked-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pulso-untracked-head svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: #8A6100;
+}
+
+.pulso-untracked-title {
+    flex: 1;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--pulso-ink);
+}
+
+.pulso-untracked-close {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--pulso-slate);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pulso-untracked-close:hover {
+    background: rgba(138, 97, 0, 0.12);
+}
+
+.pulso-untracked-text {
+    margin: 6px 0 10px;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--pulso-slate);
+}
+
+.pulso-untracked-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pulso-untracked-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pulso-untracked-unit {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.pulso-untracked-name {
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.pulso-untracked-sub {
+    font-size: 0.74rem;
+    color: var(--pulso-slate);
+}
+
+.pulso-untracked-btn {
+    flex-shrink: 0;
+    min-height: 32px;
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text);
+    font-family: var(--pulso-font);
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.pulso-untracked-btn:hover {
+    filter: brightness(1.08);
+}
+
+.pulso-untracked-btn:focus-visible,
+.pulso-untracked-close:focus-visible {
+    outline: 2px solid var(--pulso-accent);
+    outline-offset: 2px;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-untracked-head svg {
+    color: #f2c14e;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-untracked {
+    border-color: rgba(242, 193, 78, 0.4);
+    background: rgba(242, 193, 78, 0.08);
+}

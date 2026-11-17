@@ -461,7 +461,11 @@ class chat_presets {
         if ($def['mode'] === 'material') {
             require_once(__DIR__ . '/rag_retriever.php');
             if ($unit !== null) {
-                $material = rag_retriever::build_summary_context_for_cms($courseid, $unit['cmids'], $unit['title']);
+                // Lo que el profesorado subió a Épica para esta unidad (v2.17.0, el botón del aviso de unidades
+                // sin rastrear) entra como un recurso más. Falla abierto: sin Épica, solo lo de Moodle.
+                require_once(__DIR__ . '/fuentes_service.php');
+                $extra = fuentes_service::textos_de_unidad($courseid, $unit['key']);
+                $material = rag_retriever::build_summary_context_for_cms($courseid, $unit['cmids'], $unit['title'], $extra);
                 $scope = 'la unidad «' . ($material['title'] ?? '') . '»';
             } else {
                 $material = rag_retriever::build_summary_context_for_resource($courseid, $v['resource']);

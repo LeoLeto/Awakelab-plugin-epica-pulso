@@ -145,6 +145,101 @@ class unit_map {
         return $out;
     }
 
+    /**
+     * Unidades SIN RASTREAR del usuario actual (v2.17.0): las que, tras indexar el curso, no tienen un solo
+     * módulo con texto legible —un SCORM que no se deja, vídeos, enlaces—, así que Pulse no puede resumirlas
+     * ni contestar sobre ellas con su material.
+     *
+     * Sale de lo que dejó el último indexado (`full_text_store`), no se calcula aparte: una unidad cuenta
+     * solo si el indexador ya pasó por alguno de sus módulos de contenido (CONTENT_MODS, tiene fila) y ninguno
+     * salió con texto. Las tareas, cuestionarios y foros no cuentan ni a favor ni en contra: su enunciado no es
+     * el material de la unidad, y una unidad que solo tiene eso no tiene nada que subir. Una
+     * unidad recién creada, que el cron aún no ha visto, no se avisa: se avisaría de algo que no se sabe.
+     * El material extra de Épica lo resta quien llama (api_unidades_sin_rastrear.php), que es quien puede
+     * preguntar a Épica.
+     *
+     * @param int $courseid
+     * @return array [{key, num, title, modules: [{modname, name}]}] en el orden del curso.
+     */
+    public static function untracked(int $courseid): array {
+        $structure = self::structure($courseid);
+        if ($structure === null) {
+            return [];
+        }
+        $textinfo = self::text_info($courseid, $structure, false);
+        if (empty($textinfo)) {
+            return []; // Curso sin indexar todavía.
+        }
+        $out = [];
+        foreach (self::for_user($courseid)['units'] as $unit) {
+            if (self::unreadable($unit['cmids'], $structure, $textinfo)) {
+                $modules = [];
+                foreach (self::describe($courseid, $unit['cmids']) as $cm) {
+                    $modules[] = ['modname' => $cm['modname'], 'name' => $cm['name']];
+                }
+                $out[] = ['key' => $unit['key'], 'num' => $unit['num'], 'title' => $unit['title'], 'modules' => $modules];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * ¿Se ha quedado sin texto una unidad? Sí si el indexador ya pasó por alguno de sus módulos de contenido
+     * y ninguno salió legible. Solo el material de estudio: el enunciado de una tarea o de un cuestionario no
+     * explica la unidad.
+     *
+     * @param int[] $cmids
+     * @param array $structure
+     * @param array $textinfo De text_info()
+     * @return bool
+     */
+    private static function unreadable(array $cmids, array $structure, array $textinfo): bool {
+        $seen = false;
+        foreach ($cmids as $cmid) {
+            if (isset($textinfo[$cmid]) && in_array($structure['cms'][$cmid]['modname'] ?? '', self::CONTENT_MODS, true)) {
+                if (!empty($textinfo[$cmid]['usable'])) {
+                    return false;
+                }
+                $seen = true;
+            }
+        }
+        return $seen;
+    }
+
+    /**
+     * TODAS las unidades del curso, sin mirar a ningún usuario, para mandárselas a Épica al indexar (v2.17.0,
+     * migración 032 de Épica): con ellas `/fuentes` deja subir material a cualquier unidad, no solo a la del
+     * aviso. Mismo mapa que for_user() —el guardado o, sin él, las reglas— y la misma clave, que es lo que
+     * enlaza lo que se sube en Épica con la unidad de aquí. SOLO cron / tarea adhoc: el resultado incluye
+     * unidades ocultas, que el profesorado también gestiona.
+     *
+     * @param int $courseid
+     * @return array|null [{clave, nombre, sin_texto}] en el orden del curso, o null si no se pudo leer el curso.
+     */
+    public static function for_sync(int $courseid): ?array {
+        $structure = self::structure($courseid);
+        if ($structure === null) {
+            return null;
+        }
+        $textinfo = self::text_info($courseid, $structure, false);
+        $units = self::stored_units($courseid, $structure);
+        if (empty($units)) {
+            $units = self::by_rules($structure, $textinfo);
+        }
+        $out = [];
+        foreach ($units as $unit) {
+            if (empty($unit['cmids'])) {
+                continue;
+            }
+            $out[] = [
+                'clave' => (string)$unit['key'],
+                'nombre' => \core_text::substr((string)$unit['title'], 0, 200),
+                'sin_texto' => self::unreadable($unit['cmids'], $structure, $textinfo),
+            ];
+        }
+        return $out;
+    }
+
     // =====================================================================================
     // Estructura del curso
     // =====================================================================================

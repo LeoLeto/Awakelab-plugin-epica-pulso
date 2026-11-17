@@ -433,6 +433,108 @@ define(['block_pulso/common'], function(C) {
     }
 
 
+    // ========== UNIDADES SIN RASTREAR (v2.17.0) ==========
+    // Solo profesorado y solo con Épica (cfg.apiUnidadesUrl vacío si no). Se pide al ABRIR el chat por primera
+    // vez, no al cargar la página: es lo único de la home que pregunta a Épica, y no hace falta en cada vista.
+
+    var untrackedLoaded = false;
+
+    var MOD_WORDS = {
+        scorm: 'SCORM', url: 'enlace', resource: 'archivo', page: 'página', book: 'libro', lesson: 'lección',
+        h5pactivity: 'H5P', folder: 'carpeta', imscp: 'paquete IMS'
+    };
+
+    function untrackedStoreKey() {
+        return 'pulso:untracked:' + (cfg.courseid || 0);
+    }
+
+    // Lo que se cerró con la ✕ se queda cerrado mientras la lista de unidades sea la misma.
+    function untrackedDismissed(signature) {
+        try {
+            return window.localStorage && window.localStorage.getItem(untrackedStoreKey()) === signature;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    function untrackedModules(unit) {
+        var words = [];
+        (unit.modules || []).forEach(function(m) {
+            var w = MOD_WORDS[m.modname];
+            if (w && words.indexOf(w) === -1) words.push(w);
+        });
+        return words.length ? 'Solo tiene ' + words.join(', ') : '';
+    }
+
+    function renderUntracked(units) {
+        var box = el('pulso-untracked');
+        if (!box) return;
+        var signature = units.map(function(u) { return u.key; }).join(',');
+        if (!units.length || untrackedDismissed(signature)) {
+            box.hidden = true;
+            box.innerHTML = '';
+            return;
+        }
+        var title = units.length === 1
+            ? 'Hay una unidad que Pulse no puede leer'
+            : 'Hay ' + units.length + ' unidades que Pulse no puede leer';
+        var html = '<div class="pulso-untracked-head">'
+            + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            + '<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>'
+            + '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'
+            + '<h4 class="pulso-untracked-title">' + esc(title) + '</h4>'
+            + '<button type="button" class="pulso-untracked-close" data-pulso-action="pulsoUntrackedDismiss" aria-label="Ocultar este aviso">'
+            + '<span aria-hidden="true">×</span></button></div>'
+            + '<p class="pulso-untracked-text">Su contenido está en paquetes, vídeos o enlaces de los que no se puede sacar texto, '
+            + 'así que Pulse no puede resumirlas ni contestar con su material. Sube a Épica un documento o un vídeo con ese '
+            + 'contenido y Pulse lo usará. Este aviso solo lo ve el profesorado.</p>'
+            + '<ul class="pulso-untracked-list">';
+        units.forEach(function(u) {
+            var sub = untrackedModules(u);
+            html += '<li class="pulso-untracked-item"><span class="pulso-untracked-unit">'
+                + '<span class="pulso-untracked-name">' + esc(u.title) + '</span>'
+                + (sub ? '<span class="pulso-untracked-sub">' + esc(sub) + '</span>' : '')
+                + '</span><button type="button" class="pulso-untracked-btn" data-pulso-action="pulsoAbrirFuentesUnidad"'
+                + ' data-pulso-arg="' + escAttr(u.key) + '">Subir material<span class="pulso-sr-only"> para ' + esc(u.title)
+                + ' (se abre en una pestaña nueva)</span></button></li>';
+        });
+        box.innerHTML = html + '</ul>';
+        box.setAttribute('data-signature', signature);
+        box.hidden = false;
+    }
+
+    function loadUntracked() {
+        if (untrackedLoaded || !cfg.apiUnidadesUrl || !window.fetch || !el('pulso-untracked')) return;
+        untrackedLoaded = true;
+        var form = new FormData();
+        form.append('courseid', cfg.courseid || 0);
+        form.append('sesskey', cfg.sesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+        fetch(cfg.apiUnidadesUrl, {method: 'POST', body: form, credentials: 'same-origin'})
+            .then(function(r) { return r.json(); })
+            .then(function(json) {
+                if (!json || !json.success || !Array.isArray(json.units)) throw new Error('respuesta no valida');
+                renderUntracked(json.units.filter(function(u) {
+                    return u && typeof u.key === 'string' && /^u[0-9]{1,12}$/.test(u.key) && typeof u.title === 'string';
+                }));
+            })
+            .catch(function(e) {
+                // En silencio: el aviso es una ayuda, no una página que tenga que salir.
+                C.pulsoLog('Pulso unidades sin rastrear:', e);
+            });
+    }
+
+    function dismissUntracked() {
+        var box = el('pulso-untracked');
+        if (!box) return;
+        try {
+            if (window.localStorage) window.localStorage.setItem(untrackedStoreKey(), box.getAttribute('data-signature') || '');
+        } catch (e) {
+            // Sin almacenamiento se oculta solo en esta vista.
+        }
+        box.hidden = true;
+    }
+
+
     // Arranque: lo llama chat.js ANTES de registrar su propio teclado del cuadro de texto.
     function boot() {
         var input = el('pulso-input');
@@ -461,6 +563,8 @@ define(['block_pulso/common'], function(C) {
     }
 
     C.fn.pulsoPresetsBoot = boot;
+    C.fn.pulsoUntrackedLoad = loadUntracked;
+    C.fn.pulsoUntrackedDismiss = dismissUntracked;
     C.fn.pulsoPresetPick = pick;
     C.fn.pulsoPresetSend = sendPanel;
     C.fn.pulsoPresetCancel = function() { closePanel(true); };

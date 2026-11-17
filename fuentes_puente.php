@@ -19,5 +19,7 @@ require_once(__DIR__ . '/classes/epica_puente.php');
 // la valida epica_puente contra su lista cerrada; el borrador, con su regex (\z).
 \block_pulso\epica_puente::abrir(
     optional_param('herramienta', 'fuentes', PARAM_RAW),
-    optional_param('borrador', '', PARAM_RAW)
+    optional_param('borrador', '', PARAM_RAW),
+    // v2.17.0: la unidad sin rastrear del aviso del chat. La valida y la resuelve epica_puente::unidad().
+    optional_param('unidad', '', PARAM_RAW)
 );

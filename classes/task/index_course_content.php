@@ -98,6 +98,10 @@ class index_course_content extends \core\task\scheduled_task {
                 // curso ha cambiado desde el último análisis; nunca lanza.
                 require_once(__DIR__ . '/../unit_map.php');
                 mtrace('    unidades: ' . \block_pulso\unit_map::refresh($courseid));
+                // Y la lista entera de unidades a Épica (v2.17.0), para subir material por unidad desde
+                // /fuentes. Nunca lanza.
+                require_once(__DIR__ . '/../fuentes_service.php');
+                mtrace('    unidades a Épica: ' . \block_pulso\fuentes_service::sincronizar_unidades($courseid));
             } catch (\Throwable $e) {
                 // Log error but do not halt other courses.
                 mtrace("    ERROR: " . $e->getMessage());

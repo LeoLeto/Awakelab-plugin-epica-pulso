@@ -67,5 +67,8 @@ class index_course_adhoc extends \core\task\adhoc_task {
         // Unidades de aprendizaje (v2.16.0): ver index_course_content.
         require_once(__DIR__ . '/../unit_map.php');
         mtrace('  unidades: ' . \block_pulso\unit_map::refresh($courseid));
+        // Y la lista entera de unidades a Épica (v2.17.0), para subir material por unidad desde /fuentes.
+        require_once(__DIR__ . '/../fuentes_service.php');
+        mtrace('  unidades a Épica: ' . \block_pulso\fuentes_service::sincronizar_unidades($courseid));
     }
 }

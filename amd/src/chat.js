@@ -1288,6 +1288,9 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                 // Scroll al final de los mensajes
                 pulsoScrollToEnd();
 
+                // v2.17.0: el aviso de unidades sin rastrear (profesorado) se pide la primera vez que se abre.
+                if (C.fn.pulsoUntrackedLoad) C.fn.pulsoUntrackedLoad();
+
                 pulsoLog('✅ Chat abierto');
             } else {
                 // Minimizar a burbuja

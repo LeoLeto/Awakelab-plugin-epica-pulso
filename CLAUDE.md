@@ -513,6 +513,18 @@ el cron aún no había pasado) llamando a `api_chat_stream.php` con cada prompt.
 Sin cambios de `db/` ni de JS respecto a v2.16.0. **Pendiente de ver con un Moodle delante**: el mapa hecho por el modelo (hasta que
 corra el cron los títulos son los de las etiquetas, «Módulo 1» a secas) y cómo queda el glosario con el reparto nuevo.
 
+### Fechas de una actividad y fuera el glosario (v2.16.4)
+
+- **«Fechas e instrucciones de una actividad» pasa a modo `direct`** (`chat_presets::activity_info()`). Por texto caía en
+  `rag_retriever::build_quiz_answer()`, que **nunca** lee las fechas de un cuestionario, y en `build_assign_answer()`, que solo
+  enseña la fecha de entrega si existe y no dice nada si no. Ahora las fechas salen de `\core\activity_dates::get_dates_for_module()`
+  —las mismas de la página de la actividad, con las excepciones de grupo o de usuario de quien pregunta— y, si esa API falla, de la
+  fila del módulo; **sin fechas se dice** («no tiene fechas configuradas en Moodle»). Lleva unidad, tiempo límite e intentos
+  (cuestionario), calificación máxima, instrucciones en texto (`content_to_text`, 3.000 caracteres) y el enlace «Ir a…». Ningún dato
+  del grupo, así que el alumnado lo ve igual. **Las dos funciones de `rag_retriever` siguen como estaban** para el texto libre.
+- **Fuera «Haz un glosario de una unidad»**: lo pidió Chema tras verlo en sanase-test. `material_task()` lanza `bad_request` en su
+  `default`: un prompt de material sin encargo propio es un error de programación.
+
 ## Prompts preestablecidos (v2.14.0)
 
 > Desde v2.16.0 el parámetro de unidad se llama `unit` y es una clave del mapa de unidades (ver la sección de arriba), no el id de una
@@ -542,7 +554,7 @@ texto libre (`topic`) se limpia (una línea, sin `<>«»"`, 120 caracteres con `
 
 **Dos modos**, y la diferencia es la regla que hay que respetar:
 
-- **`material`** (resumen de unidad/recurso, explicar un concepto, preguntas de repaso, esquema, glosario): va **siempre al LLM** con el
+- **`material`** (resumen de unidad/recurso, explicar un concepto, preguntas de repaso, esquema): va **siempre al LLM** con el
   texto de la sección o del recurso **elegido por su id** (`rag_retriever::build_summary_context_for_section()` /
   `…_for_resource()`, que comparten `summary_context_from()` con el resumen de sección de v2.9.1: mismo material, mismos delimitadores
   `<<<RECURSO n>>>`, mismo aviso de ilegibles; un recurso solo se lleva los 24.000 caracteres enteros). Se **salta la ruta directa**

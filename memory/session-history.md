@@ -1,5 +1,12 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-17 — Fechas e instrucciones de una actividad desde Moodle; fuera el glosario (v2.16.4)
+
+Reglas en `CLAUDE.md` → «Fechas de una actividad y fuera el glosario». Solo `classes/chat_presets.php` y `version.php`. **Al desplegar: nada** (solo PHP). Lo que costó ver:
+- **La duda de Chema («¿es este curso o es general?») tenía las dos respuestas**: la ficha de cuestionario de `rag_retriever` no lee `timeopen`/`timeclose` en ningún curso (general), y la de tarea solo calla cuando la tarea no tiene fecha (del curso). No se pudo comprobar qué fechas tienen las actividades del curso 183: la sesión de sanase había caducado.
+- **`\core\activity_dates` en vez de leer columnas**: es lo que enseña Moodle en la página de la actividad, aplica excepciones por grupo o usuario y sirve para cualquier módulo. La lectura de la fila queda de respaldo.
+- **Verificado**: 99 comprobaciones PHP (11 nuevas: fechas de la API y de respaldo, tarea sin fechas ni instrucciones, instrucciones recortadas, enlace, módulos que no valen y el glosario retirado). **NO probado** en sanase.
+
 ## 2026-11-17 — El logo del centro también en los avatares del chat (v2.16.3)
 
 Pedido por Chema: el avatar de las respuestas seguía siendo el isotipo de Awakelab aunque el centro tuviera logo. `classes/tema_service.php` (`para_pintar()`: `--pulso-logo` y token `logo`, con la URL validada), `styles.css` (bloque nuevo tras MODO OSCURO), `version.php`. **Al desplegar: purgar cachés (CSS)**. Lo que costó ver: los avatares son un `::before` y un fondo, así que el logo solo puede llegarles como variable CSS dentro del `style`; por eso la URL de pluginfile se exige con una forma cerrada antes de meterla en `url("…")`. El disco es el color de la cabecera, que es donde el centro ya ha comprobado que su logo se lee. Verificado: `para_pintar()` con solo logo, con logo y colores y sin logo, y en navegador con la plantilla y el CSS reales (los dos avatares con el logo sobre la cabecera; sin el token, el isotipo de siempre).

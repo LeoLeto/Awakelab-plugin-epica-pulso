@@ -94,11 +94,6 @@ class chat_presets {
                 'params' => ['unit'],
                 'keywords' => 'esquematiza indice mapa conceptual estructura puntos tema',
             ],
-            'glosario_unidad' => [
-                'group' => 'estudio', 'label' => 'Haz un glosario de una unidad', 'mode' => 'material',
-                'params' => ['unit'],
-                'keywords' => 'terminos vocabulario definiciones conceptos clave palabras tema',
-            ],
             'contenido_unidad' => [
                 'group' => 'estructura', 'label' => '¿Qué hay en una unidad?', 'mode' => 'direct',
                 'params' => ['unit'],
@@ -120,7 +115,7 @@ class chat_presets {
                 'keywords' => 'entregas trabajos deberes lista',
             ],
             'info_actividad' => [
-                'group' => 'estructura', 'label' => 'Fechas e instrucciones de una actividad', 'mode' => 'query',
+                'group' => 'estructura', 'label' => 'Fechas e instrucciones de una actividad', 'mode' => 'direct',
                 'params' => ['activity'],
                 'keywords' => 'cuando se entrega plazo fecha limite instrucciones enunciado tarea cuestionario',
             ],
@@ -405,6 +400,12 @@ class chat_presets {
         }
 
         if ($def['mode'] === 'direct') {
+            if ($id === 'info_actividad') {
+                $info = self::activity_info($courseid, $v['activity']);
+                $out['query'] = '¿Cuáles son las fechas y las instrucciones de «' . $info['name'] . '»?';
+                $out['direct'] = $info['direct'];
+                return $out;
+            }
             if ($id === 'cuestionarios_curso' || $id === 'tareas_curso') {
                 $out['query'] = $def['label'];
                 $out['direct'] = self::course_modules_listing($courseid, $id === 'tareas_curso' ? 'assign' : 'quiz');
@@ -552,14 +553,9 @@ class chat_presets {
                     . 'Ningún apartado con "descripcion" vacía: si no tiene subpuntos, di en una frase de qué trata.';
                 break;
 
-            case 'glosario_unidad':
             default:
-                $query = 'Haz un glosario de ' . $scope . '.';
-                $task = 'Haz un glosario con los términos clave de ' . $scope . ', por orden alfabético. '
-                    . 'Formato: "type":"list" y en "data" un objeto {"name":"término","definicion":"definición según el material, en una o dos frases"} por término (hasta 10). '
-                    . 'Elige los términos y conceptos propios del tema que el material usa, aunque no los presente como '
-                    . 'definición: define cada uno con lo que el material dice de él. No añadas términos ni definiciones de memoria.';
-                break;
+                // Un prompt de material sin encargo propio es un error de programación, no del usuario.
+                throw new pulso_error('bad_request');
         }
 
         return [$query, $task];
@@ -577,9 +573,6 @@ class chat_presets {
      */
     private static function parametrized_query(int $courseid, string $id, array $v): string {
         switch ($id) {
-            case 'info_actividad':
-                return '¿Cuáles son las instrucciones y las fechas de "' . self::visible_cm_name($courseid, $v['activity'], ['quiz', 'assign']) . '"?';
-
             case 'resultados_cuestionario':
                 return '¿Cuáles son los resultados del cuestionario "' . self::visible_cm_name($courseid, $v['quiz'], ['quiz'])
                     . '": nota media, número de intentos y cuántos alumnos aprobaron?';
@@ -689,6 +682,136 @@ class chat_presets {
             'answer' => json_encode($payload, JSON_UNESCAPED_UNICODE),
             'schema_data' => $payload,
             'followup_questions' => [],
+        ];
+    }
+
+    /** Tope de las instrucciones que se enseñan de una actividad. */
+    const MAX_INSTRUCTIONS_CHARS = 3000;
+
+    /**
+     * Fechas e instrucciones de una tarea o un cuestionario, desde Moodle y sin LLM (v2.16.4).
+     *
+     * Por texto, la ruta directa de rag_retriever NUNCA leía las fechas de un cuestionario (apertura y
+     * cierre) y de una tarea solo enseñaba la fecha límite si existía, sin decir nada si no: en
+     * sanase-test la respuesta no traía ninguna fecha y no se sabía si faltaban o no estaban puestas.
+     * Las fechas salen de \core\activity_dates —las mismas que enseña Moodle en la página de la
+     * actividad, con las excepciones de grupo o de usuario de quien pregunta— y, si esa API falla, de
+     * la fila del módulo. Sin fechas se dice. Nada de datos del grupo: lo ve igual el alumnado.
+     *
+     * @param int $courseid
+     * @param int $cmid
+     * @return array{name: string, direct: array}
+     * @throws pulso_error bad_request si no es una tarea o un cuestionario visible de este curso.
+     */
+    private static function activity_info(int $courseid, int $cmid): array {
+        global $DB, $USER;
+
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+            $cm = $modinfo->get_cm($cmid);
+        } catch (\Throwable $e) {
+            throw new pulso_error('bad_request');
+        }
+        $modname = (string)$cm->modname;
+        $name = trim((string)$cm->name);
+        if (empty($cm->uservisible) || !in_array($modname, ['quiz', 'assign'], true) || $name === '') {
+            throw new pulso_error('bad_request');
+        }
+
+        $fields = $modname === 'quiz'
+            ? 'id, intro, introformat, timeopen, timeclose, timelimit, attempts, grade'
+            : 'id, intro, introformat, allowsubmissionsfromdate, duedate, cutoffdate, grade';
+        $record = $DB->get_record($modname, ['id' => $cm->instance], $fields);
+        if (!$record) {
+            throw new pulso_error('bad_request');
+        }
+
+        // Fechas: las de Moodle (con las excepciones de quien pregunta) y, si falla, las de la fila.
+        $dates = [];
+        try {
+            foreach (\core\activity_dates::get_dates_for_module($cm, (int)$USER->id) as $date) {
+                if (!empty($date['timestamp'])) {
+                    $label = trim(strip_tags((string)($date['label'] ?? '')));
+                    $dates[] = rtrim($label, ': ') . ': ' . \userdate((int)$date['timestamp']);
+                }
+            }
+        } catch (\Throwable $e) {
+            $dates = [];
+        }
+        if (empty($dates)) {
+            $raw = $modname === 'quiz'
+                ? ['Abre' => $record->timeopen, 'Cierra' => $record->timeclose]
+                : ['Abierta desde' => $record->allowsubmissionsfromdate, 'Fecha de entrega' => $record->duedate,
+                    'Fecha límite' => $record->cutoffdate];
+            foreach ($raw as $label => $timestamp) {
+                if (!empty($timestamp)) {
+                    $dates[] = $label . ': ' . \userdate((int)$timestamp);
+                }
+            }
+        }
+
+        $type = $modname === 'quiz' ? 'Cuestionario' : 'Tarea';
+        $lines = [$type . ': ' . $name];
+        require_once(__DIR__ . '/unit_map.php');
+        foreach (unit_map::for_user($courseid)['units'] as $unit) {
+            if (in_array($cmid, $unit['cmids'], true)) {
+                $lines[] = 'Unidad: ' . $unit['title'];
+                break;
+            }
+        }
+        if (empty($dates)) {
+            $lines[] = 'Fechas: no tiene fechas configuradas en Moodle; se puede hacer en cualquier momento mientras el curso esté abierto.';
+        } else {
+            $lines[] = 'Fechas:';
+            foreach ($dates as $date) {
+                $lines[] = '- ' . $date;
+            }
+        }
+        if ($modname === 'quiz') {
+            if (!empty($record->timelimit)) {
+                $lines[] = 'Tiempo límite: ' . (int)round($record->timelimit / 60) . ' minutos';
+            }
+            $lines[] = 'Intentos permitidos: ' . (empty($record->attempts) ? 'ilimitados' : (int)$record->attempts);
+        }
+        if (!empty($record->grade) && (float)$record->grade > 0) {
+            $lines[] = 'Calificación máxima: ' . (float)$record->grade;
+        }
+
+        // Instrucciones: la descripción de la actividad, en texto y con tope en caracteres.
+        $instructions = '';
+        try {
+            $instructions = \content_to_text((string)$record->intro, (int)$record->introformat);
+        } catch (\Throwable $e) {
+            $instructions = strip_tags((string)$record->intro);
+        }
+        $instructions = trim(preg_replace("/[ \t]+/u", ' ', preg_replace("/\R{3,}/u", "\n\n", (string)$instructions)));
+        if ($instructions === '') {
+            $lines[] = 'Instrucciones: no tiene instrucciones escritas en Moodle.';
+        } else {
+            if (mb_strlen($instructions, 'UTF-8') > self::MAX_INSTRUCTIONS_CHARS) {
+                $instructions = mb_substr($instructions, 0, self::MAX_INSTRUCTIONS_CHARS, 'UTF-8') . '…';
+            }
+            $lines[] = 'Instrucciones:';
+            $lines[] = $instructions;
+        }
+
+        $payload = [
+            'type' => 'text',
+            'title' => $type . ': ' . $name,
+            'summary' => empty($dates) ? 'No tiene fechas configuradas.' : 'Fechas e instrucciones de la actividad.',
+            'content' => implode("\n", $lines),
+            'link' => [
+                'url' => (new \moodle_url('/mod/' . $modname . '/view.php', ['id' => $cmid]))->out(false),
+                'label' => 'Ir a ' . ($modname === 'quiz' ? 'cuestionario' : 'tarea') . ' "' . $name . '"',
+            ],
+        ];
+        return [
+            'name' => $name,
+            'direct' => [
+                'answer' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                'schema_data' => $payload,
+                'followup_questions' => [],
+            ],
         ];
     }
 

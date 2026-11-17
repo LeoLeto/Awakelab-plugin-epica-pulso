@@ -101,13 +101,10 @@
     pointer-events: none;
 }
 
-/* Logo del centro (v2.13.0): sobre una placa blanca, para que se vea sea cual sea su color y el de la cabecera.
-   Un logo con fondo propio no se nota; uno transparente y oscuro tampoco desaparece sobre la cabecera. */
+/* Logo del centro (v2.13.0). Desde v2.16.2 se pinta TAL CUAL, sin la placa blanca de 2 px que llevaba: ese marco
+   se veía alrededor de todos los logos. Que el logo se lea sobre la cabecera es ahora cosa de quien lo elige en
+   Épica (la vista previa de /admin lo pinta sobre el color de la cabecera, sin placa, para que se vea antes). */
 .pulso-logo-centro {
-    box-sizing: border-box;
-    padding: 2px;
-    border-radius: 8px;
-    background: #ffffff;
     object-fit: contain;
 }
 
@@ -315,19 +312,6 @@
     flex-shrink: 0;
 }
 
-.pulso-version-badge {
-    display: inline-block;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--pulso-cyan-soft);
-    background: rgba(17, 234, 234, 0.14);
-    border: 1px solid rgba(17, 234, 234, 0.3);
-    padding: 1px 8px;
-    border-radius: 999px;
-    margin-left: 8px;
-    vertical-align: middle;
-    letter-spacing: 0.04em;
-}
 
 .header-controls {
     display: flex;
@@ -2815,12 +2799,6 @@ a.pulso-retos-open {
 .pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-status-dot {
     background: var(--pulso-header-text);
     box-shadow: 0 0 6px color-mix(in srgb, var(--pulso-header-text) 70%, transparent);
-}
-
-.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-version-badge {
-    color: var(--pulso-header-text);
-    background: color-mix(in srgb, var(--pulso-header-text) 14%, transparent);
-    border-color: color-mix(in srgb, var(--pulso-header-text) 35%, transparent);
 }
 
 .pulso-chat-container[data-pulso-tema~="cabecera"] .header-btn {

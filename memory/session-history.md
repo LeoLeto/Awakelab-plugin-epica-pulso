@@ -1,5 +1,9 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-17 — Logo sin placa blanca y sin insignia de versión en el chat (v2.16.2)
+
+Pedido por Chema antes de pasar a producción. `styles.css` (`.pulso-logo-centro` sin fondo, relleno ni esquinas; fuera las dos reglas de `.pulso-version-badge`), `templates/chat.mustache` y `chat_simple_view.php` (fuera `showversion` y `release`), `tema_preview.php` (la maqueta sin insignia) y `diagnostico.php` (ahora dice la versión desplegada, leída de `version.php`: es donde se comprueba qué build corre). **Al desplegar: purgar cachés (plantilla + CSS)**; sin `db/`. En Épica, la vista previa del logo en `/admin` también deja de pintar la placa. Sin la placa, un logo oscuro y transparente sobre una cabecera oscura no se ve: se acepta, porque lo elige el centro y la vista previa de Épica lo enseña sobre su cabecera antes de subirlo.
+
 ## 2026-11-16 — Ajustes tras probar los prompts en sanase-test (v2.16.1)
 
 Reglas en `CLAUDE.md` → «Unidades de aprendizaje» → «Ajustes tras probarlo en sanase-test». `classes/chat_presets.php`, `classes/rag_retriever.php`, `classes/unit_map.php`, `classes/system_prompt_designer.php`. **Al desplegar: nada** (solo PHP). Lo que costó ver:

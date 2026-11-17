@@ -33,11 +33,10 @@ Every code change, however small, must bump BOTH values in `version.php`:
 - `$plugin->release` — semver string (`1.1.1` → `1.1.2`). Patch for fixes/tweaks,
   minor for new features.
 
-The release is shown as a badge next to the chat title (only to users with
-`viewanalytics`, since v1.32.0) so they can verify which build is running.
-`chat_simple_view.php` reads `version.php` directly from disk
-(variable `release` de `templates/chat.mustache`), so the badge updates on deploy without running
-the Moodle upgrade. (Una plantilla Mustache nueva o cambiada exige purgar cachés al desplegar.) A DB upgrade (Site Administration → Notifications) is only
+**Desde v2.16.2 la versión NO se enseña en el chat** (antes era una insignia junto al título para
+`viewanalytics`; en producción no quedaba bien). Se comprueba en `diagnostico.php` (solo administración),
+que lee `version.php` directamente del disco, así que dice qué código está desplegado sin necesidad de
+pasar por la actualización de Moodle. No volver a ponerla en la cabecera. (Una plantilla Mustache nueva o cambiada exige purgar cachés al desplegar.) A DB upgrade (Site Administration → Notifications) is only
 needed when `db/` files change (install.xml, upgrade.php, caches.php, tasks.php…),
 but the `$plugin->version` bump is still mandatory every time.
 
@@ -2069,7 +2068,7 @@ mismas declaraciones que la versión anterior y el HTML de la plantilla es idén
   - **Solo se redescarga si cambia `version`** (o si, con la misma, falta el fichero). Se mira SIEMPRE, también cuando la versión del tema no cambia (el logo tiene la suya).
   - **Fallo = conservar el anterior** (o el isotipo) y `tema_sync_error` = `logo`; los colores se guardan igualmente y el mensaje del botón avisa. Al log solo host, bytes, HTTP y motivo (`tamano`, `firma`, `firma_no_coincide`, `dimensiones`, `aspecto`, `redireccion`, `http`, `descarga`, `forma_url_o_host`…); nunca URL ni ruta. `logo` ausente o `null`, o `tema: null` → se borra el fichero y los ajustes y se vuelve al isotipo. Solo logo (sin colores válidos) también funciona: `para_pintar()` devuelve el logo con `style` vacío y la plantilla no pinta `style`/`data-pulso-tema` (`hastema` = hay `style`).
   - **Se sirve por `block_pulso_pluginfile()`** (rama `CONTEXT_SYSTEM` + filearea `tema`): `require_login()` (cualquier usuario con sesión), ruta `/0/<version>/logo.<png|jpg|webp>` con forma cerrada; la versión de la ruta se ignora al servir, solo hace la URL inmutable (`send_stored_file` con un año e `immutable`). **No verificado en Moodle real**: que `pluginfile.php` llegue al callback para un contexto de sistema de un bloque (el de curso de las infografías sí funciona); comprobar en sanase-test.
-  - **Plantilla**: `logourl`/`logoalt` (alt = nombre corto del sitio o «Logotipo») sustituyen al isotipo SOLO en la cabecera y la burbuja (`.pulso-logo-centro`: placa blanca de 2 px y esquinas redondeadas, para que se vea con cualquier cabecera); los avatares de los mensajes siguen con el isotipo de Awakelab. Con logo, `isotipoclaro` no aplica.
+  - **Plantilla**: `logourl`/`logoalt` (alt = nombre corto del sitio o «Logotipo») sustituyen al isotipo SOLO en la cabecera y la burbuja (`.pulso-logo-centro`: hasta v2.16.1 llevaba una placa blanca de 2 px con esquinas redondeadas; **desde v2.16.2 se pinta tal cual, sin placa**, porque el marco se veía alrededor de todos los logos. Que se lea sobre la cabecera lo decide quien lo sube: la vista previa de `/admin` en Épica lo enseña sobre el color de la cabecera); los avatares de los mensajes siguen con el isotipo de Awakelab. Con logo, `isotipoclaro` no aplica.
   - `validar_colores()` acepta `fondo` y `creaciones` en la lista cerrada; `logo` se valida aparte (`url_logo_valida()` + `version_logo_valida()`) tanto al guardar como al pintar (`logo_para_pintar()` relee los ajustes y revalida forma y extensión).
   - **Desinstalación**: Moodle borra los ficheros de un componente al desinstalarlo (`file_storage::delete_component_files`, que a mi memoria llama `uninstall_plugin()`), pero no he podido comprobarlo sin un Moodle a mano. No se ha añadido `db/uninstall.php`.
 - **Vista previa** (`tema_preview.php`): campos `fondo`, `creaciones` y `creaciones_texto`; la tabla enseña `--pulso-bg`, `--pulso-surface` y `--pulso-surface-2` (cada una con el peor texto fijo encima y su contraste) y `--pulso-mine-bg`; las maquetas llevan el botón «Mis creaciones» y, si hay logo guardado, lo usan y lo enseñan (no se puede subir desde ahí).

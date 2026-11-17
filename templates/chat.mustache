@@ -33,8 +33,6 @@
     * isteacher - true con block/pulso:viewanalytics (profesorado); false = version de alumno
     * cancreate - true con block/pulso:createactivity: hay pestana «Crear»
     * epica - true si local_awkepica esta disponible: infografia, juego, retos e historial
-    * showversion - true solo con viewanalytics: insignia de version
-    * release - texto de la insignia (p. ej. v1.36.0)
     * greeting - saludo de la home
     * coursename - nombre del curso (chip de contexto)
 
@@ -47,8 +45,6 @@
         "isteacher": true,
         "cancreate": true,
         "epica": true,
-        "showversion": true,
-        "release": "v1.36.0",
         "greeting": "¡Hola, Ana! ¿Qué quieres saber de tu curso?",
         "coursename": "Estadística aplicada"
     }
@@ -65,7 +61,7 @@
             <div class="pulso-header-brand">
                 {{#logourl}}<img class="pulso-header-logo pulso-logo-centro" src="{{logourl}}" alt="{{logoalt}}">{{/logourl}}{{^logourl}}<img class="pulso-header-logo" src="{{isotipo}}" alt="" aria-hidden="true">{{/logourl}}
                 <div>
-                    <h2>Pulse AI{{#showversion}} <span class="pulso-version-badge">{{release}}</span>{{/showversion}}</h2>
+                    <h2>Pulse AI</h2>
                     <span class="pulso-header-sub"><span class="pulso-status-dot" aria-hidden="true"></span>Asistente del curso</span>
                 </div>
             </div>

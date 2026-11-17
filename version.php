@@ -2,8 +2,8 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'block_pulso'; // Nombre técnico exacto
-$plugin->version = 2026111603; // v2.16.1: ajustes tras probar en sanase-test (unidades del curso, mas material por unidad, recursos por unidad)
-$plugin->release   = '2.16.1';  // Semver visible en el header del chat — bump en CADA cambio
+$plugin->version = 2026111700; // v2.16.2: logo del centro sin placa blanca y sin insignia de version en el chat
+$plugin->release   = '2.16.2';  // Semver: se ve en diagnostico.php (ya no en el chat) — bump en CADA cambio
 $plugin->requires  = 2022111800;    // Moodle 4.1 o superior
 $plugin->maturity  = MATURITY_ALPHA;
 // Sin $plugin->dependencies: local_awkepica es OPCIONAL (v1.31.0). Pulse se instala en una

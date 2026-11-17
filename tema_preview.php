@@ -98,7 +98,7 @@ function pulso_prev_mock(string $titulo, string $style, string $flags, string $i
     $h .= '<div class="pulso-chat-container" role="group" aria-label="Maqueta: ' . s($titulo) . '"' . $attr . '>';
     $h .= '<div class="pulso-chat-header"><div class="pulso-header-top"><div class="pulso-header-brand">'
         . $imgcabecera
-        . '<div><h2>Pulse AI <span class="pulso-version-badge">v0.0.0</span></h2>'
+        . '<div><h2>Pulse AI</h2>'
         . '<span class="pulso-header-sub"><span class="pulso-status-dot"></span>Asistente del curso</span></div></div>'
         . '<div class="header-controls"><button type="button" class="header-btn" tabindex="-1" aria-label="Botón de cabecera (maqueta)">'
         . $svg . '</button></div></div>'

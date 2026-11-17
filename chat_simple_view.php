@@ -48,12 +48,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $presentacion_url = $CFG->wwwroot . '/blocks/pulso/api_presentacion.php';
     $presets_url = $CFG->wwwroot . '/blocks/pulso/api_presets.php';
 
-    // Leer la versión directamente de version.php (no de la BD) para que el
-    // badge del header refleje siempre el código desplegado, incluso antes
-    // de ejecutar la actualización de Moodle.
-    $plugin = new stdClass();
-    include(__DIR__ . '/version.php');
-    $pulso_release = 'v' . ($plugin->release ?? $plugin->version ?? '?');
+    // La versión ya no se enseña en la cabecera del chat (v2.16.2): está en diagnostico.php.
 
     // Token anti-CSRF de la sesión: los endpoints lo exigen con require_sesskey().
     $pulso_sesskey = sesskey();
@@ -147,8 +142,6 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         'isteacher' => !empty($isteacher),
         'cancreate' => !empty($cancreate),
         'epica' => (bool)$epicaavailable,
-        'showversion' => !empty($isteacher),
-        'release' => $pulso_release,
         'greeting' => $greeting,
         'coursename' => $coursename,
         'presetgroups' => $presetgroups,

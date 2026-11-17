@@ -7,10 +7,12 @@
 - **Anthropic API constraints** — lo que rechaza la API y cómo se evita.
 - **Invariantes que NO se pueden romper** — UTF-8, RAG fuera de la petición, cmid sintéticos, caché del prompt, historial sin JSON, sesskey.
 - **Modo alumno** — dos capabilities, tres capas. **Enrutado** — sección vs recurso vs metadatos. **Conversación proactiva** — `next_step`.
+- **Unidades de aprendizaje (v2.16.0)** — `unit_map`: el modelo las detecta al indexar (tabla `block_pulso_unidades`), con reglas de estructura de respaldo; los prompts eligen unidad por clave, no por sección.
+- **Prompts preestablecidos (v2.14.0)** — sugerencias al escribir, panel de opciones y home; el chat manda `preset` + `preset_params` y el servidor monta la pregunta y el encargo.
 - **Enlaces directos (v1.11)** y **Tema claro (v1.16)** — botón «Ir a…»; paleta y contraste.
 - **Épica** — pasos 1, 3 y 4 (bloque Crear, ciclo adhoc, panel de estado), **Gamificación** 1–4, **Ampliación** 1–2, **Retos** 1–2, **QA general**, **Historial del alumno**.
 - **Auditoría de UX, fases 1–3** — visibilidad en el RAG y `pulso_error`; Épica opcional, topes y diagnóstico; accesibilidad y móvil.
-- **Colores de cada centro (carta 11, v2.1.0; por papel v2.5.0; fondo, «Mis creaciones» y logo v2.13.0)** — tema de Épica: sincronización, validación doble, cinco claves, superficies derivadas del principal, variables por papel, vista previa.
+- **Colores de cada centro (carta 11, v2.1.0; por papel v2.5.0; fondo, «Mis creaciones» y logo v2.13.0; tarjetas, pestaña, modo oscuro e ilustración v2.15.0)** — tema de Épica: sincronización, validación doble, nueve claves y dos imágenes, superficies derivadas del principal, variables por papel, modo oscuro decidido por el fondo, vista previa.
 - **Fase 4 (cerrada, v2.0.0)** — `styles.css`, módulos AMD, pestañas + Mustache, home, pila de Crear (paso 6), «Mis creaciones» (paso 7).
 - **Modo demostración (carta 16, v2.6.0)** — Épica suelta los cupos 24 h; qué topes nuestros se sueltan y cuáles no.
 - **Historial del profesorado en Épica (carta 19, v2.11.0)** — botón «Mis proyectos en Épica» al pie de «Mis creaciones» (solo profesorado con Épica), por el puente común con `herramienta=historial`.
@@ -31,11 +33,10 @@ Every code change, however small, must bump BOTH values in `version.php`:
 - `$plugin->release` — semver string (`1.1.1` → `1.1.2`). Patch for fixes/tweaks,
   minor for new features.
 
-The release is shown as a badge next to the chat title (only to users with
-`viewanalytics`, since v1.32.0) so they can verify which build is running.
-`chat_simple_view.php` reads `version.php` directly from disk
-(variable `release` de `templates/chat.mustache`), so the badge updates on deploy without running
-the Moodle upgrade. (Una plantilla Mustache nueva o cambiada exige purgar cachés al desplegar.) A DB upgrade (Site Administration → Notifications) is only
+**Desde v2.16.2 la versión NO se enseña en el chat** (antes era una insignia junto al título para
+`viewanalytics`; en producción no quedaba bien). Se comprueba en `diagnostico.php` (solo administración),
+que lee `version.php` directamente del disco, así que dice qué código está desplegado sin necesidad de
+pasar por la actualización de Moodle. No volver a ponerla en la cabecera. (Una plantilla Mustache nueva o cambiada exige purgar cachés al desplegar.) A DB upgrade (Site Administration → Notifications) is only
 needed when `db/` files change (install.xml, upgrade.php, caches.php, tasks.php…),
 but the `$plugin->version` bump is still mandatory every time.
 
@@ -57,6 +58,8 @@ but the `$plugin->version` bump is still mandatory every time.
     conversación + cuadro de texto; Crear = lista de herramientas → formulario → detalle (pila), más «Mis creaciones».
   - El chat envía a `api_chat_stream.php` por fetch + SSE (streaming de tokens con vista previa progresiva del JSON parcial) y cae a
     `api_chat.php` (XHR/JSON) solo ante fallo de red, 404 o 405 (ver «Auditoría fase 1»).
+  - **Desde v2.14.0 la home es el catálogo de prompts preestablecidos** (ver «Prompts preestablecidos»): lo de abajo describe la home
+    anterior y vale por sus reglas (qué se oculta al primer mensaje, `clearConversation()`, `showCapabilities()`).
   - **Home corta por rol** (`#pulso-home`, v1.37.0: 4 tarjetas destacadas + «Ver más ideas», ver «Fase 4 — Home corta»): cada
     tarjeta/idea inyecta una pregunta completa en lenguaje natural en el pipeline — las nuevas deben apuntar a intenciones de
     analítica o estructurales, no a palabras sueltas, para no repetir el fallo del matcher de actividades (backlog #2). La home se
@@ -305,6 +308,26 @@ recurso por nombre y nº de preguntas de un cuestionario.
   hay", "de qué habla", "según el documento"— se abre el documento
   (`content_mode`). Si no hay texto extraíble, se dice explícitamente en vez de
   devolver metadatos que parecen una respuesta.
+- **Sin intención reconocible, el contenido, no la ficha** (v2.13.1; en sanase-test, curso SANS0001,
+  «háblame de Metodología de la Investigación Sampieri», «y Metodología…?» y la sugerencia del propio
+  Pulse «¿Puedes explicarme con más detalle el contenido de "…"?» devolvían nombre, archivo y tipo de un
+  PDF indexado). La intención la decide **una sola función**, `resource_question_intent()` —`summary` >
+  `identification` > `content` > `none`—, en las dos rutas de recurso (por nombre y dentro de una
+  sección, que discrepaban: la segunda no conocía «resume»). **`none` se resume si el recurso tiene texto
+  legible** (`resource_has_readable_text()`: manda `usable` de `block_pulso_full_text`; sin fila, el texto
+  reunido), y solo cae en la ficha si no lo tiene. Dentro de una sección, solo si la pregunta **nombra** el
+  recurso: el «único PDF de la sección» se cogió por la sección y ahí la ficha sigue siendo lo prudente.
+  Cuidado al añadir sugerencias deterministas: **su texto vuelve a entrar por el pipeline** y tiene que
+  caer en contenido; las de la rama de documento («explicarme… el contenido de», «mostrarme el siguiente
+  apartado de») están cubiertas por las reglas de v2.13.1. «qué es lo/más …» ya no es identificación.
+- **El PDF de un mod_url se contesta como un PDF del curso** (v2.13.1, `build_linked_pdf_answer()`). Un
+  «Manual unidad N» de Refactika nombrado por completo ganaba al resumen de sección (es una actividad
+  visible citada entera) y acababa en `build_generic_activity_answer()`: nombre y enlace, con el texto ya
+  indexado desde v2.10.0. Ahora, si la fila de `block_pulso_full_text` es `usable` y su `extraido_por`
+  empieza por `url_pdf_extractor::EXTRACTED_PREFIX`, devuelve `summary_mode`/`content_mode` con el texto
+  literal de la fila (6.000 / 7.000 caracteres), título `Resumen del recurso X` o `X` y enlace «Ir a
+  enlace». **Solo lee lo indexado**: descargar sigue siendo cosa del cron. Identificación/ubicación, o sin
+  texto, sigue la ficha del enlace.
 - Las **stopwords del matcher difuso** incluyen ya las genéricas de nombre de
   recurso (`material`, `recurso`, `documento`, `archivo`, `contenido`, `unidad`…):
   un PDF llamado "MATERIAL 1" no puede engancharse por la palabra "material" de la
@@ -347,7 +370,7 @@ recurso por nombre y nº de preguntas de un cuestionario.
     «no se ha podido leer: …» y se le obliga a avisarlo.
   - `build_direct_query()` trata «tema/unidad/bloque N» como sección concreta (`$mentionsSection`): «resúmeme este tema» no arrastra un recurso del historial.
   - `isSummaryIntent` de `resolve_direct_resource_query()` casa también «resume», «resúmeme», «resúmelo/la/los/las» (antes solo «resumen/resumir»: «resume MIC Tema 2»
-    devolvía la ficha de metadatos). **Pendiente:** los `isSummaryIntent` de `resolve_direct_quiz_in_section_query()` y `resolve_direct_resource_in_section_query()` siguen sin «resume».
+    devolvía la ficha de metadatos). **Pendiente:** el `isSummaryIntent` de `resolve_direct_quiz_in_section_query()` sigue sin «resume» (el de `resolve_direct_resource_in_section_query()` lo tiene desde v2.13.1, por `resource_question_intent()`).
   - **Dentro de un `namespace`, `catch (Throwable`/`Exception` y `new moodle_exception` van SIEMPRE con `\`**: sin barra apuntan a `block_pulso\Throwable` (no existe) y el catch no casa con
     nada, sin error. Los endpoints de la raíz y `chat_simple_view.php` no tienen namespace y no lo necesitan.
 
@@ -412,6 +435,210 @@ prompt no cubre el otro:
 Y un desempate de la misma tanda: **un listado no es un material**. El nombre de una
 sección ("RECURSOS") mete "recurso" en `qnorm`, así que los listados (`Contenido de la
 sección X`, `Secciones del curso`) se resuelven ANTES de la rama de documento.
+
+## Unidades de aprendizaje (v2.16.0)
+
+Hasta v2.15 «unidad» era cada sección visible de Moodle. No vale cuando el curso no está montado «una sección = una unidad»:
+secciones de servicio que salían como temas, varias unidades en una sección separadas por etiquetas (Refactika), o una unidad con su
+manual en «Recursos». Desde v2.16.0 las unidades salen de `classes/unit_map.php`, que tiene **dos orígenes**:
+
+- **`modelo`**: `unit_map::refresh($courseid)` manda al modelo principal (`block_pulso/model`, una llamada, 6.000 tokens de salida)
+  el esquema del curso —secciones, etiquetas como `ENCABEZADO` sin id, y cada módulo `m<cmid> [tipo] nombre — empieza: …` con los
+  primeros 260 caracteres de su texto— y recibe `{"unidades":[{"titulo","modulos":["m12"]}]}`. **Solo corre en el cron y en la tarea
+  adhoc de indexación**, justo después de `index_course()`; nunca en la petición de chat (misma regla que el RAG). Se guarda una fila
+  por curso en `block_pulso_unidades` con la **huella** (sha1 de estructura, nombres y arranque de los textos): si la huella no
+  cambia, la siguiente pasada dice «sin cambios» y **no se vuelve a pagar**. Nunca lanza: devuelve una frase para `mtrace`.
+- **`reglas`** (`by_rules()`): cuando no hay mapa guardado —curso sin pasar por el cron, tabla aún sin crear, sin clave, API caída,
+  respuesta cortada o no válida—. Las etiquetas/subsecciones cuyo nombre empieza por «Unidad/Tema/Módulo/Bloque/Lección/Capítulo/UD N»
+  parten una sección **si hay dos o más**; una sección sin nombre propio y con una sola toma su título; solo cuenta lo que tiene
+  contenido de estudio (texto usable o un tipo de `CONTENT_MODS`); las secciones de servicio (`RE_SERVICE`: Presentación, Recursos,
+  Foro, Evaluación final…) se apartan **solo si aun así queda alguna unidad**.
+
+Reglas que no se tocan:
+
+- **Nada de lo que dice el modelo se da por bueno** (`validate()`): solo sobreviven cmid que existen en el curso, cada uno en una
+  unidad, nunca una etiqueta; títulos limpios y con tope; el orden final es el del curso. Sin ninguna unidad válida no se guarda nada.
+- **El mapa no es de ningún usuario; la visibilidad se aplica al leer** (`for_user()`): el cron ve todo el curso, y quien pregunta
+  recibe de cada unidad solo sus módulos `uservisible`. Una unidad sin ninguno no existe para él (400 si manda su clave).
+- **La clave de una unidad es `u<cmid de su primer módulo>` y se fija al guardar**: no cambia aunque ese módulo se borre después. Es lo
+  que viaja en `preset_params.unit`; `resolve()` la valida por forma y la busca en el mapa de ESE usuario.
+- **Entre dos pasadas del cron el mapa se pone al día solo** (`stored_units()`): los módulos borrados se quitan y los nuevos se suman
+  a la unidad de su vecino de sección. Los que el modelo dejó fuera a propósito (`conocidos`) siguen fuera.
+- **El material de una unidad es una lista de cmid**, no una sección: `rag_retriever::build_summary_context_for_cms()` (comparte
+  `summary_material_for_cmids()` y `summary_context_from()` con el resumen de sección; el camino de texto libre de v2.9.1 no cambia).
+  El bloque dinámico dice «de la unidad «X»» sin número de sección. **El prompt base sigue sin cambiar** (md5 comprobado).
+- **«¿Qué hay en una unidad?» es modo `direct`**: `chat_presets::unit_listing()` monta la respuesta desde Moodle y los endpoints la
+  devuelven como una de la ruta directa, sin LLM. Ya no se puede resolver como pregunta de texto: una unidad puede no ser una sección.
+- La tabla no guarda datos personales (no entra en el privacy provider). Se borra con `delete_course_index()` y con el evento
+  `course_deleted` (`observer::course_deleted`).
+
+**Lo que NO cambia todavía**: el texto libre («resúmeme la unidad 2» tecleado) sigue resolviéndose contra las secciones de Moodle
+(`section_for_summary()`), no contra el mapa; el desplegable de «recurso» sigue agrupado por sección; y Retos sigue mandando a Épica
+el id de la sección como `unidad` (carta 22).
+
+**Al desplegar**: **Notificaciones** (tabla nueva y evento nuevo) y **purgar cachés** (JS). El mapa de cada curso aparece cuando pase
+el cron de indexación; para no esperar, en el servidor:
+`php admin/cli/scheduled_task.php --execute='\block_pulso\task\index_course_content'` (cada curso escribe una línea `unidades: …`).
+
+**Verificado** (fuera del repo, PHP 8.3 portátil con `mbstring` y Moodle simulado; `unit_map`, `chat_presets`, `rag_retriever` y
+`system_prompt_designer` reales): 76 comprobaciones —reglas sobre un curso con sección de servicio, dos unidades en una sección, una
+sin nombre y una oculta; validación de una respuesta con ids inventados, etiquetas, repetidos y basura; huella y «sin cambios»; curso
+cambiado entre pasadas; API caída, respuesta cortada, mala y sin clave; mapa ilegible; los prompts sobre el mapa y diez formas de pedir
+lo que no se puede—, md5 del prompt base y del dinámico sin encargo idénticos a HEAD, y 12 × 2 en jsdom (`src` y `build`).
+**NO probado**: el criterio del modelo con un curso real (qué unidades saca en Refactika o SANS0001), el cron en un Moodle de verdad,
+la actualización de la base ni el coste real de la llamada.
+
+### Ajustes tras probarlo en sanase-test (v2.16.1)
+
+Probado el 2026-11-16 en el curso 183 (IFCT0049, todo dentro de una sección «Curso» con etiquetas «Módulo 1/2/3»; mapa por reglas,
+el cron aún no había pasado) llamando a `api_chat_stream.php` con cada prompt. Lo que salió y lo que se cambió:
+
+- **Bien tal cual**: resumen de unidad y de recurso, preguntas de repaso, esquema, explicar un concepto, listado de una unidad,
+  ficha y resultados de un cuestionario, ficha de una tarea, panorama, alumnos en riesgo y estado de entregas.
+- **Tres prompts pasan a modo `direct`** (contados desde Moodle, sin LLM), porque por texto el modelo solo ve los fragmentos
+  recuperados: «¿Qué secciones tiene el curso?» contestaba «Curso» y «Diplomas» → ahora es **«¿Qué unidades tiene el curso?»**
+  (`unidades_curso`, del mapa); «¿Qué cuestionarios hay?» y «¿Qué tareas hay?» decían 1 de 3 → `course_modules_listing()`, con la
+  unidad de cada uno. **Regla: lo que es contar o listar la estructura no se le pregunta al modelo.**
+- **«Haz un resumen del curso»** hablaba de «dos módulos» en un curso de tres: si hay unidades con texto va como material de TODAS
+  (repartido) con la lista de unidades en el encargo; sin unidades o sin texto, la pregunta de siempre.
+- **Más texto y mejor repartido** (`rag_retriever::share_budget()`, `PRESET_SUMMARY_MAX_CHARS` = 48.000): a partes iguales el documento
+  principal se quedaba en 8.000 caracteres y un glosario salió con UN término. Ahora lo que no usa un recurso corto pasa a los largos.
+  Solo en los prompts preestablecidos; el resumen de sección por texto libre no cambia.
+- **«Sin acceder»** ya no tiene desplegable de periodo: el contexto de analítica solo trae 7 días de accesos, y «un mes» no se podía
+  contestar.
+- **Desplegable de recurso**: agrupado por unidad (había tres «Documento de aprendizaje» bajo «Curso») y solo material de estudio
+  (`CONTENT_MODS`): una tarea o un cuestionario tienen texto indexado, pero no son algo que resumir.
+- **Reglas**: encuestas de calidad y diplomas (`RULES_SKIP_MODS`) no entran en ninguna unidad.
+
+Sin cambios de `db/` ni de JS respecto a v2.16.0. **Pendiente de ver con un Moodle delante**: el mapa hecho por el modelo (hasta que
+corra el cron los títulos son los de las etiquetas, «Módulo 1» a secas) y cómo queda el glosario con el reparto nuevo.
+
+### El chat se abre arriba (v2.17.1)
+
+- **Al abrir el chat, el primer vistazo es arriba**: saludo, aviso de unidades y prompts. Hasta aquí `toggleChat()`
+  llamaba siempre a `pulsoScrollToEnd()`, y con la home larga (prompts + aviso) se abría enseñando el final del
+  catálogo. Ahora va al final **solo si `#pulso-messages` ya tiene mensajes** en esta página —entonces lo que
+  importa es la última respuesta—; si no, `scrollTop = 0` y se borra el `data-pulso-stick`. Los demás
+  `pulsoScrollToEnd()` (llegan mensajes, escribiendo, streaming) no cambian: abajo del todo es para las respuestas.
+
+### Unidades sin rastrear (v2.17.0)
+
+Al indexar, una unidad puede quedarse sin texto: su material es un SCORM que no se deja, vídeos o enlaces. El
+profesorado lo ve en la home del chat —un aviso con **un botón por unidad** que entra en Fuentes de Épica para
+esa unidad— y lo que suba ahí lo usa Pulse para esa unidad. El lado de Épica es su migración 032
+(`awk-epica/docs/fuentes.md` §18): una fuente de curso puede llevar `unidad_curso`, que **solo etiqueta**.
+
+- **Qué es «sin rastrear»** (`unit_map::untracked()`): una unidad del mapa cuyos módulos de **contenido**
+  (`CONTENT_MODS`) ya pasó el indexador —tienen fila en `full_text_store`— y **ninguno** salió con texto. No se
+  calcula aparte: sale del último indexado. Tareas, cuestionarios y foros **no cuentan**, ni a favor ni en
+  contra (su enunciado no es el material de la unidad). Lo que el cron aún no ha visto **no se avisa**, y un
+  curso sin indexar tampoco.
+- **El aviso** lo pide `presets.js` a `api_unidades_sin_rastrear.php` **la primera vez que se abre el chat**,
+  no al pintar la página: es lo único de la home que pregunta a Épica. Ese endpoint resta las unidades que ya
+  tienen material en Épica (`fuentes_service::unidades_con_material()`, el `unidad_curso` del índice, con su
+  caché de 5 min) y contesta lista vacía al alumnado, sin Épica o con Fuentes sin contratar. **Si Épica no
+  contesta, se avisa de lo que dice Moodle**: mejor un aviso de más que esconder una unidad sin material.
+  `cfg.apiUnidadesUrl` va vacío para el alumnado y sin Épica, y la caja solo existe en `{{#isteacher}}`.
+- **La ✕** guarda en `localStorage` (`pulso:untracked:<curso>`) la lista de claves que había: si cambia, vuelve.
+- **El botón** (`crear.js` → `pulsoAbrirFuentesUnidad`) manda **solo la clave** al puente de siempre
+  (`fuentes_puente.php`, `unidad=u<cmid>`). `epica_puente::unidad()` la valida (`^u\d{1,12}$`), comprueba con
+  `unit_map::find()` que es una unidad que **esta persona ve**, y pone el **título del servidor**; nunca el
+  del navegador. Viajan a Épica `unidad` y `unidad_nombre`, fuera de la firma como `curso_nombre`. Una clave
+  que no cuadra entra en Fuentes del curso entero.
+- **Los prompts de unidad** (resumen, esquema, repaso, concepto) llevan además el material extra de esa
+  unidad: `fuentes_service::textos_de_unidad()` pide por `fuentes/texto` hasta 4 fuentes y 40.000
+  caracteres, **por tramos** si una fuente es larga (calculado con los caracteres del índice), y
+  `rag_retriever::build_summary_context_for_cms()` las mete como un recurso más (`[material extra: …]`).
+  Falla abierto. La búsqueda del chat libre no cambia: ya buscaba en todo el curso.
+- **Al indexar, la lista entera de unidades va a Épica** (`fuentes_service::sincronizar_unidades()`, llamada en
+  las dos tareas de indexado después de `unit_map::refresh()`): `POST /api/moodle/fuentes/unidades` con
+  `unit_map::for_sync()` —**todas** las unidades del mapa, sin mirar a ningún usuario, ocultas incluidas, con
+  `clave`, `nombre` y `sin_texto`—. Así en `/fuentes` de Épica se elige cualquier unidad para subir material,
+  no solo la del aviso. Firma el **administrador del sitio** con el contexto del curso (como `tema_service`), y
+  se manda solo si la lista cambió desde la última vez (huella en la caché `fuentesidx`, `unisync_<curso>`) o
+  una vez al día. Nunca lanza: lo que pasó sale en el registro de la tarea. Épica la aplica entera o nada
+  (400 `unidades-invalidas`); su contrato, `awk-epica/docs/fuentes.md` §18.6.
+- **La clave es la de `unit_map`** (`u` + primer módulo, fija al guardar el mapa). Si el mapa del modelo
+  cambia la clave de una unidad, lo subido para la vieja sigue siendo material del curso —Épica no pierde
+  nada— pero esa unidad vuelve a salir en el aviso hasta que alguien lo pase a la nueva desde `/fuentes`.
+
+### Fechas de una actividad y fuera el glosario (v2.16.4)
+
+- **«Fechas e instrucciones de una actividad» pasa a modo `direct`** (`chat_presets::activity_info()`). Por texto caía en
+  `rag_retriever::build_quiz_answer()`, que **nunca** lee las fechas de un cuestionario, y en `build_assign_answer()`, que solo
+  enseña la fecha de entrega si existe y no dice nada si no. Ahora las fechas salen de `\core\activity_dates::get_dates_for_module()`
+  —las mismas de la página de la actividad, con las excepciones de grupo o de usuario de quien pregunta— y, si esa API falla, de la
+  fila del módulo; **sin fechas se dice** («no tiene fechas configuradas en Moodle»). Lleva unidad, tiempo límite e intentos
+  (cuestionario), calificación máxima, instrucciones en texto (`content_to_text`, 3.000 caracteres) y el enlace «Ir a…». Ningún dato
+  del grupo, así que el alumnado lo ve igual. **Las dos funciones de `rag_retriever` siguen como estaban** para el texto libre.
+- **Fuera «Haz un glosario de una unidad»**: lo pidió Chema tras verlo en sanase-test. `material_task()` lanza `bad_request` en su
+  `default`: un prompt de material sin encargo propio es un error de programación.
+
+## Prompts preestablecidos (v2.14.0)
+
+> Desde v2.16.0 el parámetro de unidad se llama `unit` y es una clave del mapa de unidades (ver la sección de arriba), no el id de una
+> sección: donde este apartado dice `section`, léase `unit`.
+
+El chat se orienta a prompts cerrados. Tres piezas que usan el MISMO catálogo, `classes/chat_presets.php` (`definitions()`), que es
+la fuente única —el cliente no tiene ninguna lista propia—:
+
+- **Sugerencias al escribir** (`amd/src/presets.js`): al teclear «hazme un resu» sale una lista (`#pulso-preset-suggest`, `role="listbox"`,
+  el cuadro de texto es un `combobox`) con «Haz un resumen de una unidad»… Emparejamiento local, sin LLM ni red: minúsculas sin tildes,
+  fuera las palabras vacías (`STOP`) y los números, y **todas** las palabras que quedan tienen que casar con la etiqueta (2 puntos) o con
+  `keywords` (1) —igual, por prefijo, o por raíz ≥5—. Una frase larga y libre no sugiere nada, a propósito. **Enter sin opción resaltada
+  envía texto libre**: la lista nunca secuestra el Enter; flecha abajo + Enter (o clic) elige. Escape cierra la lista, no el chat.
+- **Panel de opciones** (`#pulso-preset-panel`, encima del cuadro de texto y **fuera del `<form>`**): un desplegable por parámetro. Los ids
+  del curso (`section`, `resource`, `quiz`, `activity`) salen de `api_presets.php` → `chat_presets::course_options()`, ya filtrados por
+  `uservisible`; `resource` solo lista módulos con fila `usable=1` en `block_pulso_full_text`. Los de valores fijos están en `CHOICES`.
+  Un prompt sin parámetros se envía al elegirlo. «unidad 2» tecleado deja la unidad 2 preseleccionada.
+- **Home**: `chat_presets::home_groups()` → sección `{{#presetgroups}}` de `templates/chat.mustache`. Sustituye a las tarjetas y a «Ver más
+  ideas» (sus funciones `toggleIdeas`/`pulsoSetIdeas` siguen en `chat.js`, inertes: comprueban que el nodo exista).
+
+**Lo que viaja y quién manda.** `buildChatFormData()` añade `preset` (id) y `preset_params` (JSON); `user_query` lleva solo el texto que
+se ve en la burbuja. Los dos endpoints llaman a `chat_presets::from_request()` después de permisos y `check_enabled()` y **antes** del tope
+de ritmo: si hay `preset`, **`$user_query` pasa a ser la pregunta canónica que monta el servidor** (es la que se contesta y la que entra
+en el historial) y lo que mandó el cliente se ignora. `resolve()` revalida todo: el prompt existe, es del rol (`teacher` → 403 `access`
+a un alumno), cada id es de este curso y visible (si no, 400 `bad_request`), los valores fijos fuera de lista caen en su defecto y el
+texto libre (`topic`) se limpia (una línea, sin `<>«»"`, 120 caracteres con `mb_substr`). **La UI no es un control de acceso.**
+
+**Dos modos**, y la diferencia es la regla que hay que respetar:
+
+- **`material`** (resumen de unidad/recurso, explicar un concepto, preguntas de repaso, esquema): va **siempre al LLM** con el
+  texto de la sección o del recurso **elegido por su id** (`rag_retriever::build_summary_context_for_section()` /
+  `…_for_resource()`, que comparten `summary_context_from()` con el resumen de sección de v2.9.1: mismo material, mismos delimitadores
+  `<<<RECURSO n>>>`, mismo aviso de ilegibles; un recurso solo se lleva los 24.000 caracteres enteros). Se **salta la ruta directa**
+  (contestaría con una ficha o un listado al reconocer el nombre) y **el detector de pregunta de profesor** (la canónica lleva el nombre de
+  una unidad, que puede sonar a analítica; lo que se manda es contenido de una lista ya filtrada). El encargo —extensión, formato, tipo de
+  pregunta— va en el **bloque dinámico**: `generate_system_blocks()` tiene un 7.º parámetro `$preset_task` y
+  `build_section_summary_section()` cambia su cabecera por «ENCARGO: …». **El prompt base no cambia ni un byte** (md5 igual que en
+  v2.13.1, y el bloque dinámico sin preset también). A `generate_system_blocks()` se le pasa `''` como `$user_query` en este modo, para
+  que la regla de «de qué trata el curso» no se dispare por el nombre de una unidad.
+- **`query`** (estructura y analítica): una pregunta canónica que entra por el **pipeline de siempre**. Las que no llevan parámetros son
+  las preguntas que ya ofrecía la home; las que llevan meten el **nombre real** de la sección o actividad (el matcher lo necesita) entre
+  comillas dobles, quitando las que tuviera el nombre.
+
+**El encargo no inventa campos**: fija `type` y la forma de `data` con claves que `format.js` ya pinta —`{paragraph}` para texto;
+tarjetas con título `name`/`idea`/`tema` y cuerpo `descripcion`/`definicion`/`texto`—. Un formato nuevo tiene que pasar la pregunta de
+«Conversación proactiva»: ¿está en el esquema, lo autoriza el formato y lo pinta el frontend?
+
+**Añadir un prompt** = una entrada en `definitions()` (+ su rama en `material_task()` o `parametrized_query()` si lleva parámetros).
+El cliente, la home y las sugerencias lo recogen solos. Un parámetro nuevo de valores fijos va en `CHOICES`; uno que sea un id del curso
+necesita además su lista en `course_options()` y su entrada en `COURSE_PARAMS` de `presets.js`.
+
+**«Reintentar» y el respaldo XHR** reenvían el mismo prompt porque `S.pulsoPresetByMessage` lo guarda por el texto de la burbuja; se vacía
+con «Nueva conversación». `api_presets.php` se pide una vez (primer foco o primera elección) y **falla en silencio**: sin catálogo el chat
+es de texto libre, y un botón de la home avisa por lector de pantalla y deja el foco en el cuadro.
+
+**Al desplegar: purgar cachés** (plantilla + CSS + JS). Sin `db/`. Textos en castellano en el código, como el resto de la plantilla (sin
+claves de `lang/` nuevas).
+
+**Verificado** (fuera del repo): `php -l` en todo lo tocado; **87** comprobaciones PHP con `chat_presets`, `rag_retriever` y
+`system_prompt_designer` reales sobre un Moodle simulado (catálogo por rol, opciones visibles, las seis resoluciones de material, diez
+formas de pedir lo que no se puede, canónicas, `from_request`, bloque dinámico) y md5 del prompt base y del dinámico sin preset idénticos
+a HEAD; **40 × 2** en jsdom con la plantilla real, sobre `src` y sobre `build` (sugerencias, teclado, panel, lo que se envía, reintento,
+home, escape del concepto, sin catálogo); y una pasada visual en navegador con el servidor simulado. **NO probado**: en un Moodle real
+(sanase-test), la respuesta del modelo a cada encargo (longitudes, que respete `type`/`data`), ni cómo enrutan las canónicas de
+`info_actividad` y `resultados_cuestionario`, que son frases nuevas por el pipeline de texto.
 
 ## Bug backlog
 
@@ -1902,11 +2129,24 @@ mismas declaraciones que la versión anterior y el HTML de la plantilla es idén
   - **Solo se redescarga si cambia `version`** (o si, con la misma, falta el fichero). Se mira SIEMPRE, también cuando la versión del tema no cambia (el logo tiene la suya).
   - **Fallo = conservar el anterior** (o el isotipo) y `tema_sync_error` = `logo`; los colores se guardan igualmente y el mensaje del botón avisa. Al log solo host, bytes, HTTP y motivo (`tamano`, `firma`, `firma_no_coincide`, `dimensiones`, `aspecto`, `redireccion`, `http`, `descarga`, `forma_url_o_host`…); nunca URL ni ruta. `logo` ausente o `null`, o `tema: null` → se borra el fichero y los ajustes y se vuelve al isotipo. Solo logo (sin colores válidos) también funciona: `para_pintar()` devuelve el logo con `style` vacío y la plantilla no pinta `style`/`data-pulso-tema` (`hastema` = hay `style`).
   - **Se sirve por `block_pulso_pluginfile()`** (rama `CONTEXT_SYSTEM` + filearea `tema`): `require_login()` (cualquier usuario con sesión), ruta `/0/<version>/logo.<png|jpg|webp>` con forma cerrada; la versión de la ruta se ignora al servir, solo hace la URL inmutable (`send_stored_file` con un año e `immutable`). **No verificado en Moodle real**: que `pluginfile.php` llegue al callback para un contexto de sistema de un bloque (el de curso de las infografías sí funciona); comprobar en sanase-test.
-  - **Plantilla**: `logourl`/`logoalt` (alt = nombre corto del sitio o «Logotipo») sustituyen al isotipo SOLO en la cabecera y la burbuja (`.pulso-logo-centro`: placa blanca de 2 px y esquinas redondeadas, para que se vea con cualquier cabecera); los avatares de los mensajes siguen con el isotipo de Awakelab. Con logo, `isotipoclaro` no aplica.
+  - **Plantilla**: `logourl`/`logoalt` (alt = nombre corto del sitio o «Logotipo») sustituyen al isotipo SOLO en la cabecera y la burbuja (`.pulso-logo-centro`: hasta v2.16.1 llevaba una placa blanca de 2 px con esquinas redondeadas; **desde v2.16.2 se pinta tal cual, sin placa**, porque el marco se veía alrededor de todos los logos. Que se lea sobre la cabecera lo decide quien lo sube: la vista previa de `/admin` en Épica lo enseña sobre el color de la cabecera). **Desde v2.16.3 también sustituye al isotipo en los avatares** (el de cada respuesta, `.pulso-message.ai::before`, y el de la home, `.pulso-home-avatar`): `para_pintar()` añade `--pulso-logo: url("…")` al `style` y el token `logo`, y el CSS (bloque «LOGO DEL CENTRO EN LOS AVATARES», detrás del de MODO OSCURO) pinta el logo sobre un disco de `--pulso-header-bg`. La URL solo entra si casa con una forma cerrada sin comillas, paréntesis, espacios ni barras invertidas: va dentro de `url()` en un atributo `style`. Con solo logo y sin colores ahora sí se pinta `style`/`data-pulso-tema` (con esa única variable); los avatares de los mensajes siguen con el isotipo de Awakelab. Con logo, `isotipoclaro` no aplica.
   - `validar_colores()` acepta `fondo` y `creaciones` en la lista cerrada; `logo` se valida aparte (`url_logo_valida()` + `version_logo_valida()`) tanto al guardar como al pintar (`logo_para_pintar()` relee los ajustes y revalida forma y extensión).
   - **Desinstalación**: Moodle borra los ficheros de un componente al desinstalarlo (`file_storage::delete_component_files`, que a mi memoria llama `uninstall_plugin()`), pero no he podido comprobarlo sin un Moodle a mano. No se ha añadido `db/uninstall.php`.
 - **Vista previa** (`tema_preview.php`): campos `fondo`, `creaciones` y `creaciones_texto`; la tabla enseña `--pulso-bg`, `--pulso-surface` y `--pulso-surface-2` (cada una con el peor texto fijo encima y su contraste) y `--pulso-mine-bg`; las maquetas llevan el botón «Mis creaciones» y, si hay logo guardado, lo usan y lo enseñan (no se puede subir desde ahí).
 - **Pruebas** (fuera del repo; PHP 8.3 con stubs de Moodle + mustache.js): 714 comprobaciones en PHP (equivalencia con HEAD de `resolver_tema()` en 600 combinaciones de las cinco claves antiguas; fondo claro/oscuro/cian; **barrido de 1.500 fondos aleatorios verificando en fondo, `surface` y `surface-2` que los 7 textos fijos dan >= 4,5 (peor: 4,500), el acento >= 3 (peor: 3,075) y que ningún canal se oscurece**; `creaciones` con texto malo/inválido; logo válido PNG/JPEG/WebP, >200 KB, SVG, firma falsa, firma que no coincide, tamaños y proporción, otro host/http/puerto/userinfo, redirección fuera/`//`/URL efectiva ajena/bucle, misma versión sin redescarga, versión nueva, fichero ausente, `null`, ausente, `tema: null`, fallo de red/404/excepción conservando el anterior, solo logo, ajustes guardados manipulados), 66 sobre la plantilla (idéntica a HEAD sin logo; con logo cambian solo las dos imágenes; alt y `style` escapados) y 8 sobre la rama de `pluginfile`. **NO probado**: el aspecto real en navegador (fondo con tinte, botón, logo con placa, pastillas opacas), `color-mix`, el `curl` de Moodle real (`FOLLOWLOCATION` apagado, aborto por tamaño), ni la respuesta real de Épica (la ubicación de `logo` en el JSON es un supuesto).
+
+### Tarjetas, pestaña activa, modo oscuro e ilustración de «Crear» (v2.15.0)
+
+**Desde el 16-11-2026 Pulse y Épica los mantiene la misma persona (Chema)**: el contrato del tema ya no se negocia por carta, se cambia en los dos repositorios a la vez (en Épica: `backend/src/tema-pulse.ts`, migración 031). Sigue siendo un contrato entre dos programas que se despliegan por separado: **Épica nunca debe dejar de mandar una clave que un Pulse instalado lee**, y Pulse ignora en silencio las que no conoce. Todo es por centro y se elige en `/admin` de Épica; **ningún color nuevo está escrito en Pulse**: sin las claves, Pulse es idéntico a v2.14.0 (comprobado: 1.500 temas aleatorios con las claves antiguas y fondo claro dan el mismo `resolver_tema()` que HEAD byte a byte, y la plantilla sin ilustración da el mismo HTML en las 16 combinaciones de rol × Épica × Crear × tema). Sin `db/`: purgar cachés (plantilla + CSS).
+
+- **`tarjeta` → `--pulso-tool-bg` / `--pulso-tool-text`** (token `tarjeta`) y **`pestana` → `--pulso-tab-bg` / `--pulso-tab-text`** (token `pestana`). Mismas reglas que `creaciones`: se respetan, el `texto` de Épica solo si da >= 4,5:1 y si no blanco o negro, y **no se derivan del principal**. La tarjeta pinta las filas de `.pulso-tool` (fondo, título, subtítulo, chevron e icono); la pestaña pinta la activa como un bloque de su color, con la raya del mismo color. Las reglas de `pestana` van DETRÁS de las de `cabecera` y `acento` en el bloque «COLORES DEL CENTRO»: ganan con la misma especificidad, por orden. No moverlas arriba.
+- **Modo oscuro: lo decide el `fondo`, no una clave.** Si `mejor_texto(fondo)` es blanco (`es_fondo_oscuro()`), en vez de aclarar: token `oscuro` además de `fondo`, textos CLAROS fijos (`TEXTOS_CLAROS`: ink #f0f3fc, deep/navy #ffffff, slate #c9d4e8, muted #a9bdd8, éxito #6fd8a8, aviso #f2c14e, error #ff9a90) y el fondo se **OSCURECE** hacia negro (`oscurecer_para_panel()`, pasos del 2 %, tope negro) hasta que todos den >= 4,5:1 **sobre `surface-2`**, que en oscuro es la superficie más clara y por tanto la peor. Superficies y líneas salen del panel hacia blanco: `K_SURFACE_OSCURO` 5 %, `K_SURFACE2_OSCURO` 10 %, `K_LINE_OSCURO` 22 % (se emite `--pulso-line` solo en oscuro). Épica replica la regla con los mismos números en `seOscurecePara` para avisar en `/admin`: **si cambias un número o un color de `TEXTOS_CLAROS`, cámbialo allí y en el bloque «MODO OSCURO» de `styles.css`** (tres copias a propósito: la PHP calcula, la CSS pinta y la de Épica avisa).
+  - **El acento sobre un panel oscuro se ACLARA** (`ajustar_hasta()` → `aclarar_hasta()`), no se oscurece: oscurecerlo contra un fondo negro no termina nunca bien. Un acento enviado se sigue aceptando con >= 3:1 sobre el panel.
+  - **Bloque «MODO OSCURO» de `styles.css`**: redefine las variables de texto en el contenedor y repasa lo que no pasa por variables. Reglas: un color de estado es texto sobre el panel y nunca sobre un tinte claro (las píldoras van transparentes con borde de su color; su selector lleva los DOS tokens, `oscuro` y `fondo`, para ganar a las opacas del bloque «FONDO del centro», que pesan una clase más: se vio en el navegador); los bloques claros con su propio texto oscuro (chips #E2E6F2, fondos #72A3C4) se quedan como están; **los avatares (`.pulso-home-avatar`, `.pulso-message.ai::before`) conservan `#003670`**, porque usan `--pulso-deep` como fondo del isotipo y en oscuro `--pulso-deep` es blanco; y el botón de enviar y el micro grabando llevan texto `#01264c` sobre el acento si el centro no mandó `boton`.
+- **Ilustración → `ilustracion.<ext>`**, clave hermana de `logo` (`tema.ilustracion` {url, version}). La misma maquinaria que el logo, generalizada: `IMAGENES` (límites por clave: logo 200 KB, 96–512 px, 1,1; ilustración **400 KB, 160–1600 px, hasta 4:1**), `sincronizar_imagen()`, `validar_imagen()`, `guardar_imagen()`, `borrar_imagen()`, `fichero_imagen()`, `imagen_para_pintar()`, ajustes `tema_<clave>_version` / `tema_<clave>_ext`. **Las dos comparten filearea**: guardar o borrar una solo toca los ficheros de SU nombre (`es_de()`); antes `guardar_logo()` borraba «los demás» del área y `borrar_logo()` el área entera, lo que se habría llevado la ilustración. `tema_sync_error` puede valer `logo`, `ilustracion` o los dos separados por espacio (diagnóstico y cadena `tema_msg_ilustracion_error`). `block_pulso_pluginfile()` acepta `(logo|ilustracion).(png|jpg|webp)`.
+  - **Dónde se pinta**: `<img class="pulso-ilustracion" alt="" aria-hidden>` dentro de la raíz de «Crear», con `data-pulso-ilustracion` en la PESTAÑA (`#pulso-panel-crear`). Se posiciona respecto a la pestaña, que no hace scroll, y no respecto a la lista: así se queda en la esquina visible mientras la lista se desplaza. **Ni la raíz ni `#pulso-crear-scroll` pueden llevar `position`** o la ilustración se iría con el scroll (primera versión: con siete herramientas solo se veía al bajar del todo). Solo con sitio: container query `pulso-crear` (min-width 520 px) sobre el área de scroll; por debajo no se pinta y la lista ocupa todo el ancho. Todo cuelga del atributo: sin ilustración, el CSS de Crear es el de siempre. Las secciones `{{#ilustracionurl}}` van en líneas propias para que sin ilustración el HTML sea idéntico al de antes.
+- **Vista previa**: campos `tarjeta` y `pestana`, la maqueta lleva una fila de herramientas, la tabla enseña `--pulso-tool-bg` y `--pulso-tab-bg`, y una sección enseña la ilustración guardada.
+- **Pruebas** (fuera del repo; PHP 8.3 portátil con `gd` y `mbstring`, stubs de config y File API, mustache.js): 33.829 comprobaciones —barrido de 3.000 fondos oscuros (token `oscuro`, los 7 textos claros >= 4,5 en bg/surface/surface-2: peor 4,500; acento >= 3: peor 3,000; el panel nunca se aclara), 2.000 pares tarjeta/pestaña con texto >= 4,5, el diseño naranja/morado de referencia, límites de la ilustración, y la sincronización de las dos imágenes (no se pisan, `null` borra solo la suya, un fallo conserva la anterior, otro host rechazado)—; equivalencia con HEAD de `resolver_tema()` y de la plantilla. **Visto en navegador** (plantilla real + `styles.css` real, fuera de Moodle): el diseño de referencia en Crear y en Preguntar, la ilustración quieta al hacer scroll y oculta a 420 px. **NO probado**: en un Moodle real (purga de cachés, `pluginfile.php` sirviendo la ilustración, el `curl` contra Épica) y en móvil.
 
 ## Modo demostración (carta 16, v2.6.0)
 

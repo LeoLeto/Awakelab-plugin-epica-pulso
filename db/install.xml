@@ -181,5 +181,23 @@
         <INDEX NAME="idx_courseid_timecreated" UNIQUE="false" FIELDS="courseid, timecreated"/>
       </INDEXES>
     </TABLE>
+    <TABLE NAME="block_pulso_unidades" COMMENT="Mapa de unidades de aprendizaje de cada curso, detectado por el modelo al indexar (v2.16.0). Una fila por curso; sin fila, las unidades salen de las reglas de estructura.">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="mapa" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="JSON: unidades [{k clave, t titulo, m cmids}] y conocidos (los cmid que vio el analisis)"/>
+        <FIELD NAME="huella" TYPE="char" LENGTH="40" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="sha1 de la estructura y del arranque de los textos que vio el modelo: si no cambia, no se rehace"/>
+        <FIELD NAME="modelo" TYPE="char" LENGTH="100" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="Modelo que hizo el analisis"/>
+        <FIELD NAME="unidades" TYPE="int" LENGTH="5" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Numero de unidades detectadas"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="uniq_courseid" UNIQUE="true" FIELDS="courseid"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

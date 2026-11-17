@@ -101,13 +101,10 @@
     pointer-events: none;
 }
 
-/* Logo del centro (v2.13.0): sobre una placa blanca, para que se vea sea cual sea su color y el de la cabecera.
-   Un logo con fondo propio no se nota; uno transparente y oscuro tampoco desaparece sobre la cabecera. */
+/* Logo del centro (v2.13.0). Desde v2.16.2 se pinta TAL CUAL, sin la placa blanca de 2 px que llevaba: ese marco
+   se veía alrededor de todos los logos. Que el logo se lea sobre la cabecera es ahora cosa de quien lo elige en
+   Épica (la vista previa de /admin lo pinta sobre el color de la cabecera, sin placa, para que se vea antes). */
 .pulso-logo-centro {
-    box-sizing: border-box;
-    padding: 2px;
-    border-radius: 8px;
-    background: #ffffff;
     object-fit: contain;
 }
 
@@ -315,19 +312,6 @@
     flex-shrink: 0;
 }
 
-.pulso-version-badge {
-    display: inline-block;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--pulso-cyan-soft);
-    background: rgba(17, 234, 234, 0.14);
-    border: 1px solid rgba(17, 234, 234, 0.3);
-    padding: 1px 8px;
-    border-radius: 999px;
-    margin-left: 8px;
-    vertical-align: middle;
-    letter-spacing: 0.04em;
-}
 
 .header-controls {
     display: flex;
@@ -2817,12 +2801,6 @@ a.pulso-retos-open {
     box-shadow: 0 0 6px color-mix(in srgb, var(--pulso-header-text) 70%, transparent);
 }
 
-.pulso-chat-container[data-pulso-tema~="cabecera"] .pulso-version-badge {
-    color: var(--pulso-header-text);
-    background: color-mix(in srgb, var(--pulso-header-text) 14%, transparent);
-    border-color: color-mix(in srgb, var(--pulso-header-text) 35%, transparent);
-}
-
 .pulso-chat-container[data-pulso-tema~="cabecera"] .header-btn {
     color: var(--pulso-header-text);
     background: color-mix(in srgb, var(--pulso-header-text) 10%, transparent);
@@ -2921,6 +2899,47 @@ a.pulso-retos-open {
     color: var(--pulso-mine-text);
 }
 
+/* Tarjetas de «Crear» con el color del centro (v2.15.0): solo con el token «tarjeta». Mismo patrón que «Mis
+   creaciones»: fondo = --pulso-tool-bg y todo lo de dentro en --pulso-tool-text (>= 4,5:1 garantizado por
+   tema_service); el foco, el acento fuera del botón. */
+.pulso-chat-container[data-pulso-tema~="tarjeta"] .pulso-tool {
+    background: var(--pulso-tool-bg);
+    color: var(--pulso-tool-text);
+    border-color: var(--pulso-tool-bg);
+}
+
+.pulso-chat-container[data-pulso-tema~="tarjeta"] .pulso-tool:hover {
+    background: var(--pulso-tool-bg);
+    border-color: var(--pulso-tool-bg);
+    filter: brightness(1.12);
+}
+
+.pulso-chat-container[data-pulso-tema~="tarjeta"] .pulso-tool:focus-visible {
+    outline-offset: 2px;
+}
+
+.pulso-chat-container[data-pulso-tema~="tarjeta"] .pulso-tool .pulso-tool-title,
+.pulso-chat-container[data-pulso-tema~="tarjeta"] .pulso-tool .pulso-tool-sub,
+.pulso-chat-container[data-pulso-tema~="tarjeta"] .pulso-tool .pulso-tool-chevron {
+    color: var(--pulso-tool-text);
+}
+
+.pulso-chat-container[data-pulso-tema~="tarjeta"] .pulso-tool .pulso-tool-icon {
+    background: rgba(255, 255, 255, 0.18);
+    background: color-mix(in srgb, var(--pulso-tool-text) 14%, transparent);
+    color: var(--pulso-tool-text);
+}
+
+/* Pestaña activa con el color del centro (v2.15.0): solo con el token «pestana». Va detrás de las reglas de
+   «cabecera» y «acento» para ganarles con la misma especificidad: la pestaña elegida es un bloque de su color,
+   con su texto, y la raya inferior del mismo color (desaparece). */
+.pulso-chat-container[data-pulso-tema~="pestana"] .pulso-tab[aria-selected="true"],
+.pulso-chat-container[data-pulso-tema~="pestana"] .pulso-tab[aria-selected="true"]:hover {
+    background: var(--pulso-tab-bg);
+    color: var(--pulso-tab-text);
+    border-bottom-color: var(--pulso-tab-bg);
+}
+
 /* FONDO del centro (v2.13.0): las píldoras y etiquetas con el texto en su propio color usan un tinte rgba() que se
    compone sobre el fondo del panel. Con un fondo del centro (token «fondo») el tinte quedaría peor que hoy (el éxito ya
    da 4,37:1 sobre blanco), así que se fija OPACO, calculado sobre blanco: el mismo contraste de siempre sea cual sea el
@@ -2985,6 +3004,207 @@ a.pulso-retos-open {
 
 .pulso-chat-container[data-pulso-tema~="fondo"] .pulso-status-pill.neutral {
     background: #ebeef2;
+}
+
+/* ========== MODO OSCURO (v2.15.0) ==========
+   Solo con el token «oscuro», que tema_service pone cuando el `fondo` del centro es oscuro (sobre él se lee mejor el
+   blanco que el negro). El fondo, las superficies y las líneas llegan resueltos en el style del contenedor; aquí van
+   los TEXTOS CLAROS fijos —los mismos de tema_service::TEXTOS_CLAROS, que garantiza >= 4,5:1 sobre la superficie más
+   clara: si cambias uno, cambia los dos— y lo que no pasa por variables. Va DETRÁS del bloque «FONDO del centro»
+   (que también casa: el token «fondo» acompaña siempre a «oscuro») para deshacer sus píldoras opacas claras.
+   Reglas: un color de estado es texto sobre el panel y nunca sobre un tinte claro (las píldoras van transparentes,
+   con borde de su color); lo que es un bloque claro con su propio texto oscuro (chips #E2E6F2, fondos #72A3C4) se
+   queda como está, porque se lee igual sobre cualquier panel; los avatares conservan el azul de marca. */
+.pulso-chat-container[data-pulso-tema~="oscuro"] {
+    --pulso-ink: #f0f3fc;
+    --pulso-deep: #ffffff;
+    --pulso-navy: #ffffff;
+    --pulso-slate: #c9d4e8;
+    --pulso-muted: #a9bdd8;
+    color-scheme: dark;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-home-avatar,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-message.ai::before {
+    background-color: #003670;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"]:not([data-pulso-tema~="boton"]) .pulso-send-btn,
+.pulso-chat-container[data-pulso-tema~="oscuro"]:not([data-pulso-tema~="boton"]) .pulso-mic-btn.pulso-mic-recording {
+    color: #01264c;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-chat-messages::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-chat-messages::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.32);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-home-context-chip,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-action-chevron {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-home-section.course .pulso-action-card {
+    background: var(--pulso-surface-2);
+    border-color: var(--pulso-line);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-home-section.course .pulso-action-card:hover {
+    background: var(--pulso-surface);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-home-more-btn {
+    color: var(--pulso-deep);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-formula {
+    background: var(--pulso-surface-2);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-table tbody tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-next-step {
+    background: transparent;
+    color: var(--pulso-ink);
+}
+
+/* Estados: éxito #6fd8a8, aviso #f2c14e, error #ff9a90 (tema_service::TEXTOS_CLAROS). */
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-create-hint.warn,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-char-count.is-near {
+    color: #f2c14e;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-create-notice-inline.warn {
+    border-left-color: #f2c14e;
+    color: #f2c14e;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-create-notice-inline.danger {
+    border-left-color: #ff9a90;
+    color: #ff9a90;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-error-head,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-error-head strong {
+    color: #ff9a90;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-retos-done-head {
+    color: #6fd8a8;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-offline {
+    background: var(--pulso-surface-2);
+    border-top-color: #f2c14e;
+    color: #f2c14e;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-list-card.success { border-left-color: #6fd8a8; }
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-list-card.warn { border-left-color: #f2c14e; }
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-list-card.danger { border-left-color: #ff9a90; }
+
+/* Píldoras y etiquetas: transparentes, con el texto en su color claro y un borde de ese color. Con los DOS tokens
+   en el selector para ganar a las opacas del bloque «FONDO del centro» (`.pulso-status-pill.success` y compañía
+   pesan una clase más). */
+.pulso-chat-container[data-pulso-tema~="oscuro"][data-pulso-tema~="fondo"] .pulso-amp-tag,
+.pulso-chat-container[data-pulso-tema~="oscuro"][data-pulso-tema~="fondo"] .pulso-amp-tag-lang,
+.pulso-chat-container[data-pulso-tema~="oscuro"][data-pulso-tema~="fondo"] .pulso-retos-chip,
+.pulso-chat-container[data-pulso-tema~="oscuro"][data-pulso-tema~="fondo"] .pulso-reto-diff,
+.pulso-chat-container[data-pulso-tema~="oscuro"][data-pulso-tema~="fondo"] .pulso-activity-badge,
+.pulso-chat-container[data-pulso-tema~="oscuro"][data-pulso-tema~="fondo"] .pulso-result-box,
+.pulso-chat-container[data-pulso-tema~="oscuro"][data-pulso-tema~="fondo"] .pulso-status-pill {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-color: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-amp-tag-lang,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-retos-chip,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-reto-diff,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-activity-badge.page,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-activity-badge.book,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-activity-badge.wiki,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-status-pill.neutral {
+    color: var(--pulso-slate);
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-amp-tag,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-reto-diff.ok,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-activity-badge.resource,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-result-box,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-status-pill.success {
+    color: #6fd8a8;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-result-box {
+    border-left: 3px solid #6fd8a8;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-reto-diff.warn,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-activity-badge.label,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-status-pill.warning {
+    color: #f2c14e;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-reto-diff.danger,
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-status-pill.danger {
+    color: #ff9a90;
+}
+
+/* ========== LOGO DEL CENTRO EN LOS AVATARES (v2.16.3) ==========
+   Con el token «logo» (hay logo del centro), el avatar de cada respuesta y el de la home llevan el logo en vez del
+   isotipo de Awakelab, sobre el color de la cabecera: es donde el centro ya ha visto que se lee (la vista previa de
+   /admin lo pinta ahí). La URL llega en --pulso-logo, validada en tema_service::para_pintar(). Va DETRÁS del bloque
+   «MODO OSCURO», que fija el disco de los avatares a #003670: el `background` de aquí lo sustituye entero. */
+.pulso-chat-container[data-pulso-tema~="logo"] .pulso-home-avatar,
+.pulso-chat-container[data-pulso-tema~="logo"] .pulso-message.ai::before {
+    background: var(--pulso-header-bg) var(--pulso-logo) center / 64% no-repeat;
+    border-color: transparent;
+}
+
+/* ========== ILUSTRACIÓN DEL CENTRO EN «CREAR» (v2.15.0) ==========
+   Decorativa (alt vacío): abajo a la derecha de la lista de herramientas, que deja libre ese hueco. Solo cuando el
+   panel de Crear tiene sitio (container query sobre el área que hace scroll); en un panel estrecho o en el móvil no
+   se pinta y la lista ocupa todo el ancho, como siempre. Sin ilustración no casa nada de esto.
+   Se coloca respecto a la PESTAÑA (#pulso-panel-crear, que no hace scroll) y no respecto a la lista: así se queda
+   quieta en la esquina visible mientras la lista se desplaza, como un fondo. Por eso ni la raíz ni el área que hace
+   scroll pueden llevar `position`: serían ellas el bloque contenedor y la ilustración se iría con el scroll. Y se
+   esconde con la raíz: al abrir una herramienta, la raíz pasa a [hidden] y la ilustración con ella.
+   Todo cuelga de [data-pulso-ilustracion] en la pestaña: sin ilustración, el CSS de Crear es el de siempre. */
+#pulso-panel-crear[data-pulso-ilustracion] {
+    position: relative;
+}
+
+#pulso-panel-crear[data-pulso-ilustracion] #pulso-crear-scroll {
+    container: pulso-crear / inline-size;
+}
+
+.pulso-ilustracion {
+    display: none;
+}
+
+@container pulso-crear (min-width: 520px) {
+    #pulso-panel-crear[data-pulso-ilustracion] .pulso-create-root > :not(.pulso-ilustracion) {
+        margin-right: 34%;
+    }
+
+    .pulso-ilustracion {
+        display: block;
+        position: absolute;
+        right: 14px;
+        bottom: 0;
+        width: 32%;
+        max-height: 100%;
+        object-fit: contain;
+        object-position: right bottom;
+        pointer-events: none;
+        user-select: none;
+    }
 }
 
 /* ========== MÓVIL: pantalla completa ========== */
@@ -3087,3 +3307,315 @@ a.pulso-retos-open {
     }
 }
 
+/* ========== PROMPTS PREESTABLECIDOS (v2.14.0) ==========
+   Lista de sugerencias mientras se escribe y panel de opciones, los dos encima del cuadro de texto.
+   Solo variables --pulso-*: valen para el tema de siempre y para el de cada centro. */
+
+.pulso-preset-home-hint {
+    margin: 0 0 4px;
+    font-family: var(--pulso-font);
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--pulso-slate);
+}
+
+.pulso-preset-idea {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pulso-preset-idea-more,
+.pulso-preset-option-more {
+    flex-shrink: 0;
+    padding: 2px 8px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--pulso-slate);
+    background: var(--pulso-surface);
+}
+
+.pulso-preset-suggest {
+    margin: 0 0 10px;
+    padding: 4px;
+    list-style: none;
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    background: var(--pulso-bg);
+    box-shadow: 0 6px 18px rgba(1, 25, 50, 0.10);
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.pulso-preset-suggest[hidden],
+.pulso-preset-panel[hidden],
+.pulso-preset-error[hidden] {
+    display: none;
+}
+
+.pulso-preset-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    font-family: var(--pulso-font);
+    font-size: 0.86rem;
+    line-height: 1.35;
+    color: var(--pulso-ink);
+    cursor: pointer;
+}
+
+.pulso-preset-option:hover,
+.pulso-preset-option.is-active {
+    background: var(--pulso-surface-2);
+}
+
+.pulso-preset-option.is-active {
+    box-shadow: inset 0 0 0 2px var(--pulso-accent);
+}
+
+.pulso-preset-panel {
+    margin: 0 0 10px;
+    padding: 12px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 12px;
+    background: var(--pulso-surface);
+    max-height: 46vh;
+    overflow-y: auto;
+}
+
+.pulso-preset-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.pulso-preset-title {
+    margin: 0;
+    font-family: var(--pulso-font);
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--pulso-ink);
+}
+
+.pulso-preset-title:focus {
+    outline: none;
+}
+
+.pulso-preset-close {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    padding: 5px;
+    border: 1px solid var(--pulso-line);
+    border-radius: 8px;
+    background: var(--pulso-bg);
+    color: var(--pulso-slate);
+    cursor: pointer;
+}
+
+.pulso-preset-close svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.pulso-preset-close:focus-visible,
+.pulso-preset-send:focus-visible,
+.pulso-preset-idea:focus-visible {
+    outline: 2px solid var(--pulso-accent);
+    outline-offset: 2px;
+}
+
+.pulso-preset-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0 10px;
+}
+
+/* El primer campo (unidad, recurso, actividad) y el concepto ocupan la fila entera. */
+.pulso-preset-fields > :first-child,
+.pulso-preset-fields > .pulso-preset-empty {
+    grid-column: 1 / -1;
+}
+
+.pulso-preset-fields .pulso-create-field {
+    margin-bottom: 10px;
+    min-width: 0;
+}
+
+.pulso-preset-fields .pulso-create-field select,
+.pulso-preset-fields .pulso-create-field input[type="text"] {
+    background: var(--pulso-bg);
+}
+
+.pulso-preset-empty,
+.pulso-preset-error {
+    margin: 0 0 10px;
+    font-family: var(--pulso-font);
+    font-size: 0.84rem;
+    line-height: 1.4;
+    color: var(--pulso-ink);
+}
+
+.pulso-preset-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.pulso-preset-send {
+    padding: 9px 18px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text);
+    font-family: var(--pulso-font);
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.pulso-preset-send[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* ========== UNIDADES SIN RASTREAR (v2.17.0) ==========
+   Aviso de la home, solo para el profesorado: las unidades que Pulse no puede leer, con un botón por unidad
+   que lleva a Fuentes de Épica. Ámbar como el resto de avisos; el botón, con el color de acción del centro. */
+
+.pulso-untracked {
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(138, 97, 0, 0.35);
+    background: rgba(138, 97, 0, 0.07);
+    color: var(--pulso-ink);
+    font-family: var(--pulso-font);
+}
+
+.pulso-untracked[hidden] {
+    display: none;
+}
+
+.pulso-untracked-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pulso-untracked-head svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: #8A6100;
+}
+
+.pulso-untracked-title {
+    flex: 1;
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--pulso-ink);
+}
+
+.pulso-untracked-close {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--pulso-slate);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.pulso-untracked-close:hover {
+    background: rgba(138, 97, 0, 0.12);
+}
+
+.pulso-untracked-text {
+    margin: 6px 0 10px;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    color: var(--pulso-slate);
+}
+
+.pulso-untracked-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pulso-untracked-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.pulso-untracked-unit {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.pulso-untracked-name {
+    font-size: 0.84rem;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+}
+
+.pulso-untracked-sub {
+    font-size: 0.74rem;
+    color: var(--pulso-slate);
+}
+
+.pulso-untracked-btn {
+    flex-shrink: 0;
+    min-height: 32px;
+    padding: 6px 14px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--pulso-action-bg);
+    color: var(--pulso-action-text);
+    font-family: var(--pulso-font);
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.pulso-untracked-btn:hover {
+    filter: brightness(1.08);
+}
+
+.pulso-untracked-btn:focus-visible,
+.pulso-untracked-close:focus-visible {
+    outline: 2px solid var(--pulso-accent);
+    outline-offset: 2px;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-untracked-head svg {
+    color: #f2c14e;
+}
+
+.pulso-chat-container[data-pulso-tema~="oscuro"] .pulso-untracked {
+    border-color: rgba(242, 193, 78, 0.4);
+    background: rgba(242, 193, 78, 0.08);
+}

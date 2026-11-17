@@ -392,16 +392,14 @@ class rag_retriever {
     private static function resolve_direct_resource_query(int $courseid, string $query): ?array {
         global $DB;
 
-        // "resume", "resúmeme", "resúmelo/la/los/las" también (v2.9.1: antes solo "resumen/resumir", y
-        // "resume MIC Tema 2" devolvía la ficha de metadatos en vez del contenido).
-        $isSummaryIntent = (bool)preg_match('/resumen|resumir|\bres[uú]me(me|lo|la|los|las)?\b|s[ií]ntesis|sintesis|resum[eé]n|de\s+qu[eé]\s+va|de\s+qu[eé]\s+trata/u', $query);
-        // Regla: si la pregunta nombra un recurso Y pide algo de su CONTENIDO, la
-        // respuesta de solo-metadatos no vale. Los metadatos quedan para las
-        // preguntas de identificación ("¿qué es X?", "¿en qué formato está?") y de
-        // ubicación/acceso ("¿dónde está?", "¿cómo accedo?").
-        $isIdentificationIntent = self::is_identification_query($query);
-        $isContentIntent = !$isSummaryIntent && !$isIdentificationIntent
-            && (self::is_pdf_content_query($query) || self::is_resource_content_question($query));
+        // Regla: si la pregunta nombra un recurso, la ficha (nombre, archivo, tipo)
+        // solo es la respuesta de las preguntas de identificación ("¿qué es X?",
+        // "¿en qué formato está?") y de ubicación/acceso ("¿dónde está?", "¿cómo
+        // accedo?"). Lo demás es contenido; ver resource_question_intent().
+        $intent = self::resource_question_intent($query);
+        $isSummaryIntent = $intent === 'summary';
+        $isIdentificationIntent = $intent === 'identification';
+        $isContentIntent = $intent === 'content';
         $isAnalyticsIntent = self::is_course_analytics_query($query);
 
         // Atajo: en una pregunta de analitica de curso solo puede ganar un match
@@ -526,6 +524,18 @@ class rag_retriever {
             return self::build_assign_answer($courseid, $matched, $query);
         }
 
+        // ----- PDF enlazado (mod_url con texto indexado, v2.13.1) -----
+        // Un «Manual unidad N» de Refactika es un mod_url a un PDF que el cron ya ha
+        // leído (v2.10.0). Pedir su contenido por su nombre devolvía la ficha del
+        // enlace: se contesta como un PDF del curso. Sin texto, o si la pregunta es
+        // de identificación/ubicación, sigue la ficha de siempre.
+        if ($matchedType === 'url' && !$isIdentificationIntent) {
+            $linkedPdf = self::build_linked_pdf_answer($courseid, $matched, $query, $intent);
+            if ($linkedPdf !== null) {
+                return $linkedPdf;
+            }
+        }
+
         // ----- Other activity types -----
         if (in_array($matchedType, ['forum', 'page', 'url', 'book', 'folder', 'glossary', 'wiki', 'choice', 'feedback', 'lesson'], true)) {
             return self::build_generic_activity_answer($courseid, $matched, $matchedType, $query);
@@ -570,6 +580,14 @@ class rag_retriever {
             $joined = self::get_resource_joined_chunks($courseid, (string)$matched->name);
         }
         $joinedLower = mb_strtolower($joined, 'UTF-8');
+
+        // Sin intención reconocible («háblame de X», «y X?», el nombre a secas): si
+        // el recurso tiene texto legible se resume (v2.13.1). Antes caía en la ficha,
+        // y la propia sugerencia «¿Puedes explicarme con más detalle el contenido
+        // de X?» devolvía otra vez la ficha.
+        if ($intent === 'none' && self::resource_has_readable_text($courseid, $cm ? (int)$cm->id : 0, $joined)) {
+            $isSummaryIntent = true;
+        }
 
         $summaryParts = [];
         if ($filename !== '' || $mimetype !== '') {
@@ -1463,6 +1481,88 @@ class rag_retriever {
     }
 
     /**
+     * Respuesta de CONTENIDO para un mod_url que enlaza un PDF ya indexado (v2.13.1).
+     *
+     * El cron lee esos PDF desde v2.10.0 (url_pdf_extractor) y su texto está en
+     * block_pulso_full_text con `extraido_por` «url: pdf …», pero la ruta directa
+     * los trataba como un enlace más (build_generic_activity_answer: nombre y
+     * URL). Aquí se contestan como un PDF del curso: resumen o respuesta del modelo
+     * sobre el texto, con los mismos campos que la rama de recursos para que
+     * chat_pipeline::resolve_direct_answer() y build_direct_followups() los traten
+     * igual.
+     *
+     * Solo lee lo ya indexado: nada de descargar en la petición de chat (la
+     * descarga es exclusiva del cron, ver «PDF enlazados» en CLAUDE.md).
+     *
+     * @param int    $courseid
+     * @param object $url    Registro de {url} (id, name, intro)
+     * @param string $query  Consulta en minúsculas
+     * @param string $intent resource_question_intent(): 'summary', 'content' o 'none'
+     * @return array|null null si no hay texto legible del PDF: sigue la ficha
+     */
+    private static function build_linked_pdf_answer(int $courseid, object $url, string $query, string $intent): ?array {
+        global $DB;
+
+        $cm = $DB->get_record_sql(
+            "SELECT cm.id
+               FROM {course_modules} cm
+               JOIN {modules} m ON m.id = cm.module
+              WHERE cm.course = :courseid
+                AND m.name = :modname
+                AND cm.instance = :instance
+                AND cm.deletioninprogress = 0",
+            ['courseid' => $courseid, 'modname' => 'url', 'instance' => $url->id]
+        );
+        if (!$cm || !course_visibility::cm_visible($courseid, (int)$cm->id)) {
+            return null;
+        }
+
+        $row = full_text_store::get_resource_text($courseid, (int)$cm->id);
+        if ($row === null || strpos((string)$row['extraido_por'], url_pdf_extractor::EXTRACTED_PREFIX) !== 0) {
+            return null;
+        }
+        $texto = trim((string)$row['texto']);
+        if ($texto === '') {
+            return null;
+        }
+
+        $name = trim((string)$url->name);
+        $intro = trim(strip_tags((string)($url->intro ?? '')));
+        $isContent = $intent === 'content';
+
+        $result = [
+            'type' => 'text',
+            'title' => $isContent ? $name : ('Resumen del recurso ' . $name),
+            'summary' => 'Es un PDF enlazado desde el curso.',
+        ];
+
+        if ($isContent) {
+            // Placeholder — chat_pipeline lo reemplaza con la respuesta del modelo.
+            $result['content'] = 'Buscando la respuesta en el documento...';
+            $result['content_mode'] = true;
+            $result['raw_content_source'] = mb_substr((string)preg_replace('/\s+/u', ' ', $texto), 0, 7000);
+        } else {
+            // Resumen determinista de respaldo por si falla la llamada al modelo.
+            $fallback = self::build_resource_summary(mb_substr($texto, 0, 2000), $intro, '');
+            $result['content'] = 'Resumen: ' . ($fallback !== ''
+                ? $fallback
+                : 'No se pudo extraer suficiente texto para resumir el PDF con precisión.');
+            $result['summary_mode'] = true;
+            $result['raw_summary_source'] = self::build_summary_source_text($texto, $intro, '');
+        }
+
+        return self::attach_activity_link(
+            $result,
+            $courseid,
+            'url',
+            (int)$cm->id,
+            $name,
+            'Enlace',
+            $query
+        );
+    }
+
+    /**
      * Build a generic answer for any Moodle activity (forum, page, url, book, folder, glossary, wiki, choice, feedback, lesson).
      */
     private static function build_generic_activity_answer(int $courseid, object $activity, string $modType, string $query): array {
@@ -1815,11 +1915,11 @@ class rag_retriever {
     private static function resolve_direct_resource_in_section_query(int $courseid, $section, string $query): ?array {
         global $DB;
 
-        $isSummaryIntent = (bool)preg_match('/resumen|resumir|s[ií]ntesis|sintesis|resum[eé]n|de\s+qu[eé]\s+va|de\s+qu[eé]\s+trata/u', $query);
-        // Misma regla que en resolve_direct_resource_query: si pide contenido, no
-        // se contesta con metadatos.
-        $isContentIntent = !$isSummaryIntent && !self::is_identification_query($query)
-            && (self::is_pdf_content_query($query) || self::is_resource_content_question($query));
+        // Misma regla que en resolve_direct_resource_query (y desde v2.13.1 la misma
+        // función: aquí faltaban «resume»/«resúmeme»).
+        $intent = self::resource_question_intent($query);
+        $isSummaryIntent = $intent === 'summary';
+        $isContentIntent = $intent === 'content';
 
         $resources = $DB->get_records_sql(
             "SELECT r.id, r.name, r.intro, cm.id AS cmid
@@ -1840,10 +1940,12 @@ class rag_retriever {
         }
 
         $picked = null;
+        $pickedByName = false;
         foreach ($resources as $res) {
             $name = mb_strtolower(trim((string)$res->name), 'UTF-8');
             if ($name !== '' && preg_match('/(?<![\pL\pN])' . preg_quote($name, '/') . '(?![\pL\pN])/ui', $query)) {
                 $picked = $res;
+                $pickedByName = true;
                 break;
             }
         }
@@ -1882,6 +1984,14 @@ class rag_retriever {
             $joined = self::get_resource_joined_chunks($courseid, (string)$picked->name);
         }
         $joinedLower = mb_strtolower($joined, 'UTF-8');
+
+        // Sin intención reconocible, el contenido (v2.13.1) — pero solo si la pregunta
+        // NOMBRA el recurso. Si se ha cogido por ser el único PDF de la sección, la
+        // pregunta habla de la sección y la ficha sigue siendo lo prudente.
+        if ($intent === 'none' && $pickedByName
+                && self::resource_has_readable_text($courseid, (int)$picked->cmid, $joined)) {
+            $isSummaryIntent = true;
+        }
 
         $sectionTitle = trim((string)$section->name);
         if ($sectionTitle === '') {
@@ -2306,6 +2416,23 @@ class rag_retriever {
             return $out;
         }
 
+        return self::summary_material_for_cmids($courseid, $modinfo, $cmids);
+    }
+
+    /**
+     * Lo mismo para una lista de módulos YA filtrada por visibilidad (una sección, o una unidad
+     * de aprendizaje, que puede no coincidir con ninguna sección: v2.16.0).
+     *
+     * @param int $courseid
+     * @param object $modinfo course_modinfo
+     * @param int[] $cmids
+     * @return array{texts: array, unreadable: array}
+     */
+    private static function summary_material_for_cmids(int $courseid, $modinfo, array $cmids): array {
+        global $DB;
+
+        $out = ['texts' => [], 'unreadable' => []];
+
         try {
             $rows = full_text_store::get_rows_for_cmids($courseid, $cmids);
         } catch (\Throwable $e) {
@@ -2416,19 +2543,174 @@ class rag_retriever {
             return [];
         }
 
-        $material = self::section_summary_material($courseid, $section);
+        return self::summary_context_from($courseid, $section, 0);
+    }
+
+    /**
+     * Lo mismo, pero con la sección elegida POR SU ID (prompts preestablecidos, v2.14.0): no hay
+     * pregunta que interpretar ni nombre que emparejar. Vacío si la sección no es de este curso, es la
+     * general (0) o este usuario no la ve.
+     *
+     * @param int $courseid
+     * @param int $sectionid course_sections.id
+     * @return array Como build_section_summary_context().
+     */
+    public static function build_summary_context_for_section(int $courseid, int $sectionid): array {
+        global $DB;
+
+        $section = $DB->get_record('course_sections', ['id' => $sectionid, 'course' => $courseid], 'id, section, name, summary, visible');
+        if (!$section || (int)$section->section === 0 || !course_visibility::section_visible($courseid, (int)$section->section)) {
+            return [];
+        }
+        return self::summary_context_from($courseid, $section, 0);
+    }
+
+    /**
+     * Material de UN recurso elegido por su cmid (prompts preestablecidos, v2.14.0), con la misma
+     * forma que el de una sección más `resource => true`. Al ser uno solo, se lleva el presupuesto
+     * entero. Vacío si el módulo no es de este curso o este usuario no lo ve.
+     *
+     * @param int $courseid
+     * @param int $cmid
+     * @return array
+     */
+    public static function build_summary_context_for_resource(int $courseid, int $cmid): array {
+        global $DB;
+
+        if (!course_visibility::cm_visible($courseid, $cmid)) {
+            return [];
+        }
+        try {
+            $cm = \get_fast_modinfo($courseid)->get_cm($cmid);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $section = $DB->get_record('course_sections', ['id' => (int)$cm->section, 'course' => $courseid], 'id, section, name, summary, visible');
+        if (!$section) {
+            return [];
+        }
+        $context = self::summary_context_from($courseid, $section, $cmid);
+        $name = trim((string)$cm->name);
+        $context['title'] = $name !== '' ? preg_replace('/[<>]{3,}/u', '', $name) : $context['title'];
+        $context['resource'] = true;
+        return $context;
+    }
+
+    /**
+     * Material de una UNIDAD DE APRENDIZAJE (unit_map, v2.16.0): una lista de módulos que puede ser
+     * media sección o estar repartida entre varias. Misma forma que el de una sección más
+     * `unit => true`. Los módulos que este usuario no ve se descartan aquí. Vacío si no queda ninguno.
+     *
+     * @param int $courseid
+     * @param int[] $cmids En el orden del curso
+     * @param string $title Título de la unidad
+     * @param array $extra Material extra de Épica subido para esta unidad (v2.17.0): [{nombre, texto}] de
+     *                     fuentes_service::textos_de_unidad(). Va detrás de lo de Moodle, como un recurso más.
+     * @return array
+     */
+    public static function build_summary_context_for_cms(int $courseid, array $cmids, string $title, array $extra = []): array {
+        $visible = [];
+        foreach ($cmids as $cmid) {
+            if (course_visibility::cm_visible($courseid, (int)$cmid)) {
+                $visible[] = (int)$cmid;
+            }
+        }
+        if (empty($visible)) {
+            return [];
+        }
+        try {
+            $modinfo = \get_fast_modinfo($courseid);
+        } catch (\Throwable $e) {
+            return [];
+        }
+        $material = self::summary_material_for_cmids($courseid, $modinfo, $visible);
+        foreach ($extra as $item) {
+            if (is_array($item) && trim((string)($item['texto'] ?? '')) !== '') {
+                $material['texts'][] = ['cmid' => 0, 'modname' => 'material extra', 'name' => (string)($item['nombre'] ?? 'Documento'),
+                    'text' => trim((string)$item['texto'])];
+            }
+        }
+        $section = (object)['name' => preg_replace('/[<>]{3,}/u', '', $title), 'section' => 0, 'summary' => ''];
+        $context = self::summary_context_from($courseid, $section, 0, $material);
+        $context['unit'] = true;
+        return $context;
+    }
+
+    /** Tope total del material de un prompt preestablecido (unidad o recurso elegido). */
+    const PRESET_SUMMARY_MAX_CHARS = 48000;
+
+    /**
+     * Reparte un presupuesto de caracteres entre textos de distinta longitud: cada uno recibe lo que
+     * necesita mientras quepa, y lo que sobra de los cortos se lo llevan los largos a partes iguales.
+     *
+     * @param int[] $lengths Longitud de cada texto
+     * @param int $total Presupuesto total
+     * @return int[] Presupuesto de cada texto, en el mismo orden
+     */
+    public static function share_budget(array $lengths, int $total): array {
+        $order = array_keys($lengths);
+        usort($order, function($a, $b) use ($lengths) {
+            return $lengths[$a] <=> $lengths[$b];
+        });
+        $budgets = [];
+        $left = max(0, $total);
+        $pending = count($order);
+        foreach ($order as $i) {
+            $share = (int)floor($left / $pending);
+            $budgets[$i] = min((int)$lengths[$i], $share);
+            $left -= $budgets[$i];
+            $pending--;
+        }
+        ksort($budgets);
+        return $budgets;
+    }
+
+    /**
+     * Arma el contexto de resumen de una sección ya elegida. Con $onlycmid > 0 se queda solo con
+     * ese módulo (y sin la descripción de la sección, que no es suya).
+     *
+     * @param int $courseid
+     * @param object $section Registro de course_sections
+     * @param int $onlycmid 0 = toda la sección
+     * @return array{title: string, number: int, material: string, unreadable: string[], via_url: string[]}
+     */
+    private static function summary_context_from(int $courseid, $section, int $onlycmid, ?array $material = null): array {
+        $explicit = $material !== null; // material de una unidad elegida, no de una sección detectada en el texto
+        $material = $material ?? self::section_summary_material($courseid, $section);
+        if ($onlycmid > 0) {
+            $only = function(array $item) use ($onlycmid): bool {
+                return (int)$item['cmid'] === $onlycmid;
+            };
+            $material['texts'] = array_values(array_filter($material['texts'], $only));
+            $material['unreadable'] = array_values(array_filter($material['unreadable'], $only));
+        }
         $title = trim((string)$section->name);
         if ($title === '') {
             $title = 'Seccion ' . (int)$section->section;
         }
 
         $count = count($material['texts']);
-        $budget = $count > 0
-            ? min(self::SECTION_SUMMARY_MAX_PER_RESOURCE, (int)floor(self::SECTION_SUMMARY_MAX_CHARS / $count))
+        $perresource = $onlycmid > 0 ? self::SECTION_SUMMARY_MAX_CHARS : self::SECTION_SUMMARY_MAX_PER_RESOURCE;
+        $evenbudget = $count > 0
+            ? min($perresource, (int)floor(self::SECTION_SUMMARY_MAX_CHARS / $count))
             : 0;
+        // Prompts preestablecidos (unidad o recurso elegido de una lista, v2.16.1): el reparto a partes
+        // iguales dejaba el documento principal de la unidad en 8.000 caracteres —el índice y poco más—
+        // mientras el enunciado de una tarea no gastaba ni mil (en sanase-test un glosario salió con un
+        // solo término). Aquí lo que no usa un recurso corto pasa a los largos, y el total es mayor.
+        // El resumen de sección por texto libre (v2.9.1) no cambia.
+        $budgets = null;
+        if ($count > 0 && ($explicit || $onlycmid > 0)) {
+            $lengths = [];
+            foreach ($material['texts'] as $item) {
+                $lengths[] = mb_strlen($item['text'], 'UTF-8');
+            }
+            $budgets = self::share_budget($lengths, self::PRESET_SUMMARY_MAX_CHARS);
+        }
 
         $blocks = [];
         foreach ($material['texts'] as $i => $item) {
+            $budget = $budgets !== null ? $budgets[$i] : $evenbudget;
             $text = mb_substr($item['text'], 0, $budget, 'UTF-8');
             if (mb_strlen($item['text'], 'UTF-8') > $budget) {
                 $text .= '…';
@@ -2439,7 +2721,7 @@ class rag_retriever {
             $blocks[] = '<<<RECURSO ' . ($i + 1) . ' [' . $item['modname'] . ': ' . $name . ']>>>' . "\n" . $text . "\n" . '<<<FIN>>>';
         }
 
-        $summary = trim(strip_tags((string)$section->summary));
+        $summary = $onlycmid > 0 ? '' : trim(strip_tags((string)$section->summary));
         if ($summary !== '') {
             array_unshift($blocks, 'Descripcion de la seccion: ' . mb_substr(preg_replace('/\s+/u', ' ', $summary), 0, 1500, 'UTF-8'));
         }
@@ -2522,9 +2804,72 @@ class rag_retriever {
             '|de\s+qu[eé]\s+(habla|se\s+habla)|qu[eé]\s+temas?\s+(trata|aborda|cubre)' .
             '|expl[ií]came|expl[ií]ca\s|acl[aá]rame|det[aá]llame|cu[eé]ntame\s+(qu[eé]|sobre|de)' .
             '|seg[uú]n\s+(el|la|los|las)\s+(documento|pdf|material|archivo|recurso|apuntes|temario)' .
-            '|\bsobre\s+(la|el|los|las)\s+\w{4,}/u',
+            '|\bsobre\s+(la|el|los|las)\s+\w{4,}' .
+            // v2.13.1: infinitivos y enclíticos que el chat real usaba y caían en la
+            // ficha («háblame de X», «¿puedes explicarme el contenido de X?» —esta es
+            // la sugerencia que el propio Pulse ofrece tras una ficha—).
+            '|h[aá]bla(me|nos)\s+(de|sobre)|hablar(me|nos)?\s+(de|sobre)' .
+            '|explicar(me|nos)?\b|expl[ií]ca(nos|melo|mela)\b|cu[eé]nta(nos|melo)\b|contar(me|nos)\b' .
+            '|detallar(me)?\b|profundiza(r|me)?\s+en' .
+            '|\bcontenido\s+(de|del)\b|\binformaci[oó]n\s+(de|del|sobre)\b' .
+            '|(puntos|ideas|conceptos)\s+(clave|importantes|principales|m[aá]s\s+importantes)' .
+            '|lo\s+m[aá]s\s+importante/u',
             $query
         );
+    }
+
+    /**
+     * Qué pide una pregunta que nombra un recurso (v2.13.1): 'summary', 'content',
+     * 'identification' o 'none'.
+     *
+     * Precedencia: resumen > identificación/ubicación > contenido, la misma que
+     * tenían las tres comprobaciones sueltas que sustituye (en
+     * resolve_direct_resource_query() y resolve_direct_resource_in_section_query(),
+     * que además discrepaban: la segunda no conocía «resume»).
+     *
+     * 'none' NO quiere decir «da la ficha»: quien llama lo convierte en resumen
+     * cuando el recurso tiene texto legible (resource_has_readable_text()). Hasta
+     * v2.13.0 el defecto era la ficha, y cualquier fraseo que no estuviera en las
+     * listas («háblame de X», «y X?») devolvía nombre, archivo y tipo de un PDF
+     * que sí estaba indexado.
+     *
+     * @param string $query Consulta ya en minúsculas
+     * @return string
+     */
+    private static function resource_question_intent(string $query): string {
+        if (preg_match('/resumen|resumir|\bres[uú]me(me|lo|la|los|las)?\b|s[ií]ntesis|sintesis|resum[eé]n|de\s+qu[eé]\s+va|de\s+qu[eé]\s+trata/u', $query)) {
+            return 'summary';
+        }
+        if (self::is_identification_query($query)) {
+            return 'identification';
+        }
+        if (self::is_pdf_content_query($query) || self::is_resource_content_question($query)) {
+            return 'content';
+        }
+        return 'none';
+    }
+
+    /**
+     * ¿Tiene este recurso texto que se pueda resumir? (v2.13.1)
+     *
+     * Manda la fila de block_pulso_full_text: si existe, su `usable` (un PDF
+     * escaneado tiene fila con usable=0 y fragmentos que no son su contenido). Sin
+     * fila —curso aún sin pasar por el cron, o tabla ausente— vale el texto que ya
+     * se haya podido juntar.
+     *
+     * @param int    $courseid
+     * @param int    $cmid    0 si no se conoce
+     * @param string $joined  Texto ya reunido para el recurso
+     * @return bool
+     */
+    private static function resource_has_readable_text(int $courseid, int $cmid, string $joined): bool {
+        if ($cmid > 0) {
+            $rows = full_text_store::get_rows_for_cmids($courseid, [$cmid]);
+            if (isset($rows[$cmid])) {
+                return !empty($rows[$cmid]->usable) && trim((string)$rows[$cmid]->texto) !== '';
+            }
+        }
+        return trim($joined) !== '';
     }
 
     /**
@@ -2539,8 +2884,10 @@ class rag_retriever {
         if (self::is_location_query($query)) {
             return true;
         }
+        // «qué es lo más importante de X» / «qué es más relevante» piden contenido,
+        // no identificar el recurso (v2.13.1).
         return (bool)preg_match(
-            '/\bqu[eé]\s+es\s+(el|la|los|las)?\s*\w' .
+            '/\bqu[eé]\s+es\s+(?!lo\b|m[aá]s\b)(el|la|los|las)?\s*\w' .
             '|en\s+qu[eé]\s+formato|qu[eé]\s+(tipo|formato)\s+de\s+(archivo|documento|fichero)' .
             '|nombre\s+del\s+(archivo|fichero)|c[oó]mo\s+se\s+llama\s+el\s+(archivo|fichero)' .
             '|cu[aá]nto\s+pesa|tama[nñ]o\s+del\s+(archivo|fichero)/u',
@@ -2557,7 +2904,7 @@ class rag_retriever {
      * @return bool
      */
     private static function is_pdf_content_query(string $query): bool {
-        return (bool)preg_match('/enunciado|primer\s+problem[ao]|\bproblema\s+\d+|primer\s+ejercicio|ejercicio\s*\d+|mu[eé]strame\s+(el|la|los|las|un)\b|soluci[oó]n\s+del\b|dame\s+(un|el|la|los)\s+\w+|qu[eé]\s+preguntas?|cu[aá]ntas?\s+preguntas?|pregunta\s+\d+|\bpregunta\s+del/u', $query);
+        return (bool)preg_match('/enunciado|primer\s+problem[ao]|\bproblema\s+\d+|primer\s+ejercicio|ejercicio\s*\d+|(mu[eé]strame|mostrarme|ens[eé][nñ]ame|ense[nñ]arme)\s+(el|la|los|las|un)\b|soluci[oó]n\s+del\b|dame\s+(un|el|la|los)\s+\w+|qu[eé]\s+preguntas?|cu[aá]ntas?\s+preguntas?|pregunta\s+\d+|\bpregunta\s+del/u', $query);
     }
 
     /**
@@ -3774,6 +4121,8 @@ class rag_retriever {
         unset_config('lastindexqueue_' . $courseid, 'block_pulso');
         unset_config(url_pdf_extractor::CACHE_PREFIX . $courseid, 'block_pulso');
         full_text_store::delete_course_texts($courseid);
+        require_once(__DIR__ . '/unit_map.php');
+        unit_map::delete($courseid);
         if (!self::rag_table_exists()) {
             return;
         }

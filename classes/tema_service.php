@@ -30,7 +30,7 @@ class tema_service {
     const RUTA = '/api/moodle/tema';
 
     /** Las únicas claves que Pulse usa (todas opcionales); cualquier otra que mande Épica se ignora. */
-    const CLAVES = ['principal', 'acento', 'cabecera', 'boton', 'burbuja', 'fondo', 'creaciones'];
+    const CLAVES = ['principal', 'acento', 'cabecera', 'boton', 'burbuja', 'fondo', 'creaciones', 'tarjeta', 'pestana'];
 
     const RE_CLAVE = '/^[a-z][a-z0-9-]{0,31}\z/';
     const RE_COLOR = '/^#[0-9a-f]{6}\z/';
@@ -71,7 +71,25 @@ class tema_service {
     const K_SURFACE = 0.3;
     const K_SURFACE2 = 0.6;
 
-    /** Logo del centro (v2.13.0): filearea propia en el contexto de sistema. */
+    /**
+     * MODO OSCURO (v2.15.0): lo decide el propio `fondo`. Si sobre él se lee mejor el blanco que el negro
+     * (mejor_texto() = blanco), el panel pasa a textos CLAROS fijos (TEXTOS_CLAROS: ink, deep, slate, muted,
+     * éxito, aviso y error en su versión clara, los mismos que el bloque «MODO OSCURO» de styles.css) y el
+     * fondo se OSCURECE hacia negro (pasos del 2 %, tope 50 = negro) hasta que todos den >= 4,5:1 sobre la
+     * superficie MÁS CLARA (surface-2), que en oscuro es la peor. Las superficies y las líneas son el panel
+     * mezclado hacia blanco en estas fracciones. Épica replica la regla para avisar en /admin
+     * (`seOscurecePara` de su catálogo): si cambia aquí, cambia allí.
+     */
+    const TEXTOS_CLAROS = ['#f0f3fc', '#ffffff', '#c9d4e8', '#a9bdd8', '#6fd8a8', '#f2c14e', '#ff9a90'];
+    const K_SURFACE_OSCURO = 0.05;
+    const K_SURFACE2_OSCURO = 0.10;
+    const K_LINE_OSCURO = 0.22;
+
+    /**
+     * Imágenes del centro: el logo (v2.13.0) y la ilustración de «Crear» (v2.15.0). Las dos viven en la
+     * misma filearea, contexto de sistema, itemid 0, con nombre propio (`logo.<ext>`, `ilustracion.<ext>`):
+     * guardar o borrar una NO toca la otra. Cada una tiene sus límites y sus ajustes `tema_<clave>_*`.
+     */
     const LOGO_AREA = 'tema';
     const LOGO_MAX_BYTES = 204800; // 200 KB
     const LOGO_MIN_PX = 96;
@@ -81,6 +99,12 @@ class tema_service {
     const LOGO_TIMEOUT_S = 20;
     const RE_LOGO_VERSION = '/^[A-Za-z0-9._-]{1,64}\z/';
     const LOGO_EXTENSIONES = ['png', 'jpg', 'webp'];
+    const IMAGENES = [
+        'logo' => ['max_bytes' => self::LOGO_MAX_BYTES, 'min_px' => self::LOGO_MIN_PX, 'max_px' => self::LOGO_MAX_PX,
+            'aspecto' => self::LOGO_ASPECTO_MAX],
+        // Decorativa, a la derecha de la lista de «Crear»: hasta 400 KB, 160–1600 px, de 1:4 a 4:1.
+        'ilustracion' => ['max_bytes' => 409600, 'min_px' => 160, 'max_px' => 1600, 'aspecto' => 4.0],
+    ];
 
     /** Descargador de pruebas (null = el curl de Moodle). Firma: fn(string $url): array con errno, http, body, too_big, location, effective. */
     private static $descargador = null;
@@ -152,9 +176,11 @@ class tema_service {
         $hayguardado = self::hay_guardado();
 
         if ($tema === null) {
-            // El centro ha vuelto al tema por defecto de Pulse (también sin logo).
+            // El centro ha vuelto al tema por defecto de Pulse (también sin logo ni ilustración).
             self::borrar();
-            self::borrar_logo();
+            foreach (array_keys(self::IMAGENES) as $clave) {
+                self::borrar_imagen($clave);
+            }
             self::marcar_ok();
             return self::resultado($hayguardado ? self::ESTADO_BORRADO : self::ESTADO_SIN_TEMA,
                 $hayguardado ? 'tema_msg_borrado' : 'tema_msg_sin_tema');
@@ -166,49 +192,71 @@ class tema_service {
             error_log('Pulso tema: la respuesta no trae una versión válida.');
             return self::fallo('respuesta', 'tema_msg_error_respuesta');
         }
-        // Logo (v2.13.0): clave aparte de `colores` (no es un color). Ausente o null = sin logo.
-        $logo = is_array($tema) ? ($tema['logo'] ?? null) : null;
+        // Logo (v2.13.0) e ilustración (v2.15.0): claves aparte de `colores` (no son colores). Ausente o
+        // null = sin esa imagen.
+        $imagenes = [];
+        foreach (array_keys(self::IMAGENES) as $clave) {
+            $imagenes[$clave] = is_array($tema) ? ($tema[$clave] ?? null) : null;
+        }
 
         if (!$colores) {
             // Nada utilizable (p. ej. solo claves que Pulse no usa): equivale a no tener tema.
             error_log('Pulso tema: el tema no trae colores que Pulse use o que tengan forma #rrggbb.');
             self::borrar();
-            if ($logo === null) {
-                self::borrar_logo();
+            if (!array_filter($imagenes, function ($i) {
+                return $i !== null;
+            })) {
+                foreach (array_keys(self::IMAGENES) as $clave) {
+                    self::borrar_imagen($clave);
+                }
                 self::marcar_ok();
                 return self::resultado($hayguardado ? self::ESTADO_BORRADO : self::ESTADO_SIN_TEMA,
                     $hayguardado ? 'tema_msg_borrado' : 'tema_msg_sin_tema');
             }
-            // Solo logo: los colores vuelven a ser los de Pulse y el logo se trata como siempre.
-            $logoerror = !self::sincronizar_logo($logo);
+            // Solo imágenes: los colores vuelven a ser los de Pulse y las imágenes se tratan como siempre.
+            $fallidas = self::sincronizar_imagenes($imagenes);
             self::marcar_ok();
-            return self::con_aviso_logo(self::resultado(self::ESTADO_GUARDADO, 'tema_msg_guardado', $version), $logoerror);
+            return self::con_aviso_imagenes(self::resultado(self::ESTADO_GUARDADO, 'tema_msg_guardado', $version), $fallidas);
         }
 
-        // El logo se mira SIEMPRE, aunque no cambie la versión del tema: tiene su propia `version`.
-        $logoerror = !self::sincronizar_logo($logo);
+        // Las imágenes se miran SIEMPRE, aunque no cambie la versión del tema: cada una tiene su `version`.
+        $fallidas = self::sincronizar_imagenes($imagenes);
 
         if ($hayguardado && (string)get_config('block_pulso', 'tema_version') === $version) {
             self::marcar_ok();
-            return self::con_aviso_logo(self::resultado(self::ESTADO_SIN_CAMBIOS, 'tema_msg_sin_cambios', $version), $logoerror);
+            return self::con_aviso_imagenes(self::resultado(self::ESTADO_SIN_CAMBIOS, 'tema_msg_sin_cambios', $version), $fallidas);
         }
 
         set_config('tema_json', json_encode($colores), 'block_pulso');
         set_config('tema_version', $version, 'block_pulso');
         self::marcar_ok();
-        return self::con_aviso_logo(self::resultado(self::ESTADO_GUARDADO, 'tema_msg_guardado', $version), $logoerror);
+        return self::con_aviso_imagenes(self::resultado(self::ESTADO_GUARDADO, 'tema_msg_guardado', $version), $fallidas);
+    }
+
+    /** Pone al día cada imagen. @return string[] las claves que fallaron (y conservan la anterior). */
+    private static function sincronizar_imagenes(array $imagenes): array {
+        $fallidas = [];
+        foreach ($imagenes as $clave => $imagen) {
+            if (!self::sincronizar_imagen($clave, $imagen)) {
+                $fallidas[] = $clave;
+            }
+        }
+        return $fallidas;
     }
 
     /**
-     * Si el logo falló: conserva el anterior (nada se tocó), deja un código GENÉRICO en tema_sync_error
-     * (tras marcar_ok(), que lo borra) y avisa al administrador. Los colores ya se guardaron.
+     * Si una imagen falló: conserva la anterior (nada se tocó), deja un código GENÉRICO en tema_sync_error
+     * (tras marcar_ok(), que lo borra: `logo`, `ilustracion` o los dos con espacio) y avisa al administrador.
+     * Los colores ya se guardaron.
      */
-    private static function con_aviso_logo(array $res, bool $logoerror): array {
-        if ($logoerror) {
-            set_config('tema_sync_error', 'logo', 'block_pulso');
+    private static function con_aviso_imagenes(array $res, array $fallidas): array {
+        if ($fallidas) {
+            set_config('tema_sync_error', implode(' ', $fallidas), 'block_pulso');
             set_config('tema_sync_error_time', time(), 'block_pulso');
             $res['ok'] = false;
-            $res['mensaje'] .= ' ' . get_string('tema_msg_logo_error', 'block_pulso');
+            foreach ($fallidas as $clave) {
+                $res['mensaje'] .= ' ' . get_string('tema_msg_' . $clave . '_error', 'block_pulso');
+            }
         }
         return $res;
     }
@@ -315,48 +363,49 @@ class tema_service {
     }
 
     /**
-     * Pone al día el logo guardado con lo que manda Épica. true = bien (o sin cambios); false = fallo,
-     * y entonces NO se toca el logo anterior. Al log solo host, bytes, HTTP y motivo.
+     * Pone al día una imagen guardada (`logo` o `ilustracion`) con lo que manda Épica. true = bien (o sin
+     * cambios); false = fallo, y entonces NO se toca la anterior. Al log solo host, bytes, HTTP y motivo.
      *
-     * @param mixed $logo null (borrar) o {url, version}.
+     * @param mixed $imagen null (borrar) o {url, version}.
      */
-    private static function sincronizar_logo($logo): bool {
-        if ($logo === null) {
-            self::borrar_logo();
+    private static function sincronizar_imagen(string $clave, $imagen): bool {
+        if ($imagen === null) {
+            self::borrar_imagen($clave);
             return true;
         }
-        $url = is_array($logo) ? ($logo['url'] ?? null) : null;
-        $version = is_array($logo) ? ($logo['version'] ?? null) : null;
+        $url = is_array($imagen) ? ($imagen['url'] ?? null) : null;
+        $version = is_array($imagen) ? ($imagen['version'] ?? null) : null;
         if (!self::version_logo_valida($version) || self::url_logo_valida($url) === '') {
-            self::log_logo(is_string($url) ? $url : '', 0, 0, 'forma_url_o_host');
+            self::log_imagen($clave, is_string($url) ? $url : '', 0, 0, 'forma_url_o_host');
             return false;
         }
-        if ((string)get_config('block_pulso', 'tema_logo_version') === $version && self::fichero_logo() !== null) {
+        if ((string)get_config('block_pulso', 'tema_' . $clave . '_version') === $version && self::fichero_imagen($clave) !== null) {
             return true; // misma versión y el fichero está: no se redescarga
         }
 
-        $r = self::descargar_logo($url);
+        $max = self::IMAGENES[$clave]['max_bytes'];
+        $r = self::descargar_logo($url, $max);
         if ($r['motivo'] !== '') {
-            self::log_logo($url, $r['bytes'], $r['http'], $r['motivo']);
+            self::log_imagen($clave, $url, $r['bytes'], $r['http'], $r['motivo']);
             return false;
         }
-        $v = self::validar_imagen_logo($r['body']);
+        $v = self::validar_imagen($r['body'], self::IMAGENES[$clave]);
         if ($v['motivo'] !== '') {
-            self::log_logo($url, $r['bytes'], $r['http'], $v['motivo']);
+            self::log_imagen($clave, $url, $r['bytes'], $r['http'], $v['motivo']);
             return false;
         }
-        if (!self::guardar_logo($r['body'], $v['ext'], $version)) {
-            self::log_logo($url, $r['bytes'], $r['http'], 'guardado');
+        if (!self::guardar_imagen($clave, $r['body'], $v['ext'], $version)) {
+            self::log_imagen($clave, $url, $r['bytes'], $r['http'], 'guardado');
             return false;
         }
         return true;
     }
 
-    private static function log_logo(string $url, int $bytes, int $http, string $motivo): void {
+    private static function log_imagen(string $clave, string $url, int $bytes, int $http, string $motivo): void {
         $host = $url !== '' ? parse_url($url, PHP_URL_HOST) : null;
         $host = is_string($host) ? preg_replace('/[^A-Za-z0-9.-]/', '', $host) : '';
-        error_log('Pulso tema: logo no actualizado (host ' . ($host !== '' ? $host : '?') . ', ' . $bytes . ' bytes, HTTP ' . $http
-            . ', motivo ' . $motivo . '); se conserva el anterior.');
+        error_log('Pulso tema: ' . $clave . ' no actualizado (host ' . ($host !== '' ? $host : '?') . ', ' . $bytes . ' bytes, HTTP '
+            . $http . ', motivo ' . $motivo . '); se conserva el anterior.');
     }
 
     /**
@@ -364,7 +413,7 @@ class tema_service {
      *
      * @return array{motivo: string, http: int, bytes: int, body: string} motivo '' = hay cuerpo 200.
      */
-    private static function descargar_logo(string $url): array {
+    private static function descargar_logo(string $url, int $max = self::LOGO_MAX_BYTES): array {
         $out = ['motivo' => 'descarga', 'http' => 0, 'bytes' => 0, 'body' => ''];
         try {
             for ($salto = 0; $salto <= self::LOGO_MAX_REDIRECTS; $salto++) {
@@ -372,7 +421,7 @@ class tema_service {
                     $out['motivo'] = $salto > 0 ? 'redireccion' : 'url';
                     return $out;
                 }
-                $r = self::http_logo($url);
+                $r = self::http_logo($url, $max);
                 $out['http'] = (int)$r['http'];
                 $out['bytes'] = strlen((string)$r['body']);
                 if ($r['too_big']) {
@@ -399,7 +448,7 @@ class tema_service {
                     $out['motivo'] = 'http';
                     return $out;
                 }
-                if ($out['bytes'] > self::LOGO_MAX_BYTES) {
+                if ($out['bytes'] > $max) {
                     $out['motivo'] = 'demasiado_grande';
                     return $out;
                 }
@@ -410,7 +459,7 @@ class tema_service {
             $out['motivo'] = 'redireccion';
             return $out;
         } catch (\Throwable $e) {
-            error_log('Pulso tema: excepción al descargar el logo: ' . get_class($e));
+            error_log('Pulso tema: excepción al descargar una imagen: ' . get_class($e));
             return $out;
         }
     }
@@ -429,11 +478,11 @@ class tema_service {
     }
 
     /**
-     * Una petición GET sin seguir redirecciones, con tope de 200 KB (aborta al pasar, no baja entero).
+     * Una petición GET sin seguir redirecciones, con tope de $max bytes (aborta al pasar, no baja entero).
      *
      * @return array{errno: int, http: int, body: string, too_big: bool, location: string, effective: string}
      */
-    private static function http_logo(string $url): array {
+    private static function http_logo(string $url, int $max = self::LOGO_MAX_BYTES): array {
         if (self::$descargador !== null) {
             return (self::$descargador)($url) + [
                 'errno' => 0, 'http' => 200, 'body' => '', 'too_big' => false, 'location' => '', 'effective' => '',
@@ -442,7 +491,6 @@ class tema_service {
         global $CFG;
         require_once($CFG->libdir . '/filelib.php');
 
-        $max = self::LOGO_MAX_BYTES;
         $toobig = false;
         $curl = new \curl();
         $curl->setopt([
@@ -484,14 +532,24 @@ class tema_service {
     }
 
     /**
-     * PNG, JPEG o WebP (nada de SVG): firma mágica Y getimagesizefromstring() de acuerdo entre sí,
-     * 96–512 px por lado y casi cuadrado.
+     * El logo: PNG, JPEG o WebP, 96–512 px por lado y casi cuadrado (ver validar_imagen()).
      *
      * @return array{motivo: string, ext: string} motivo '' = vale.
      */
     public static function validar_imagen_logo(string $body): array {
+        return self::validar_imagen($body, self::IMAGENES['logo']);
+    }
+
+    /**
+     * PNG, JPEG o WebP (nada de SVG): firma mágica Y getimagesizefromstring() de acuerdo entre sí, y los
+     * límites de la imagen (bytes, px por lado y proporción) de self::IMAGENES.
+     *
+     * @param array{max_bytes: int, min_px: int, max_px: int, aspecto: float} $lim
+     * @return array{motivo: string, ext: string} motivo '' = vale.
+     */
+    public static function validar_imagen(string $body, array $lim): array {
         $len = strlen($body);
-        if ($len === 0 || $len > self::LOGO_MAX_BYTES) {
+        if ($len === 0 || $len > $lim['max_bytes']) {
             return ['motivo' => 'tamano', 'ext' => ''];
         }
         if (strncmp($body, "\x89PNG\r\n\x1a\n", 8) === 0) {
@@ -513,27 +571,33 @@ class tema_service {
         }
         $w = (int)$info[0];
         $h = (int)$info[1];
-        if ($w < self::LOGO_MIN_PX || $h < self::LOGO_MIN_PX || $w > self::LOGO_MAX_PX || $h > self::LOGO_MAX_PX) {
+        if ($w < $lim['min_px'] || $h < $lim['min_px'] || $w > $lim['max_px'] || $h > $lim['max_px']) {
             return ['motivo' => 'dimensiones', 'ext' => ''];
         }
-        if (max($w, $h) / min($w, $h) > self::LOGO_ASPECTO_MAX) {
+        if (max($w, $h) / min($w, $h) > $lim['aspecto']) {
             return ['motivo' => 'aspecto', 'ext' => ''];
         }
         return ['motivo' => '', 'ext' => $firma];
     }
 
+    /** ¿Es `<clave>.<ext>` el fichero de esa imagen? (Las dos comparten filearea.) */
+    private static function es_de(string $clave, string $nombre): bool {
+        return preg_match('/^' . preg_quote($clave, '/') . '\.(png|jpg|webp)\z/', $nombre) === 1;
+    }
+
     /**
-     * Guarda el logo en la filearea propia (contexto de sistema, itemid 0). Primero se escribe el nuevo
-     * y después se quitan los demás, para no quedarse sin logo si falla la escritura.
+     * Guarda una imagen en la filearea propia (contexto de sistema, itemid 0) como `<clave>.<ext>`. Primero
+     * se escribe la nueva y después se quitan las otras extensiones de LA MISMA imagen, para no quedarse sin
+     * ella si falla la escritura. La otra imagen del área no se toca.
      */
-    private static function guardar_logo(string $body, string $ext, string $version): bool {
-        if (!in_array($ext, self::LOGO_EXTENSIONES, true)) {
+    private static function guardar_imagen(string $clave, string $body, string $ext, string $version): bool {
+        if (!in_array($ext, self::LOGO_EXTENSIONES, true) || !isset(self::IMAGENES[$clave])) {
             return false;
         }
         try {
             $fs = get_file_storage();
             $ctxid = \context_system::instance()->id;
-            $nombre = 'logo.' . $ext;
+            $nombre = $clave . '.' . $ext;
             foreach ($fs->get_area_files($ctxid, 'block_pulso', self::LOGO_AREA, 0, 'id', false) as $f) {
                 if ($f->get_filename() === $nombre) {
                     $f->delete(); // mismo nombre: no pueden convivir
@@ -544,53 +608,66 @@ class tema_service {
                 'itemid' => 0, 'filepath' => '/', 'filename' => $nombre,
             ], $body);
             foreach ($fs->get_area_files($ctxid, 'block_pulso', self::LOGO_AREA, 0, 'id', false) as $f) {
-                if ($f->get_filename() !== $nombre) {
+                if ($f->get_filename() !== $nombre && self::es_de($clave, $f->get_filename())) {
                     $f->delete();
                 }
             }
-            set_config('tema_logo_ext', $ext, 'block_pulso');
-            set_config('tema_logo_version', $version, 'block_pulso');
+            set_config('tema_' . $clave . '_ext', $ext, 'block_pulso');
+            set_config('tema_' . $clave . '_version', $version, 'block_pulso');
             return true;
         } catch (\Throwable $e) {
-            error_log('Pulso tema: no se pudo guardar el logo: ' . get_class($e));
+            error_log('Pulso tema: no se pudo guardar ' . $clave . ': ' . get_class($e));
             return false;
         }
     }
 
-    /** `logo: null`, o tema borrado: fuera el fichero y los ajustes; el chat vuelve al isotipo. */
-    private static function borrar_logo(): void {
+    /** `<clave>: null`, o tema borrado: fuera SU fichero y sus ajustes (la otra imagen se queda). */
+    private static function borrar_imagen(string $clave): void {
         try {
-            get_file_storage()->delete_area_files(\context_system::instance()->id, 'block_pulso', self::LOGO_AREA, 0);
+            $fs = get_file_storage();
+            foreach ($fs->get_area_files(\context_system::instance()->id, 'block_pulso', self::LOGO_AREA, 0, 'id', false) as $f) {
+                if (self::es_de($clave, $f->get_filename())) {
+                    $f->delete();
+                }
+            }
         } catch (\Throwable $e) {
-            error_log('Pulso tema: no se pudo borrar el logo: ' . get_class($e));
+            error_log('Pulso tema: no se pudo borrar ' . $clave . ': ' . get_class($e));
         }
-        unset_config('tema_logo_version', 'block_pulso');
-        unset_config('tema_logo_ext', 'block_pulso');
+        unset_config('tema_' . $clave . '_version', 'block_pulso');
+        unset_config('tema_' . $clave . '_ext', 'block_pulso');
     }
 
-    /** El fichero guardado, o null. */
-    private static function fichero_logo(): ?\stored_file {
-        $ext = (string)get_config('block_pulso', 'tema_logo_ext');
+    /** El fichero guardado de una imagen, o null. */
+    private static function fichero_imagen(string $clave): ?\stored_file {
+        $ext = (string)get_config('block_pulso', 'tema_' . $clave . '_ext');
         if (!in_array($ext, self::LOGO_EXTENSIONES, true)) {
             return null;
         }
-        $f = get_file_storage()->get_file(\context_system::instance()->id, 'block_pulso', self::LOGO_AREA, 0, '/', 'logo.' . $ext);
+        $f = get_file_storage()->get_file(\context_system::instance()->id, 'block_pulso', self::LOGO_AREA, 0, '/', $clave . '.' . $ext);
         return ($f && !$f->is_directory()) ? $f : null;
     }
 
     /**
-     * URL de pluginfile del logo guardado, con la versión en la ruta (cache larga), o '' si no hay. Lee solo
-     * ajustes (sin BD de ficheros) y los REVALIDA. block_pulso_pluginfile() ignora ese segmento de versión.
+     * URL de pluginfile de una imagen guardada, con la versión en la ruta (cache larga), o '' si no hay. Lee
+     * solo ajustes (sin BD de ficheros) y los REVALIDA. block_pulso_pluginfile() ignora ese segmento de versión.
      */
-    public static function logo_para_pintar(): string {
-        $version = (string)get_config('block_pulso', 'tema_logo_version');
-        $ext = (string)get_config('block_pulso', 'tema_logo_ext');
+    public static function imagen_para_pintar(string $clave): string {
+        if (!isset(self::IMAGENES[$clave])) {
+            return '';
+        }
+        $version = (string)get_config('block_pulso', 'tema_' . $clave . '_version');
+        $ext = (string)get_config('block_pulso', 'tema_' . $clave . '_ext');
         if (!self::version_logo_valida($version) || !in_array($ext, self::LOGO_EXTENSIONES, true)) {
             return '';
         }
         return \moodle_url::make_pluginfile_url(
-            \context_system::instance()->id, 'block_pulso', self::LOGO_AREA, 0, '/' . $version . '/', 'logo.' . $ext
+            \context_system::instance()->id, 'block_pulso', self::LOGO_AREA, 0, '/' . $version . '/', $clave . '.' . $ext
         )->out(false);
+    }
+
+    /** El logo (v2.13.0): ver imagen_para_pintar(). */
+    public static function logo_para_pintar(): string {
+        return self::imagen_para_pintar('logo');
     }
 
     // ----------------------------------------------------------------
@@ -715,11 +792,16 @@ class tema_service {
         return $out;
     }
 
-    /** El texto fijo con peor contraste sobre $base y ese contraste. @return array{0: string, 1: float} */
-    public static function peor_texto_fijo(string $base): array {
-        $peor = self::TEXTOS_FIJOS[0];
+    /**
+     * El texto fijo con peor contraste sobre $base y ese contraste. @return array{0: string, 1: float}
+     *
+     * @param string[]|null $textos TEXTOS_FIJOS (los oscuros del modo claro) si no se dice otra lista.
+     */
+    public static function peor_texto_fijo(string $base, ?array $textos = null): array {
+        $textos = $textos ?? self::TEXTOS_FIJOS;
+        $peor = $textos[0];
         $min = self::contraste($peor, $base);
-        foreach (self::TEXTOS_FIJOS as $t) {
+        foreach ($textos as $t) {
             $c = self::contraste($t, $base);
             if ($c < $min) {
                 $peor = $t;
@@ -761,6 +843,60 @@ class tema_service {
         return self::BLANCO;
     }
 
+    /** ¿Pasa este `fondo` a modo oscuro? Sí si sobre él se lee mejor el blanco que el negro. */
+    public static function es_fondo_oscuro(string $hex): bool {
+        return self::mejor_texto($hex) === self::BLANCO;
+    }
+
+    /** ¿Todos los textos claros se leen (>= 4,5:1) sobre la superficie más clara que sale de este panel? */
+    private static function panel_oscuro_cumple(string $hex): bool {
+        $surface2 = self::mezclar_hacia($hex, self::BLANCO, self::K_SURFACE2_OSCURO);
+        return self::peor_texto_fijo($surface2, self::TEXTOS_CLAROS)[1] >= self::CONTRASTE_TEXTO;
+    }
+
+    /**
+     * Modo oscuro (v2.15.0): el fondo del panel OSCURECIDO hacia negro (nunca aclarado) en pasos del 2 % hasta
+     * que todos los TEXTOS_CLAROS den >= 4,5:1 sobre surface-2, que es la superficie más clara. Tope 50 pasos
+     * (= negro, que cumple). La misma forma que aclarar_para_panel() al revés.
+     */
+    public static function oscurecer_para_panel(string $hex): string {
+        if (self::panel_oscuro_cumple($hex)) {
+            return $hex;
+        }
+        $r = hexdec(substr($hex, 1, 2));
+        $g = hexdec(substr($hex, 3, 2));
+        $b = hexdec(substr($hex, 5, 2));
+        for ($paso = 1; $paso <= 50; $paso++) {
+            $k = 1 - 0.02 * $paso;
+            $c = sprintf('#%02x%02x%02x', (int)round($r * $k), (int)round($g * $k), (int)round($b * $k));
+            if (self::panel_oscuro_cumple($c)) {
+                return $c;
+            }
+        }
+        return self::NEGRO;
+    }
+
+    /** Como oscurecer_hasta() pero ACLARANDO hacia blanco: para un acento que tiene que verse sobre un panel oscuro. */
+    private static function aclarar_hasta(string $hex, float $minimo, string $contra): string {
+        if (self::contraste($hex, $contra) >= $minimo) {
+            return $hex;
+        }
+        for ($paso = 1; $paso <= 50; $paso++) {
+            $c = self::mezclar_hacia($hex, self::BLANCO, 0.02 * $paso);
+            if (self::contraste($c, $contra) >= $minimo) {
+                return $c;
+            }
+        }
+        return self::BLANCO;
+    }
+
+    /** Lleva $hex lo justo hacia donde haga falta (más oscuro sobre un panel claro, más claro sobre uno oscuro). */
+    private static function ajustar_hasta(string $hex, float $minimo, string $panel): string {
+        return self::es_fondo_oscuro($panel)
+            ? self::aclarar_hasta($hex, $minimo, $panel)
+            : self::oscurecer_hasta($hex, $minimo, $panel);
+    }
+
     /**
      * Texto sobre un fondo explícito del centro: el `texto` de Épica solo si da >= 4,5:1; si no,
      * el mejor de blanco/negro.
@@ -800,18 +936,35 @@ class tema_service {
         $ignorados = [];
         $origen = [];
 
-        // FONDO del panel (v2.13.0): se aclara si hace falta y de él salen las dos superficies.
+        // FONDO del panel (v2.13.0): se aclara si hace falta y de él salen las dos superficies. Desde v2.15.0,
+        // si el fondo es OSCURO el panel pasa a modo oscuro (token `oscuro`): textos claros fijos (styles.css),
+        // el fondo se oscurece si hace falta y las superficies y las líneas salen de él hacia blanco.
         $panel = self::BLANCO;
         $fondoinfo = null;
+        $oscuro = false;
         if (isset($colores['fondo'])) {
             $original = $colores['fondo']['valor'];
-            $panel = self::aclarar_para_panel($original);
-            $vars['--pulso-bg'] = $panel;
-            $vars['--pulso-surface'] = self::mezclar_hacia($panel, self::BLANCO, self::K_SURFACE);
-            $vars['--pulso-surface-2'] = self::mezclar_hacia($panel, self::BLANCO, self::K_SURFACE2);
+            $oscuro = self::es_fondo_oscuro($original);
+            if ($oscuro) {
+                $panel = self::oscurecer_para_panel($original);
+                $vars['--pulso-bg'] = $panel;
+                $vars['--pulso-surface'] = self::mezclar_hacia($panel, self::BLANCO, self::K_SURFACE_OSCURO);
+                $vars['--pulso-surface-2'] = self::mezclar_hacia($panel, self::BLANCO, self::K_SURFACE2_OSCURO);
+                $vars['--pulso-line'] = self::mezclar_hacia($panel, self::BLANCO, self::K_LINE_OSCURO);
+            } else {
+                $panel = self::aclarar_para_panel($original);
+                $vars['--pulso-bg'] = $panel;
+                $vars['--pulso-surface'] = self::mezclar_hacia($panel, self::BLANCO, self::K_SURFACE);
+                $vars['--pulso-surface-2'] = self::mezclar_hacia($panel, self::BLANCO, self::K_SURFACE2);
+            }
             $origen['--pulso-bg'] = 'epica';
             $flags[] = 'fondo'; // activa las píldoras opacas del CSS (ver «FONDO del centro» en styles.css)
-            $fondoinfo = ['original' => $original, 'efectivo' => $panel, 'aclarado' => $panel !== $original];
+            if ($oscuro) {
+                $flags[] = 'oscuro'; // y el bloque «MODO OSCURO», que va detrás y las vuelve a tintar
+            }
+            $fondoinfo = [
+                'original' => $original, 'efectivo' => $panel, 'aclarado' => $panel !== $original, 'oscuro' => $oscuro,
+            ];
         }
 
         $principal = $colores['principal']['valor'] ?? null;
@@ -855,6 +1008,20 @@ class tema_service {
             $flags[] = 'creaciones';
         }
 
+        // Tarjetas de «Crear» y pestaña activa (v2.15.0): como `creaciones`, solo si el centro las manda y sin
+        // derivarlas del principal (sin ellas, las de siempre). Se respeta el color y el texto es el de Épica si
+        // da >= 4,5:1 o, si no, blanco o negro.
+        foreach (['tarjeta' => '--pulso-tool', 'pestana' => '--pulso-tab'] as $clave => $prefijo) {
+            if (!isset($colores[$clave])) {
+                continue;
+            }
+            $fondo = $colores[$clave]['valor'];
+            $vars[$prefijo . '-bg'] = $fondo;
+            $vars[$prefijo . '-text'] = self::texto_para($fondo, $colores[$clave]['texto'] ?? null);
+            $origen[$prefijo . '-bg'] = 'epica';
+            $flags[] = $clave;
+        }
+
         // El acento tiene que verse sobre el panel (blanco): es lo único que se exige para usarlo
         // (foco, bordes e iconos). Solo pinta además los detalles de la cabecera y del botón
         // (indicador de pestaña, orden de tabla) si da el mismo contraste sobre ellos, que son
@@ -880,15 +1047,16 @@ class tema_service {
         }
         if ($acento === null && $principal !== null) {
             $origen['--pulso-accent'] = 'derivado';
-            // El principal si se ve sobre el panel; si no, su versión oscurecida hasta >= 3:1.
+            // El principal si se ve sobre el panel; si no, su versión oscurecida hasta >= 3:1 (aclarada si el
+            // panel es oscuro, v2.15.0).
             $acento = $sobrepanel($principal)
                 ? $principal
-                : self::oscurecer_hasta($principal, self::CONTRASTE_GRAFICO, $panel);
+                : self::ajustar_hasta($principal, self::CONTRASTE_GRAFICO, $panel);
         }
         // Con fondo del centro y sin acento propio ni derivado: el cian de Pulse (#0b93aa, 3,64:1 sobre blanco) puede
-        // no llegar a 3:1 sobre el fondo; se oscurece lo justo, igual que el derivado del principal.
+        // no llegar a 3:1 sobre el fondo; se ajusta lo justo, igual que el derivado del principal.
         if ($acento === null && $fondoinfo !== null && !$sobrepanel(self::ACENTO_DEFECTO)) {
-            $acento = self::oscurecer_hasta(self::ACENTO_DEFECTO, self::CONTRASTE_GRAFICO, $panel);
+            $acento = self::ajustar_hasta(self::ACENTO_DEFECTO, self::CONTRASTE_GRAFICO, $panel);
             $origen['--pulso-accent'] = 'derivado';
         }
         $usoacento = 'panel';
@@ -926,13 +1094,15 @@ class tema_service {
             }
             if ($fondoinfo !== null) {
                 // El peor texto fijo sobre el fondo y sobre cada superficie derivada (más claras que el fondo).
+                $cambio = $oscuro ? 'oscurecido' : 'aclarado';
                 $filas = [
-                    ['--pulso-bg', $panel, 'epica', $fondoinfo['aclarado'] ? 'aclarado desde ' . $fondoinfo['original'] : 'sin cambios'],
+                    ['--pulso-bg', $panel, 'epica', ($oscuro ? 'modo oscuro; ' : '')
+                        . ($fondoinfo['aclarado'] ? $cambio . ' desde ' . $fondoinfo['original'] : 'sin cambios')],
                     ['--pulso-surface', $vars['--pulso-surface'], 'derivado', 'más clara que el fondo'],
                     ['--pulso-surface-2', $vars['--pulso-surface-2'], 'derivado', 'más clara que el fondo'],
                 ];
                 foreach ($filas as [$nombre, $valor, $orig, $nota]) {
-                    [$peor, $cpeor] = self::peor_texto_fijo($valor);
+                    [$peor, $cpeor] = self::peor_texto_fijo($valor, $oscuro ? self::TEXTOS_CLAROS : null);
                     $detalle[] = [
                         'var' => $nombre, 'valor' => $valor, 'texto' => $peor, 'contraste' => $cpeor, 'origen' => $orig,
                         'nota' => $nota . '; peor texto fijo encima',
@@ -944,6 +1114,14 @@ class tema_service {
                     'var' => '--pulso-mine-bg', 'valor' => $vars['--pulso-mine-bg'], 'texto' => $vars['--pulso-mine-text'],
                     'contraste' => self::contraste($vars['--pulso-mine-bg'], $vars['--pulso-mine-text']), 'origen' => 'epica',
                 ];
+            }
+            foreach (['--pulso-tool', '--pulso-tab'] as $prefijo) {
+                if (isset($vars[$prefijo . '-bg'])) {
+                    $detalle[] = [
+                        'var' => $prefijo . '-bg', 'valor' => $vars[$prefijo . '-bg'], 'texto' => $vars[$prefijo . '-text'],
+                        'contraste' => self::contraste($vars[$prefijo . '-bg'], $vars[$prefijo . '-text']), 'origen' => 'epica',
+                    ];
+                }
             }
         }
 
@@ -971,9 +1149,10 @@ class tema_service {
      * Lo que necesita la plantilla del chat. Lee SOLO lo guardado (jamás llama a Épica) y lo
      * revalida. Vacío = sin tema: la plantilla no pinta ni `style` ni `data-pulso-tema`.
      *
-     * El logo (v2.13.0) es independiente de los colores: puede haber logo sin colores y al revés.
+     * El logo (v2.13.0) y la ilustración (v2.15.0) son independientes de los colores: puede haber
+     * imágenes sin colores y al revés.
      *
-     * @return array{style: string, flags: string, isotipoclaro: bool, logo: string}|array{}
+     * @return array{style: string, flags: string, isotipoclaro: bool, logo: string, ilustracion: string}|array{}
      */
     public static function para_pintar(): array {
         if (!epica_client::disponible()) {
@@ -982,11 +1161,20 @@ class tema_service {
         try {
             $res = self::resolver_tema(self::leer());
             $logo = self::logo_para_pintar();
+            $ilustracion = self::imagen_para_pintar('ilustracion');
         } catch (\Throwable $e) {
             error_log('Pulso tema: no se pudo leer lo guardado: ' . get_class($e));
             return [];
         }
-        if (!$res['vars'] && $logo === '') {
+        // El logo también va DENTRO del chat (v2.16.3): en el avatar de cada respuesta y en el de la home, que
+        // son un `::before` y un fondo, así que solo pueden leerlo como variable CSS. La URL de pluginfile va en
+        // `url("…")` dentro del `style`, y por eso se exige una forma cerrada: sin comillas, paréntesis,
+        // espacios ni barras invertidas no puede cerrar el `url()` ni la declaración.
+        if ($logo !== '' && preg_match('#\Ahttps?://[A-Za-z0-9._~:/%@+=-]+\z#', $logo)) {
+            $res['vars']['--pulso-logo'] = 'url("' . $logo . '")';
+            $res['flags'][] = 'logo';
+        }
+        if (!$res['vars'] && $logo === '' && $ilustracion === '') {
             return [];
         }
         return [
@@ -994,6 +1182,7 @@ class tema_service {
             'flags' => implode(' ', $res['flags']),
             'isotipoclaro' => $res['isotipoclaro'],
             'logo' => $logo,
+            'ilustracion' => $ilustracion,
         ];
     }
 }

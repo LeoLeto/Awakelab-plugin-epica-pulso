@@ -29,15 +29,17 @@ $PAGE->set_pagelayout('admin');
 $PAGE->set_title('Vista previa de los colores del centro');
 $PAGE->set_heading('Vista previa de los colores del centro');
 
-/** Las siete claves del formulario (v2.13.0: fondo y creaciones), con su explicación. */
+/** Las nueve claves del formulario (v2.13.0: fondo y creaciones; v2.15.0: tarjeta y pestana), con su explicación. */
 $claves = [
     'principal' => 'Principal (marca; de él se deriva lo que falte)',
     'cabecera' => 'Cabecera (cabecera y burbuja flotante)',
     'boton' => 'Botón (botones de acción, filtros activos, tablas)',
     'burbuja' => 'Burbuja (mensajes de quien escribe)',
     'acento' => 'Acento (foco, bordes, iconos)',
-    'fondo' => 'Fondo (del panel; se ACLARA si el texto no se lee, nunca se oscurece)',
+    'fondo' => 'Fondo (del panel; si es oscuro, MODO OSCURO y se oscurece si hace falta; si es claro, se aclara)',
     'creaciones' => 'Creaciones (botón «Mis creaciones»; no se deriva del principal)',
+    'tarjeta' => 'Tarjeta (filas de herramientas de «Crear»; no se deriva del principal)',
+    'pestana' => 'Pestaña (pestaña activa; no se deriva del principal)',
 ];
 
 // --- Colores a probar: los de la URL (validados) o, si no hay ninguno, los guardados. ---
@@ -96,7 +98,7 @@ function pulso_prev_mock(string $titulo, string $style, string $flags, string $i
     $h .= '<div class="pulso-chat-container" role="group" aria-label="Maqueta: ' . s($titulo) . '"' . $attr . '>';
     $h .= '<div class="pulso-chat-header"><div class="pulso-header-top"><div class="pulso-header-brand">'
         . $imgcabecera
-        . '<div><h2>Pulse AI <span class="pulso-version-badge">v0.0.0</span></h2>'
+        . '<div><h2>Pulse AI</h2>'
         . '<span class="pulso-header-sub"><span class="pulso-status-dot"></span>Asistente del curso</span></div></div>'
         . '<div class="header-controls"><button type="button" class="header-btn" tabindex="-1" aria-label="Botón de cabecera (maqueta)">'
         . $svg . '</button></div></div>'
@@ -118,6 +120,11 @@ function pulso_prev_mock(string $titulo, string $style, string $flags, string $i
         . '<span class="pulso-step-badge">Paso 1</span>'
         . '<button type="button" class="pulso-send-btn" tabindex="-1" aria-label="Enviar (maqueta)">' . $svg . '</button>'
         . '<span class="pulso-prev-focus">Elemento con foco</span></div>';
+    // Una fila de herramientas de «Crear», con las clases reales (lleva el token «tarjeta» si el centro lo mandó).
+    $h .= '<ul class="pulso-tools" style="margin:16px 16px 0"><li><button type="button" class="pulso-tool" tabindex="-1">'
+        . '<span class="pulso-tool-icon" aria-hidden="true">' . $svg . '</span>'
+        . '<span class="pulso-tool-text"><span class="pulso-tool-title">Infografía</span>'
+        . '<span class="pulso-tool-sub">Resume un recurso del curso en una imagen</span></span></button></li></ul>';
     // Botón «Mis creaciones», con las clases reales (lleva el token «creaciones» si el centro lo mandó).
     $h .= '<div class="pulso-mine-wrap" style="margin:0 16px 16px"><button type="button" class="pulso-mine-btn" tabindex="-1">'
         . '<span class="pulso-mine-btn-icon" aria-hidden="true">' . $svg . '</span>'
@@ -141,6 +148,8 @@ $nombresvar = [
     '--pulso-surface' => 'Superficie derivada (más clara que el fondo; peor texto fijo encima)',
     '--pulso-surface-2' => 'Superficie 2 derivada (más clara que el fondo; peor texto fijo encima)',
     '--pulso-mine-bg' => 'Botón «Mis creaciones»',
+    '--pulso-tool-bg' => 'Tarjetas de «Crear»',
+    '--pulso-tab-bg' => 'Pestaña activa',
 ];
 
 echo $OUTPUT->header();
@@ -216,6 +225,18 @@ if ($logoguardado !== '') {
         . '" alt="Logo guardado del centro"></p>';
 } else {
     echo html_writer::tag('p', 'No hay logo guardado: Pulse usa el isotipo de Awakelab.');
+}
+
+// --- Ilustración de «Crear» guardada (v2.15.0; igual: solo se ve). ---
+$ilustracionguardada = tema_service::imagen_para_pintar('ilustracion');
+echo $OUTPUT->heading('Ilustración de «Crear»', 3);
+if ($ilustracionguardada !== '') {
+    echo html_writer::tag('p', 'Ilustración guardada, versión ' . s((string)get_config('block_pulso', 'tema_ilustracion_version'))
+        . '. Se pinta abajo a la derecha de la lista de «Crear» cuando el panel tiene sitio (520 px o más).');
+    echo '<p><img style="max-width:240px;max-height:240px;border:1px solid #ccc" src="' . s($ilustracionguardada)
+        . '" alt="Ilustración guardada del centro"></p>';
+} else {
+    echo html_writer::tag('p', 'No hay ilustración guardada: la lista de «Crear» ocupa todo el ancho.');
 }
 
 // --- Variables resueltas. ---

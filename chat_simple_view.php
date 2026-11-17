@@ -46,13 +46,10 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $historial_url = $CFG->wwwroot . '/blocks/pulso/epica_historial.php';
     $fuentes_url = $CFG->wwwroot . '/blocks/pulso/fuentes_puente.php';
     $presentacion_url = $CFG->wwwroot . '/blocks/pulso/api_presentacion.php';
+    $presets_url = $CFG->wwwroot . '/blocks/pulso/api_presets.php';
+    $unidades_url = $CFG->wwwroot . '/blocks/pulso/api_unidades_sin_rastrear.php';
 
-    // Leer la versión directamente de version.php (no de la BD) para que el
-    // badge del header refleje siempre el código desplegado, incluso antes
-    // de ejecutar la actualización de Moodle.
-    $plugin = new stdClass();
-    include(__DIR__ . '/version.php');
-    $pulso_release = 'v' . ($plugin->release ?? $plugin->version ?? '?');
+    // La versión ya no se enseña en la cabecera del chat (v2.16.2): está en diagnostico.php.
 
     // Token anti-CSRF de la sesión: los endpoints lo exigen con require_sesskey().
     $pulso_sesskey = sesskey();
@@ -93,6 +90,9 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         'apiHistorialUrl' => $historial_url,
         'apiFuentesUrl' => $fuentes_url,
         'apiPresentacionUrl' => $presentacion_url,
+        'apiPresetsUrl' => $presets_url,
+        // v2.17.0: el aviso de unidades sin rastrear (solo profesorado y solo con Épica).
+        'apiUnidadesUrl' => ($isteacher && $epicaavailable) ? $unidades_url : '',
         'sesskey' => $pulso_sesskey,
         'isTeacher' => !empty($isteacher),
         'epicaAvailable' => (bool)$epicaavailable,
@@ -110,6 +110,11 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
             . 'Pregúntame sobre el contenido del curso: pídeme un resumen, '
             . 'una explicación o dudas sobre los materiales.';
     }
+
+    // Catálogo de prompts preestablecidos de la home (v2.14.0): solo los del rol de quien mira. Es
+    // texto fijo, sin consultas; las opciones de cada prompt las pide el JS a api_presets.php.
+    require_once(__DIR__ . '/classes/chat_presets.php');
+    $presetgroups = \block_pulso\chat_presets::home_groups(!empty($isteacher));
 
     try {
         $coursename = format_string(get_course($courseid)->fullname);
@@ -133,14 +138,15 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         // la regla de isotipoclaro no aplica (el logo lleva su propia placa blanca en el CSS).
         'logourl' => $logourl,
         'logoalt' => $logourl !== '' ? $logoalt : '',
+        // Ilustración de «Crear» (v2.15.0): URL de pluginfile ya validada; vacío = sin ilustración.
+        'ilustracionurl' => (string)($tema['ilustracion'] ?? ''),
         'temastyle' => $tema['style'] ?? '',
         'temaflags' => $tema['flags'] ?? '',
         'isteacher' => !empty($isteacher),
         'cancreate' => !empty($cancreate),
         'epica' => (bool)$epicaavailable,
-        'showversion' => !empty($isteacher),
-        'release' => $pulso_release,
         'greeting' => $greeting,
         'coursename' => $coursename,
+        'presetgroups' => $presetgroups,
     ]);
 }

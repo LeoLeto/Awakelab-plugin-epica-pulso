@@ -1,0 +1,69 @@
+# Despliega Pulse en sanase-test (https://sanase-test.awakelab.world) en cada
+# empujón a dev.
+#
+# GitHub no llega a Aspasia05 por SSH (su cortafuegos solo admite ciertas IP),
+# así que se entra saltando por LightsailDev. La clave SANASE_DEPLOY_KEY está
+# atada en los dos servidores:
+#   - en LightsailDev solo puede abrir el túnel a 51.44.30.62:22 (sin shell);
+#   - en Aspasia05 solo puede ejecutar /usr/local/bin/deploy-pulso-sanase-test
+#     con el SHA de este commit, que además tiene que estar en dev.
+# El guion trae el código de GitHub con una deploy key de solo lectura, hace
+# una copia de la carpeta, corre upgrade.php y se niega a bajar de versión.
+# Registro en el servidor: /var/log/deploy-pulso-sanase-test.log
+#
+# main no se despliega solo: es lo que va a las plataformas de producción.
+name: Desplegar sanase-test
+
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: desplegar-sanase-test
+  cancel-in-progress: false
+
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sintaxis de PHP
+        run: |
+          php --version | head -1
+          git ls-files -z '*.php' | xargs -0 -n1 php -l > /dev/null
+
+  desplegar:
+    needs: comprobar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Preparar SSH
+        env:
+          CLAVE: ${{ secrets.SANASE_DEPLOY_KEY }}
+          CONOCIDOS: ${{ secrets.SANASE_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$CLAVE" > ~/.ssh/despliegue && chmod 600 ~/.ssh/despliegue
+          printf '%s\n' "$CONOCIDOS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'EOF'
+          Host salto
+            HostName 13.38.161.213
+            User ubuntu
+          Host sanase
+            HostName 51.44.30.62
+            User ubuntu
+            ProxyJump salto
+          Host *
+            IdentityFile ~/.ssh/despliegue
+            IdentitiesOnly yes
+            IdentityAgent none
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ConnectTimeout 20
+          EOF
+      - name: Desplegar ${{ github.sha }}
+        run: ssh sanase "$GITHUB_SHA"
+      - name: Resumen
+        if: success()
+        run: echo "sanase-test -> https://sanase-test.awakelab.world ($GITHUB_SHA)" >> "$GITHUB_STEP_SUMMARY"

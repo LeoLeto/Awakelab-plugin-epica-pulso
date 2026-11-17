@@ -1231,6 +1231,15 @@ define(['block_pulso/common'], function(C) {
         }
 
 
+        // Material extra de UNA unidad (v2.17.0): el botón de cada unidad del aviso «sin rastrear». Mismo puente,
+        // con la clave de la unidad; el servidor comprueba que es una unidad que este usuario ve y pone el título.
+        function pulsoAbrirFuentesUnidad(clave) {
+            if (cfg.isTeacher !== true || !cfg.apiFuentesUrl) return;
+            if (typeof clave !== 'string' || !/^u[0-9]{1,12}$/.test(clave)) return;
+            pulsoPostNuevaPestana(cfg.apiFuentesUrl, [['unidad', clave]]);
+        }
+
+
         // «Mis proyectos en Épica» (carta 19): mismo puente de docentes con `herramienta=historial`. Solo profesorado;
         // epica_puente exige viewanalytics y sesskey y firma el token (nunca este JS).
         function pulsoAbrirProyectos() {
@@ -1304,6 +1313,7 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoSyncPolling = pulsoSyncPolling;
     C.fn.pulsoAbrirHistorial = pulsoAbrirHistorial;
     C.fn.pulsoAbrirFuentes = pulsoAbrirFuentes;
+    C.fn.pulsoAbrirFuentesUnidad = pulsoAbrirFuentesUnidad;
     C.fn.pulsoAbrirProyectos = pulsoAbrirProyectos;
     C.fn.pulsoAbrirFactoria = pulsoAbrirFactoria;
     C.fn.pulsoAbrirReto = pulsoAbrirReto;

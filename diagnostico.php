@@ -72,6 +72,12 @@ foreach ($checks as $name => $method) {
 }
 
 echo $OUTPUT->header();
+// La versión desplegada (v2.16.2: ya no se enseña en la cabecera del chat). Se lee de version.php y no de
+// la base, para que diga qué código hay aunque falte pasar por Notificaciones.
+$plugin = new stdClass();
+include(__DIR__ . '/version.php');
+echo html_writer::tag('p', 'Versión desplegada de Pulse: <strong>v' . s($plugin->release ?? '?') . '</strong> (build '
+    . s($plugin->version ?? '?') . ').');
 echo html_writer::tag('p', 'Las claves nunca se muestran. Las llamadas de red usan el proxy de Moodle, si lo hay. '
     . 'Recarga la página para volver a comprobar.');
 echo html_writer::table($table);

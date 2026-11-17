@@ -179,6 +179,9 @@ class diagnostics {
                 'sin_correo' => 'el administrador del sitio no tiene correo',
                 'red' => 'no se pudo contactar con Épica',
                 'rechazo' => 'Épica rechazó la petición (revisa la plataforma y el secreto de local_awkepica)',
+                'logo' => 'no se pudo actualizar el logo',
+                'ilustracion' => 'no se pudo actualizar la ilustración',
+                'logo ilustracion' => 'no se pudieron actualizar el logo ni la ilustración',
                 'respuesta' => 'la respuesta de Épica no tenía la forma esperada',
             ];
             $quedan = $colores

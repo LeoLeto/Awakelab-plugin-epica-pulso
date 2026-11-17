@@ -75,9 +75,10 @@ class epica_puente {
      * @param string $herramienta
      * @param string $cursonombre
      * @param string $borrador
+     * @param array|null $unidad {key, title} de unit_map::find(), solo con `fuentes` (v2.17.0)
      * @return array<string, string>
      */
-    public static function campos(string $herramienta, string $cursonombre, string $borrador = ''): array {
+    public static function campos(string $herramienta, string $cursonombre, string $borrador = '', ?array $unidad = null): array {
         // `historial` («Mis proyectos», carta 19) no lleva nada más que el token y la herramienta.
         if ($herramienta === 'historial') {
             return ['herramienta' => $herramienta];
@@ -86,7 +87,31 @@ class epica_puente {
         if ($herramienta === 'factoria') {
             $campos['borrador'] = $borrador;
         }
+        // La unidad sin rastrear (v2.17.0, migración 032 de Épica): fuera de la firma, como curso_nombre.
+        // Épica aterriza en esa unidad y la pone a lo que se suba; no autoriza nada.
+        if ($herramienta === 'fuentes' && $unidad !== null) {
+            $campos['unidad'] = (string)$unidad['key'];
+            $campos['unidad_nombre'] = \core_text::substr((string)$unidad['title'], 0, 200);
+        }
         return $campos;
+    }
+
+    /**
+     * La unidad del botón del aviso, resuelta en el servidor (v2.17.0): la clave tiene que tener su forma y
+     * ser una unidad que este usuario ve en este curso. El título sale de aquí, nunca del navegador. Si no
+     * cuadra, se entra en Fuentes del curso entero: la unidad solo etiqueta.
+     *
+     * @param int $courseid
+     * @param mixed $clave
+     * @return array|null {key, title}
+     */
+    public static function unidad($courseid, $clave): ?array {
+        if (!is_string($clave) || preg_match('/^u\d{1,12}\z/', $clave) !== 1) {
+            return null;
+        }
+        require_once(__DIR__ . '/unit_map.php');
+        $unit = unit_map::find((int)$courseid, $clave);
+        return $unit === null ? null : ['key' => $unit['key'], 'title' => $unit['title']];
     }
 
     /**
@@ -118,8 +143,9 @@ class epica_puente {
      *
      * @param string $herramienta Valor de `herramienta` tal cual llegó (se valida contra HERRAMIENTAS).
      * @param mixed $borrador Valor de `borrador` tal cual llegó (solo se mira con `factoria`).
+     * @param mixed $unidad Clave de unidad tal cual llegó (solo se mira con `fuentes`, v2.17.0).
      */
-    public static function abrir($herramienta, $borrador): void {
+    public static function abrir($herramienta, $borrador, $unidad = ''): void {
         global $USER;
 
         $titulo = 'Épica';
@@ -169,7 +195,8 @@ class epica_puente {
 
         $texto = self::texto_abriendo($herramienta);
         $campos = ['token' => $token]
-            + self::campos($herramienta, format_string($course->fullname), is_string($borrador) ? $borrador : '');
+            + self::campos($herramienta, format_string($course->fullname), is_string($borrador) ? $borrador : '',
+                $herramienta === 'fuentes' ? self::unidad($courseid, $unidad) : null);
 
         $inputs = '';
         foreach ($campos as $nombre => $valor) {

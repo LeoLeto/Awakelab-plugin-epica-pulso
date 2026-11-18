@@ -146,6 +146,17 @@ $string['pres_err_config'] = 'The connection to the Factory is not configured pr
 $string['pres_err_otro'] = 'The Factory could not handle the request. Try again later.';
 $string['pres_err_tope_dia'] = 'You have reached the limit of {$a} presentations for today. You can continue tomorrow.';
 $string['pres_err_en_curso'] = 'You are already preparing a presentation. Wait for it to finish.';
+// v2.18.0: teachers' «Create game», finished in Épica (juego_epica_service).
+$string['jep_err_sin_texto'] = 'That resource is no longer available or has no usable text for a game. Choose another one.';
+$string['jep_err_transitorio'] = 'Épica is not responding right now. Try again in a few seconds.';
+$string['jep_err_respuesta'] = 'Épica returned something unexpected. Try again in a moment.';
+$string['jep_err_rol'] = 'Only teachers can prepare games to finish them in Épica.';
+$string['jep_err_generico'] = 'We could not prepare the game. Try again in a moment.';
+$string['jep_err_excesivo'] = 'That resource is too long for a game. Try a shorter one.';
+$string['jep_err_cuota'] = 'You have prepared several games in a row and Épica asks for a break. You can continue in {$a}.';
+$string['jep_err_nocontratada'] = 'Gamification is not part of this school\'s plan.';
+$string['jep_err_config'] = 'The connection with Épica is not set up correctly. Tell your Moodle administrator.';
+$string['jep_err_otro'] = 'Épica could not handle the request. Try again later.';
 
 // === Epica cycle: sign, order, poll, collect (v1.19.0) ===
 $string['task_epica_ciclo_adhoc'] = 'One step of the Epica creation cycle (Pulse AI)';

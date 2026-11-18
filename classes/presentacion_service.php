@@ -298,10 +298,14 @@ class presentacion_service {
     /**
      * Firma un token nuevo y llama a la puerta del borrador. Errores por `motivo`, nunca por el texto.
      *
+     * v2.18.0: también la del juego (`juego_epica_service`, `/api/moodle/juegos/borrador`). `$pre` es el prefijo
+     * de las cadenas de error, para que cada una nombre lo suyo («la presentación», «el juego»).
+     *
      * @return array{borrador: string, caduca: ?string, forma: string}
      * @throws pulso_error
      */
-    private static function pedir_borrador(array $cuerpo, int $courseid): array {
+    public static function pedir_borrador(array $cuerpo, int $courseid, string $ruta = self::RUTA,
+            string $pre = 'pres_err_'): array {
         global $USER;
 
         if (!epica_client::disponible()) {
@@ -312,7 +316,7 @@ class presentacion_service {
             throw new pulso_error('unavailable', $motivo, 503);
         }
 
-        $transitorio = new pulso_error('busy', get_string('pres_err_transitorio', 'block_pulso'), 503);
+        $transitorio = new pulso_error('busy', get_string($pre . 'transitorio', 'block_pulso'), 503);
         try {
             $contexto = \context_course::instance($courseid);
             // Token nuevo (vale 120 s y un solo uso); (string) del id, nunca el objeto del curso.
@@ -320,10 +324,10 @@ class presentacion_service {
             $cuerpo = ['token' => $token] + $cuerpo;
             // pedir() no comprueba json_encode(): UTF-8 inválido mandaría un cuerpo vacío.
             if (json_encode($cuerpo) === false) {
-                throw new pulso_error('bad_request', get_string('pres_err_generico', 'block_pulso'));
+                throw new pulso_error('bad_request', get_string($pre . 'generico', 'block_pulso'));
             }
             // Espera corta: la puerta no llama a ningún modelo.
-            $respuesta = \local_awkepica\epica::pedir(epica_client::endpoint(self::RUTA), $cuerpo, null);
+            $respuesta = \local_awkepica\epica::pedir(epica_client::endpoint($ruta), $cuerpo, null);
         } catch (pulso_error $e) {
             throw $e;
         } catch (\Throwable $e) {
@@ -341,9 +345,9 @@ class presentacion_service {
 
         // El contrato dice 201; un 200 con un borrador de forma válida también vale (no cambia nada para quien llama).
         if ($http === 201 || $http === 200) {
-            return self::leer_creado($datos, $resumen);
+            return self::leer_creado($datos, $resumen, $pre);
         }
-        throw self::traducir_error($http, $datos, $resumen);
+        throw self::traducir_error($http, $datos, $resumen, $pre);
     }
 
     /**
@@ -374,11 +378,11 @@ class presentacion_service {
      *
      * @throws pulso_error respuesta-inesperada
      */
-    private static function leer_creado(array $datos, string $resumen): array {
+    private static function leer_creado(array $datos, string $resumen, string $pre): array {
         $borrador = $datos['borrador'] ?? null;
         if (!epica_puente::borrador_valido($borrador)) {
             error_log('Pulso presentacion: respuesta-inesperada: ' . $resumen);
-            throw new pulso_error('empty', get_string('pres_err_respuesta', 'block_pulso'), 502, $resumen);
+            throw new pulso_error('empty', get_string($pre . 'respuesta', 'block_pulso'), 502, $resumen);
         }
         $forma = ($datos['forma'] ?? '') === 'tema' ? 'tema' : 'contenido';
         $caduca = null;
@@ -404,7 +408,7 @@ class presentacion_service {
     }
 
     /** Traduce un error de Épica por `motivo` (carta 18 §2), nunca por su texto. */
-    private static function traducir_error(int $http, array $datos, string $resumen): pulso_error {
+    private static function traducir_error(int $http, array $datos, string $resumen, string $pre): pulso_error {
         $motivo = (string)($datos['motivo'] ?? '');
         if (!preg_match(self::MOTIVO_REGEX, $motivo)) {
             $motivo = '';
@@ -414,24 +418,24 @@ class presentacion_service {
 
         switch ($motivo) {
             case 'rol-sin-permiso':
-                return new pulso_error('access', get_string('pres_err_rol', 'block_pulso'), 403, $resumen);
+                return new pulso_error('access', get_string($pre . 'rol', 'block_pulso'), 403, $resumen);
             case 'encargo-ambiguo':
             case 'cuerpo-incompleto':
                 // Fallo nuestro (mandamos los dos campos, o ninguno): nada que la persona pueda arreglar.
-                return new pulso_error('unknown', get_string('pres_err_generico', 'block_pulso'), 502, $resumen);
+                return new pulso_error('unknown', get_string($pre . 'generico', 'block_pulso'), 502, $resumen);
             case 'material-excesivo':
-                return new pulso_error('bad_request', get_string('pres_err_excesivo', 'block_pulso'), 400, $resumen);
+                return new pulso_error('bad_request', get_string($pre . 'excesivo', 'block_pulso'), 400, $resumen);
             case 'cuota-agotada':
                 // Retry-After no llega por pedir(): Épica lo repite en el cuerpo como `esperaS`.
                 $espera = epica_client::retry_after($datos);
                 return new pulso_error('quota',
-                    get_string('pres_err_cuota', 'block_pulso', self::formatear_espera($espera)), 429, $resumen);
+                    get_string($pre . 'cuota', 'block_pulso', self::formatear_espera($espera)), 429, $resumen);
             case 'herramienta-no-contratada':
-                return new pulso_error('unavailable', get_string('pres_err_nocontratada', 'block_pulso'), 409, $resumen);
+                return new pulso_error('unavailable', get_string($pre . 'nocontratada', 'block_pulso'), 409, $resumen);
         }
         if (self::es_motivo_de_token($motivo, $http)) {
             // Error de configuración (secreto, plataforma, reloj del servidor): la persona no puede arreglarlo.
-            return new pulso_error('config', get_string('pres_err_config', 'block_pulso'), 503, $resumen);
+            return new pulso_error('config', get_string($pre . 'config', 'block_pulso'), 503, $resumen);
         }
         // Excepción (Épica, 22-10-2026): ante un 4xx con un motivo que no traducimos, el `error` de Épica es el texto
         // para la persona (p. ej. un campo mal rellenado). Saneado aquí y escapado al pintarlo en el cliente.
@@ -441,7 +445,7 @@ class presentacion_service {
                 return new pulso_error('bad_request', $texto, 400, $resumen);
             }
         }
-        return new pulso_error('unknown', get_string('pres_err_otro', 'block_pulso'), 502, $resumen);
+        return new pulso_error('unknown', get_string($pre . 'otro', 'block_pulso'), 502, $resumen);
     }
 
     /**

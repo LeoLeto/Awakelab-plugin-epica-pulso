@@ -39,7 +39,8 @@ require_once(__DIR__ . '/epica_client.php');
 class epica_puente {
 
     /** Herramientas que admite el puente (lista cerrada). */
-    const HERRAMIENTAS = ['fuentes', 'factoria', 'historial'];
+    // v2.18.0: `gamificacion` + `borrador` = el juego preparado en «Crear juego» que se termina en Épica.
+    const HERRAMIENTAS = ['fuentes', 'factoria', 'historial', 'gamificacion'];
 
     /** Forma del código de borrador que devuelve la Factoría (carta 18 §2: 32 alfanuméricos de ejemplo; se admiten - y _ por si es base64url). */
     const BORRADOR_REGEX = '/^[A-Za-z0-9_-]{16,64}\z/';
@@ -65,6 +66,9 @@ class epica_puente {
         if ($herramienta === 'historial') {
             return 'Abriendo tus proyectos en Épica…';
         }
+        if ($herramienta === 'gamificacion') {
+            return 'Abriendo el juego en Épica…';
+        }
         return 'Abriendo el material para Pulse en Épica…';
     }
 
@@ -84,7 +88,7 @@ class epica_puente {
             return ['herramienta' => $herramienta];
         }
         $campos = ['herramienta' => $herramienta, 'curso_nombre' => $cursonombre];
-        if ($herramienta === 'factoria') {
+        if ($herramienta === 'factoria' || $herramienta === 'gamificacion') {
             $campos['borrador'] = $borrador;
         }
         // La unidad sin rastrear (v2.17.0, migración 032 de Épica): fuera de la firma, como curso_nombre.
@@ -167,6 +171,9 @@ class epica_puente {
         }
         if ($herramienta === 'factoria' && !self::borrador_valido($borrador)) {
             self::page($titulo, '<p>El borrador de la presentación no es válido. Vuelve a Pulse y prepárala de nuevo.</p>', 400);
+        }
+        if ($herramienta === 'gamificacion' && !self::borrador_valido($borrador)) {
+            self::page($titulo, '<p>El juego preparado no es válido. Vuelve a Pulse y prepáralo de nuevo.</p>', 400);
         }
 
         if (!epica_client::disponible()) {

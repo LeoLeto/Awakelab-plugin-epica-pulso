@@ -147,6 +147,17 @@ $string['pres_err_config'] = 'La conexión con la Factoría no está bien config
 $string['pres_err_otro'] = 'La Factoría no ha podido atender la petición. Inténtalo de nuevo más tarde.';
 $string['pres_err_tope_dia'] = 'Has llegado al límite de {$a} presentaciones de hoy. Podrás seguir mañana.';
 $string['pres_err_en_curso'] = 'Ya estás preparando una presentación. Espera a que termine.';
+// v2.18.0: «Crear juego» del profesorado, terminado en Épica (juego_epica_service).
+$string['jep_err_sin_texto'] = 'Ese recurso ya no está disponible o no tiene texto aprovechable para un juego. Elige otro.';
+$string['jep_err_transitorio'] = 'Épica no responde ahora mismo. Inténtalo de nuevo en unos segundos.';
+$string['jep_err_respuesta'] = 'Épica ha contestado algo inesperado. Inténtalo de nuevo en un momento.';
+$string['jep_err_rol'] = 'Solo el profesorado puede preparar juegos para terminarlos en Épica.';
+$string['jep_err_generico'] = 'No hemos podido preparar el juego. Inténtalo de nuevo en un momento.';
+$string['jep_err_excesivo'] = 'El material de ese recurso es demasiado largo para un juego. Prueba con un recurso más corto.';
+$string['jep_err_cuota'] = 'Has preparado varios juegos seguidos y Épica te pide un respiro. Podrás seguir en {$a}.';
+$string['jep_err_nocontratada'] = 'Gamificación no está contratada en este centro.';
+$string['jep_err_config'] = 'La conexión con Épica no está bien configurada. Avisa a quien administre Moodle.';
+$string['jep_err_otro'] = 'Épica no ha podido atender la petición. Inténtalo de nuevo más tarde.';
 
 // === Ciclo con Épica: firmar, encargar, sondear, recoger (v1.19.0) ===
 $string['task_epica_ciclo_adhoc'] = 'Un paso del ciclo de creación con Épica (Pulse AI)';

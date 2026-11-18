@@ -46,6 +46,7 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
     $historial_url = $CFG->wwwroot . '/blocks/pulso/epica_historial.php';
     $fuentes_url = $CFG->wwwroot . '/blocks/pulso/fuentes_puente.php';
     $presentacion_url = $CFG->wwwroot . '/blocks/pulso/api_presentacion.php';
+    $juego_epica_url = $CFG->wwwroot . '/blocks/pulso/api_juego_epica.php';
     $presets_url = $CFG->wwwroot . '/blocks/pulso/api_presets.php';
     $unidades_url = $CFG->wwwroot . '/blocks/pulso/api_unidades_sin_rastrear.php';
 
@@ -90,6 +91,8 @@ function render_chat_simple($courseid, $context, $isteacher = true, $cancreate =
         'apiHistorialUrl' => $historial_url,
         'apiFuentesUrl' => $fuentes_url,
         'apiPresentacionUrl' => $presentacion_url,
+        // v2.18.0: «Crear juego» del profesorado, terminado en Épica.
+        'apiJuegoEpicaUrl' => $juego_epica_url,
         'apiPresetsUrl' => $presets_url,
         // v2.17.0: el aviso de unidades sin rastrear (solo profesorado y solo con Épica).
         'apiUnidadesUrl' => ($isteacher && $epicaavailable) ? $unidades_url : '',

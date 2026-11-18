@@ -547,6 +547,67 @@ define(['block_pulso/common'], function(C) {
         }
 
 
+        // ---- «Crear juego» del profesorado, terminado en Épica (v2.18.0) ----
+        // Dos pasos, como «Presentación»: el borrador se crea al enviar (api_juego_epica.php) y después sale el
+        // botón «Abrir en Épica», que es el clic que abre la pestaña nueva (sin gesto, el navegador la bloquea).
+        // En Épica el juego empieza a generarse solo; allí se prueba, se cambia, se guarda o se descarga en HTML.
+        let pulsoJuegoBorrador = '';
+
+        function pulsoJuegoEpicaEnviar(cmid, prompt, btn, labels) {
+            if (btn) {
+                pulsoSetDisabled(btn, true);
+                btn.textContent = 'Preparando…';
+            }
+            pulsoJuegoBorrador = '';
+            const formData = new FormData();
+            formData.append('sesskey', cfg.sesskey || (window.M && M.cfg && M.cfg.sesskey) || '');
+            formData.append('courseid', cfg.courseid);
+            formData.append('cmid', cmid);
+            formData.append('prompt', prompt);
+
+            const fallo = function(msg) {
+                renderCreateNotice(msg);
+                if (btn) {
+                    pulsoSetDisabled(btn, false);
+                    btn.textContent = labels.submitLabel;
+                }
+            };
+            fetch(cfg.apiJuegoEpicaUrl, { method: 'POST', credentials: 'same-origin', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.success || typeof data.borrador !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(data.borrador)) {
+                        fallo(data.message || 'No se ha podido preparar el juego. Inténtalo de nuevo.');
+                        return;
+                    }
+                    pulsoJuegoBorrador = data.borrador;
+                    const body = document.getElementById('pulso-create-body');
+                    if (!body) return;
+                    body.innerHTML = '<div class="pulso-amp">'
+                        + '<div class="pulso-amp-head">Juego preparado</div>'
+                        + '<div class="pulso-create-notice-inline" role="status">'
+                        + 'Ábrelo en Épica: allí empieza a generarse, lo pruebas, le pides cambios y lo guardas en el '
+                        + 'catálogo o lo descargas en HTML para subirlo a Moodle. El enlace vale 24 horas.</div>'
+                        + '<div class="pulso-amp-actions">'
+                        + '<button type="button" class="pulso-create-submit" data-pulso-action="pulsoJuegoAbrir">'
+                        + 'Abrir en Épica<span aria-hidden="true"> ↗</span>' + C.PULSO_NEWTAB_SR + '</button>'
+                        + '<button type="button" class="pulso-create-submit" data-pulso-action="openCreatePanel" data-pulso-arg="gamificacion">'
+                        + 'Preparar otro</button>'
+                        + '</div></div>';
+                })
+                .catch(function() {
+                    fallo('No se ha podido conectar para preparar el juego. Inténtalo de nuevo.');
+                });
+        }
+
+
+        // El clic de «Abrir en Épica»: el mismo puente que la Factoría, con `herramienta=gamificacion`.
+        function pulsoJuegoAbrir() {
+            if (cfg.isTeacher !== true || !cfg.apiFuentesUrl) return;
+            if (!/^[A-Za-z0-9_-]{16,64}$/.test(pulsoJuegoBorrador)) return;
+            pulsoPostNuevaPestana(cfg.apiFuentesUrl, [['herramienta', 'gamificacion'], ['borrador', pulsoJuegoBorrador]]);
+        }
+
+
         function submitCreate() {
             const select = document.getElementById('pulso-create-resource');
             const promptEl = document.getElementById('pulso-create-prompt');
@@ -560,6 +621,13 @@ define(['block_pulso/common'], function(C) {
             const prompt = promptEl.value.trim();
             if (!prompt) {
                 promptEl.focus();
+                return;
+            }
+
+            // v2.18.0: el juego del PROFESORADO se termina en Épica (borrador + puente), no aquí. El alumnado
+            // sigue con el encargo de siempre: un token de alumno no abre sesión en Épica.
+            if (isjuego && cfg.isTeacher === true && cfg.apiJuegoEpicaUrl) {
+                pulsoJuegoEpicaEnviar(select.value, prompt, btn, labels);
                 return;
             }
 
@@ -1316,6 +1384,7 @@ define(['block_pulso/common'], function(C) {
     C.fn.pulsoAbrirFuentesUnidad = pulsoAbrirFuentesUnidad;
     C.fn.pulsoAbrirProyectos = pulsoAbrirProyectos;
     C.fn.pulsoAbrirFactoria = pulsoAbrirFactoria;
+    C.fn.pulsoJuegoAbrir = pulsoJuegoAbrir;
     C.fn.pulsoAbrirReto = pulsoAbrirReto;
     C.fn.pulsoAbrirRetoUnidad = pulsoAbrirRetoUnidad;
     C.fn.pulsoRetoCodigoValido = pulsoRetoCodigoValido;

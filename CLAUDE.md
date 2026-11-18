@@ -1014,6 +1014,21 @@ descomentar algo ya puesto"—. Reglas que deben persistir:
   que falla creando un juego y pulsa «Empezar una creación nueva» aterrizaría en
   el formulario de infografía sin darse cuenta.
 
+### El juego del profesorado se termina en Épica (v2.18.0, migración 033 de Épica)
+
+- **Solo el profesorado** (`cfg.isTeacher === true` y `apiJuegoEpicaUrl`): `submitCreate()` manda el
+  formulario a `api_juego_epica.php` en vez de a `api_create_submit.php`. El **alumnado sigue con el encargo
+  de siempre** (cola, `juego.php`): un token de alumno no abre sesión en Épica.
+- `api_juego_epica.php` → `juego_epica_service::preparar()`: `viewanalytics`, `sesskey`, el `cmid` recalculado
+  contra `get_resources_context()`, el texto **literal** del recurso por `epica_client::resolve_material()` (sin
+  Haiku) y `POST /api/moodle/juegos/borrador`. La llamada es `presentacion_service::pedir_borrador()` con su
+  ruta y el prefijo de cadenas `jep_err_` —cada herramienta nombra lo suyo—.
+- Después sale **«Abrir en Épica»** (dos pasos, como «Presentación»: sin un clic, el navegador bloquea la
+  pestaña), que va por `fuentes_puente.php` con `herramienta=gamificacion` y el borrador. En Épica el juego
+  **se genera solo al llegar** y se prueba, se cambia, se guarda o se descarga en HTML.
+- **Sin tope propio en Pulse**: aquí no se gasta nada; el cupo lo pone Épica al generar.
+- El contrato está en el repositorio de Épica: `docs/gamificacion-pulse.md`.
+
 ## Cómo se trabaja este repo con prompts
 
 El trabajo entra por prompts escritos para Claude Code, uno por paso, y **cada paso en una

@@ -60,6 +60,31 @@ define([], function() {
         // El desplazamiento del chat vive en #pulso-scroll: envuelve la home y el registro de
         // mensajes (#pulso-messages, la única región en vivo). Con otra pestaña activa su panel
         // está oculto y no hay dónde desplazar: se anota y se hace al volver a Preguntar.
+        // v2.18.1: el nombre se queda (lo llaman todos los que añaden un mensaje), pero ya no baja al final:
+        // deja arriba el PRINCIPIO del último mensaje —la respuesta de Pulse, el «escribiendo» o la pregunta—,
+        // para leerlo desde su primera línea. Los chips de preguntas sugeridas (.pulso-followup-container) no
+        // son un mensaje: con ellos detrás, el que manda sigue siendo la respuesta.
+        // El último mensaje ya colocado: mientras crece (streaming) no se vuelve a mover el scroll, para no
+        // arrastrar a quien ya está bajando para leerlo.
+        let pulsoPinned = null;
+
+        function pulsoLastMessage() {
+            const log = document.getElementById('pulso-messages');
+            const messages = log ? log.querySelectorAll(':scope > .pulso-message') : [];
+            return messages.length ? messages[messages.length - 1] : null;
+        }
+
+        function pulsoScrollToLast(scroller) {
+            const last = pulsoLastMessage();
+            pulsoPinned = last;
+            if (!last) {
+                scroller.scrollTop = scroller.scrollHeight;
+                return;
+            }
+            const top = last.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+            scroller.scrollTop = Math.max(0, top - 8);
+        }
+
         function pulsoScrollToEnd() {
             const scroller = document.getElementById('pulso-scroll');
             if (!scroller) return;
@@ -67,7 +92,9 @@ define([], function() {
                 scroller.setAttribute('data-pulso-stick', '1');
                 return;
             }
-            scroller.scrollTop = scroller.scrollHeight;
+            const last = pulsoLastMessage();
+            if (last && last === pulsoPinned) return;
+            pulsoScrollToLast(scroller);
         }
 
 
@@ -190,6 +217,7 @@ define([], function() {
         pollsPaused: pollsPaused,
         PULSO_NEWTAB_SR: PULSO_NEWTAB_SR,
         pulsoScrollToEnd: pulsoScrollToEnd,
+        pulsoScrollToLast: pulsoScrollToLast,
         pulsoAnnounce: pulsoAnnounce,
         pulsoSetDisabled: pulsoSetDisabled,
         escapeHtml: escapeHtml,

@@ -162,9 +162,9 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                 const shown = target.querySelector('.pulso-chat-messages');
                 if (shown) {
                     if (shown.getAttribute('data-pulso-stick')) {
-                        // Llegaron mensajes con la otra pestaña delante: al final.
+                        // Llegaron mensajes con la otra pestaña delante: al principio del último (v2.18.1).
                         shown.removeAttribute('data-pulso-stick');
-                        shown.scrollTop = shown.scrollHeight;
+                        C.pulsoScrollToLast(shown);
                     } else {
                         shown.scrollTop = parseInt(shown.getAttribute('data-pulso-scrolltop'), 10) || 0;
                     }
@@ -1285,13 +1285,14 @@ define(['block_pulso/common', 'block_pulso/format', 'block_pulso/crear', 'block_
                     else if (activeTab) activeTab.focus();
                 }, 100);
 
-                // v2.17.1: el primer vistazo es ARRIBA (saludo, aviso y prompts). Abajo del todo solo se va
-                // cuando ya hay conversación en esta página: entonces lo que importa es la última respuesta.
+                // v2.17.1: el primer vistazo es ARRIBA (saludo, aviso y prompts). Con conversación en esta
+                // página, al principio del último mensaje (v2.18.1), que es lo que importa leer.
                 const log = document.getElementById('pulso-messages');
+                const scroller = document.getElementById('pulso-scroll');
                 if (log && log.children.length > 0) {
-                    pulsoScrollToEnd();
+                    if (scroller && S.pulsoTab === 'ask') C.pulsoScrollToLast(scroller);
+                    else pulsoScrollToEnd();
                 } else {
-                    const scroller = document.getElementById('pulso-scroll');
                     if (scroller) {
                         scroller.removeAttribute('data-pulso-stick');
                         scroller.scrollTop = 0;

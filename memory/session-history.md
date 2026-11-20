@@ -1,5 +1,9 @@
 # Historial de sesiones — block_pulso
 
+## 2026-11-20 — El scroll deja arriba el principio del último mensaje (v2.18.1)
+
+Pedido por Chema: «deja el scroll siempre arriba del todo del último mensaje escrito». `amd/src/common.js` (`pulsoScrollToLast`, `pulsoPinned`), `amd/src/chat.js` (al volver de otra pestaña y al reabrir), sus builds y `version.php`. **Al desplegar: purgar cachés** (JS). Lo que costó ver: con cada trozo del streaming se llama a la misma función, y colocar en cada uno arrastraría a quien ya baja para leer; por eso solo se coloca cuando el último mensaje es otro. Verificado en un navegador de verdad con la plantilla y el build reales: la respuesta larga queda con su principio a 8 px (y no al final), los chips de detrás no la desplazan, bajar mientras crece no se deshace, y al reabrir vuelve a su principio. **NO probado** en sanase.
+
 ## 2026-11-17 — El chat se abre arriba (v2.17.1)
 
 Pedido por Chema: al abrir Pulse el primer vistazo tiene que estar arriba; abajo del todo, solo para las respuestas. Solo `amd/src/chat.js` (`toggleChat()`), su build y `version.php`. **Al desplegar: purgar cachés** (JS). Verificado en un navegador de verdad con la plantilla, el CSS y el build reales (jsdom no calcula scroll): sin conversación abre con `scrollTop` 0 sobre 1.441 px de home; con un mensaje en el registro, al reabrir va al final (1.586 de 1.586). **NO probado** en sanase.

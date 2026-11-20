@@ -513,6 +513,19 @@ el cron aún no había pasado) llamando a `api_chat_stream.php` con cada prompt.
 Sin cambios de `db/` ni de JS respecto a v2.16.0. **Pendiente de ver con un Moodle delante**: el mapa hecho por el modelo (hasta que
 corra el cron los títulos son los de las etiquetas, «Módulo 1» a secas) y cómo queda el glosario con el reparto nuevo.
 
+### El scroll deja arriba el último mensaje (v2.18.1)
+
+- **`pulsoScrollToEnd()` ya no baja al final**: deja el **principio del último mensaje** (`.pulso-message` hijo
+  directo de `#pulso-messages`: la respuesta, el «escribiendo» o la pregunta) a 8 px del borde de arriba, para
+  leerlo desde su primera línea. Los chips de preguntas sugeridas (`.pulso-followup-container`) no son un
+  mensaje, así que con ellos detrás manda la respuesta. Se conservó el nombre porque lo llaman todos los que
+  añaden un mensaje; la medida la hace `pulsoScrollToLast(scroller)` en `common.js`.
+- **No arrastra durante el streaming**: guarda el último mensaje ya colocado (`pulsoPinned`) y, mientras sea el
+  mismo, no vuelve a mover el scroll; si alguien baja para leer mientras Pulse escribe, se queda donde está.
+  Al llegar la respuesta final (otro elemento) se coloca una vez más en su principio.
+- Al volver a Preguntar con mensajes llegados en otra pestaña y al reabrir el chat con conversación, se
+  llama a `pulsoScrollToLast` directamente: con el panel oculto el navegador pierde el `scrollTop`.
+
 ### El chat se abre arriba (v2.17.1)
 
 - **Al abrir el chat, el primer vistazo es arriba**: saludo, aviso de unidades y prompts. Hasta aquí `toggleChat()`
